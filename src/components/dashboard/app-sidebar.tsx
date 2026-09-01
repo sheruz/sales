@@ -11,6 +11,7 @@ import {
   LayoutDashboard,
   ListTodo,
   MessageSquare,
+  Rocket,
   Settings,
   Target,
   Users,
@@ -36,6 +37,11 @@ const mainNav = [
   { title: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
   { title: "Leads", href: "/dashboard/leads", icon: Users },
   { title: "Campaigns", href: "/dashboard/campaigns", icon: Target },
+  {
+    title: "Autopilot",
+    href: "/dashboard/autopilot",
+    icon: Rocket,
+  },
   {
     title: "Conversations",
     href: "/dashboard/conversations",

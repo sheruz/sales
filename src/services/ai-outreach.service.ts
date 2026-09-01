@@ -10,6 +10,8 @@ import { aiComplete, parseAIJson } from "@/lib/ai/provider";
 import { buildOutreachPrompt } from "@/lib/ai/prompts";
 import { activityService } from "@/services/activity.service";
 import { isEmailConfigured, sendEmail } from "@/lib/email/smtp";
+import { linkedInAccountService } from "@/services/linkedin-account.service";
+import { sendConnectionOrMessage } from "@/lib/linkedin/messaging";
 
 interface OutreachResult {
   subject: string | null;
@@ -100,7 +102,31 @@ export class AIOutreachService {
 
     const lead = conversation.lead;
 
-    if (conversation.channel === ConversationChannel.EMAIL && lead.email) {
+    if (conversation.channel === ConversationChannel.LINKEDIN) {
+      if (!lead.linkedInUrl) {
+        throw new Error("Lead has no LinkedIn URL");
+      }
+
+      const meta = lead.automationMeta as { profileUrn?: string } | null;
+      const profileUrn =
+        meta?.profileUrn ??
+        lead.linkedInUrl.split("/in/")[1]?.replace(/\/$/, "");
+
+      if (userId) {
+        const client = await linkedInAccountService.getClient(userId);
+        const canSend = await linkedInAccountService.canMessage(userId, 50);
+        if (!canSend) throw new Error("Daily LinkedIn message limit reached");
+
+        await sendConnectionOrMessage(
+          client,
+          profileUrn ?? lead.linkedInUrl,
+          conversation.content ?? ""
+        );
+        await linkedInAccountService.incrementMessage(userId);
+      } else {
+        throw new Error("User ID required for LinkedIn messaging");
+      }
+    } else if (conversation.channel === ConversationChannel.EMAIL && lead.email) {
       if (!isEmailConfigured()) {
         throw new Error("SMTP not configured — outreach saved as draft");
       }

@@ -211,6 +211,8 @@ model User {
   sessions          Session[]
   lockedLeads       Lead[]               @relation("LockedLeads")
   linkedInJobs      LinkedInDiscoveryJob[]
+  linkedInAccount   LinkedInAccount?
+  autopilotConfig   AutopilotConfig?
 
   @@index([email])
   @@index([role])
@@ -378,6 +380,7 @@ model Campaign {
   campaignLeads    CampaignLead[]
   followUpSequence FollowUpSequence?
   linkedInJobs     LinkedInDiscoveryJob[]
+  autopilotConfigs AutopilotConfig[]
 
   @@index([status])
   @@map("campaigns")
@@ -849,8 +852,57 @@ model Service {
   updatedAt       DateTime @updatedAt @map("updated_at")
 
   campaigns Campaign[]
+  autopilotConfigs AutopilotConfig[]
 
   @@map("services")
+}
+
+// ─── LinkedIn & Autopilot ────────────────────────────────────────────────────
+
+model LinkedInAccount {
+  id                String    @id @default(uuid())
+  userId            String    @unique @map("user_id")
+  linkedInEmail     String?   @map("linkedin_email")
+  liAtCookie        String    @map("li_at_cookie")
+  jsessionId        String?   @map("jsession_id")
+  profileUrn        String?   @map("profile_urn")
+  isActive          Boolean   @default(true) @map("is_active")
+  lastVerifiedAt    DateTime? @map("last_verified_at")
+  dailySearchCount  Int       @default(0) @map("daily_search_count")
+  dailyMessageCount Int       @default(0) @map("daily_message_count")
+  lastResetAt       DateTime? @map("last_reset_at")
+  createdAt         DateTime  @default(now()) @map("created_at")
+  updatedAt         DateTime  @updatedAt @map("updated_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("linkedin_accounts")
+}
+
+model AutopilotConfig {
+  id                  String    @id @default(uuid())
+  userId              String    @unique @map("user_id")
+  isEnabled           Boolean   @default(false) @map("is_enabled")
+  goal                String?
+  targetJobTitles     String[]  @default([]) @map("target_job_titles")
+  targetIndustries    String[]  @default([]) @map("target_industries")
+  targetCountries     String[]  @default([]) @map("target_countries")
+  dailySearchLimit    Int       @default(25) @map("daily_search_limit")
+  dailyMessageLimit   Int       @default(20) @map("daily_message_limit")
+  autoCreateCampaigns Boolean   @default(true) @map("auto_create_campaigns")
+  serviceId           String?   @map("service_id")
+  activeCampaignId    String?   @map("active_campaign_id")
+  lastRunAt           DateTime? @map("last_run_at")
+  nextRunAt           DateTime? @map("next_run_at")
+  lastRunResult       Json?     @map("last_run_result")
+  createdAt           DateTime  @default(now()) @map("created_at")
+  updatedAt           DateTime  @updatedAt @map("updated_at")
+
+  user           User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  service        Service?  @relation(fields: [serviceId], references: [id])
+  activeCampaign Campaign? @relation(fields: [activeCampaignId], references: [id])
+
+  @@map("autopilot_configs")
 }
 
 // ─── AI & Audit ──────────────────────────────────────────────────────────────

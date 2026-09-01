@@ -10,3 +10,6 @@ export { aiOutreachService } from "./ai-outreach.service";
 export { conversationService } from "./conversation.service";
 export { linkedInService } from "./linkedin.service";
 export { automationService } from "./automation.service";
+export { linkedInAccountService } from "./linkedin-account.service";
+export { autopilotService } from "./autopilot.service";
+export { autoCampaignService } from "./auto-campaign.service";

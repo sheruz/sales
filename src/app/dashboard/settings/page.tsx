@@ -1,7 +1,9 @@
 import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth/session";
 import { hasPermission } from "@/lib/auth/permissions";
+import { linkedInAccountService } from "@/services/linkedin-account.service";
 import { UserManagementPanel } from "@/components/dashboard/user-management-panel";
+import { LinkedInSettings } from "@/components/settings/linkedin-settings";
 import {
   Card,
   CardContent,
@@ -16,6 +18,18 @@ export default async function SettingsPage() {
   if (!user) redirect("/login");
 
   const canManageUsers = hasPermission(user.role, "users:manage");
+  const canManageIntegrations = hasPermission(user.role, "settings:write");
+
+  const linkedInStatus = canManageIntegrations
+    ? await linkedInAccountService.getStatus(user.id)
+    : null;
+
+  const serializedLinkedIn = linkedInStatus
+    ? {
+        ...linkedInStatus,
+        lastVerifiedAt: linkedInStatus.lastVerifiedAt?.toISOString() ?? null,
+      }
+    : null;
 
   return (
     <div className="space-y-6">
@@ -33,6 +47,9 @@ export default async function SettingsPage() {
             <TabsTrigger value="users">User Management</TabsTrigger>
           )}
           <TabsTrigger value="services">Services</TabsTrigger>
+          {canManageIntegrations && (
+            <TabsTrigger value="linkedin">LinkedIn</TabsTrigger>
+          )}
         </TabsList>
 
         <TabsContent value="profile" className="mt-4">
@@ -78,6 +95,12 @@ export default async function SettingsPage() {
             </CardContent>
           </Card>
         </TabsContent>
+
+        {canManageIntegrations && (
+          <TabsContent value="linkedin" className="mt-4">
+            <LinkedInSettings initialStatus={serializedLinkedIn} />
+          </TabsContent>
+        )}
       </Tabs>
     </div>
   );

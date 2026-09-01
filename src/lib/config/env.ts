@@ -55,6 +55,9 @@ const envSchema = z.object({
   ENCRYPTION_KEY: z.string().optional(),
   JOB_POLL_INTERVAL_MS: z.coerce.number().default(60000),
   FOLLOWUP_CHECK_INTERVAL_MS: z.coerce.number().default(300000),
+  LINKEDIN_LI_AT: z.string().optional(),
+  LINKEDIN_JSESSIONID: z.string().optional(),
+  AUTOPILOT_ENABLED: z.coerce.boolean().default(false),
   CRON_SECRET: z.string().optional(),
 });
 

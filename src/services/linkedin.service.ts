@@ -9,6 +9,8 @@ import {
 import { LINKEDIN_PROFILE_URL_REGEX } from "@/lib/constants/automation";
 import { activityService } from "@/services/activity.service";
 import { automationService } from "@/services/automation.service";
+import { linkedInAccountService } from "@/services/linkedin-account.service";
+import { searchPeople } from "@/lib/linkedin/search";
 import type { LinkedInDiscoveryInput } from "@/lib/validations/automation";
 
 interface ProspectProfile {
@@ -79,8 +81,54 @@ export class LinkedInService {
           }
         }
       } else if (job.searchCriteria) {
+        const criteria = job.searchCriteria as LinkedInDiscoveryInput["searchCriteria"];
+        let usedRealSearch = false;
+
+        try {
+          const client = await linkedInAccountService.getClient(job.createdById);
+          const keywords = [
+            ...(criteria?.jobTitles ?? []),
+            ...(criteria?.industries ?? []),
+            ...(criteria?.keywords ?? []),
+          ].join(" ");
+
+          if (keywords.trim()) {
+            const results = await searchPeople(client, {
+              keywords: keywords.trim(),
+              count: job.targetCount,
+            });
+            await linkedInAccountService.incrementSearch(job.createdById);
+
+            for (const profile of results) {
+              try {
+                const leadId = await this.createLeadFromLinkedInProfile(
+                  {
+                    firstName: profile.firstName,
+                    lastName: profile.lastName,
+                    fullName: profile.fullName,
+                    jobTitle: profile.headline,
+                    linkedInUrl: profile.linkedInUrl,
+                    profileUrn: profile.profileUrn,
+                    country: profile.location,
+                    companyName: profile.headline?.split(" at ").pop(),
+                  },
+                  job.campaignId,
+                  job.createdById
+                );
+                createdLeadIds.push(leadId);
+              } catch (err) {
+                errors.push(`${profile.fullName}: ${err instanceof Error ? err.message : "failed"}`);
+              }
+            }
+            usedRealSearch = results.length > 0;
+          }
+        } catch {
+          // Fall back to AI-generated prospects
+        }
+
+        if (!usedRealSearch) {
         const prospects = await this.discoverProspects(
-          job.searchCriteria as LinkedInDiscoveryInput["searchCriteria"],
+          criteria,
           job.targetCount,
           job.campaign?.aiInstructions,
           job.createdById
@@ -98,17 +146,12 @@ export class LinkedInService {
             errors.push(`${prospect.fullName}: ${err instanceof Error ? err.message : "failed"}`);
           }
         }
+        }
       }
 
-      if (job.campaignId) {
-        const autoStart = true;
-        if (autoStart && createdLeadIds.length > 0) {
-          await automationService.startBatch(
-            createdLeadIds,
-            job.campaignId,
-            job.createdById,
-            ["linkedin", "email"]
-          );
+      if (job.campaignId && createdLeadIds.length > 0) {
+        for (const leadId of createdLeadIds) {
+          automationService.runPipeline(leadId, job.createdById).catch(console.error);
         }
       }
 
@@ -196,6 +239,41 @@ export class LinkedInService {
     }));
   }
 
+  async createLeadFromLinkedInProfile(
+    profile: {
+      firstName: string;
+      lastName: string;
+      fullName: string;
+      jobTitle?: string;
+      companyName?: string;
+      linkedInUrl: string;
+      profileUrn?: string;
+      country?: string;
+      industry?: string;
+      email?: string | null;
+    },
+    campaignId?: string | null,
+    userId?: string
+  ) {
+    return this.createLeadFromProspect(
+      {
+        firstName: profile.firstName,
+        lastName: profile.lastName,
+        fullName: profile.fullName,
+        jobTitle: profile.jobTitle ?? "",
+        companyName: profile.companyName ?? "",
+        linkedInUrl: profile.linkedInUrl,
+        country: profile.country ?? "",
+        industry: profile.industry ?? "",
+        email: profile.email,
+        confidence: 100,
+        notes: profile.profileUrn ? `urn:${profile.profileUrn}` : undefined,
+      },
+      campaignId,
+      userId
+    );
+  }
+
   private async createLeadFromProspect(
     prospect: ProspectProfile & { fullName?: string },
     campaignId?: string | null,
@@ -222,7 +300,11 @@ export class LinkedInService {
         campaignId,
         createdById: userId,
         automationStatus: AutomationStatus.DISCOVERING,
-        automationMeta: { confidence: prospect.confidence, notes: prospect.notes },
+        automationMeta: {
+          confidence: prospect.confidence,
+          notes: prospect.notes,
+          profileUrn: prospect.notes?.startsWith("urn:") ? prospect.notes : undefined,
+        },
       },
     });
 
