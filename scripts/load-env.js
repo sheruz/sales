@@ -2,13 +2,12 @@
 const fs = require("fs");
 const path = require("path");
 const { ensureDatabaseUrl } = require("./database-url");
+const { loadEnvFile } = require("./load-env-file");
 
 const rootDir = path.join(__dirname, "..");
 const envPath = path.join(rootDir, ".env");
 
-if (fs.existsSync(envPath)) {
-  require("dotenv").config({ path: envPath });
-} else {
+if (!loadEnvFile(envPath)) {
   console.warn("[env] No .env file found at", envPath);
 }
 
