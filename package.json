@@ -17,7 +17,15 @@
     "docker:up": "docker compose up -d postgres",
     "docker:down": "docker compose down",
     "docker:logs": "docker compose logs -f",
-    "postinstall": "prisma generate"
+    "postinstall": "prisma generate && node scripts/ensure-tailwind-oxide.js"
+  },
+  "optionalDependencies": {
+    "@tailwindcss/oxide-darwin-arm64": "4.3.3",
+    "@tailwindcss/oxide-darwin-x64": "4.3.3",
+    "@tailwindcss/oxide-linux-arm64-gnu": "4.3.3",
+    "@tailwindcss/oxide-linux-x64-gnu": "4.3.3",
+    "@tailwindcss/oxide-linux-x64-musl": "4.3.3",
+    "@tailwindcss/oxide-win32-x64-msvc": "4.3.3"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"
