@@ -227,21 +227,81 @@ No schema changes. Uses existing `User` and `Session` models.
 
 ---
 
-## Phase 4: Campaign Management ⏳ NEXT
+## Phase 4: Campaign Management & AI Automation ✅ COMPLETED
 
-- Campaign CRUD
-- Lead assignment to campaigns
-- Campaign analytics
-- Filters and search
+**Date:** September 1, 2026
+
+### Completed Features
+
+- [x] Campaign CRUD with service linking and AI instructions
+- [x] AI provider abstraction (OpenAI + Anthropic via fetch)
+- [x] LinkedIn lead discovery — profile URL import + AI prospect finder
+- [x] AI lead research and scoring (LeadResearch, LeadScore)
+- [x] AI outreach generation (LinkedIn + email)
+- [x] Lead locking during automation (AutomationStatus)
+- [x] Full automation pipeline: research → score → outreach → follow-ups
+- [x] Conversation inbox with AI reply analysis and auto-response
+- [x] Follow-up job scheduling per campaign
+- [x] Cron endpoint for background automation processing
+- [x] SMTP email sending (when configured)
+
+### Files Created
+
+**AI Layer:**
+- `src/lib/ai/provider.ts`, `openai.ts`, `anthropic.ts`, `types.ts`, `usage.ts`, `prompts.ts`
+- `src/lib/email/smtp.ts`
+- `src/lib/constants/automation.ts`
+- `src/lib/validations/automation.ts`
+
+**Services:**
+- `src/services/campaign.service.ts`
+- `src/services/ai-research.service.ts`
+- `src/services/ai-outreach.service.ts`
+- `src/services/conversation.service.ts`
+- `src/services/linkedin.service.ts`
+- `src/services/automation.service.ts`
+
+**API Routes:**
+- `GET/POST /api/campaigns`, `GET/PATCH/DELETE /api/campaigns/[id]`
+- `GET /api/campaigns/[id]/stats`
+- `POST /api/campaigns/[id]/discover` — LinkedIn discovery
+- `POST /api/linkedin/import`, `POST /api/linkedin/discover`
+- `POST /api/ai/research/[leadId]`, `POST /api/ai/outreach`
+- `POST /api/automation/start`, `POST/DELETE /api/automation/[leadId]`
+- `GET/POST /api/conversations`
+- `POST /api/cron/automation`
+- `GET /api/services`
+
+**UI:**
+- `src/app/dashboard/campaigns/page.tsx` — Campaign list + create
+- `src/app/dashboard/campaigns/[id]/page.tsx` — Campaign detail with LinkedIn import
+- `src/app/dashboard/conversations/page.tsx` — Conversation inbox
+- `src/components/campaigns/campaigns-list.tsx`, `campaign-detail.tsx`
+- `src/components/conversations/conversations-inbox.tsx`
+- Lead detail page — AI automation panel
+
+**Schema Additions:**
+- `AutomationStatus` enum on Lead
+- Lead fields: `automationStatus`, `lockedAt`, `lockedById`, `nextAutomationAt`, `automationError`, `automationMeta`, `autoReplyEnabled`
+- `LinkedInDiscoveryJob` model
+
+### How to Use
+
+1. Set `OPENAI_API_KEY` (or `ANTHROPIC_API_KEY`) in `.env`
+2. Create a campaign at `/dashboard/campaigns`
+3. Import LinkedIn URLs or use AI Prospect Finder on campaign page
+4. Leads are auto-researched, scored, and outreach is generated
+5. View conversations at `/dashboard/conversations`
+6. Set up cron: `POST /api/cron/automation` with `Authorization: Bearer <CRON_SECRET>`
+
+### Verification
+
+- TypeScript: no errors
+- Production build: successful (47 routes)
 
 ---
 
-## Phase 5: AI Features ⏳ PENDING
-
-- AI provider abstraction
-- Lead research agent
-- Lead scoring
-- Outreach generation
+## Phase 5: Advanced AI Features ⏳ NEXT
 
 ---
 

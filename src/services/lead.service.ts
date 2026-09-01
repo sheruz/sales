@@ -92,6 +92,7 @@ export class LeadService {
             user: { select: { id: true, firstName: true, lastName: true } },
           },
         },
+        researches: { orderBy: { createdAt: "desc" }, take: 1 },
       },
     });
     if (!lead) throw new NotFoundError("Lead not found");

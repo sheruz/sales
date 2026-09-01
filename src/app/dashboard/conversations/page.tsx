@@ -1,13 +1,23 @@
-import { ModulePlaceholder } from "@/components/dashboard/module-placeholder";
-import { MessageSquare } from "lucide-react";
+import { conversationService } from "@/services/conversation.service";
+import { ConversationsInbox } from "@/components/conversations/conversations-inbox";
 
-export default function ConversationsPage() {
+export default async function ConversationsPage() {
+  const conversations = await conversationService.list();
+
+  const serialized = conversations.map((c) => ({
+    ...c,
+    createdAt: c.createdAt.toISOString(),
+  }));
+
   return (
-    <ModulePlaceholder
-      title="Conversations"
-      description="Unified view of all lead communications."
-      phase="Phase 8"
-      icon={MessageSquare}
-    />
+    <div className="space-y-6">
+      <div>
+        <h2 className="text-2xl font-bold tracking-tight">Conversations</h2>
+        <p className="text-muted-foreground">
+          AI-managed outreach and client replies across LinkedIn and email.
+        </p>
+      </div>
+      <ConversationsInbox initialConversations={serialized} />
+    </div>
   );
 }

@@ -55,6 +55,7 @@ const envSchema = z.object({
   ENCRYPTION_KEY: z.string().optional(),
   JOB_POLL_INTERVAL_MS: z.coerce.number().default(60000),
   FOLLOWUP_CHECK_INTERVAL_MS: z.coerce.number().default(300000),
+  CRON_SECRET: z.string().optional(),
 });
 
 let cachedEnv: z.infer<typeof envSchema> | null = null;

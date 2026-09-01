@@ -165,6 +165,23 @@ enum JobStatus {
   RETRYING
 }
 
+enum AutomationStatus {
+  IDLE
+  LOCKED
+  DISCOVERING
+  RESEARCHING
+  SCORING
+  GENERATING_OUTREACH
+  OUTREACH_READY
+  OUTREACH_SENT
+  AWAITING_REPLY
+  PROCESSING_REPLY
+  FOLLOW_UP_SCHEDULED
+  COMPLETED
+  FAILED
+  PAUSED
+}
+
 // ─── Auth & Users ────────────────────────────────────────────────────────────
 
 model User {
@@ -192,6 +209,8 @@ model User {
   aiConversations   AIConversation[]
   auditLogs         AuditLog[]
   sessions          Session[]
+  lockedLeads       Lead[]               @relation("LockedLeads")
+  linkedInJobs      LinkedInDiscoveryJob[]
 
   @@index([email])
   @@index([role])
@@ -269,6 +288,13 @@ model Lead {
   estimatedBudget     Decimal?   @map("estimated_budget") @db.Decimal(12, 2)
   notes               String?
   unsubscribed        Boolean    @default(false)
+  automationStatus    AutomationStatus @default(IDLE) @map("automation_status")
+  lockedAt            DateTime?  @map("locked_at")
+  lockedById          String?    @map("locked_by_id")
+  nextAutomationAt    DateTime?  @map("next_automation_at")
+  automationError     String?    @map("automation_error")
+  automationMeta      Json?      @map("automation_meta")
+  autoReplyEnabled    Boolean    @default(true) @map("auto_reply_enabled")
   createdAt           DateTime   @default(now()) @map("created_at")
   updatedAt           DateTime   @updatedAt @map("updated_at")
   deletedAt           DateTime?  @map("deleted_at")
@@ -277,6 +303,7 @@ model Lead {
   company       Company?       @relation(fields: [companyId], references: [id])
   assignedTo    User?          @relation("AssignedLeads", fields: [assignedToId], references: [id])
   createdBy     User?          @relation("CreatedLeads", fields: [createdById], references: [id])
+  lockedBy      User?          @relation("LockedLeads", fields: [lockedById], references: [id])
   tags          LeadTag[]
   leadNotes     Note[]
   tasks         Task[]
@@ -291,6 +318,8 @@ model Lead {
   proposals     Proposal[]
   followUpJobs  FollowUpJob[]
 
+  @@index([automationStatus])
+  @@index([nextAutomationAt])
   @@index([status])
   @@index([score])
   @@index([scoreCategory])
@@ -348,6 +377,7 @@ model Campaign {
   leads            Lead[]
   campaignLeads    CampaignLead[]
   followUpSequence FollowUpSequence?
+  linkedInJobs     LinkedInDiscoveryJob[]
 
   @@index([status])
   @@map("campaigns")
@@ -364,6 +394,29 @@ model CampaignLead {
 
   @@unique([campaignId, leadId])
   @@map("campaign_leads")
+}
+
+model LinkedInDiscoveryJob {
+  id             String    @id @default(uuid())
+  campaignId     String?   @map("campaign_id")
+  createdById    String    @map("created_by_id")
+  status         JobStatus @default(PENDING)
+  searchCriteria Json?     @map("search_criteria")
+  profileUrls    String[]  @map("profile_urls")
+  targetCount    Int       @default(10) @map("target_count")
+  leadsCreated   Int       @default(0) @map("leads_created")
+  results        Json?
+  error          String?
+  createdAt      DateTime  @default(now()) @map("created_at")
+  updatedAt      DateTime  @updatedAt @map("updated_at")
+  completedAt    DateTime? @map("completed_at")
+
+  campaign  Campaign? @relation(fields: [campaignId], references: [id])
+  createdBy User      @relation(fields: [createdById], references: [id])
+
+  @@index([status])
+  @@index([campaignId])
+  @@map("linkedin_discovery_jobs")
 }
 
 // ─── AI Research & Scoring ───────────────────────────────────────────────────

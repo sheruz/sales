@@ -1,2 +1,5 @@
-// Background jobs - populated in Phase 7
-export {};
+import { automationService } from "@/services/automation.service";
+
+export async function runAutomationJobs() {
+  return automationService.processPendingJobs();
+}

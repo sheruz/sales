@@ -6,6 +6,7 @@ import { leadService } from "@/services/lead.service";
 import { getCurrentUser } from "@/lib/auth/session";
 import { LeadStatusBadge } from "@/components/leads/lead-status-badge";
 import { LeadDetailTabs } from "@/components/leads/lead-detail-tabs";
+import { LeadAIPanel } from "@/components/campaigns/campaign-detail";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -124,6 +125,14 @@ export default async function LeadDetailPage({ params }: PageProps) {
               )}
             </CardContent>
           </Card>
+
+          <LeadAIPanel
+            leadId={lead.id}
+            automationStatus={lead.automationStatus}
+            score={lead.score}
+            scoreCategory={lead.scoreCategory}
+            hasResearch={lead.researches.length > 0}
+          />
 
           <Card>
             <CardHeader>
