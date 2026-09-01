@@ -2,17 +2,41 @@ import type { LinkedInSession } from "./types";
 
 const BASE_URL = "https://www.linkedin.com/voyager/api";
 
+/**
+ * Normalize LinkedIn session cookies.
+ * JSESSIONID value is typically "ajax:1234567890" — csrf-token header must match exactly.
+ */
+export function buildSession(liAt: string, jsessionId: string): LinkedInSession {
+  let jsession = jsessionId.trim().replace(/^["']|["']$/g, "");
+
+  // Remove accidental double-ajax prefix
+  if (jsession.startsWith("ajax:ajax:")) {
+    jsession = jsession.replace(/^ajax:/, "");
+  }
+
+  // csrf-token must exactly equal the JSESSIONID cookie value
+  const csrfToken = jsession.startsWith("ajax:") ? jsession : `ajax:${jsession}`;
+  const cookieValue = jsession.startsWith("ajax:") ? jsession : csrfToken;
+
+  return {
+    liAt: liAt.trim(),
+    jsessionId: cookieValue,
+    csrfToken,
+  };
+}
+
 export class LinkedInVoyagerClient {
   constructor(private session: LinkedInSession) {}
 
   private get headers(): Record<string, string> {
-    const jsession = this.session.jsessionId.replace(/^"|"$/g, "");
     return {
-      Cookie: `li_at=${this.session.liAt}; JSESSIONID="${jsession}"`,
-      "csrf-token": this.session.csrfToken || `ajax:${jsession}`,
+      Cookie: `li_at=${this.session.liAt}; JSESSIONID="${this.session.jsessionId}"`,
+      "csrf-token": this.session.csrfToken,
       "x-restli-protocol-version": "2.0.0",
       "x-li-lang": "en_US",
       Accept: "application/vnd.linkedin.normalized+json+2.1",
+      Referer: "https://www.linkedin.com/feed/",
+      Origin: "https://www.linkedin.com",
       "User-Agent":
         "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
     };
@@ -54,23 +78,27 @@ export class LinkedInVoyagerClient {
   async verifySession(): Promise<{ name: string; urn: string }> {
     const data = await this.get<{
       miniProfile?: { firstName: string; lastName: string; entityUrn: string };
+      included?: Array<{
+        firstName?: string;
+        lastName?: string;
+        entityUrn?: string;
+        $type?: string;
+      }>;
     }>("/me");
 
-    const profile = data.miniProfile;
-    if (!profile) throw new Error("Invalid LinkedIn session — could not fetch profile");
+    const profile = data.miniProfile ?? data.included?.find(
+      (i) => i.$type?.includes("MiniProfile") || i.firstName
+    );
+
+    if (!profile?.firstName) {
+      throw new Error(
+        "Invalid LinkedIn session — refresh cookies from browser (li_at + JSESSIONID)"
+      );
+    }
 
     return {
       name: `${profile.firstName} ${profile.lastName}`,
-      urn: profile.entityUrn,
+      urn: profile.entityUrn ?? "",
     };
   }
-}
-
-export function buildSession(liAt: string, jsessionId: string): LinkedInSession {
-  const cleanJsession = jsessionId.replace(/^"|"$/g, "");
-  return {
-    liAt,
-    jsessionId: cleanJsession,
-    csrfToken: `ajax:${cleanJsession}`,
-  };
 }

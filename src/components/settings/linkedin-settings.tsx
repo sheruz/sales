@@ -112,10 +112,14 @@ export function LinkedInSettings({ initialStatus }: LinkedInSettingsProps) {
             <div className="rounded-lg bg-muted p-4 text-sm space-y-2">
               <p className="font-medium">How to get your cookies:</p>
               <ol className="list-decimal list-inside space-y-1 text-muted-foreground">
-                <li>Log into LinkedIn in Chrome</li>
-                <li>Press F12 → Application → Cookies → linkedin.com</li>
-                <li>Copy <code className="text-xs">li_at</code> value</li>
-                <li>Copy <code className="text-xs">JSESSIONID</code> value</li>
+                <li>Log into LinkedIn in Chrome (stay on linkedin.com)</li>
+                <li>Press F12 → Application → Cookies → www.linkedin.com</li>
+                <li>Copy <code className="text-xs">li_at</code> value (long string starting with AQ...)</li>
+                <li>
+                  Copy <code className="text-xs">JSESSIONID</code> value exactly as shown
+                  (usually starts with <code className="text-xs">ajax:</code>)
+                </li>
+                <li>Paste both immediately — cookies expire quickly</li>
               </ol>
             </div>
             <div>
@@ -133,7 +137,7 @@ export function LinkedInSettings({ initialStatus }: LinkedInSettingsProps) {
                 type="password"
                 value={jsessionId}
                 onChange={(e) => setJsessionId(e.target.value)}
-                placeholder='ajax:1234567890...'
+                placeholder="ajax:1709123456789012345"
               />
             </div>
             <div>
