@@ -1,7 +1,8 @@
-import "dotenv/config";
-import { defineConfig } from "prisma/config";
-
-function getDatabaseUrl(): string {
+/* eslint-disable @typescript-eslint/no-require-imports */
+/**
+ * Builds DATABASE_URL from POSTGRES_* env vars when DATABASE_URL is not set.
+ */
+function buildDatabaseUrl() {
   if (process.env.DATABASE_URL) {
     return process.env.DATABASE_URL;
   }
@@ -15,13 +16,10 @@ function getDatabaseUrl(): string {
   return `postgresql://${user}:${encodeURIComponent(password)}@${host}:${port}/${db}?schema=public`;
 }
 
-export default defineConfig({
-  schema: "prisma/schema.prisma",
-  migrations: {
-    path: "prisma/migrations",
-  },
-  engine: "classic",
-  datasource: {
-    url: getDatabaseUrl(),
-  },
-});
+function ensureDatabaseUrl() {
+  const url = buildDatabaseUrl();
+  process.env.DATABASE_URL = url;
+  return url;
+}
+
+module.exports = { buildDatabaseUrl, ensureDatabaseUrl };
