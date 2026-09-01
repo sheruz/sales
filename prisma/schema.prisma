@@ -1,0 +1,864 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ─── Enums ───────────────────────────────────────────────────────────────────
+
+enum UserRole {
+  ADMIN
+  SALES_MANAGER
+  SALES_REPRESENTATIVE
+}
+
+enum LeadStatus {
+  NEW
+  RESEARCHING
+  QUALIFIED
+  CONTACTED
+  REPLIED
+  INTERESTED
+  MEETING
+  PROPOSAL
+  NEGOTIATION
+  WON
+  LOST
+  DISQUALIFIED
+}
+
+enum LeadScoreCategory {
+  HOT
+  WARM
+  POSSIBLE
+  LOW_PRIORITY
+}
+
+enum CampaignStatus {
+  DRAFT
+  ACTIVE
+  PAUSED
+  COMPLETED
+}
+
+enum EmailStatus {
+  DRAFT
+  SCHEDULED
+  SENT
+  DELIVERED
+  OPENED
+  REPLIED
+  FAILED
+}
+
+enum ReplyClassification {
+  INTERESTED
+  NOT_INTERESTED
+  ASK_LATER
+  NEED_INFORMATION
+  PRICE_QUESTION
+  MEETING_REQUEST
+  PROPOSAL_REQUEST
+  OTHER
+}
+
+enum DealStage {
+  LEAD
+  CONTACTED
+  REPLIED
+  QUALIFIED
+  MEETING
+  PROPOSAL
+  NEGOTIATION
+  WON
+  LOST
+}
+
+enum TaskPriority {
+  LOW
+  MEDIUM
+  HIGH
+  URGENT
+}
+
+enum TaskStatus {
+  PENDING
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+}
+
+enum ActivityType {
+  LEAD_CREATED
+  LEAD_UPDATED
+  LEAD_ASSIGNED
+  RESEARCH_COMPLETED
+  SCORE_UPDATED
+  EMAIL_SENT
+  EMAIL_RECEIVED
+  LINKEDIN_SENT
+  FOLLOW_UP_SENT
+  REPLY_ANALYZED
+  MEETING_SCHEDULED
+  MEETING_COMPLETED
+  PROPOSAL_CREATED
+  DEAL_CREATED
+  DEAL_STAGE_CHANGED
+  NOTE_ADDED
+  TASK_CREATED
+  TASK_COMPLETED
+  CAMPAIGN_ASSIGNED
+  STATUS_CHANGED
+}
+
+enum ConversationChannel {
+  EMAIL
+  LINKEDIN
+  PHONE
+  MEETING
+  NOTE
+  SYSTEM
+}
+
+enum FollowUpJobStatus {
+  PENDING
+  PROCESSING
+  COMPLETED
+  FAILED
+  CANCELLED
+}
+
+enum ProposalStatus {
+  DRAFT
+  REVIEW
+  APPROVED
+  SENT
+  ACCEPTED
+  REJECTED
+}
+
+enum MeetingType {
+  DISCOVERY
+  DEMO
+  FOLLOW_UP
+  NEGOTIATION
+  KICKOFF
+  OTHER
+}
+
+enum MeetingOutcome {
+  SCHEDULED
+  COMPLETED
+  NO_SHOW
+  RESCHEDULED
+  CANCELLED
+}
+
+enum JobStatus {
+  PENDING
+  PROCESSING
+  COMPLETED
+  FAILED
+  RETRYING
+}
+
+// ─── Auth & Users ────────────────────────────────────────────────────────────
+
+model User {
+  id           String   @id @default(uuid())
+  email        String   @unique
+  passwordHash String   @map("password_hash")
+  firstName    String   @map("first_name")
+  lastName     String   @map("last_name")
+  role         UserRole @default(SALES_REPRESENTATIVE)
+  isActive     Boolean  @default(true) @map("is_active")
+  avatarUrl    String?  @map("avatar_url")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+  deletedAt    DateTime? @map("deleted_at")
+
+  assignedLeads     Lead[]           @relation("AssignedLeads")
+  createdLeads      Lead[]           @relation("CreatedLeads")
+  notes             Note[]
+  tasks             Task[]           @relation("AssignedTasks")
+  createdTasks      Task[]           @relation("CreatedTasks")
+  activities        Activity[]
+  deals             Deal[]
+  meetings          Meeting[]
+  proposals         Proposal[]
+  aiConversations   AIConversation[]
+  auditLogs         AuditLog[]
+  sessions          Session[]
+
+  @@index([email])
+  @@index([role])
+  @@map("users")
+}
+
+model Session {
+  id        String   @id @default(uuid())
+  userId    String   @map("user_id")
+  token     String   @unique
+  expiresAt DateTime @map("expires_at")
+  createdAt DateTime @default(now()) @map("created_at")
+  ipAddress String?  @map("ip_address")
+  userAgent String?  @map("user_agent")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([token])
+  @@index([expiresAt])
+  @@map("sessions")
+}
+
+// ─── Companies ───────────────────────────────────────────────────────────────
+
+model Company {
+  id              String   @id @default(uuid())
+  name            String
+  website         String?
+  linkedInUrl     String?  @map("linkedin_url")
+  industry        String?
+  size            String?  @map("company_size")
+  description     String?
+  country         String?
+  city            String?
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+  deletedAt       DateTime? @map("deleted_at")
+
+  leads Lead[]
+  deals Deal[]
+
+  @@index([name])
+  @@index([industry])
+  @@map("companies")
+}
+
+// ─── Leads ───────────────────────────────────────────────────────────────────
+
+model Lead {
+  id                  String     @id @default(uuid())
+  firstName           String     @map("first_name")
+  lastName            String     @map("last_name")
+  fullName            String     @map("full_name")
+  email               String?
+  phone               String?
+  linkedInUrl         String?    @map("linkedin_url")
+  companyName         String?    @map("company_name")
+  companyWebsite      String?    @map("company_website")
+  companyLinkedIn     String?    @map("company_linkedin")
+  jobTitle            String?    @map("job_title")
+  country             String?
+  city                String?
+  industry            String?
+  companySize         String?    @map("company_size")
+  companyDescription  String?    @map("company_description")
+  source              String?
+  campaignId          String?    @map("campaign_id")
+  companyId           String?    @map("company_id")
+  assignedToId        String?    @map("assigned_to_id")
+  createdById         String?    @map("created_by_id")
+  status              LeadStatus @default(NEW)
+  score               Int        @default(0)
+  scoreCategory       LeadScoreCategory? @map("score_category")
+  estimatedBudget     Decimal?   @map("estimated_budget") @db.Decimal(12, 2)
+  notes               String?
+  unsubscribed        Boolean    @default(false)
+  createdAt           DateTime   @default(now()) @map("created_at")
+  updatedAt           DateTime   @updatedAt @map("updated_at")
+  deletedAt           DateTime?  @map("deleted_at")
+
+  campaign      Campaign?      @relation(fields: [campaignId], references: [id])
+  company       Company?       @relation(fields: [companyId], references: [id])
+  assignedTo    User?          @relation("AssignedLeads", fields: [assignedToId], references: [id])
+  createdBy     User?          @relation("CreatedLeads", fields: [createdById], references: [id])
+  tags          LeadTag[]
+  leadNotes     Note[]
+  tasks         Task[]
+  activities    Activity[]
+  researches    LeadResearch[]
+  scores        LeadScore[]
+  campaignLeads CampaignLead[]
+  conversations Conversation[]
+  emailThreads  EmailThread[]
+  deals         Deal[]
+  meetings      Meeting[]
+  proposals     Proposal[]
+  followUpJobs  FollowUpJob[]
+
+  @@index([status])
+  @@index([score])
+  @@index([scoreCategory])
+  @@index([assignedToId])
+  @@index([campaignId])
+  @@index([companyId])
+  @@index([email])
+  @@index([fullName])
+  @@index([createdAt])
+  @@map("leads")
+}
+
+// ─── Tags ────────────────────────────────────────────────────────────────────
+
+model Tag {
+  id        String   @id @default(uuid())
+  name      String   @unique
+  color     String   @default("#6366f1")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  leads LeadTag[]
+
+  @@map("tags")
+}
+
+model LeadTag {
+  leadId String @map("lead_id")
+  tagId  String @map("tag_id")
+
+  lead Lead @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  tag  Tag  @relation(fields: [tagId], references: [id], onDelete: Cascade)
+
+  @@id([leadId, tagId])
+  @@map("lead_tags")
+}
+
+// ─── Campaigns ───────────────────────────────────────────────────────────────
+
+model Campaign {
+  id                String         @id @default(uuid())
+  name              String
+  description       String?
+  targetAudience    String?        @map("target_audience")
+  targetCountries   String[]       @map("target_countries")
+  targetIndustries  String[]       @map("target_industries")
+  serviceId         String?        @map("service_id")
+  aiInstructions    String?        @map("ai_instructions")
+  dailyOutreachLimit Int           @default(50) @map("daily_outreach_limit")
+  status            CampaignStatus @default(DRAFT)
+  createdAt         DateTime       @default(now()) @map("created_at")
+  updatedAt         DateTime       @updatedAt @map("updated_at")
+  deletedAt         DateTime?      @map("deleted_at")
+
+  service          Service?           @relation(fields: [serviceId], references: [id])
+  leads            Lead[]
+  campaignLeads    CampaignLead[]
+  followUpSequence FollowUpSequence?
+
+  @@index([status])
+  @@map("campaigns")
+}
+
+model CampaignLead {
+  id         String   @id @default(uuid())
+  campaignId String   @map("campaign_id")
+  leadId     String   @map("lead_id")
+  addedAt    DateTime @default(now()) @map("added_at")
+
+  campaign Campaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  lead     Lead     @relation(fields: [leadId], references: [id], onDelete: Cascade)
+
+  @@unique([campaignId, leadId])
+  @@map("campaign_leads")
+}
+
+// ─── AI Research & Scoring ───────────────────────────────────────────────────
+
+model LeadResearch {
+  id                     String   @id @default(uuid())
+  leadId                 String   @map("lead_id")
+  companySummary         String?  @map("company_summary")
+  whatCompanyDoes        String?  @map("what_company_does")
+  industry               String?
+  businessChallenges     Json?    @map("business_challenges")
+  softwareOpportunities  Json?    @map("software_opportunities")
+  recommendedServices    Json?    @map("recommended_services")
+  decisionMakerAnalysis  String?  @map("decision_maker_analysis")
+  personalizationPoints  Json?    @map("personalization_points")
+  suggestedOpeningMessage String? @map("suggested_opening_message")
+  suggestedApproach      String?  @map("suggested_approach")
+  leadScore              Int?     @map("lead_score")
+  reasoning              String?
+  rawResponse            Json?    @map("raw_response")
+  isEdited               Boolean  @default(false) @map("is_edited")
+  version                Int      @default(1)
+  createdAt              DateTime @default(now()) @map("created_at")
+
+  lead Lead @relation(fields: [leadId], references: [id], onDelete: Cascade)
+
+  @@index([leadId])
+  @@index([createdAt])
+  @@map("lead_research")
+}
+
+model LeadScore {
+  id                String            @id @default(uuid())
+  leadId            String            @map("lead_id")
+  score             Int
+  category          LeadScoreCategory
+  explanation       String?
+  recommendedAction String?           @map("recommended_action")
+  factors           Json?
+  createdAt         DateTime          @default(now()) @map("created_at")
+
+  lead Lead @relation(fields: [leadId], references: [id], onDelete: Cascade)
+
+  @@index([leadId])
+  @@index([createdAt])
+  @@map("lead_scores")
+}
+
+// ─── Notes & Tasks ───────────────────────────────────────────────────────────
+
+model Note {
+  id        String   @id @default(uuid())
+  leadId    String   @map("lead_id")
+  userId    String   @map("user_id")
+  content   String
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  lead Lead @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id])
+
+  @@index([leadId])
+  @@map("notes")
+}
+
+model Task {
+  id           String       @id @default(uuid())
+  title        String
+  description  String?
+  leadId       String?      @map("lead_id")
+  dealId       String?      @map("deal_id")
+  assignedToId String?      @map("assigned_to_id")
+  createdById  String?      @map("created_by_id")
+  dueDate      DateTime?    @map("due_date")
+  priority     TaskPriority @default(MEDIUM)
+  status       TaskStatus   @default(PENDING)
+  createdAt    DateTime     @default(now()) @map("created_at")
+  updatedAt    DateTime     @updatedAt @map("updated_at")
+
+  lead       Lead? @relation(fields: [leadId], references: [id], onDelete: SetNull)
+  deal       Deal? @relation(fields: [dealId], references: [id], onDelete: SetNull)
+  assignedTo User? @relation("AssignedTasks", fields: [assignedToId], references: [id])
+  createdBy  User? @relation("CreatedTasks", fields: [createdById], references: [id])
+
+  @@index([assignedToId])
+  @@index([leadId])
+  @@index([dueDate])
+  @@index([status])
+  @@map("tasks")
+}
+
+// ─── Activities & Conversations ──────────────────────────────────────────────
+
+model Activity {
+  id          String       @id @default(uuid())
+  leadId      String?      @map("lead_id")
+  dealId      String?      @map("deal_id")
+  userId      String?      @map("user_id")
+  type        ActivityType
+  title       String
+  description String?
+  metadata    Json?
+  createdAt   DateTime     @default(now()) @map("created_at")
+
+  lead Lead? @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  deal Deal? @relation("DealActivities", fields: [dealId], references: [id], onDelete: Cascade)
+  user User? @relation(fields: [userId], references: [id])
+
+  @@index([leadId])
+  @@index([dealId])
+  @@index([type])
+  @@index([createdAt])
+  @@map("activities")
+}
+
+model Conversation {
+  id          String              @id @default(uuid())
+  leadId      String              @map("lead_id")
+  channel     ConversationChannel
+  subject     String?
+  content     String?
+  summary     String?
+  metadata    Json?
+  isInbound   Boolean             @default(false) @map("is_inbound")
+  classification ReplyClassification?
+  aiAnalysis  Json?               @map("ai_analysis")
+  createdAt   DateTime            @default(now()) @map("created_at")
+
+  lead Lead @relation(fields: [leadId], references: [id], onDelete: Cascade)
+
+  @@index([leadId])
+  @@index([channel])
+  @@index([createdAt])
+  @@map("conversations")
+}
+
+// ─── Email ───────────────────────────────────────────────────────────────────
+
+model EmailAccount {
+  id           String   @id @default(uuid())
+  name         String
+  email        String   @unique
+  smtpHost     String   @map("smtp_host")
+  smtpPort     Int      @map("smtp_port")
+  smtpSecure   Boolean  @default(true) @map("smtp_secure")
+  smtpUser     String   @map("smtp_user")
+  smtpPassword String   @map("smtp_password")
+  isDefault    Boolean  @default(false) @map("is_default")
+  isActive     Boolean  @default(true) @map("is_active")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  threads  EmailThread[]
+  messages EmailMessage[]
+
+  @@map("email_accounts")
+}
+
+model EmailThread {
+  id             String   @id @default(uuid())
+  leadId         String   @map("lead_id")
+  emailAccountId String   @map("email_account_id")
+  subject        String
+  externalId     String?  @map("external_id")
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  lead         Lead          @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  emailAccount EmailAccount  @relation(fields: [emailAccountId], references: [id])
+  messages     EmailMessage[]
+
+  @@index([leadId])
+  @@map("email_threads")
+}
+
+model EmailMessage {
+  id             String      @id @default(uuid())
+  threadId       String      @map("thread_id")
+  emailAccountId String      @map("email_account_id")
+  fromEmail      String      @map("from_email")
+  toEmail        String      @map("to_email")
+  ccEmails       String[]    @map("cc_emails")
+  subject        String
+  bodyHtml       String?     @map("body_html")
+  bodyText       String?     @map("body_text")
+  status         EmailStatus @default(DRAFT)
+  scheduledAt    DateTime?   @map("scheduled_at")
+  sentAt         DateTime?   @map("sent_at")
+  externalId     String?     @map("external_id")
+  errorMessage   String?     @map("error_message")
+  metadata       Json?
+  createdAt      DateTime    @default(now()) @map("created_at")
+  updatedAt      DateTime    @updatedAt @map("updated_at")
+
+  thread       EmailThread  @relation(fields: [threadId], references: [id], onDelete: Cascade)
+  emailAccount EmailAccount @relation(fields: [emailAccountId], references: [id])
+  attachments  EmailAttachment[]
+
+  @@index([threadId])
+  @@index([status])
+  @@index([scheduledAt])
+  @@map("email_messages")
+}
+
+model EmailAttachment {
+  id        String   @id @default(uuid())
+  messageId String   @map("message_id")
+  filename  String
+  mimeType  String   @map("mime_type")
+  size      Int
+  url       String
+  createdAt DateTime @default(now()) @map("created_at")
+
+  message EmailMessage @relation(fields: [messageId], references: [id], onDelete: Cascade)
+
+  @@map("email_attachments")
+}
+
+// ─── Follow-up Automation ────────────────────────────────────────────────────
+
+model FollowUpSequence {
+  id         String   @id @default(uuid())
+  campaignId String   @unique @map("campaign_id")
+  name       String
+  steps      Json
+  isActive   Boolean  @default(true) @map("is_active")
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @updatedAt @map("updated_at")
+
+  campaign Campaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+
+  @@map("follow_up_sequences")
+}
+
+model FollowUpJob {
+  id          String            @id @default(uuid())
+  leadId      String            @map("lead_id")
+  stepIndex   Int               @map("step_index")
+  scheduledAt DateTime          @map("scheduled_at")
+  status      FollowUpJobStatus @default(PENDING)
+  attempts    Int               @default(0)
+  maxAttempts Int               @default(3) @map("max_attempts")
+  lastError   String?           @map("last_error")
+  completedAt DateTime?         @map("completed_at")
+  metadata    Json?
+  createdAt   DateTime          @default(now()) @map("created_at")
+  updatedAt   DateTime          @updatedAt @map("updated_at")
+
+  lead Lead @relation(fields: [leadId], references: [id], onDelete: Cascade)
+
+  @@index([status])
+  @@index([scheduledAt])
+  @@index([leadId])
+  @@map("follow_up_jobs")
+}
+
+model JobLog {
+  id        String    @id @default(uuid())
+  jobType   String    @map("job_type")
+  jobId     String?   @map("job_id")
+  status    JobStatus
+  message   String?
+  metadata  Json?
+  createdAt DateTime  @default(now()) @map("created_at")
+
+  @@index([jobType])
+  @@index([status])
+  @@index([createdAt])
+  @@map("job_logs")
+}
+
+// ─── Deals & Pipeline ────────────────────────────────────────────────────────
+
+model Deal {
+  id               String    @id @default(uuid())
+  name             String
+  leadId           String    @map("lead_id")
+  companyId        String?   @map("company_id")
+  assignedToId     String?   @map("assigned_to_id")
+  estimatedValue   Decimal   @map("estimated_value") @db.Decimal(12, 2)
+  currency         String    @default("USD")
+  probability      Int       @default(10)
+  expectedCloseDate DateTime? @map("expected_close_date")
+  stage            DealStage @default(LEAD)
+  notes            String?
+  wonAt            DateTime? @map("won_at")
+  lostAt           DateTime? @map("lost_at")
+  lostReason       String?   @map("lost_reason")
+  createdAt        DateTime  @default(now()) @map("created_at")
+  updatedAt        DateTime  @updatedAt @map("updated_at")
+  deletedAt        DateTime? @map("deleted_at")
+
+  lead       Lead           @relation(fields: [leadId], references: [id])
+  company    Company?       @relation(fields: [companyId], references: [id])
+  assignedTo User?          @relation(fields: [assignedToId], references: [id])
+  activities DealActivity[]
+  leadActivities Activity[] @relation("DealActivities")
+  tasks      Task[]
+  proposals  Proposal[]
+  meetings   Meeting[]
+
+  @@index([stage])
+  @@index([assignedToId])
+  @@index([leadId])
+  @@map("deals")
+}
+
+model DealActivity {
+  id          String    @id @default(uuid())
+  dealId      String    @map("deal_id")
+  fromStage   DealStage? @map("from_stage")
+  toStage     DealStage @map("to_stage")
+  notes       String?
+  createdAt   DateTime  @default(now()) @map("created_at")
+
+  deal Deal @relation(fields: [dealId], references: [id], onDelete: Cascade)
+
+  @@index([dealId])
+  @@map("deal_activities")
+}
+
+// ─── Meetings ────────────────────────────────────────────────────────────────
+
+model Meeting {
+  id          String         @id @default(uuid())
+  leadId      String         @map("lead_id")
+  dealId      String?        @map("deal_id")
+  userId      String         @map("user_id")
+  title       String
+  date        DateTime
+  duration    Int            @default(30)
+  type        MeetingType    @default(DISCOVERY)
+  meetingLink String?        @map("meeting_link")
+  outcome     MeetingOutcome @default(SCHEDULED)
+  aiPrepNotes Json?          @map("ai_prep_notes")
+  createdAt   DateTime       @default(now()) @map("created_at")
+  updatedAt   DateTime       @updatedAt @map("updated_at")
+
+  lead  Lead          @relation(fields: [leadId], references: [id])
+  deal  Deal?         @relation(fields: [dealId], references: [id])
+  user  User          @relation(fields: [userId], references: [id])
+  notes MeetingNote[]
+
+  @@index([leadId])
+  @@index([date])
+  @@index([userId])
+  @@map("meetings")
+}
+
+model MeetingNote {
+  id              String   @id @default(uuid())
+  meetingId       String   @map("meeting_id")
+  content         String
+  transcript      String?
+  aiSummary       String?  @map("ai_summary")
+  aiRequirements  Json?    @map("ai_requirements")
+  aiNextSteps     Json?    @map("ai_next_steps")
+  aiFollowUpDraft String?  @map("ai_follow_up_draft")
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  meeting Meeting @relation(fields: [meetingId], references: [id], onDelete: Cascade)
+
+  @@map("meeting_notes")
+}
+
+// ─── Proposals ───────────────────────────────────────────────────────────────
+
+model Proposal {
+  id          String         @id @default(uuid())
+  leadId      String         @map("lead_id")
+  dealId      String?        @map("deal_id")
+  createdById String         @map("created_by_id")
+  title       String
+  status      ProposalStatus @default(DRAFT)
+  totalPrice  Decimal?       @map("total_price") @db.Decimal(12, 2)
+  currency    String         @default("USD")
+  isPriceApproved Boolean    @default(false) @map("is_price_approved")
+  createdAt   DateTime       @default(now()) @map("created_at")
+  updatedAt   DateTime       @updatedAt @map("updated_at")
+
+  lead      Lead              @relation(fields: [leadId], references: [id])
+  deal      Deal?             @relation(fields: [dealId], references: [id])
+  createdBy User              @relation(fields: [createdById], references: [id])
+  versions  ProposalVersion[]
+
+  @@index([leadId])
+  @@index([status])
+  @@map("proposals")
+}
+
+model ProposalVersion {
+  id               String   @id @default(uuid())
+  proposalId       String   @map("proposal_id")
+  version          Int
+  executiveSummary String?  @map("executive_summary")
+  problemStatement String?  @map("problem_statement")
+  proposedSolution String?  @map("proposed_solution")
+  scopeOfWork      String?  @map("scope_of_work")
+  features         Json?
+  technologyStack  Json?    @map("technology_stack")
+  timeline         String?
+  deliverables     Json?
+  pricingSection   String?  @map("pricing_section")
+  assumptions      String?
+  rawContent       Json?    @map("raw_content")
+  createdAt        DateTime @default(now()) @map("created_at")
+
+  proposal Proposal @relation(fields: [proposalId], references: [id], onDelete: Cascade)
+
+  @@unique([proposalId, version])
+  @@map("proposal_versions")
+}
+
+// ─── Services Configuration ──────────────────────────────────────────────────
+
+model Service {
+  id              String   @id @default(uuid())
+  name            String   @unique
+  description     String
+  targetClientType String? @map("target_client_type")
+  minBudget       Decimal? @map("min_budget") @db.Decimal(12, 2)
+  maxBudget       Decimal? @map("max_budget") @db.Decimal(12, 2)
+  typicalTimeline String?  @map("typical_timeline")
+  technologies    String[]
+  caseStudies     Json?    @map("case_studies")
+  talkingPoints   Json?    @map("talking_points")
+  isActive        Boolean  @default(true) @map("is_active")
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  campaigns Campaign[]
+
+  @@map("services")
+}
+
+// ─── AI & Audit ──────────────────────────────────────────────────────────────
+
+model AIConversation {
+  id        String   @id @default(uuid())
+  userId    String   @map("user_id")
+  title     String?
+  messages  Json
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("ai_conversations")
+}
+
+model AIUsageLog {
+  id           String   @id @default(uuid())
+  userId       String?  @map("user_id")
+  feature      String
+  model        String?
+  promptTokens Int?     @map("prompt_tokens")
+  outputTokens Int?     @map("output_tokens")
+  totalTokens  Int?     @map("total_tokens")
+  cost         Decimal? @db.Decimal(10, 6)
+  metadata     Json?
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  @@index([feature])
+  @@index([createdAt])
+  @@map("ai_usage_logs")
+}
+
+model AuditLog {
+  id         String   @id @default(uuid())
+  userId     String?  @map("user_id")
+  action     String
+  entityType String   @map("entity_type")
+  entityId   String?  @map("entity_id")
+  oldValues  Json?    @map("old_values")
+  newValues  Json?    @map("new_values")
+  ipAddress  String?  @map("ip_address")
+  userAgent  String?  @map("user_agent")
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  user User? @relation(fields: [userId], references: [id])
+
+  @@index([entityType, entityId])
+  @@index([userId])
+  @@index([createdAt])
+  @@map("audit_logs")
+}
+
+model Settings {
+  id        String   @id @default(uuid())
+  key       String   @unique
+  value     Json
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("settings")
+}
