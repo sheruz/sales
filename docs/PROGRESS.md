@@ -161,18 +161,73 @@ No schema changes. Uses existing `User` and `Session` models.
 
 ---
 
-## Phase 3: Leads CRM ⏳ NEXT
+## Phase 3: Leads CRM ✅ COMPLETED
 
-- Lead CRUD operations
-- Companies management
-- Notes and tasks
-- Activity timeline
-- Search, filter, bulk actions
-- CSV import
+**Date:** September 1, 2026
+
+### Completed Features
+
+- [x] Lead CRUD (create, read, update, soft-delete)
+- [x] Lead list with search, status filter, pagination, and bulk actions
+- [x] CSV import for leads
+- [x] Lead detail page with contact, company, and metadata cards
+- [x] Notes — add and list per lead
+- [x] Tasks — create, complete, and list per lead
+- [x] Activity timeline (auto-logged on create, update, notes, tasks)
+- [x] Global tasks page with all/pending/overdue filters
+- [x] Tags API endpoint (for future tagging UI)
+- [x] Company fields embedded on leads (company service ready)
+
+### Files Created
+
+**Services:**
+- `src/services/lead.service.ts` — Lead CRUD, bulk actions, CSV import
+- `src/services/company.service.ts` — Company management
+- `src/services/note.service.ts` — Lead notes
+- `src/services/task.service.ts` — Task CRUD and status updates
+- `src/services/activity.service.ts` — Activity logging
+
+**Validation & Constants:**
+- `src/lib/validations/lead.ts` — Zod schemas for leads, notes, tasks
+- `src/lib/constants/leads.ts` — Status labels, source options
+- `src/lib/auth/api-auth.ts` — API route auth helper
+
+**API Routes:**
+- `GET/POST /api/leads` — List and create leads
+- `GET/PATCH/DELETE /api/leads/[id]` — Lead detail operations
+- `POST /api/leads/bulk` — Bulk status/assign/delete
+- `POST /api/leads/import` — CSV import
+- `GET/POST /api/leads/[id]/notes` — Lead notes
+- `GET/POST /api/leads/[id]/tasks` — Lead tasks
+- `GET /api/leads/[id]/activities` — Activity timeline
+- `GET /api/tags` — List tags
+- `GET /api/tasks` — List all tasks
+- `PATCH/DELETE /api/tasks/[id]` — Update/delete tasks
+
+**Pages:**
+- `src/app/dashboard/leads/page.tsx` — Leads list (server-driven)
+- `src/app/dashboard/leads/new/page.tsx` — Create lead
+- `src/app/dashboard/leads/[id]/page.tsx` — Lead detail
+- `src/app/dashboard/leads/[id]/edit/page.tsx` — Edit lead
+- `src/app/dashboard/tasks/page.tsx` — Tasks list (replaces placeholder)
+
+**Components:**
+- `src/components/leads/leads-list.tsx` — Searchable table with bulk actions
+- `src/components/leads/lead-form.tsx` — Create/edit form
+- `src/components/leads/lead-status-badge.tsx` — Status badge
+- `src/components/leads/import-csv-dialog.tsx` — CSV import dialog
+- `src/components/leads/lead-detail-tabs.tsx` — Activity, notes, tasks tabs
+- `src/components/tasks/tasks-list.tsx` — Global tasks list
+
+### Verification
+
+- TypeScript: no errors
+- ESLint: passing (warnings only in scripts)
+- Production build: successful (33 routes)
 
 ---
 
-## Phase 4: Campaign Management ⏳ PENDING
+## Phase 4: Campaign Management ⏳ NEXT
 
 - Campaign CRUD
 - Lead assignment to campaigns
