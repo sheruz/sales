@@ -151,46 +151,4 @@ npm run build
 npm start
 ```
 
-## Linux Server Deployment (Ubuntu)
-
-**Important:** Never copy `node_modules` from Windows/Mac to Linux. Always install dependencies on the server.
-
-```bash
-cd /var/www/html/sales
-
-# 1. Create .env first (see .env.server.example)
-nano .env
-
-# 2. Clean install (no postinstall hooks — safe without DATABASE_URL)
-rm -rf node_modules .next
-npm install --include=optional
-
-# 3. Manual setup (after .env exists)
-npm run setup:tailwind    # optional, fixes Tailwind on Linux
-npm run setup:generate      # prisma generate
-npm run db:push
-npm run db:seed
-
-# 4. Build and run
-npm run build
-npm start
-```
-
-Run with PM2 for production:
-
-```bash
-npm install -g pm2
-pm2 start npm --name sales-platform -- start
-pm2 save
-```
-
-### Tailwind build error on Linux
-
-If you see `Cannot find module '@tailwindcss/oxide-linux-x64-gnu'`:
-
-1. Delete `node_modules` and `.next`
-2. Run `npm install` again **on the Linux server** (not locally)
-3. Do not use `npm install --omit=optional` in production
-
-
-Private - Internal use only.
+## License
