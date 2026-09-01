@@ -15,6 +15,18 @@ function resolveDatabaseUrl(): void {
   process.env.DATABASE_URL = `postgresql://${user}:${encodeURIComponent(password)}@${host}:${port}/${db}?schema=public`;
 }
 
+function sanitizeEnv(env: NodeJS.ProcessEnv): Record<string, string | undefined> {
+  const sanitized: Record<string, string | undefined> = {};
+
+  for (const [key, value] of Object.entries(env)) {
+    if (value === undefined) continue;
+    const trimmed = value.trim();
+    sanitized[key] = trimmed === "" ? undefined : trimmed;
+  }
+
+  return sanitized;
+}
+
 const envSchema = z.object({
   NODE_ENV: z
     .enum(["development", "production", "test"])
@@ -35,12 +47,12 @@ const envSchema = z.object({
   SMTP_USER: z.string().optional(),
   SMTP_PASSWORD: z.string().optional(),
   SMTP_FROM_NAME: z.string().default("Sales Platform"),
-  SMTP_FROM_EMAIL: z.string().email().optional(),
+  SMTP_FROM_EMAIL: z.union([z.string().email(), z.undefined()]).optional(),
   REDIS_URL: z.string().optional(),
   USE_REDIS_QUEUE: z.coerce.boolean().default(false),
   RATE_LIMIT_MAX: z.coerce.number().default(100),
   RATE_LIMIT_WINDOW_MS: z.coerce.number().default(60000),
-  ENCRYPTION_KEY: z.string().min(32).optional(),
+  ENCRYPTION_KEY: z.string().optional(),
   JOB_POLL_INTERVAL_MS: z.coerce.number().default(60000),
   FOLLOWUP_CHECK_INTERVAL_MS: z.coerce.number().default(300000),
 });
@@ -52,7 +64,7 @@ export function getEnv(): z.infer<typeof envSchema> {
 
   resolveDatabaseUrl();
 
-  const parsed = envSchema.safeParse(process.env);
+  const parsed = envSchema.safeParse(sanitizeEnv(process.env));
 
   if (!parsed.success) {
     console.error(
