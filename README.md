@@ -158,21 +158,20 @@ npm start
 ```bash
 cd /var/www/html/sales
 
-# Clean stale installs (fixes Tailwind native binding errors)
-rm -rf node_modules .next
+# 1. Create .env first (see .env.server.example)
+nano .env
 
-# Reinstall for Linux (includes @tailwindcss/oxide-linux-x64-gnu)
+# 2. Clean install (no postinstall hooks — safe without DATABASE_URL)
+rm -rf node_modules .next
 npm install --include=optional
 
-# If build still fails, force-install the Linux binding:
-npm install @tailwindcss/oxide-linux-x64-gnu --save-optional
-
-# Setup env + database
-cp .env.example .env   # then edit with production values
+# 3. Manual setup (after .env exists)
+npm run setup:tailwind    # optional, fixes Tailwind on Linux
+npm run setup:generate      # prisma generate
 npm run db:push
 npm run db:seed
 
-# Build and run
+# 4. Build and run
 npm run build
 npm start
 ```
