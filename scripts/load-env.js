@@ -13,6 +13,11 @@ if (fs.existsSync(envPath)) {
 }
 
 const databaseUrl = ensureDatabaseUrl();
+
+const appPort = process.env.APP_PORT || process.env.PORT || "3000";
+process.env.PORT = String(appPort);
+
 console.log("[env] Using database:", databaseUrl.replace(/:([^:@/]+)@/, ":***@"));
+console.log("[env] App port:", appPort);
 
 module.exports = { databaseUrl };
