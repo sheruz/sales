@@ -151,6 +151,47 @@ npm run build
 npm start
 ```
 
-## License
+## Linux Server Deployment (Ubuntu)
+
+**Important:** Never copy `node_modules` from Windows/Mac to Linux. Always install dependencies on the server.
+
+```bash
+cd /var/www/html/sales
+
+# Clean stale installs (fixes Tailwind native binding errors)
+rm -rf node_modules .next
+
+# Reinstall for Linux (includes @tailwindcss/oxide-linux-x64-gnu)
+npm install --include=optional
+
+# If build still fails, force-install the Linux binding:
+npm install @tailwindcss/oxide-linux-x64-gnu --save-optional
+
+# Setup env + database
+cp .env.example .env   # then edit with production values
+npm run db:push
+npm run db:seed
+
+# Build and run
+npm run build
+npm start
+```
+
+Run with PM2 for production:
+
+```bash
+npm install -g pm2
+pm2 start npm --name sales-platform -- start
+pm2 save
+```
+
+### Tailwind build error on Linux
+
+If you see `Cannot find module '@tailwindcss/oxide-linux-x64-gnu'`:
+
+1. Delete `node_modules` and `.next`
+2. Run `npm install` again **on the Linux server** (not locally)
+3. Do not use `npm install --omit=optional` in production
+
 
 Private - Internal use only.
