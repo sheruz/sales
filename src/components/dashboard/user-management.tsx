@@ -34,6 +34,7 @@ import {
 } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 import { ROLE_LABELS } from "@/lib/auth/permissions";
+import { canManageTargetUser, getAssignableRoles } from "@/lib/auth/role-policy";
 
 interface UserRecord {
   id: string;
@@ -47,11 +48,15 @@ interface UserRecord {
 
 interface UserManagementProps {
   initialUsers: UserRecord[];
+  actorRole?: UserRole;
 }
 
-export function UserManagement({ initialUsers }: UserManagementProps) {
+export function UserManagement({ initialUsers, actorRole }: UserManagementProps) {
   const router = useRouter();
   const users = initialUsers;
+  const assignableRoles = actorRole
+    ? getAssignableRoles(actorRole)
+    : Object.values(UserRole);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [form, setForm] = useState<{
@@ -205,7 +210,7 @@ export function UserManagement({ initialUsers }: UserManagementProps) {
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    {Object.values(UserRole).map((role) => (
+                    {assignableRoles.map((role) => (
                       <SelectItem key={role} value={role}>
                         {ROLE_LABELS[role]}
                       </SelectItem>
@@ -250,7 +255,8 @@ export function UserManagement({ initialUsers }: UserManagementProps) {
                   </Badge>
                 </TableCell>
                 <TableCell>
-                  {user.isActive && (
+                  {user.isActive &&
+                    (!actorRole || canManageTargetUser(actorRole, user.role)) && (
                     <Button
                       variant="ghost"
                       size="icon"

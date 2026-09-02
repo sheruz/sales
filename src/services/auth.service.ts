@@ -7,6 +7,8 @@ import {
 } from "@/lib/auth/session";
 import { UnauthorizedError, ValidationError } from "@/lib/api/response";
 import { logger } from "@/lib/logger";
+import { canAssignRole, canManageTargetUser } from "@/lib/auth/role-policy";
+import { UserRole } from "@prisma/client";
 import type { AuthUser } from "@/types/auth";
 import type { CreateUserInput, UpdateUserInput } from "@/lib/auth/schemas";
 
@@ -91,7 +93,11 @@ export class AuthService {
     });
   }
 
-  async createUser(input: CreateUserInput) {
+  async createUser(input: CreateUserInput, actorRole: UserRole) {
+    if (!canAssignRole(actorRole, input.role)) {
+      throw new ValidationError("You cannot assign this role");
+    }
+
     const existing = await prisma.user.findUnique({
       where: { email: input.email.toLowerCase().trim() },
     });
@@ -125,13 +131,21 @@ export class AuthService {
     return user;
   }
 
-  async updateUser(userId: string, input: UpdateUserInput) {
+  async updateUser(userId: string, input: UpdateUserInput, actorRole: UserRole) {
     const user = await prisma.user.findFirst({
       where: { id: userId, deletedAt: null },
     });
 
     if (!user) {
       throw new ValidationError("User not found");
+    }
+
+    if (!canManageTargetUser(actorRole, user.role)) {
+      throw new ValidationError("You cannot manage this user");
+    }
+
+    if (input.role && !canAssignRole(actorRole, input.role)) {
+      throw new ValidationError("You cannot assign this role");
     }
 
     return prisma.user.update({
@@ -191,9 +205,30 @@ export class AuthService {
     });
   }
 
-  async deactivateUser(userId: string, actorId: string) {
+  async deactivateUser(userId: string, actorId: string, actorRole: UserRole) {
     if (userId === actorId) {
       throw new ValidationError("Cannot deactivate your own account");
+    }
+
+    const target = await prisma.user.findFirst({
+      where: { id: userId, deletedAt: null },
+    });
+
+    if (!target) {
+      throw new ValidationError("User not found");
+    }
+
+    if (!canManageTargetUser(actorRole, target.role)) {
+      throw new ValidationError("You cannot deactivate this user");
+    }
+
+    if (target.role === UserRole.SUPER_ADMIN) {
+      const superAdminCount = await prisma.user.count({
+        where: { role: UserRole.SUPER_ADMIN, isActive: true, deletedAt: null },
+      });
+      if (superAdminCount <= 1) {
+        throw new ValidationError("Cannot deactivate the last super admin");
+      }
     }
 
     await prisma.user.update({

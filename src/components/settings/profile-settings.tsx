@@ -7,13 +7,15 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { ROLE_LABELS } from "@/lib/auth/permissions";
+import type { UserRole } from "@prisma/client";
 
 interface ProfileSettingsProps {
   user: {
     firstName: string;
     lastName: string;
     email: string;
-    role: string;
+    role: UserRole;
   };
 }
 
@@ -89,7 +91,9 @@ export function ProfileSettings({ user }: ProfileSettingsProps) {
             <Label>Email</Label>
             <Input type="email" value={profile.email} onChange={(e) => setProfile({ ...profile, email: e.target.value })} />
           </div>
-          <p className="text-sm text-muted-foreground">Role: {user.role}</p>
+          <p className="text-sm text-muted-foreground">
+            Role: {ROLE_LABELS[user.role]}
+          </p>
           <Button onClick={saveProfile} disabled={savingProfile}>Save profile</Button>
         </CardContent>
       </Card>

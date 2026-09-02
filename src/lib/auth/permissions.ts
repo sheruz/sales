@@ -3,7 +3,8 @@ import { UserRole } from "@prisma/client";
 export const SESSION_COOKIE = "session_token";
 
 export const ROLE_LABELS: Record<UserRole, string> = {
-  ADMIN: "Admin",
+  SUPER_ADMIN: "Super Admin",
+  ADMIN: "Company Admin",
   SALES_MANAGER: "Sales Manager",
   SALES_REPRESENTATIVE: "Sales Representative",
 };
@@ -31,34 +32,38 @@ export type Permission =
   | "settings:write"
   | "users:manage"
   | "integrations:manage"
-  | "ai:use";
+  | "ai:use"
+  | "platform:manage";
+
+const ALL_APP_PERMISSIONS: Permission[] = [
+  "leads:read",
+  "leads:write",
+  "leads:delete",
+  "leads:assign",
+  "campaigns:read",
+  "campaigns:write",
+  "campaigns:delete",
+  "deals:read",
+  "deals:write",
+  "conversations:read",
+  "conversations:write",
+  "meetings:read",
+  "meetings:write",
+  "proposals:read",
+  "proposals:write",
+  "tasks:read",
+  "tasks:write",
+  "analytics:read",
+  "settings:read",
+  "settings:write",
+  "users:manage",
+  "integrations:manage",
+  "ai:use",
+];
 
 const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
-  ADMIN: [
-    "leads:read",
-    "leads:write",
-    "leads:delete",
-    "leads:assign",
-    "campaigns:read",
-    "campaigns:write",
-    "campaigns:delete",
-    "deals:read",
-    "deals:write",
-    "conversations:read",
-    "conversations:write",
-    "meetings:read",
-    "meetings:write",
-    "proposals:read",
-    "proposals:write",
-    "tasks:read",
-    "tasks:write",
-    "analytics:read",
-    "settings:read",
-    "settings:write",
-    "integrations:manage",
-    "users:manage",
-    "ai:use",
-  ],
+  SUPER_ADMIN: [...ALL_APP_PERMISSIONS, "platform:manage"],
+  ADMIN: [...ALL_APP_PERMISSIONS],
   SALES_MANAGER: [
     "leads:read",
     "leads:write",
@@ -112,10 +117,23 @@ export function hasAnyPermission(
   return permissions.some((permission) => hasPermission(role, permission));
 }
 
-export function isAdmin(role: UserRole): boolean {
+export function isSuperAdmin(role: UserRole): boolean {
+  return role === UserRole.SUPER_ADMIN;
+}
+
+export function isCompanyAdmin(role: UserRole): boolean {
   return role === UserRole.ADMIN;
 }
 
+/** Company admin or platform super admin */
+export function isAdmin(role: UserRole): boolean {
+  return role === UserRole.ADMIN || role === UserRole.SUPER_ADMIN;
+}
+
 export function isManagerOrAbove(role: UserRole): boolean {
-  return role === UserRole.ADMIN || role === UserRole.SALES_MANAGER;
+  return (
+    role === UserRole.SUPER_ADMIN ||
+    role === UserRole.ADMIN ||
+    role === UserRole.SALES_MANAGER
+  );
 }

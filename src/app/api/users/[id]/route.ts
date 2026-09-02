@@ -20,7 +20,7 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
     const { id } = await params;
     const body = await request.json();
     const input = updateUserSchema.parse(body);
-    const updated = await authService.updateUser(id, input);
+    const updated = await authService.updateUser(id, input, currentUser.role);
 
     return NextResponse.json(apiSuccess(updated));
   } catch (error) {
@@ -36,7 +36,7 @@ export async function DELETE(_request: NextRequest, { params }: RouteParams) {
     }
 
     const { id } = await params;
-    await authService.deactivateUser(id, currentUser.id);
+    await authService.deactivateUser(id, currentUser.id, currentUser.role);
 
     return NextResponse.json(apiSuccess({ message: "User deactivated" }));
   } catch (error) {

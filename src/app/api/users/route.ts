@@ -29,7 +29,7 @@ export async function POST(request: NextRequest) {
 
     const body = await request.json();
     const input = createUserSchema.parse(body);
-    const newUser = await authService.createUser(input);
+    const newUser = await authService.createUser(input, user.role);
 
     return NextResponse.json(apiSuccess(newUser), { status: 201 });
   } catch (error) {

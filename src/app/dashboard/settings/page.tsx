@@ -100,7 +100,7 @@ export default async function SettingsPage({
 
         {canManageUsers && (
           <TabsContent value="users" className="mt-4">
-            <UserManagementPanel />
+            <UserManagementPanel actorRole={user.role} />
           </TabsContent>
         )}
       </Tabs>

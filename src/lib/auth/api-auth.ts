@@ -18,3 +18,11 @@ export async function requirePermission(
   }
   return user;
 }
+
+export async function requireSuperAdmin(): Promise<AuthUser> {
+  const user = await requireUser();
+  if (!hasPermission(user.role, "platform:manage")) {
+    throw new ForbiddenError();
+  }
+  return user;
+}
