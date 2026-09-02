@@ -30,6 +30,7 @@ export type Permission =
   | "settings:read"
   | "settings:write"
   | "users:manage"
+  | "integrations:manage"
   | "ai:use";
 
 const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
@@ -54,6 +55,7 @@ const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
     "analytics:read",
     "settings:read",
     "settings:write",
+    "integrations:manage",
     "users:manage",
     "ai:use",
   ],
@@ -76,6 +78,7 @@ const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
     "tasks:write",
     "analytics:read",
     "settings:read",
+    "integrations:manage",
     "ai:use",
   ],
   SALES_REPRESENTATIVE: [
@@ -91,6 +94,7 @@ const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
     "proposals:read",
     "tasks:read",
     "tasks:write",
+    "integrations:manage",
     "ai:use",
   ],
 };

@@ -182,6 +182,18 @@ enum AutomationStatus {
   PAUSED
 }
 
+enum IntegrationPlatform {
+  OPENAI
+  ANTHROPIC
+  EMAIL_SMTP
+  LINKEDIN
+}
+
+enum LinkedInConnectionType {
+  OAUTH
+  SESSION
+}
+
 // ─── Auth & Users ────────────────────────────────────────────────────────────
 
 model User {
@@ -213,6 +225,8 @@ model User {
   linkedInJobs      LinkedInDiscoveryJob[]
   linkedInAccount   LinkedInAccount?
   autopilotConfig   AutopilotConfig?
+  userIntegrations  UserIntegration[]
+  outreachSettings  UserOutreachSettings?
 
   @@index([email])
   @@index([role])
@@ -857,22 +871,84 @@ model Service {
   @@map("services")
 }
 
+// ─── Integrations (SaaS BYOK) ───────────────────────────────────────────────
+
+model IntegrationProduct {
+  id                String              @id @default(uuid())
+  platform          IntegrationPlatform @unique
+  name              String
+  description       String
+  monthlyPriceCents Int                 @default(0) @map("monthly_price_cents")
+  isActive          Boolean             @default(true) @map("is_active")
+  sortOrder         Int                 @default(0) @map("sort_order")
+  createdAt         DateTime            @default(now()) @map("created_at")
+  updatedAt         DateTime            @updatedAt @map("updated_at")
+
+  userIntegrations UserIntegration[]
+
+  @@map("integration_products")
+}
+
+model UserIntegration {
+  id                   String              @id @default(uuid())
+  userId               String              @map("user_id")
+  platform             IntegrationPlatform
+  productId            String?             @map("product_id")
+  isConnected          Boolean             @default(false) @map("is_connected")
+  isEnabled            Boolean             @default(true) @map("is_enabled")
+  encryptedCredentials String?             @map("encrypted_credentials")
+  publicConfig         Json?               @map("public_config")
+  displayLabel         String?             @map("display_label")
+  lastVerifiedAt       DateTime?           @map("last_verified_at")
+  lastError            String?             @map("last_error")
+  createdAt            DateTime            @default(now()) @map("created_at")
+  updatedAt            DateTime            @updatedAt @map("updated_at")
+
+  user    User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  product IntegrationProduct? @relation(fields: [productId], references: [id])
+
+  @@unique([userId, platform])
+  @@index([userId])
+  @@map("user_integrations")
+}
+
+model UserOutreachSettings {
+  userId          String   @id @map("user_id")
+  activeAiProvider IntegrationPlatform @default(OPENAI) @map("active_ai_provider")
+  economyModel    String   @default("gpt-4o-mini") @map("economy_model")
+  qualityModel    String   @default("gpt-4o") @map("quality_model")
+  enabledChannels String[] @default(["email"]) @map("enabled_channels")
+  discoveryMode   String   @default("job_posts") @map("discovery_mode")
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("user_outreach_settings")
+}
+
 // ─── LinkedIn & Autopilot ────────────────────────────────────────────────────
 
 model LinkedInAccount {
-  id                String    @id @default(uuid())
-  userId            String    @unique @map("user_id")
-  linkedInEmail     String?   @map("linkedin_email")
-  liAtCookie        String    @map("li_at_cookie")
-  jsessionId        String?   @map("jsession_id")
-  profileUrn        String?   @map("profile_urn")
-  isActive          Boolean   @default(true) @map("is_active")
-  lastVerifiedAt    DateTime? @map("last_verified_at")
-  dailySearchCount  Int       @default(0) @map("daily_search_count")
-  dailyMessageCount Int       @default(0) @map("daily_message_count")
-  lastResetAt       DateTime? @map("last_reset_at")
-  createdAt         DateTime  @default(now()) @map("created_at")
-  updatedAt         DateTime  @updatedAt @map("updated_at")
+  id                String                 @id @default(uuid())
+  userId            String                 @unique @map("user_id")
+  connectionType    LinkedInConnectionType @default(OAUTH) @map("connection_type")
+  linkedInEmail     String?                @map("linkedin_email")
+  displayName       String?                @map("display_name")
+  linkedInMemberId  String?                @map("linkedin_member_id")
+  liAtCookie        String?                @map("li_at_cookie")
+  jsessionId        String?                @map("jsession_id")
+  oauthAccessToken  String?                @map("oauth_access_token")
+  oauthRefreshToken String?                @map("oauth_refresh_token")
+  oauthExpiresAt    DateTime?              @map("oauth_expires_at")
+  profileUrn        String?                @map("profile_urn")
+  isActive          Boolean                @default(true) @map("is_active")
+  lastVerifiedAt    DateTime?              @map("last_verified_at")
+  dailySearchCount  Int                    @default(0) @map("daily_search_count")
+  dailyMessageCount Int                    @default(0) @map("daily_message_count")
+  lastResetAt       DateTime?              @map("last_reset_at")
+  createdAt         DateTime               @default(now()) @map("created_at")
+  updatedAt         DateTime               @updatedAt @map("updated_at")
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
@@ -887,8 +963,15 @@ model AutopilotConfig {
   targetJobTitles     String[]  @default([]) @map("target_job_titles")
   targetIndustries    String[]  @default([]) @map("target_industries")
   targetCountries     String[]  @default([]) @map("target_countries")
-  dailySearchLimit    Int       @default(25) @map("daily_search_limit")
-  dailyMessageLimit   Int       @default(20) @map("daily_message_limit")
+  dailySearchLimit    Int       @default(5) @map("daily_search_limit")
+  dailyMessageLimit   Int       @default(5) @map("daily_message_limit")
+  maxLeadsPerRun      Int       @default(5) @map("max_leads_per_run")
+  maxLeadsPerDay      Int       @default(10) @map("max_leads_per_day")
+  dailyLeadsCreated   Int       @default(0) @map("daily_leads_created")
+  dailyEmailsSent     Int       @default(0) @map("daily_emails_sent")
+  dailyAiCalls        Int       @default(0) @map("daily_ai_calls")
+  maxAiCallsPerDay    Int       @default(15) @map("max_ai_calls_per_day")
+  dailyResetAt        DateTime? @map("daily_reset_at")
   autoCreateCampaigns Boolean   @default(true) @map("auto_create_campaigns")
   serviceId           String?   @map("service_id")
   activeCampaignId    String?   @map("active_campaign_id")

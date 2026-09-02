@@ -7,9 +7,9 @@ import {
 } from "@prisma/client";
 import { NotFoundError } from "@/lib/api/response";
 import { aiComplete, parseAIJson } from "@/lib/ai/provider";
-import { buildOutreachPrompt } from "@/lib/ai/prompts";
+import { buildOutreachPrompt, buildJobPostEmailPrompt } from "@/lib/ai/prompts";
 import { activityService } from "@/services/activity.service";
-import { isEmailConfigured, sendEmail } from "@/lib/email/smtp";
+import { sendEmailForUser } from "@/lib/email/smtp";
 import { linkedInAccountService } from "@/services/linkedin-account.service";
 import { sendConnectionOrMessage } from "@/lib/linkedin/messaging";
 
@@ -39,10 +39,26 @@ export class AIOutreachService {
       ? await prisma.campaign.findUnique({ where: { id: campaignId } })
       : lead.campaign;
 
+    const jobMeta = (lead.automationMeta as { jobPost?: Record<string, unknown> } | null)?.jobPost;
+
     await prisma.lead.update({
       where: { id: leadId },
       data: { automationStatus: AutomationStatus.GENERATING_OUTREACH },
     });
+
+    const userPrompt =
+      channel === "email" && jobMeta
+        ? buildJobPostEmailPrompt(
+            lead,
+            jobMeta as Parameters<typeof buildJobPostEmailPrompt>[1],
+            campaign?.aiInstructions
+          )
+        : buildOutreachPrompt(
+            lead,
+            research ?? {},
+            channel,
+            campaign?.aiInstructions
+          );
 
     const result = await aiComplete({
       feature: `outreach_${channel}`,
@@ -56,12 +72,7 @@ export class AIOutreachService {
         },
         {
           role: "user",
-          content: buildOutreachPrompt(
-            lead,
-            research ?? {},
-            channel,
-            campaign?.aiInstructions
-          ),
+          content: userPrompt,
         },
       ],
     });
@@ -127,10 +138,7 @@ export class AIOutreachService {
         throw new Error("User ID required for LinkedIn messaging");
       }
     } else if (conversation.channel === ConversationChannel.EMAIL && lead.email) {
-      if (!isEmailConfigured()) {
-        throw new Error("SMTP not configured — outreach saved as draft");
-      }
-      await sendEmail({
+      await sendEmailForUser(userId, {
         to: lead.email,
         subject: conversation.subject ?? `Hello ${lead.firstName}`,
         text: conversation.content ?? "",

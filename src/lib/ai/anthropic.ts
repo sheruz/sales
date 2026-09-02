@@ -11,10 +11,10 @@ export class AnthropicProvider implements AIProvider {
   name = "anthropic";
 
   async complete(options: AICompletionOptions): Promise<AICompletionResult> {
-    const apiKey = env.ANTHROPIC_API_KEY;
-    if (!apiKey) throw new Error("ANTHROPIC_API_KEY is not configured");
+    const apiKey = options.apiKey ?? env.ANTHROPIC_API_KEY;
+    if (!apiKey) throw new Error("Anthropic API key is not configured. Add your key in Settings → Integrations.");
 
-    const configured = env.ANTHROPIC_MODEL;
+    const configured = options.model ?? env.ANTHROPIC_MODEL;
     const modelsToTry = [
       configured,
       ...FALLBACK_MODELS.filter((m) => m !== configured),

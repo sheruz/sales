@@ -129,6 +129,7 @@ export default async function LeadDetailPage({ params }: PageProps) {
           <LeadAIPanel
             leadId={lead.id}
             automationStatus={lead.automationStatus}
+            automationError={lead.automationError}
             score={lead.score}
             scoreCategory={lead.scoreCategory}
             hasResearch={lead.researches.length > 0}

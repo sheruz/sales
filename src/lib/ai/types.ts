@@ -8,6 +8,9 @@ export interface AICompletionOptions {
   temperature?: number;
   maxTokens?: number;
   jsonMode?: boolean;
+  /** Override for per-user BYOK */
+  apiKey?: string;
+  model?: string;
 }
 
 export interface AICompletionResult {

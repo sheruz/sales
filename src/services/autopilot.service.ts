@@ -1,24 +1,49 @@
 import prisma from "@/lib/db/prisma";
-import { CampaignStatus, JobStatus } from "@prisma/client";
-import { linkedInAccountService } from "@/services/linkedin-account.service";
+import { JobStatus } from "@prisma/client";
 import { autoCampaignService } from "@/services/auto-campaign.service";
-import { linkedInService } from "@/services/linkedin.service";
+import { jobDiscoveryService } from "@/services/job-discovery.service";
 import { automationService } from "@/services/automation.service";
-import { searchPeople } from "@/lib/linkedin/search";
-import { NotFoundError, ValidationError } from "@/lib/api/response";
+import { ValidationError } from "@/lib/api/response";
+import {
+  assertAutopilotCanRun,
+  AUTOPILOT_SAFE_DEFAULTS,
+  effectiveRunLimit,
+  getAutopilotUsage,
+  incrementAutopilotAiCalls,
+  incrementAutopilotEmails,
+  incrementAutopilotLeads,
+  resetAutopilotDailyIfNeeded,
+} from "@/lib/autopilot\limits";
+import {
+  getDefaultOutreachChannels,
+  getOutreachChannelsForUser,
+  isEmailConfiguredForOutreach,
+} from "@/lib/outreach/channels";
 import type { Prisma } from "@prisma/client";
 
 export class AutopilotService {
   async getOrCreateConfig(userId: string) {
     return prisma.autopilotConfig.upsert({
       where: { userId },
-      create: { userId },
+      create: {
+        userId,
+        dailySearchLimit: AUTOPILOT_SAFE_DEFAULTS.dailySearchLimit,
+        dailyMessageLimit: AUTOPILOT_SAFE_DEFAULTS.dailyMessageLimit,
+        maxLeadsPerRun: AUTOPILOT_SAFE_DEFAULTS.maxLeadsPerRun,
+        maxLeadsPerDay: AUTOPILOT_SAFE_DEFAULTS.maxLeadsPerDay,
+        maxAiCallsPerDay: AUTOPILOT_SAFE_DEFAULTS.maxAiCallsPerDay,
+      },
       update: {},
       include: {
         service: { select: { id: true, name: true } },
         activeCampaign: { select: { id: true, name: true, status: true } },
       },
     });
+  }
+
+  async getUsage(userId: string) {
+    await this.getOrCreateConfig(userId);
+    return getAutopilotUsage(userId);
   }
 
   async updateConfig(
@@ -31,14 +56,37 @@ export class AutopilotService {
       targetCountries?: string[];
       dailySearchLimit?: number;
       dailyMessageLimit?: number;
+      maxLeadsPerRun?: number;
+      maxLeadsPerDay?: number;
+      maxAiCallsPerDay?: number;
       autoCreateCampaigns?: boolean;
       serviceId?: string;
     }
   ) {
     await this.getOrCreateConfig(userId);
+
+    const capped = {
+      ...data,
+      ...(data.dailySearchLimit !== undefined
+        ? { dailySearchLimit: Math.min(data.dailySearchLimit, 10) }
+        : {}),
+      ...(data.dailyMessageLimit !== undefined
+        ? { dailyMessageLimit: Math.min(data.dailyMessageLimit, 10) }
+        : {}),
+      ...(data.maxLeadsPerRun !== undefined
+        ? { maxLeadsPerRun: Math.min(data.maxLeadsPerRun, 10) }
+        : {}),
+      ...(data.maxLeadsPerDay !== undefined
+        ? { maxLeadsPerDay: Math.min(data.maxLeadsPerDay, 20) }
+        : {}),
+      ...(data.maxAiCallsPerDay !== undefined
+        ? { maxAiCallsPerDay: Math.min(data.maxAiCallsPerDay, 30) }
+        : {}),
+    };
+
     return prisma.autopilotConfig.update({
       where: { userId },
-      data,
+      data: capped,
       include: {
         service: { select: { id: true, name: true } },
         activeCampaign: { select: { id: true, name: true } },
@@ -47,6 +95,7 @@ export class AutopilotService {
   }
 
   async run(userId: string) {
+    await resetAutopilotDailyIfNeeded(userId);
     const config = await this.getOrCreateConfig(userId);
 
     if (!config.isEnabled) {
@@ -57,18 +106,26 @@ export class AutopilotService {
       throw new ValidationError("Set an autopilot goal first");
     }
 
-    const canSearch = await linkedInAccountService.canSearch(
-      userId,
-      config.dailySearchLimit
-    );
-    if (!canSearch) {
-      throw new ValidationError("Daily LinkedIn search limit reached");
+    if (!(await isEmailConfiguredForOutreach(userId))) {
+      throw new ValidationError(
+        "Email not configured. Connect Email (SMTP) in Settings → Integrations."
+      );
     }
 
+    await assertAutopilotCanRun(userId);
+
+    const runLimit = effectiveRunLimit(config);
+    if (runLimit <= 0) {
+      throw new ValidationError("Daily limits reached — no new leads will be created today");
+    }
+
+    const channels = await getOutreachChannelsForUser(userId);
     const log: string[] = [];
+    log.push(`Mode: job-post discovery → email-only outreach`);
+    log.push(`Safe limits: max ${runLimit} new leads this run, ${config.maxLeadsPerDay}/day total`);
+
     let campaignId = config.activeCampaignId;
 
-    // Step 1: Auto-create campaign if needed
     if (!campaignId && config.autoCreateCampaigns) {
       log.push("Creating campaign from AI goal...");
       const { campaign } = await autoCampaignService.createFromGoal(
@@ -77,15 +134,11 @@ export class AutopilotService {
         config.serviceId ?? undefined
       );
       campaignId = campaign.id;
+      await incrementAutopilotAiCalls(userId, 1);
 
       await prisma.autopilotConfig.update({
         where: { userId },
-        data: {
-          activeCampaignId: campaignId,
-          targetJobTitles: config.targetJobTitles.length
-            ? config.targetJobTitles
-            : [],
-        },
+        data: { activeCampaignId: campaignId },
       });
       log.push(`Campaign created: ${campaign.name}`);
     }
@@ -94,117 +147,71 @@ export class AutopilotService {
       throw new ValidationError("No active campaign. Enable auto-create or assign one.");
     }
 
-    // Step 2: Real LinkedIn search
-    const keywords = autoCampaignService.buildSearchKeywords({
-      targetJobTitles: config.targetJobTitles,
-      targetIndustries: config.targetIndustries,
-      targetCountries: config.targetCountries,
-      goal: config.goal,
-    });
+    log.push(`Discovering job posts matching: ${config.goal.slice(0, 80)}...`);
 
-    log.push(`Searching LinkedIn: "${keywords}"`);
-
-    const searchCount = Math.min(config.dailySearchLimit, 25);
-    const createdLeadIds: string[] = [];
-    const errors: string[] = [];
-    let profilesFound = 0;
-    let usedAiFallback = false;
-
-    try {
-      const client = await linkedInAccountService.getClient(userId);
-      const results = await searchPeople(client, {
-        keywords,
-        count: searchCount,
-      });
-
-      await linkedInAccountService.incrementSearch(userId, 1);
-      profilesFound = results.length;
-      log.push(`Found ${profilesFound} profiles on LinkedIn`);
-
-      for (const profile of results) {
-        try {
-          const existing = await prisma.lead.findFirst({
-            where: {
-              OR: [
-                { linkedInUrl: profile.linkedInUrl },
-                { fullName: profile.fullName, deletedAt: null },
-              ],
-            },
-          });
-          if (existing) {
-            createdLeadIds.push(existing.id);
-            continue;
-          }
-
-          const leadId = await linkedInService.createLeadFromLinkedInProfile(
-            {
-              firstName: profile.firstName,
-              lastName: profile.lastName,
-              fullName: profile.fullName,
-              jobTitle: profile.headline,
-              linkedInUrl: profile.linkedInUrl,
-              profileUrn: profile.profileUrn,
-              country: profile.location,
-              companyName: profile.headline?.split(" at ").pop(),
-            },
-            campaignId,
-            userId
-          );
-          createdLeadIds.push(leadId);
-        } catch (err) {
-          errors.push(`${profile.fullName}: ${err instanceof Error ? err.message : "failed"}`);
-        }
-      }
-    } catch (linkedinErr) {
-      const msg = linkedinErr instanceof Error ? linkedinErr.message : "LinkedIn search failed";
-      log.push(`LinkedIn search failed: ${msg}`);
-      log.push("Falling back to AI prospect discovery...");
-
-      const { leadIds, errors: aiErrors } = await linkedInService.discoverWithAI(
+    const { leadIds, errors, prospectsFound, skippedNoEmail } =
+      await jobDiscoveryService.discoverFromJobPosts(
         {
           jobTitles: config.targetJobTitles,
           industries: config.targetIndustries,
           countries: config.targetCountries,
           description: config.goal ?? undefined,
         },
-        searchCount,
+        runLimit,
         campaignId,
         userId,
         config.goal
       );
 
-      createdLeadIds.push(...leadIds);
-      errors.push(...aiErrors);
-      profilesFound = leadIds.length;
-      usedAiFallback = true;
-      log.push(`AI fallback created ${leadIds.length} leads`);
+    await incrementAutopilotAiCalls(userId, 1);
+    await incrementAutopilotLeads(userId, leadIds.length);
+
+    if (skippedNoEmail > 0) {
+      log.push(`Skipped ${skippedNoEmail} leads without valid email`);
+    }
+    log.push(`Job posts matched: ${prospectsFound}, new leads created: ${leadIds.length}`);
+
+    const usage = await getAutopilotUsage(userId);
+    const emailsSentToday = usage?.dailyMessageCount ?? 0;
+    const emailLimit = Math.min(
+      config.dailyMessageLimit - emailsSentToday,
+      runLimit
+    );
+
+    if (emailLimit <= 0) {
+      throw new ValidationError("Daily email limit reached");
     }
 
-    log.push(`Created/updated ${createdLeadIds.length} leads`);
+    let emailsSent = 0;
 
-    // Step 4: Run full automation pipeline on each lead
-    let automated = 0;
-    const messageLimit = config.dailyMessageLimit;
-
-    for (const leadId of createdLeadIds) {
-      if (automated >= messageLimit) break;
+    for (const leadId of leadIds) {
+      if (emailsSent >= emailLimit) {
+        log.push(`Stopped at daily email limit (${config.dailyMessageLimit})`);
+        break;
+      }
       try {
-        await automationService.runPipeline(leadId, userId);
-        automated++;
-        log.push(`Automated lead ${leadId}`);
+        await automationService.runPipeline(leadId, userId, {
+          channels,
+          skipResearch: true,
+        });
+        emailsSent++;
+        await incrementAutopilotAiCalls(userId, 1);
+        await incrementAutopilotEmails(userId, 1);
+        log.push(`Email sent for lead ${leadId}`);
       } catch (err) {
         errors.push(`Pipeline ${leadId}: ${err instanceof Error ? err.message : "failed"}`);
       }
     }
 
+    const cooldownMs = AUTOPILOT_SAFE_DEFAULTS.minHoursBetweenRuns * 60 * 60 * 1000;
+
     const result = {
       status: "completed",
       campaignId,
-      keywords,
-      profilesFound,
-      usedAiFallback,
-      leadsProcessed: createdLeadIds.length,
-      automated,
+      discoveryMode: "job_posts",
+      prospectsFound,
+      newLeadsCreated: leadIds.length,
+      emailsSent,
       errors,
       log,
       finishedAt: new Date().toISOString(),
@@ -214,21 +221,20 @@ export class AutopilotService {
       where: { userId },
       data: {
         lastRunAt: new Date(),
-        nextRunAt: new Date(Date.now() + 4 * 60 * 60 * 1000), // 4 hours
+        nextRunAt: new Date(Date.now() + cooldownMs),
         lastRunResult: result as unknown as Prisma.InputJsonValue,
       },
     });
 
-    // Log discovery job
     await prisma.linkedInDiscoveryJob.create({
       data: {
         campaignId,
         createdById: userId,
         status: JobStatus.COMPLETED,
-        searchCriteria: { keywords, autopilot: true, usedAiFallback },
+        searchCriteria: { mode: "job_posts", goal: config.goal, runLimit },
         profileUrls: [],
-        targetCount: searchCount,
-        leadsCreated: createdLeadIds.length,
+        targetCount: runLimit,
+        leadsCreated: leadIds.length,
         results: result as unknown as Prisma.InputJsonValue,
         completedAt: new Date(),
       },
@@ -248,6 +254,16 @@ export class AutopilotService {
     const results = [];
     for (const config of configs) {
       try {
+        const usage = await getAutopilotUsage(config.userId);
+        if (usage && usage.remainingLeadsToday <= 0) {
+          results.push({
+            userId: config.userId,
+            status: "skipped",
+            reason: "Daily lead limit reached",
+          });
+          continue;
+        }
+
         const result = await this.run(config.userId);
         results.push({ userId: config.userId, status: "success", result });
       } catch (err) {

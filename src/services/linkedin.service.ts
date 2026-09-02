@@ -227,7 +227,23 @@ export class LinkedInService {
     const errors: string[] = [];
 
     for (const prospect of prospects) {
+      if (leadIds.length >= count) break;
+
       try {
+        const existing = await prisma.lead.findFirst({
+          where: {
+            deletedAt: null,
+            OR: [
+              ...(prospect.linkedInUrl ? [{ linkedInUrl: prospect.linkedInUrl }] : []),
+              {
+                fullName: prospect.fullName,
+                ...(prospect.companyName ? { companyName: prospect.companyName } : {}),
+              },
+            ],
+          },
+        });
+        if (existing) continue;
+
         const leadId = await this.createLeadFromProspect(prospect, campaignId, userId);
         leadIds.push(leadId);
       } catch (err) {

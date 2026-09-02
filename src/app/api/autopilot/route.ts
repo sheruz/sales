@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import prisma from "@/lib/db/prisma";
 import { autopilotService } from "@/services/autopilot.service";
+import { assertAutopilotCanRun } from "@/lib/autopilot\limits";
 import { requirePermission } from "@/lib/auth/api-auth";
 import { apiSuccess } from "@/lib/api/response";
 import { handleApiError } from "@/lib/api/error-handler";
@@ -12,8 +13,11 @@ const updateSchema = z.object({
   targetJobTitles: z.array(z.string()).optional(),
   targetIndustries: z.array(z.string()).optional(),
   targetCountries: z.array(z.string()).optional(),
-  dailySearchLimit: z.coerce.number().min(1).max(100).optional(),
-  dailyMessageLimit: z.coerce.number().min(1).max(100).optional(),
+  dailySearchLimit: z.coerce.number().min(1).max(25).optional(),
+  dailyMessageLimit: z.coerce.number().min(1).max(25).optional(),
+  maxLeadsPerRun: z.coerce.number().min(1).max(25).optional(),
+  maxLeadsPerDay: z.coerce.number().min(1).max(50).optional(),
+  maxAiCallsPerDay: z.coerce.number().min(10).max(100).optional(),
   autoCreateCampaigns: z.boolean().optional(),
   serviceId: z.string().uuid().optional(),
 });
@@ -21,8 +25,11 @@ const updateSchema = z.object({
 export async function GET() {
   try {
     const user = await requirePermission("ai:use");
-    const config = await autopilotService.getOrCreateConfig(user.id);
-    return NextResponse.json(apiSuccess(config));
+    const [config, usage] = await Promise.all([
+      autopilotService.getOrCreateConfig(user.id),
+      autopilotService.getUsage(user.id),
+    ]);
+    return NextResponse.json(apiSuccess({ ...config, usage }));
   } catch (error) {
     return handleApiError(error);
   }
@@ -43,6 +50,8 @@ export async function PATCH(request: NextRequest) {
 export async function POST() {
   try {
     const user = await requirePermission("ai:use");
+
+    await assertAutopilotCanRun(user.id);
 
     const existing = await autopilotService.getOrCreateConfig(user.id);
     const lastResult = existing.lastRunResult as { status?: string } | null;

@@ -1,41 +1,42 @@
-import nodemailer from "nodemailer";
 import { env } from "@/lib/config/env";
+import { sendEmailWithConfig, type SmtpConfig } from "@/lib/email/send-mail";
+import { userIntegrationService } from "@/services/user-integration.service";
 
-export interface SendEmailParams {
-  to: string;
-  subject: string;
-  text: string;
-  html?: string;
-}
+export type { SendEmailParams } from "@/lib/email/send-mail";
 
-export async function sendEmail(params: SendEmailParams): Promise<{ messageId: string }> {
-  if (!env.SMTP_HOST || !env.SMTP_USER || !env.SMTP_PASSWORD) {
-    throw new Error("SMTP is not configured. Set SMTP_HOST, SMTP_USER, and SMTP_PASSWORD.");
+export async function sendEmailForUser(
+  userId: string | undefined,
+  params: { to: string; subject: string; text: string; html?: string }
+) {
+  if (userId) {
+    const userConfig = await userIntegrationService.getEmailConfig(userId);
+    if (userConfig) {
+      return sendEmailWithConfig(userConfig, params);
+    }
   }
 
-  const transporter = nodemailer.createTransport({
+  if (!env.SMTP_HOST || !env.SMTP_USER || !env.SMTP_PASSWORD) {
+    throw new Error(
+      "Email not configured. Add your SMTP settings in Settings → Integrations."
+    );
+  }
+
+  const platformConfig: SmtpConfig = {
     host: env.SMTP_HOST,
     port: env.SMTP_PORT,
     secure: env.SMTP_SECURE,
-    auth: {
-      user: env.SMTP_USER,
-      pass: env.SMTP_PASSWORD,
-    },
-  });
+    user: env.SMTP_USER,
+    password: env.SMTP_PASSWORD,
+    fromName: env.SMTP_FROM_NAME,
+    fromEmail: env.SMTP_FROM_EMAIL ?? env.SMTP_USER,
+  };
 
-  const info = await transporter.sendMail({
-    from: env.SMTP_FROM_EMAIL
-      ? `"${env.SMTP_FROM_NAME}" <${env.SMTP_FROM_EMAIL}>`
-      : env.SMTP_USER,
-    to: params.to,
-    subject: params.subject,
-    text: params.text,
-    html: params.html ?? params.text.replace(/\n/g, "<br>"),
-  });
-
-  return { messageId: info.messageId };
+  return sendEmailWithConfig(platformConfig, params);
 }
 
-export function isEmailConfigured(): boolean {
+export async function isEmailConfiguredForUser(userId?: string): Promise<boolean> {
+  if (userId) {
+    return userIntegrationService.isEmailConfigured(userId);
+  }
   return Boolean(env.SMTP_HOST && env.SMTP_USER && env.SMTP_PASSWORD);
 }

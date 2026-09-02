@@ -1,9 +1,10 @@
 import { redirect } from "next/navigation";
+import { Suspense } from "react";
 import { getCurrentUser } from "@/lib/auth/session";
 import { hasPermission } from "@/lib/auth/permissions";
-import { linkedInAccountService } from "@/services/linkedin-account.service";
+import { userIntegrationService } from "@/services/user-integration.service";
 import { UserManagementPanel } from "@/components/dashboard/user-management-panel";
-import { LinkedInSettings } from "@/components/settings/linkedin-settings";
+import { IntegrationsPanel } from "@/components/settings/integrations-panel";
 import {
   Card,
   CardContent,
@@ -13,22 +14,22 @@ import {
 } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
-export default async function SettingsPage() {
+export default async function SettingsPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ tab?: string }>;
+}) {
   const user = await getCurrentUser();
   if (!user) redirect("/login");
 
+  const params = await searchParams;
+  const defaultTab = params.tab === "integrations" ? "integrations" : "profile";
+
   const canManageUsers = hasPermission(user.role, "users:manage");
-  const canManageIntegrations = hasPermission(user.role, "settings:write");
+  const canManageIntegrations = hasPermission(user.role, "integrations:manage");
 
-  const linkedInStatus = canManageIntegrations
-    ? await linkedInAccountService.getStatus(user.id)
-    : null;
-
-  const serializedLinkedIn = linkedInStatus
-    ? {
-        ...linkedInStatus,
-        lastVerifiedAt: linkedInStatus.lastVerifiedAt?.toISOString() ?? null,
-      }
+  const integrationData = canManageIntegrations
+    ? await userIntegrationService.listForUser(user.id)
     : null;
 
   return (
@@ -36,20 +37,20 @@ export default async function SettingsPage() {
       <div>
         <h2 className="text-2xl font-bold tracking-tight">Settings</h2>
         <p className="text-muted-foreground">
-          Manage your account and platform configuration.
+          Connect your own AI, email, and outreach accounts. Credentials are encrypted and never shared.
         </p>
       </div>
 
-      <Tabs defaultValue="profile">
+      <Tabs defaultValue={defaultTab}>
         <TabsList>
           <TabsTrigger value="profile">Profile</TabsTrigger>
+          {canManageIntegrations && (
+            <TabsTrigger value="integrations">Integrations</TabsTrigger>
+          )}
           {canManageUsers && (
             <TabsTrigger value="users">User Management</TabsTrigger>
           )}
           <TabsTrigger value="services">Services</TabsTrigger>
-          {canManageIntegrations && (
-            <TabsTrigger value="linkedin">LinkedIn</TabsTrigger>
-          )}
         </TabsList>
 
         <TabsContent value="profile" className="mt-4">
@@ -73,6 +74,14 @@ export default async function SettingsPage() {
           </Card>
         </TabsContent>
 
+        {canManageIntegrations && integrationData && (
+          <TabsContent value="integrations" className="mt-4">
+            <Suspense fallback={<p>Loading integrations...</p>}>
+              <IntegrationsPanel initialData={integrationData} />
+            </Suspense>
+          </TabsContent>
+        )}
+
         {canManageUsers && (
           <TabsContent value="users" className="mt-4">
             <UserManagementPanel />
@@ -84,23 +93,11 @@ export default async function SettingsPage() {
             <CardHeader>
               <CardTitle>Company Services</CardTitle>
               <CardDescription>
-                Configure services for AI outreach generation. Available in a
-                future update.
+                Services your AI uses when writing outreach. Configure in admin panel (coming soon).
               </CardDescription>
             </CardHeader>
-            <CardContent>
-              <p className="text-sm text-muted-foreground">
-                Service configuration will be available in Phase 5.
-              </p>
-            </CardContent>
           </Card>
         </TabsContent>
-
-        {canManageIntegrations && (
-          <TabsContent value="linkedin" className="mt-4">
-            <LinkedInSettings initialStatus={serializedLinkedIn} />
-          </TabsContent>
-        )}
       </Tabs>
     </div>
   );

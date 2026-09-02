@@ -1,25 +1,33 @@
 import { env } from "@/lib/config/env";
 import { AnthropicProvider } from "./anthropic";
 import { OpenAIProvider } from "./openai";
+import { resolveAiRuntime } from "./resolve-config";
 import { logAIUsage } from "./usage";
 import type { AICompletionOptions, AICompletionResult, AIProvider } from "./types";
 
-let cachedProvider: AIProvider | null = null;
+const openaiProvider = new OpenAIProvider();
+const anthropicProvider = new AnthropicProvider();
 
+function getProvider(name: "openai" | "anthropic"): AIProvider {
+  return name === "anthropic" ? anthropicProvider : openaiProvider;
+}
+
+/** @deprecated Use aiComplete with userId instead */
 export function getAIProvider(): AIProvider {
-  if (cachedProvider) return cachedProvider;
-
-  cachedProvider =
-    env.AI_PROVIDER === "anthropic" ? new AnthropicProvider() : new OpenAIProvider();
-
-  return cachedProvider;
+  return env.AI_PROVIDER === "anthropic" ? anthropicProvider : openaiProvider;
 }
 
 export async function aiComplete(
   options: AICompletionOptions & { feature: string; userId?: string }
 ): Promise<AICompletionResult> {
-  const provider = getAIProvider();
-  const result = await provider.complete(options);
+  const runtime = await resolveAiRuntime(options.userId, options.feature);
+  const provider = getProvider(runtime.provider);
+
+  const result = await provider.complete({
+    ...options,
+    apiKey: runtime.apiKey,
+    model: runtime.model,
+  });
 
   await logAIUsage({
     userId: options.userId,
@@ -28,6 +36,7 @@ export async function aiComplete(
     promptTokens: result.promptTokens,
     outputTokens: result.outputTokens,
     totalTokens: result.totalTokens,
+    metadata: { source: runtime.source, provider: runtime.provider },
   });
 
   return result;

@@ -23,9 +23,9 @@ export const CAMPAIGN_STATUS_LABELS: Record<string, string> = {
 };
 
 export const DEFAULT_FOLLOW_UP_STEPS = [
-  { delayDays: 3, channel: "linkedin", template: "follow_up_1" },
+  { delayDays: 3, channel: "email", template: "follow_up_1" },
   { delayDays: 7, channel: "email", template: "follow_up_2" },
-  { delayDays: 14, channel: "linkedin", template: "follow_up_3" },
+  { delayDays: 14, channel: "email", template: "follow_up_3" },
 ];
 
 export const LINKEDIN_PROFILE_URL_REGEX =

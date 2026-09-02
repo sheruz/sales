@@ -1,5 +1,5 @@
 import prisma from "@/lib/db/prisma";
-import { env } from "@/lib/config/env";
+import { LinkedInConnectionType } from "@prisma/client";
 import { encrypt, decrypt, isEncryptionConfigured } from "@/lib/crypto/encrypt";
 import { buildSession, LinkedInVoyagerClient } from "@/lib/linkedin/voyager-client";
 import { NotFoundError, ValidationError } from "@/lib/api/response";
@@ -26,6 +26,7 @@ export class LinkedInAccountService {
       where: { userId },
       create: {
         userId,
+        connectionType: LinkedInConnectionType.SESSION,
         liAtCookie: encryptedLiAt,
         jsessionId: encryptedJsession,
         linkedInEmail: data.linkedInEmail,
@@ -34,6 +35,7 @@ export class LinkedInAccountService {
         isActive: true,
       },
       update: {
+        connectionType: LinkedInConnectionType.SESSION,
         liAtCookie: encryptedLiAt,
         jsessionId: encryptedJsession,
         linkedInEmail: data.linkedInEmail,
@@ -54,6 +56,16 @@ export class LinkedInAccountService {
     });
 
     if (account) {
+      if (account.connectionType === LinkedInConnectionType.OAUTH) {
+        throw new NotFoundError(
+          "LinkedIn OAuth is connected for profile. Messaging requires LinkedIn API partner access — use email outreach."
+        );
+      }
+      if (!account.liAtCookie) {
+        throw new NotFoundError(
+          "LinkedIn session not available. Connect LinkedIn in Settings → Integrations."
+        );
+      }
       const liAt = decrypt(account.liAtCookie);
       const jsessionId = account.jsessionId ? decrypt(account.jsessionId) : "";
       return new LinkedInVoyagerClient(buildSession(liAt, jsessionId));

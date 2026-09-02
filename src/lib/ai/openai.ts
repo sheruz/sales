@@ -5,10 +5,10 @@ export class OpenAIProvider implements AIProvider {
   name = "openai";
 
   async complete(options: AICompletionOptions): Promise<AICompletionResult> {
-    const apiKey = env.OPENAI_API_KEY;
-    if (!apiKey) throw new Error("OPENAI_API_KEY is not configured");
+    const apiKey = options.apiKey ?? env.OPENAI_API_KEY;
+    if (!apiKey) throw new Error("OpenAI API key is not configured. Add your key in Settings → Integrations.");
 
-    const model = env.OPENAI_MODEL;
+    const model = options.model ?? env.OPENAI_MODEL;
 
     const response = await fetch("https://api.openai.com/v1/chat/completions", {
       method: "POST",

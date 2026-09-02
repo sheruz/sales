@@ -38,9 +38,11 @@ const envSchema = z.object({
   BCRYPT_ROUNDS: z.coerce.number().default(12),
   AI_PROVIDER: z.enum(["openai", "anthropic"]).default("openai"),
   OPENAI_API_KEY: z.string().optional(),
-  OPENAI_MODEL: z.string().default("gpt-4o"),
+  OPENAI_MODEL: z.string().default("gpt-4o-mini"),
+  OPENAI_QUALITY_MODEL: z.string().default("gpt-4o"),
   ANTHROPIC_API_KEY: z.string().optional(),
-  ANTHROPIC_MODEL: z.string().default("claude-sonnet-4-6"),
+  ANTHROPIC_MODEL: z.string().default("claude-haiku-4-5-20251001"),
+  ANTHROPIC_QUALITY_MODEL: z.string().default("claude-sonnet-4-6"),
   SMTP_HOST: z.string().optional(),
   SMTP_PORT: z.coerce.number().default(587),
   SMTP_SECURE: z.coerce.boolean().default(false),
@@ -57,8 +59,15 @@ const envSchema = z.object({
   FOLLOWUP_CHECK_INTERVAL_MS: z.coerce.number().default(300000),
   LINKEDIN_LI_AT: z.string().optional(),
   LINKEDIN_JSESSIONID: z.string().optional(),
+  LINKEDIN_CLIENT_ID: z.string().optional(),
+  LINKEDIN_CLIENT_SECRET: z.string().optional(),
+  LINKEDIN_REDIRECT_URI: z.string().url().optional(),
   AUTOPILOT_ENABLED: z.coerce.boolean().default(false),
   CRON_SECRET: z.string().optional(),
+  /** Comma-separated: email, linkedin. Default email-only to protect LinkedIn account */
+  OUTREACH_CHANNELS: z.string().default("email"),
+  /** job_posts (default) or linkedin */
+  AUTOPILOT_DISCOVERY_MODE: z.enum(["job_posts", "linkedin"]).default("job_posts"),
 });
 
 let cachedEnv: z.infer<typeof envSchema> | null = null;

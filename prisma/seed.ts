@@ -1,5 +1,6 @@
 import { PrismaClient, UserRole } from "@prisma/client";
 import bcrypt from "bcryptjs";
+import { INTEGRATION_CATALOG } from "../src/lib/integrations/catalog";
 
 const prisma = new PrismaClient();
 
@@ -175,6 +176,27 @@ async function main() {
   console.log(`  Rep: ${rep.email}`);
   console.log(`  Services: ${services.length}`);
   console.log(`  Tags: ${tags.length}`);
+
+  for (const item of INTEGRATION_CATALOG) {
+    await prisma.integrationProduct.upsert({
+      where: { platform: item.platform },
+      create: {
+        platform: item.platform,
+        name: item.name,
+        description: item.description,
+        monthlyPriceCents: item.monthlyPriceCents,
+        sortOrder: item.sortOrder,
+      },
+      update: {
+        name: item.name,
+        description: item.description,
+        monthlyPriceCents: item.monthlyPriceCents,
+        sortOrder: item.sortOrder,
+      },
+    });
+  }
+
+  console.log(`  Integration products: ${INTEGRATION_CATALOG.length}`);
   console.log("\nDefault password for all users: Admin@123");
 }
 

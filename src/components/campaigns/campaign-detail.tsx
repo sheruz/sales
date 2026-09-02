@@ -227,6 +227,7 @@ export function CampaignDetail({ campaign, stats }: CampaignDetailProps) {
 interface LeadAIPanelProps {
   leadId: string;
   automationStatus: string;
+  automationError?: string | null;
   score: number;
   scoreCategory: string | null;
   hasResearch: boolean;
@@ -235,6 +236,7 @@ interface LeadAIPanelProps {
 export function LeadAIPanel({
   leadId,
   automationStatus,
+  automationError,
   score,
   scoreCategory,
   hasResearch,
@@ -297,10 +299,15 @@ export function LeadAIPanel({
       <CardContent className="space-y-4">
         <div className="flex items-center justify-between">
           <span className="text-sm text-muted-foreground">Status</span>
-          <Badge variant={isLocked ? "default" : "secondary"}>
+          <Badge variant={automationStatus === "FAILED" ? "destructive" : isLocked ? "default" : "secondary"}>
             {AUTOMATION_STATUS_LABELS[automationStatus] ?? automationStatus}
           </Badge>
         </div>
+        {automationStatus === "FAILED" && automationError && (
+          <p className="text-sm text-destructive rounded-md border border-destructive/30 bg-destructive/5 p-2">
+            {automationError}
+          </p>
+        )}
         <div className="flex items-center justify-between">
           <span className="text-sm text-muted-foreground">AI Score</span>
           <span className="font-medium">

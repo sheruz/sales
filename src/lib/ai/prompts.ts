@@ -175,3 +175,92 @@ Return JSON array of prospects:
   "confidence": 0-100
 }]`;
 }
+
+export function buildJobPostDiscoveryPrompt(
+  criteria: {
+    jobTitles?: string[];
+    industries?: string[];
+    countries?: string[];
+    keywords?: string[];
+    description?: string;
+  },
+  count: number,
+  campaignContext?: string
+) {
+  return `Find ${count} realistic companies or hiring managers who recently posted freelance/contract job requirements matching these criteria.
+
+Focus on job posts like: "Need React developer", "Looking for freelancer for web app", "Contract full-stack engineer", "Hire agency for MVP", etc.
+Platforms: Upwork, LinkedIn Jobs, Indeed, Freelancer, company career pages, startup job boards.
+
+CRITERIA: ${JSON.stringify(criteria)}
+${campaignContext ? `OUR OFFER / CONTEXT: ${campaignContext}` : ""}
+
+For each opportunity return a contact who posted or owns the hiring decision (not a random employee).
+
+RULES:
+- email is REQUIRED — use realistic business emails (e.g. hiring@, hr@, firstname@company.com). Never leave email empty.
+- Include the job post title and requirements summary
+- leadScore 0-100 based on fit for a dev agency/freelancer outreach
+- Prefer posts with clear budget or urgency signals
+
+Return JSON array:
+[{
+  "firstName": "string",
+  "lastName": "string",
+  "jobTitle": "string (their role, e.g. CTO, Hiring Manager)",
+  "email": "required valid-looking business email",
+  "companyName": "string",
+  "companyWebsite": "string or null",
+  "industry": "string",
+  "country": "string",
+  "jobPostTitle": "string (the job/gig title they posted)",
+  "jobPostPlatform": "Upwork|LinkedIn Jobs|Indeed|Freelancer|Company Site|Other",
+  "jobPostUrl": "string or null",
+  "jobRequirements": "2-3 sentence summary of what they need",
+  "budgetHint": "string or null",
+  "companySummary": "1-2 sentences about the company",
+  "leadScore": 0-100,
+  "scoreCategory": "HOT|WARM|POSSIBLE|LOW_PRIORITY",
+  "personalizationPoints": ["point1", "point2"]
+}]`;
+}
+
+export function buildJobPostEmailPrompt(
+  lead: {
+    fullName: string;
+    jobTitle?: string | null;
+    companyName?: string | null;
+    email?: string | null;
+  },
+  jobPost: {
+    jobPostTitle?: string;
+    jobRequirements?: string;
+    budgetHint?: string;
+    jobPostPlatform?: string;
+    companySummary?: string;
+    personalizationPoints?: string[];
+  },
+  campaignInstructions?: string | null
+) {
+  const points = jobPost.personalizationPoints?.join(", ") ?? "";
+
+  return `Write a personalized cold email responding to a freelance/job requirement post.
+
+CONTACT: ${lead.fullName}, ${lead.jobTitle} at ${lead.companyName}
+THEIR JOB POST: "${jobPost.jobPostTitle ?? "Freelance developer needed"}"
+PLATFORM: ${jobPost.jobPostPlatform ?? "Job board"}
+REQUIREMENTS: ${jobPost.jobRequirements ?? "Not specified"}
+BUDGET: ${jobPost.budgetHint ?? "Not specified"}
+COMPANY: ${jobPost.companySummary ?? lead.companyName}
+PERSONALIZATION: ${points}
+${campaignInstructions ? `OUR PITCH INSTRUCTIONS: ${campaignInstructions}` : ""}
+
+Rules:
+- Position us as a capable dev team/freelancer who can deliver their posted requirements
+- Reference their specific job post needs (not generic)
+- Professional, concise, 3 short paragraphs max
+- Include a soft CTA (quick call or reply)
+- Plain text email body
+
+Return JSON: { "subject": "email subject referencing their project", "message": "email body" }`;
+}

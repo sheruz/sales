@@ -27,14 +27,14 @@ export const linkedInDiscoverySchema = z.object({
       description: z.string().optional(),
     })
     .optional(),
-  targetCount: z.coerce.number().min(1).max(100).default(10),
-  autoStartAutomation: z.boolean().default(true),
+  targetCount: z.coerce.number().min(1).max(25).default(10),
+  autoStartAutomation: z.boolean().default(false),
 });
 
 export const startAutomationSchema = z.object({
   leadIds: z.array(z.string().uuid()).min(1).max(50),
   campaignId: z.string().uuid().optional(),
-  channels: z.array(z.enum(["linkedin", "email"])).default(["linkedin", "email"]),
+  channels: z.array(z.enum(["linkedin", "email"])).default(["email"]),
 });
 
 export const inboundReplySchema = z.object({
