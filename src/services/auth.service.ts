@@ -149,6 +149,48 @@ export class AuthService {
     });
   }
 
+  async updateProfile(userId: string, input: { firstName: string; lastName: string; email: string }) {
+    const email = input.email.toLowerCase().trim();
+    const existing = await prisma.user.findFirst({
+      where: { email, NOT: { id: userId } },
+    });
+    if (existing) throw new ValidationError("Email already in use");
+
+    return prisma.user.update({
+      where: { id: userId },
+      data: {
+        firstName: input.firstName,
+        lastName: input.lastName,
+        email,
+      },
+      select: {
+        id: true,
+        email: true,
+        firstName: true,
+        lastName: true,
+        role: true,
+        avatarUrl: true,
+      },
+    });
+  }
+
+  async changePassword(userId: string, currentPassword: string, newPassword: string) {
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { passwordHash: true },
+    });
+    if (!user) throw new ValidationError("User not found");
+
+    const valid = await verifyPassword(currentPassword, user.passwordHash);
+    if (!valid) throw new UnauthorizedError("Current password is incorrect");
+
+    const passwordHash = await hashPassword(newPassword);
+    await prisma.user.update({
+      where: { id: userId },
+      data: { passwordHash },
+    });
+  }
+
   async deactivateUser(userId: string, actorId: string) {
     if (userId === actorId) {
       throw new ValidationError("Cannot deactivate your own account");

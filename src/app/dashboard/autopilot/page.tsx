@@ -4,6 +4,7 @@ import { hasPermission } from "@/lib/auth/permissions";
 import prisma from "@/lib/db/prisma";
 import { autopilotService } from "@/services/autopilot.service";
 import { userIntegrationService } from "@/services/user-integration.service";
+import { isAiConfigured } from "@/lib/integrations/readiness";
 import { AutopilotPanel } from "@/components/autopilot/autopilot-panel";
 
 export default async function AutopilotPage() {
@@ -21,7 +22,10 @@ export default async function AutopilotPage() {
     autopilotService.getUsage(user.id),
   ]);
 
-  const emailConfigured = await userIntegrationService.isEmailConfigured(user.id);
+  const [emailConfigured, aiConfigured] = await Promise.all([
+    userIntegrationService.isEmailConfigured(user.id),
+    isAiConfigured(user.id),
+  ]);
 
   return (
     <div className="space-y-6">
@@ -53,6 +57,7 @@ export default async function AutopilotPage() {
         usage={usage}
         services={services}
         emailConfigured={emailConfigured}
+        aiConfigured={aiConfigured}
       />
     </div>
   );

@@ -40,7 +40,7 @@ interface IntegrationItem {
   fields: Array<{ key: string; label: string; type: string; placeholder?: string; required?: boolean }>;
   isConnected: boolean;
   maskedPreview: string | null;
-  lastError: string | null;
+  lastError?: string | null;
 }
 
 interface IntegrationsPanelProps {
@@ -83,6 +83,18 @@ export function IntegrationsPanel({ initialData }: IntegrationsPanelProps) {
 
   function getIntegration(platform: string) {
     return data.integrations.find((i) => i.platform === platform);
+  }
+
+  function toggleChannel(channel: "email" | "linkedin") {
+    const current = data.outreachSettings.enabledChannels;
+    const next = current.includes(channel)
+      ? current.filter((c) => c !== channel)
+      : [...current, channel];
+    if (next.length === 0) {
+      toast.error("At least one outreach channel must stay enabled");
+      return;
+    }
+    void saveOutreach({ enabledChannels: next });
   }
 
   async function saveOutreach(updates: Partial<typeof data.outreachSettings>) {
@@ -269,6 +281,35 @@ export function IntegrationsPanel({ initialData }: IntegrationsPanelProps) {
         </CardContent>
       </Card>
 
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">Outreach channels</CardTitle>
+          <CardDescription>
+            Choose how autopilot contacts leads. Email-only is recommended and safest.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="flex flex-wrap gap-6">
+          <label className="flex items-center gap-2 text-sm cursor-pointer">
+            <input
+              type="checkbox"
+              checked={data.outreachSettings.enabledChannels.includes("email")}
+              onChange={() => toggleChannel("email")}
+              className="h-4 w-4 rounded border"
+            />
+            Email (SMTP)
+          </label>
+          <label className="flex items-center gap-2 text-sm cursor-pointer">
+            <input
+              type="checkbox"
+              checked={data.outreachSettings.enabledChannels.includes("linkedin")}
+              onChange={() => toggleChannel("linkedin")}
+              className="h-4 w-4 rounded border"
+            />
+            LinkedIn (requires connected account)
+          </label>
+        </CardContent>
+      </Card>
+
       <IntegrationCard
         icon={<Bot className="h-5 w-5" />}
         title="OpenAI"
@@ -362,12 +403,12 @@ export function IntegrationsPanel({ initialData }: IntegrationsPanelProps) {
             <p className="text-sm text-muted-foreground">
               Sign in with your LinkedIn username and password on LinkedIn&apos;s official login page — we never store your password.
             </p>
-            <Button asChild>
-              <a href="/api/integrations/linkedin/oauth">
+            <a href="/api/integrations/linkedin/oauth">
+              <Button>
                 <Globe className="mr-2 h-4 w-4" />
                 Connect LinkedIn Account
-              </a>
-            </Button>
+              </Button>
+            </a>
           </div>
         )}
       </IntegrationCard>

@@ -1,5 +1,7 @@
 import prisma from "@/lib/db/prisma";
 import { getCurrentUser } from "@/lib/auth/session";
+import { getUserReadiness } from "@/lib/integrations/readiness";
+import { SetupChecklist } from "@/components/dashboard/setup-checklist";
 import {
   Card,
   CardContent,
@@ -16,85 +18,66 @@ import {
   TrendingUp,
   Users,
 } from "lucide-react";
-import { ROLE_LABELS } from "@/lib/auth/permissions";
+import { ROLE_LABELS, isAdmin, isManagerOrAbove } from "@/lib/auth/permissions";
+import Link from "next/link";
+import { Button } from "@/components/ui/button";
 
-async function getDashboardStats() {
+async function getDashboardStats(userId: string, role: string) {
+  const scopeFilter =
+    isAdmin(role as import("@prisma/client").UserRole) ||
+    isManagerOrAbove(role as import("@prisma/client").UserRole)
+      ? { deletedAt: null }
+      : { deletedAt: null, OR: [{ assignedToId: userId }, { createdById: userId }] };
+
   const [
     totalLeads,
-    newLeads,
-    qualifiedLeads,
-    contactedLeads,
+    hotLeads,
     repliedLeads,
+    contactedLeads,
     activeDeals,
-    wonDeals,
-    lostDeals,
-    upcomingMeetings,
     pendingTasks,
   ] = await Promise.all([
-    prisma.lead.count({ where: { deletedAt: null } }),
-    prisma.lead.count({ where: { deletedAt: null, status: "NEW" } }),
-    prisma.lead.count({ where: { deletedAt: null, status: "QUALIFIED" } }),
-    prisma.lead.count({ where: { deletedAt: null, status: "CONTACTED" } }),
-    prisma.lead.count({ where: { deletedAt: null, status: "REPLIED" } }),
+    prisma.lead.count({ where: scopeFilter }),
+    prisma.lead.count({ where: { ...scopeFilter, scoreCategory: "HOT" } }),
+    prisma.lead.count({ where: { ...scopeFilter, status: "REPLIED" } }),
+    prisma.lead.count({ where: { ...scopeFilter, status: "CONTACTED" } }),
     prisma.deal.count({
       where: {
         deletedAt: null,
         stage: { notIn: ["WON", "LOST"] },
+        ...(isManagerOrAbove(role as import("@prisma/client").UserRole)
+          ? {}
+          : { assignedToId: userId }),
       },
     }),
-    prisma.deal.count({ where: { deletedAt: null, stage: "WON" } }),
-    prisma.deal.count({ where: { deletedAt: null, stage: "LOST" } }),
-    prisma.meeting.count({
+    prisma.task.count({
       where: {
-        date: { gte: new Date() },
-        outcome: "SCHEDULED",
+        status: "PENDING",
+        ...(isManagerOrAbove(role as import("@prisma/client").UserRole)
+          ? {}
+          : { assignedToId: userId }),
       },
     }),
-    prisma.task.count({ where: { status: "PENDING" } }),
   ]);
 
-  const pipelineValue = await prisma.deal.aggregate({
-    where: {
-      deletedAt: null,
-      stage: { notIn: ["WON", "LOST"] },
-    },
-    _sum: { estimatedValue: true },
-  });
-
-  return {
-    totalLeads,
-    newLeads,
-    qualifiedLeads,
-    contactedLeads,
-    repliedLeads,
-    activeDeals,
-    wonDeals,
-    lostDeals,
-    upcomingMeetings,
-    pendingTasks,
-    pipelineValue: Number(pipelineValue._sum.estimatedValue ?? 0),
-  };
+  return { totalLeads, hotLeads, repliedLeads, contactedLeads, activeDeals, pendingTasks };
 }
 
 export default async function DashboardPage() {
   const user = await getCurrentUser();
-  const stats = await getDashboardStats();
+  if (!user) return null;
+
+  const [stats, readiness] = await Promise.all([
+    getDashboardStats(user.id, user.role),
+    getUserReadiness(user.id),
+  ]);
 
   const statCards = [
     { label: "Total Leads", value: stats.totalLeads, icon: Users },
-    { label: "New Leads", value: stats.newLeads, icon: TrendingUp },
-    { label: "Qualified", value: stats.qualifiedLeads, icon: Target },
+    { label: "Hot Leads", value: stats.hotLeads, icon: TrendingUp, href: "/dashboard/leads?score=HOT" },
     { label: "Contacted", value: stats.contactedLeads, icon: MessageSquare },
     { label: "Replied", value: stats.repliedLeads, icon: MessageSquare },
     { label: "Active Deals", value: stats.activeDeals, icon: Briefcase },
-    { label: "Won Deals", value: stats.wonDeals, icon: Briefcase },
-    { label: "Lost Deals", value: stats.lostDeals, icon: Briefcase },
-    {
-      label: "Pipeline Value",
-      value: `$${stats.pipelineValue.toLocaleString()}`,
-      icon: TrendingUp,
-    },
-    { label: "Upcoming Meetings", value: stats.upcomingMeetings, icon: Calendar },
     { label: "Pending Tasks", value: stats.pendingTasks, icon: Target },
   ];
 
@@ -102,19 +85,19 @@ export default async function DashboardPage() {
     <div className="space-y-6">
       <div>
         <h2 className="text-2xl font-bold tracking-tight">
-          Welcome back, {user?.firstName}
+          Welcome back, {user.firstName}
         </h2>
         <p className="text-muted-foreground">
-          Here&apos;s an overview of your sales pipeline.
-          {user && (
-            <Badge variant="secondary" className="ml-2">
-              {ROLE_LABELS[user.role]}
-            </Badge>
-          )}
+          Your sales automation command center.
+          <Badge variant="secondary" className="ml-2">
+            {ROLE_LABELS[user.role]}
+          </Badge>
         </p>
       </div>
 
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+      <SetupChecklist readiness={readiness} />
+
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {statCards.map((stat) => (
           <Card key={stat.label}>
             <CardHeader className="flex flex-row items-center justify-between pb-2">
@@ -125,6 +108,13 @@ export default async function DashboardPage() {
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold">{stat.value}</div>
+              {stat.href && stat.value > 0 && (
+                <Link href={stat.href}>
+                  <Button variant="link" className="px-0 h-auto text-xs">
+                    View hot leads →
+                  </Button>
+                </Link>
+              )}
             </CardContent>
           </Card>
         ))}
@@ -133,26 +123,34 @@ export default async function DashboardPage() {
       <div className="grid gap-4 md:grid-cols-2">
         <Card>
           <CardHeader>
-            <CardTitle>Quick Actions</CardTitle>
-            <CardDescription>Common tasks to get started</CardDescription>
+            <CardTitle>Quick actions</CardTitle>
           </CardHeader>
-          <CardContent className="space-y-2 text-sm text-muted-foreground">
-            <p>• Add your first lead from the Leads section</p>
-            <p>• Create a campaign to organize outreach</p>
-            <p>• Configure company services in Settings</p>
-            <p>• Set up your email account for outreach</p>
+          <CardContent className="flex flex-wrap gap-2">
+            <Link href="/dashboard/settings?tab=integrations">
+              <Button variant="outline" size="sm">Connect integrations</Button>
+            </Link>
+            <Link href="/dashboard/leads">
+              <Button variant="outline" size="sm">View leads</Button>
+            </Link>
+            <Link href="/dashboard/autopilot">
+              <Button variant="outline" size="sm">Run autopilot</Button>
+            </Link>
+            <Link href="/dashboard/campaigns">
+              <Button variant="outline" size="sm">Campaigns</Button>
+            </Link>
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader>
-            <CardTitle>Getting Started</CardTitle>
-            <CardDescription>Your sales workflow</CardDescription>
+            <CardTitle>Workflow</CardTitle>
+            <CardDescription>How your SaaS automation works</CardDescription>
           </CardHeader>
-          <CardContent className="space-y-2 text-sm text-muted-foreground">
-            <p>Lead Discovery → Research → Qualification</p>
-            <p>→ Personalized Outreach → Reply Management</p>
-            <p>→ Follow-ups → Meeting → Proposal → Won/Lost</p>
+          <CardContent className="space-y-1 text-sm text-muted-foreground">
+            <p>1. Connect your AI + email in Settings</p>
+            <p>2. Autopilot finds job-post leads with email</p>
+            <p>3. AI writes & sends outreach from your inbox</p>
+            <p>4. Track replies in Conversations</p>
           </CardContent>
         </Card>
       </div>

@@ -13,11 +13,14 @@ export async function sendEmailForUser(
     if (userConfig) {
       return sendEmailWithConfig(userConfig, params);
     }
+    throw new Error(
+      "Email not configured. Go to Settings → Integrations and connect your SMTP account."
+    );
   }
 
   if (!env.SMTP_HOST || !env.SMTP_USER || !env.SMTP_PASSWORD) {
     throw new Error(
-      "Email not configured. Add your SMTP settings in Settings → Integrations."
+      "Email not configured. Connect SMTP in Settings → Integrations."
     );
   }
 

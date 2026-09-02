@@ -13,7 +13,7 @@ import {
   incrementAutopilotEmails,
   incrementAutopilotLeads,
   resetAutopilotDailyIfNeeded,
-} from "@/lib/autopilot\limits";
+} from "@/lib/autopilot/limits";
 import {
   getDefaultOutreachChannels,
   getOutreachChannelsForUser,

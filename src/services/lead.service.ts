@@ -29,13 +29,14 @@ function emptyToNull(value?: string | null) {
 
 export class LeadService {
   async list(query: LeadListQuery) {
-    const { page, limit, search, status, assignedToId, tagId, source, sortBy, sortOrder } =
+    const { page, limit, search, status, scoreCategory, assignedToId, tagId, source, sortBy, sortOrder } =
       query;
     const skip = (page - 1) * limit;
 
     const where = {
       deletedAt: null,
       ...(status ? { status } : {}),
+      ...(scoreCategory ? { scoreCategory } : {}),
       ...(assignedToId ? { assignedToId } : {}),
       ...(source ? { source } : {}),
       ...(tagId ? { tags: { some: { tagId } } } : {}),

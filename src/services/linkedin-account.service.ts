@@ -1,6 +1,7 @@
 import prisma from "@/lib/db/prisma";
 import { LinkedInConnectionType } from "@prisma/client";
 import { encrypt, decrypt, isEncryptionConfigured } from "@/lib/crypto/encrypt";
+import { env } from "@/lib/config/env";
 import { buildSession, LinkedInVoyagerClient } from "@/lib/linkedin/voyager-client";
 import { NotFoundError, ValidationError } from "@/lib/api/response";
 

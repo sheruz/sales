@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import prisma from "@/lib/db/prisma";
 import { autopilotService } from "@/services/autopilot.service";
-import { assertAutopilotCanRun } from "@/lib/autopilot\limits";
+import { assertAutopilotCanRun } from "@/lib/autopilot/limits";
 import { requirePermission } from "@/lib/auth/api-auth";
 import { apiSuccess } from "@/lib/api/response";
 import { handleApiError } from "@/lib/api/error-handler";

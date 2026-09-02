@@ -58,22 +58,27 @@ export async function resolveAiRuntime(
 
   const useAnthropic = env.AI_PROVIDER === "anthropic";
   const apiKey = useAnthropic ? env.ANTHROPIC_API_KEY : env.OPENAI_API_KEY;
-  if (!apiKey) {
-    throw new Error(
-      "No AI API key configured. Add your OpenAI or Anthropic key in Settings → Integrations."
-    );
+  if (!userId && apiKey) {
+    const model =
+      tier === "quality"
+        ? useAnthropic
+          ? env.ANTHROPIC_QUALITY_MODEL
+          : env.OPENAI_QUALITY_MODEL
+        : useAnthropic
+          ? env.ANTHROPIC_MODEL
+          : env.OPENAI_MODEL;
+
+    return {
+      provider: useAnthropic ? "anthropic" : "openai",
+      apiKey,
+      model,
+      source: "platform" as const,
+    };
   }
 
-  const model = tier === "quality"
-    ? (useAnthropic ? env.ANTHROPIC_QUALITY_MODEL : env.OPENAI_QUALITY_MODEL)
-    : (useAnthropic ? env.ANTHROPIC_MODEL : env.OPENAI_MODEL);
-
-  return {
-    provider: useAnthropic ? "anthropic" : "openai",
-    apiKey,
-    model,
-    source: "platform",
-  };
+  throw new Error(
+    "No AI API key configured. Go to Settings → Integrations and connect OpenAI or Anthropic."
+  );
 }
 
 export async function getOrCreateOutreachSettings(userId: string) {

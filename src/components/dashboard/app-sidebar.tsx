@@ -3,11 +3,6 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
-  BarChart3,
-  Bot,
-  Briefcase,
-  Calendar,
-  FileText,
   LayoutDashboard,
   ListTodo,
   MessageSquare,
@@ -37,35 +32,12 @@ const mainNav = [
   { title: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
   { title: "Leads", href: "/dashboard/leads", icon: Users },
   { title: "Campaigns", href: "/dashboard/campaigns", icon: Target },
-  {
-    title: "Autopilot",
-    href: "/dashboard/autopilot",
-    icon: Rocket,
-  },
-  {
-    title: "Conversations",
-    href: "/dashboard/conversations",
-    icon: MessageSquare,
-  },
-  { title: "Pipeline", href: "/dashboard/pipeline", icon: Briefcase },
-  { title: "Meetings", href: "/dashboard/meetings", icon: Calendar },
-  { title: "Proposals", href: "/dashboard/proposals", icon: FileText },
+  { title: "Autopilot", href: "/dashboard/autopilot", icon: Rocket },
+  { title: "Conversations", href: "/dashboard/conversations", icon: MessageSquare },
   { title: "Tasks", href: "/dashboard/tasks", icon: ListTodo },
 ];
 
 const secondaryNav = [
-  {
-    title: "Analytics",
-    href: "/dashboard/analytics",
-    icon: BarChart3,
-    permission: "analytics:read" as const,
-  },
-  {
-    title: "AI Assistant",
-    href: "/dashboard/assistant",
-    icon: Bot,
-    permission: "ai:use" as const,
-  },
   {
     title: "Settings",
     href: "/dashboard/settings",

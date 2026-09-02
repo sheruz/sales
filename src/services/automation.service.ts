@@ -133,12 +133,14 @@ export class AutomationService {
       throw new ValidationError("Lead has unsubscribed");
     }
 
-    const alreadyProcessed = [
-      AutomationStatus.AWAITING_REPLY,
-      AutomationStatus.OUTREACH_SENT,
-      AutomationStatus.COMPLETED,
-      AutomationStatus.FOLLOW_UP_SCHEDULED,
-    ].includes(lead.automationStatus);
+    const alreadyProcessed = (
+      [
+        AutomationStatus.AWAITING_REPLY,
+        AutomationStatus.OUTREACH_SENT,
+        AutomationStatus.COMPLETED,
+        AutomationStatus.FOLLOW_UP_SCHEDULED,
+      ] as AutomationStatus[]
+    ).includes(lead.automationStatus);
 
     if (alreadyProcessed) {
       return { skipped: true, leadId, reason: "Already automated" };
@@ -150,7 +152,7 @@ export class AutomationService {
 
     if (emailOnly && !(await isEmailConfiguredForOutreach(userId))) {
       throw new ValidationError(
-        "SMTP not configured — set SMTP_HOST, SMTP_USER, SMTP_PASSWORD in .env"
+        "Email not configured. Connect SMTP in Settings → Integrations."
       );
     }
 
@@ -341,10 +343,14 @@ export class AutomationService {
     });
 
     const results = [];
-    const channels = userId ? await getOutreachChannelsForUser(userId) : ["email"];
-    const emailOnly = channels.length === 1 && channels[0] === "email";
 
     for (const job of jobs) {
+      const ownerId = job.lead.assignedToId ?? job.lead.createdById ?? undefined;
+      const channels = ownerId
+        ? await getOutreachChannelsForUser(ownerId)
+        : (["email"] as OutreachChannel[]);
+      const emailOnly = channels.length === 1 && channels[0] === "email";
+
       try {
         await prisma.followUpJob.update({
           where: { id: job.id },

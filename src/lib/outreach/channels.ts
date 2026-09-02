@@ -1,9 +1,7 @@
-import prisma from "@/lib/db/prisma";
-import type { OutreachChannel } from "@/lib/outreach/channels";
 import { env } from "@/lib/config/env";
 import { getOrCreateOutreachSettings } from "@/lib/ai/resolve-config";
 
-export type { OutreachChannel };
+export type OutreachChannel = "email" | "linkedin";
 
 export async function getOutreachChannelsForUser(userId?: string): Promise<OutreachChannel[]> {
   if (userId) {

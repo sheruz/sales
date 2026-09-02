@@ -7,6 +7,7 @@ interface PageProps {
   searchParams: Promise<{
     search?: string;
     status?: string;
+    score?: string;
     page?: string;
   }>;
 }
@@ -16,12 +17,17 @@ export default async function LeadsPage({ searchParams }: PageProps) {
   const page = Number(params.page) || 1;
   const status =
     params.status && params.status !== "all" ? params.status : undefined;
+  const scoreCategory =
+    params.score && params.score !== "all"
+      ? (params.score as import("@prisma/client").LeadScoreCategory)
+      : undefined;
 
   const result = await leadService.list({
     page,
     limit: 20,
     search: params.search,
     status: status as import("@prisma/client").LeadStatus | undefined,
+    scoreCategory,
     sortBy: "createdAt",
     sortOrder: "desc",
   });
@@ -39,6 +45,7 @@ export default async function LeadsPage({ searchParams }: PageProps) {
     filters: {
       search: params.search ?? "",
       status: params.status ?? "all",
+      score: params.score ?? "all",
       page,
     },
   };

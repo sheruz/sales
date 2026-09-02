@@ -3,7 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { LeadStatus } from "@prisma/client";
+import { LeadScoreCategory, LeadStatus } from "@prisma/client";
 import { format } from "date-fns";
 import { toast } from "sonner";
 import { MoreHorizontal, Plus, Search, Trash2 } from "lucide-react";
@@ -32,7 +32,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { LeadStatusBadge } from "@/components/leads/lead-status-badge";
 import { ImportCsvDialog } from "@/components/leads/import-csv-dialog";
-import { LEAD_STATUS_LABELS } from "@/lib/constants/leads";
+import { LEAD_STATUS_LABELS, SCORE_CATEGORY_LABELS } from "@/lib/constants/leads";
 
 interface LeadRow {
   id: string;
@@ -42,6 +42,7 @@ interface LeadRow {
   jobTitle: string | null;
   status: LeadStatus;
   score: number;
+  scoreCategory: string | null;
   source: string | null;
   createdAt: string;
   assignedTo: { firstName: string; lastName: string } | null;
@@ -51,7 +52,7 @@ interface LeadsListProps {
   initialData: {
     leads: LeadRow[];
     pagination: { page: number; limit: number; total: number; totalPages: number };
-    filters: { search: string; status: string; page: number };
+    filters: { search: string; status: string; score: string; page: number };
   };
 }
 
@@ -61,12 +62,15 @@ export function LeadsList({ initialData }: LeadsListProps) {
   const [search, setSearch] = useState(initialData.filters.search);
   const [status, setStatus] = useState(initialData.filters.status);
 
+  const [score, setScore] = useState(initialData.filters.score);
+
   const { leads, pagination } = initialData;
 
   function applyFilters() {
     const params = new URLSearchParams();
     if (search) params.set("search", search);
     if (status !== "all") params.set("status", status);
+    if (score !== "all") params.set("score", score);
     router.push(`/dashboard/leads?${params.toString()}`);
   }
 
@@ -74,6 +78,7 @@ export function LeadsList({ initialData }: LeadsListProps) {
     const params = new URLSearchParams();
     if (search) params.set("search", search);
     if (status !== "all") params.set("status", status);
+    if (score !== "all") params.set("score", score);
     params.set("page", String(page));
     router.push(`/dashboard/leads?${params.toString()}`);
   }
@@ -157,6 +162,19 @@ export function LeadsList({ initialData }: LeadsListProps) {
               {Object.values(LeadStatus).map((s) => (
                 <SelectItem key={s} value={s}>
                   {LEAD_STATUS_LABELS[s]}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <Select value={score} onValueChange={(v) => v && setScore(v)}>
+            <SelectTrigger className="w-[150px]">
+              <SelectValue placeholder="Score" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Scores</SelectItem>
+              {Object.values(LeadScoreCategory).map((s) => (
+                <SelectItem key={s} value={s}>
+                  {SCORE_CATEGORY_LABELS[s]}
                 </SelectItem>
               ))}
             </SelectContent>
@@ -259,7 +277,14 @@ export function LeadsList({ initialData }: LeadsListProps) {
                   <TableCell>
                     <LeadStatusBadge status={lead.status} />
                   </TableCell>
-                  <TableCell>{lead.score}</TableCell>
+                  <TableCell>
+                    {lead.score}
+                    {lead.scoreCategory && (
+                      <span className="ml-1 text-xs text-muted-foreground">
+                        ({SCORE_CATEGORY_LABELS[lead.scoreCategory as LeadScoreCategory] ?? lead.scoreCategory})
+                      </span>
+                    )}
+                  </TableCell>
                   <TableCell>{lead.source ?? "—"}</TableCell>
                   <TableCell>
                     {lead.assignedTo

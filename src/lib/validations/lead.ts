@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { LeadStatus } from "@prisma/client";
+import { LeadScoreCategory, LeadStatus } from "@prisma/client";
 
 export const createLeadSchema = z.object({
   firstName: z.string().min(1, "First name is required"),
@@ -32,6 +32,7 @@ export const leadListQuerySchema = z.object({
   limit: z.coerce.number().int().positive().max(100).default(20),
   search: z.string().optional(),
   status: z.nativeEnum(LeadStatus).optional(),
+  scoreCategory: z.nativeEnum(LeadScoreCategory).optional(),
   assignedToId: z.string().uuid().optional(),
   tagId: z.string().uuid().optional(),
   source: z.string().optional(),

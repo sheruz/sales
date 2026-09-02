@@ -60,6 +60,7 @@ interface AutopilotPanelProps {
       newLeadsCreated?: number;
       leadsProcessed?: number;
       emailsSent?: number;
+      automated?: number;
       discoveryMode?: string;
       log?: string[];
       status?: string;
@@ -73,6 +74,7 @@ interface AutopilotPanelProps {
   usage: AutopilotUsage | null;
   services: Array<{ id: string; name: string }>;
   emailConfigured: boolean;
+  aiConfigured: boolean;
 }
 
 export function AutopilotPanel({
@@ -80,7 +82,9 @@ export function AutopilotPanel({
   usage: initialUsage,
   services,
   emailConfigured,
+  aiConfigured,
 }: AutopilotPanelProps) {
+  const integrationsReady = emailConfigured && aiConfigured;
   const router = useRouter();
   const [config, setConfig] = useState(initialConfig);
   const [usage] = useState(initialUsage);
@@ -129,8 +133,8 @@ export function AutopilotPanel({
   }
 
   async function runNow() {
-    if (!emailConfigured) {
-      toast.error("Configure SMTP email in .env first (SMTP_HOST, SMTP_USER, SMTP_PASSWORD)");
+    if (!integrationsReady) {
+      toast.error("Connect AI + Email in Settings → Integrations first");
       return;
     }
     if (limitsReached) {
@@ -212,12 +216,14 @@ export function AutopilotPanel({
         </Card>
       )}
 
-      {!emailConfigured && (
+      {!integrationsReady && (
         <Card className="border-amber-500/50 bg-amber-500/5">
-          <CardContent className="pt-4 text-sm">
-            Configure email in your server <code className="text-xs">.env</code>:{" "}
-            <strong>SMTP_HOST</strong>, <strong>SMTP_USER</strong>, <strong>SMTP_PASSWORD</strong>
-            before running autopilot.
+          <CardContent className="pt-4 text-sm space-y-1">
+            <p className="font-medium">Connect integrations before running autopilot</p>
+            <ul className="list-disc list-inside text-muted-foreground">
+              {!aiConfigured && <li>Connect OpenAI or Anthropic in Settings → Integrations</li>}
+              {!emailConfigured && <li>Connect your business email (SMTP) in Settings → Integrations</li>}
+            </ul>
           </CardContent>
         </Card>
       )}
@@ -259,7 +265,7 @@ export function AutopilotPanel({
           </Button>
           <Button
             onClick={runNow}
-            disabled={isRunning || !emailConfigured || !!limitsReached}
+            disabled={isRunning || !integrationsReady || !!limitsReached}
           >
             {isRunning ? (
               <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -393,7 +399,7 @@ export function AutopilotPanel({
               />
             </div>
             <div>
-              <Label>Daily AI calls (Claude)</Label>
+              <Label>Daily AI calls</Label>
               <Input
                 type="number"
                 min={5}
