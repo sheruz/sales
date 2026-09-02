@@ -1,6 +1,12 @@
 import { env } from "@/lib/config/env";
 import type { AICompletionOptions, AICompletionResult, AIProvider } from "./types";
 
+const FALLBACK_MODELS = [
+  "claude-sonnet-4-6",
+  "claude-sonnet-4-5-20250929",
+  "claude-haiku-4-5-20251001",
+];
+
 export class AnthropicProvider implements AIProvider {
   name = "anthropic";
 
@@ -8,9 +14,48 @@ export class AnthropicProvider implements AIProvider {
     const apiKey = env.ANTHROPIC_API_KEY;
     if (!apiKey) throw new Error("ANTHROPIC_API_KEY is not configured");
 
-    const model = env.ANTHROPIC_MODEL;
+    const configured = env.ANTHROPIC_MODEL;
+    const modelsToTry = [
+      configured,
+      ...FALLBACK_MODELS.filter((m) => m !== configured),
+    ];
+
+    let lastError = "Unknown error";
+
+    for (const model of modelsToTry) {
+      try {
+        return await this.completeWithModel(model, options, apiKey);
+      } catch (err) {
+        lastError = err instanceof Error ? err.message : String(err);
+        if (!lastError.includes("not_found_error") && !lastError.includes("404")) {
+          throw err;
+        }
+      }
+    }
+
+    throw new Error(
+      `No valid Anthropic model found. Tried: ${modelsToTry.join(", ")}. Last error: ${lastError}`
+    );
+  }
+
+  private async completeWithModel(
+    model: string,
+    options: AICompletionOptions,
+    apiKey: string
+  ): Promise<AICompletionResult> {
     const systemMessage = options.messages.find((m) => m.role === "system");
     const otherMessages = options.messages.filter((m) => m.role !== "system");
+
+    const body: Record<string, unknown> = {
+      model,
+      max_tokens: options.maxTokens ?? 4096,
+      system: systemMessage?.content,
+      messages: otherMessages.map((m) => ({
+        role: m.role === "assistant" ? "assistant" : "user",
+        content: m.content,
+      })),
+      temperature: options.temperature ?? 0.7,
+    };
 
     const response = await fetch("https://api.anthropic.com/v1/messages", {
       method: "POST",
@@ -19,16 +64,7 @@ export class AnthropicProvider implements AIProvider {
         "anthropic-version": "2023-06-01",
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({
-        model,
-        max_tokens: options.maxTokens ?? 4096,
-        system: systemMessage?.content,
-        messages: otherMessages.map((m) => ({
-          role: m.role === "assistant" ? "assistant" : "user",
-          content: m.content,
-        })),
-        temperature: options.temperature ?? 0.7,
-      }),
+      body: JSON.stringify(body),
     });
 
     if (!response.ok) {
