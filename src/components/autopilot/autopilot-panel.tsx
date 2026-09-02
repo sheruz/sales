@@ -42,6 +42,10 @@ interface AutopilotPanelProps {
       leadsProcessed?: number;
       automated?: number;
       log?: string[];
+      status?: string;
+      error?: string;
+      startedAt?: string;
+      finishedAt?: string;
     } | null;
     service: { id: string; name: string } | null;
     activeCampaign: { id: string; name: string } | null;
@@ -100,10 +104,25 @@ export function AutopilotPanel({
     setIsRunning(true);
     try {
       const res = await fetch("/api/autopilot", { method: "POST" });
-      const data = await res.json();
+      const text = await res.text();
+      let data: { success?: boolean; data?: { started?: boolean; message?: string; profilesFound?: number; automated?: number }; error?: { message?: string } };
+      try {
+        data = JSON.parse(text);
+      } catch {
+        throw new Error(
+          res.status === 504
+            ? "Request timed out — deploy latest code for background autopilot"
+            : "Server returned invalid response. Check nginx timeout settings."
+        );
+      }
       if (!data.success) throw new Error(data.error?.message);
+      if (res.status === 202 || data.data?.started) {
+        toast.success(data.data?.message ?? "Autopilot started — refresh in a few minutes");
+        router.refresh();
+        return;
+      }
       toast.success(
-        `Done! Found ${data.data.profilesFound} profiles, automated ${data.data.automated} leads`
+        `Done! Found ${data.data?.profilesFound ?? 0} profiles, automated ${data.data?.automated ?? 0} leads`
       );
       router.refresh();
     } catch (err) {
@@ -132,6 +151,11 @@ export function AutopilotPanel({
           <Badge variant={config.isEnabled ? "default" : "secondary"}>
             {config.isEnabled ? "Autopilot ON" : "Autopilot OFF"}
           </Badge>
+          {config.lastRunResult?.status === "running" && (
+            <Badge variant="outline" className="animate-pulse">
+              Running...
+            </Badge>
+          )}
           {config.activeCampaign && (
             <span className="text-sm text-muted-foreground">
               Campaign: {config.activeCampaign.name}
@@ -262,7 +286,15 @@ export function AutopilotPanel({
         </CardContent>
       </Card>
 
-      {config.lastRunAt && (
+      {config.lastRunResult?.status === "failed" && (
+        <Card className="border-destructive/50">
+          <CardContent className="pt-4 text-sm text-destructive">
+            Last run failed: {config.lastRunResult.error}
+          </CardContent>
+        </Card>
+      )}
+
+      {config.lastRunAt && config.lastRunResult?.status !== "running" && (
         <Card>
           <CardHeader>
             <CardTitle className="text-base">Last Run</CardTitle>

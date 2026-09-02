@@ -198,6 +198,7 @@ export class AutopilotService {
     }
 
     const result = {
+      status: "completed",
       campaignId,
       keywords,
       profilesFound,
@@ -206,6 +207,7 @@ export class AutopilotService {
       automated,
       errors,
       log,
+      finishedAt: new Date().toISOString(),
     };
 
     await prisma.autopilotConfig.update({
