@@ -43,17 +43,30 @@ export class LinkedInVoyagerClient {
   }
 
   async get<T>(path: string): Promise<T> {
-    const response = await fetch(`${BASE_URL}${path}`, {
-      method: "GET",
-      headers: this.headers,
-    });
+    try {
+      const response = await fetch(`${BASE_URL}${path}`, {
+        method: "GET",
+        headers: this.headers,
+        signal: AbortSignal.timeout(30000),
+      });
 
-    if (!response.ok) {
-      const text = await response.text();
-      throw new Error(`LinkedIn API ${response.status}: ${text.slice(0, 200)}`);
+      if (!response.ok) {
+        const text = await response.text();
+        throw new Error(`LinkedIn API ${response.status}: ${text.slice(0, 200)}`);
+      }
+
+      return response.json() as Promise<T>;
+    } catch (err) {
+      if (err instanceof Error && err.name === "AbortError") {
+        throw new Error("LinkedIn request timed out — server may be blocked from linkedin.com");
+      }
+      if (err instanceof TypeError && err.message === "fetch failed") {
+        throw new Error(
+          "Cannot reach LinkedIn from server (network blocked or datacenter IP blocked). Reconnect cookies or use AI fallback."
+        );
+      }
+      throw err;
     }
-
-    return response.json() as Promise<T>;
   }
 
   async post<T>(path: string, body: unknown): Promise<T> {

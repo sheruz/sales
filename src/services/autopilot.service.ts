@@ -104,53 +104,80 @@ export class AutopilotService {
 
     log.push(`Searching LinkedIn: "${keywords}"`);
 
-    const client = await linkedInAccountService.getClient(userId);
     const searchCount = Math.min(config.dailySearchLimit, 25);
-    const results = await searchPeople(client, {
-      keywords,
-      count: searchCount,
-    });
-
-    await linkedInAccountService.incrementSearch(userId, 1);
-    log.push(`Found ${results.length} profiles on LinkedIn`);
-
     const createdLeadIds: string[] = [];
     const errors: string[] = [];
+    let profilesFound = 0;
+    let usedAiFallback = false;
 
-    // Step 3: Create leads from real LinkedIn results
-    for (const profile of results) {
-      try {
-        const existing = await prisma.lead.findFirst({
-          where: {
-            OR: [
-              { linkedInUrl: profile.linkedInUrl },
-              { fullName: profile.fullName, deletedAt: null },
-            ],
-          },
-        });
-        if (existing) {
-          createdLeadIds.push(existing.id);
-          continue;
+    try {
+      const client = await linkedInAccountService.getClient(userId);
+      const results = await searchPeople(client, {
+        keywords,
+        count: searchCount,
+      });
+
+      await linkedInAccountService.incrementSearch(userId, 1);
+      profilesFound = results.length;
+      log.push(`Found ${profilesFound} profiles on LinkedIn`);
+
+      for (const profile of results) {
+        try {
+          const existing = await prisma.lead.findFirst({
+            where: {
+              OR: [
+                { linkedInUrl: profile.linkedInUrl },
+                { fullName: profile.fullName, deletedAt: null },
+              ],
+            },
+          });
+          if (existing) {
+            createdLeadIds.push(existing.id);
+            continue;
+          }
+
+          const leadId = await linkedInService.createLeadFromLinkedInProfile(
+            {
+              firstName: profile.firstName,
+              lastName: profile.lastName,
+              fullName: profile.fullName,
+              jobTitle: profile.headline,
+              linkedInUrl: profile.linkedInUrl,
+              profileUrn: profile.profileUrn,
+              country: profile.location,
+              companyName: profile.headline?.split(" at ").pop(),
+            },
+            campaignId,
+            userId
+          );
+          createdLeadIds.push(leadId);
+        } catch (err) {
+          errors.push(`${profile.fullName}: ${err instanceof Error ? err.message : "failed"}`);
         }
-
-        const leadId = await linkedInService.createLeadFromLinkedInProfile(
-          {
-            firstName: profile.firstName,
-            lastName: profile.lastName,
-            fullName: profile.fullName,
-            jobTitle: profile.headline,
-            linkedInUrl: profile.linkedInUrl,
-            profileUrn: profile.profileUrn,
-            country: profile.location,
-            companyName: profile.headline?.split(" at ").pop(),
-          },
-          campaignId,
-          userId
-        );
-        createdLeadIds.push(leadId);
-      } catch (err) {
-        errors.push(`${profile.fullName}: ${err instanceof Error ? err.message : "failed"}`);
       }
+    } catch (linkedinErr) {
+      const msg = linkedinErr instanceof Error ? linkedinErr.message : "LinkedIn search failed";
+      log.push(`LinkedIn search failed: ${msg}`);
+      log.push("Falling back to AI prospect discovery...");
+
+      const { leadIds, errors: aiErrors } = await linkedInService.discoverWithAI(
+        {
+          jobTitles: config.targetJobTitles,
+          industries: config.targetIndustries,
+          countries: config.targetCountries,
+          description: config.goal ?? undefined,
+        },
+        searchCount,
+        campaignId,
+        userId,
+        config.goal
+      );
+
+      createdLeadIds.push(...leadIds);
+      errors.push(...aiErrors);
+      profilesFound = leadIds.length;
+      usedAiFallback = true;
+      log.push(`AI fallback created ${leadIds.length} leads`);
     }
 
     log.push(`Created/updated ${createdLeadIds.length} leads`);
@@ -173,7 +200,8 @@ export class AutopilotService {
     const result = {
       campaignId,
       keywords,
-      profilesFound: results.length,
+      profilesFound,
+      usedAiFallback,
       leadsProcessed: createdLeadIds.length,
       automated,
       errors,
@@ -195,8 +223,8 @@ export class AutopilotService {
         campaignId,
         createdById: userId,
         status: JobStatus.COMPLETED,
-        searchCriteria: { keywords, autopilot: true },
-        profileUrls: results.map((r) => r.linkedInUrl),
+        searchCriteria: { keywords, autopilot: true, usedAiFallback },
+        profileUrls: [],
         targetCount: searchCount,
         leadsCreated: createdLeadIds.length,
         results: result as unknown as Prisma.InputJsonValue,

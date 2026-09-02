@@ -209,6 +209,35 @@ export class LinkedInService {
     );
   }
 
+  async discoverWithAI(
+    criteria: LinkedInDiscoveryInput["searchCriteria"],
+    count: number,
+    campaignId: string | null | undefined,
+    userId: string,
+    campaignContext?: string | null
+  ) {
+    const prospects = await this.discoverProspects(
+      criteria,
+      count,
+      campaignContext,
+      userId
+    );
+
+    const leadIds: string[] = [];
+    const errors: string[] = [];
+
+    for (const prospect of prospects) {
+      try {
+        const leadId = await this.createLeadFromProspect(prospect, campaignId, userId);
+        leadIds.push(leadId);
+      } catch (err) {
+        errors.push(`${prospect.fullName}: ${err instanceof Error ? err.message : "failed"}`);
+      }
+    }
+
+    return { leadIds, errors, prospects };
+  }
+
   private async discoverProspects(
     criteria: LinkedInDiscoveryInput["searchCriteria"],
     count: number,
