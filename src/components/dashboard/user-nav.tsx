@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { ChevronsUpDown, LogOut, Settings, Shield } from "lucide-react";
@@ -21,51 +22,89 @@ interface UserNavProps {
   variant?: "header" | "sidebar";
 }
 
+function UserNavTrigger({
+  user,
+  variant,
+  initials,
+}: {
+  user: AuthUser;
+  variant: "header" | "sidebar";
+  initials: string;
+}) {
+  return (
+    <div
+      className={cn(
+        "flex items-center outline-none",
+        variant === "header" && "size-9 justify-center rounded-full",
+        variant === "sidebar" && "w-full gap-2 rounded-md p-2"
+      )}
+    >
+      <Avatar className={cn(variant === "header" ? "size-9" : "size-8")}>
+        <AvatarFallback className="text-xs">{initials}</AvatarFallback>
+      </Avatar>
+      {variant === "sidebar" && (
+        <>
+          <div className="grid min-w-0 flex-1 text-left text-sm leading-tight">
+            <span className="truncate font-medium">
+              {user.firstName} {user.lastName}
+            </span>
+            <span className="truncate text-xs text-muted-foreground">
+              {ROLE_LABELS[user.role]}
+            </span>
+          </div>
+          <ChevronsUpDown className="ml-auto size-4 shrink-0 text-muted-foreground" />
+        </>
+      )}
+    </div>
+  );
+}
+
 export function UserNav({ user, variant = "header" }: UserNavProps) {
   const router = useRouter();
+  const [mounted, setMounted] = useState(false);
   const initials = `${user.firstName[0]}${user.lastName[0]}`.toUpperCase();
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   async function handleLogout() {
     try {
       const response = await fetch("/api/auth/logout", { method: "POST" });
       if (!response.ok) throw new Error("Logout failed");
       toast.success("Signed out successfully");
-      router.push("/login");
-      router.refresh();
+      window.location.href = "/login";
     } catch {
       toast.error("Failed to sign out");
     }
   }
 
+  const triggerClassName = cn(
+    "cursor-pointer rounded-full outline-none transition-colors",
+    "focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
+    "hover:bg-accent data-popup-open:bg-accent",
+    variant === "header" && "inline-flex size-9 items-center justify-center",
+    variant === "sidebar" &&
+      "flex w-full rounded-md hover:bg-sidebar-accent data-popup-open:bg-sidebar-accent"
+  );
+
+  if (!mounted) {
+    return (
+      <div className={triggerClassName} aria-label="User menu">
+        <UserNavTrigger user={user} variant={variant} initials={initials} />
+      </div>
+    );
+  }
+
   return (
     <DropdownMenu>
       <DropdownMenuTrigger
+        nativeButton={false}
+        render={<div />}
         aria-label="User menu"
-        className={cn(
-          "inline-flex items-center justify-center rounded-full outline-none transition-colors",
-          "focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
-          "hover:bg-accent data-popup-open:bg-accent",
-          variant === "header" && "h-9 w-9",
-          variant === "sidebar" &&
-            "h-auto w-full gap-2 rounded-md p-2 text-left hover:bg-sidebar-accent data-popup-open:bg-sidebar-accent"
-        )}
+        className={triggerClassName}
       >
-        <Avatar className={cn(variant === "header" ? "h-9 w-9" : "h-8 w-8")}>
-          <AvatarFallback className="text-xs">{initials}</AvatarFallback>
-        </Avatar>
-        {variant === "sidebar" && (
-          <>
-            <div className="grid min-w-0 flex-1 text-left text-sm leading-tight">
-              <span className="truncate font-medium">
-                {user.firstName} {user.lastName}
-              </span>
-              <span className="truncate text-xs text-muted-foreground">
-                {ROLE_LABELS[user.role]}
-              </span>
-            </div>
-            <ChevronsUpDown className="ml-auto size-4 shrink-0 text-muted-foreground" />
-          </>
-        )}
+        <UserNavTrigger user={user} variant={variant} initials={initials} />
       </DropdownMenuTrigger>
       <DropdownMenuContent
         align={variant === "sidebar" ? "start" : "end"}
