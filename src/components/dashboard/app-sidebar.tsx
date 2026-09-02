@@ -26,7 +26,7 @@ import {
   SidebarMenuItem,
   SidebarRail,
 } from "@/components/ui/sidebar";
-import { UserNav } from "@/components/dashboard/user-nav";
+import { SidebarUserFooter } from "@/components/dashboard/sidebar-user-footer";
 import { hasPermission } from "@/lib/auth/permissions";
 import type { AuthUser } from "@/types/auth";
 
@@ -160,11 +160,7 @@ export function AppSidebar({ user }: AppSidebarProps) {
       </SidebarContent>
 
       <SidebarFooter>
-        <SidebarMenu>
-          <SidebarMenuItem>
-            <UserNav user={user} variant="sidebar" />
-          </SidebarMenuItem>
-        </SidebarMenu>
+        <SidebarUserFooter user={user} />
       </SidebarFooter>
 
       <SidebarRail />
