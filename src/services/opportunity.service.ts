@@ -394,9 +394,256 @@ export class OpportunityService {
   }
 
   /**
-   * Core Phase 3 path: job post (or any hiring signal) → company + signal → opportunity.
-   * Optionally links a legacy Lead for automation/conversations.
+   * Provider-agnostic ingestion. Opportunity Engine does not care about the connector
+   * that produced the NormalizedSignalRecord (hiring, funding, CSV, etc.).
    */
+  async ingestNormalizedSignal(input: {
+    organizationId: string;
+    userId: string;
+    record: import("@/lib/connectors/types").NormalizedSignalRecord;
+    sourceKey: string;
+    sourceName: string;
+    sourceConnectorId?: string | null;
+    sourceRunId?: string | null;
+    campaignId?: string | null;
+    leadId?: string | null;
+    skipDedupe?: boolean;
+  }) {
+    const { resolveSignalDedupe } = await import("@/lib/connectors/dedupe");
+    const { ensureFingerprint } = await import("@/lib/connectors/types");
+
+    const fingerprint = ensureFingerprint(
+      input.record,
+      input.organizationId
+    );
+    input.record.fingerprint = fingerprint;
+
+    if (!input.skipDedupe) {
+      const decision = await resolveSignalDedupe(
+        input.organizationId,
+        input.record,
+        input.sourceConnectorId
+      );
+      if (decision.action === "skip") {
+        return {
+          skipped: true as const,
+          reason: decision.reason,
+          existingSignalId: decision.existingSignalId,
+          companyId: null,
+          contactId: null,
+          signalId: decision.existingSignalId ?? null,
+          opportunityId: null,
+        };
+      }
+    }
+
+    const source = await this.ensureSource(
+      input.organizationId,
+      input.sourceKey,
+      input.sourceName
+    );
+
+    const company = await companyService.findOrCreate(
+      input.organizationId,
+      input.record.company.name,
+      {
+        website: input.record.company.website ?? undefined,
+        domain:
+          input.record.company.domain ??
+          extractDomain(input.record.company.website) ??
+          undefined,
+        industry: input.record.company.industry ?? undefined,
+        country: input.record.company.country ?? undefined,
+        city: input.record.company.city ?? undefined,
+        description: input.record.company.description ?? undefined,
+        technologies: input.record.company.technologies,
+        source: input.sourceKey,
+      }
+    );
+
+    let contactId: string | null = null;
+    if (input.record.contact) {
+      const c = input.record.contact;
+      const fullName = `${c.firstName} ${c.lastName}`.trim();
+      const existingContact = c.email
+        ? await prisma.contact.findFirst({
+            where: {
+              organizationId: input.organizationId,
+              companyId: company.id,
+              email: c.email.toLowerCase(),
+            },
+          })
+        : null;
+
+      const contact =
+        existingContact ??
+        (await prisma.contact.create({
+          data: {
+            organizationId: input.organizationId,
+            companyId: company.id,
+            firstName: c.firstName,
+            lastName: c.lastName,
+            fullName,
+            title: c.title,
+            email: c.email?.toLowerCase() || null,
+            linkedInUrl: c.linkedInUrl,
+            phone: c.phone,
+            department: c.department,
+            seniority: c.seniority,
+            source: input.sourceKey,
+            status: ContactStatus.ACTIVE,
+            leadId: input.leadId || null,
+          },
+        }));
+
+      if (existingContact && input.leadId && !existingContact.leadId) {
+        await prisma.contact.update({
+          where: { id: existingContact.id },
+          data: { leadId: input.leadId },
+        });
+      }
+      contactId = contact.id;
+    }
+
+    const signal = await prisma.signal.create({
+      data: {
+        organizationId: input.organizationId,
+        companyId: company.id,
+        sourceId: source.id,
+        sourceConnectorId: input.sourceConnectorId || null,
+        sourceRunId: input.sourceRunId || null,
+        type: input.record.signalType,
+        title: input.record.title,
+        description: input.record.description,
+        evidenceUrl: input.record.evidenceUrl,
+        evidenceText: input.record.evidenceText,
+        confidence: clamp(input.record.confidence ?? 60),
+        fingerprint,
+        externalId: input.record.externalId || null,
+        status: SignalStatus.ACTIVE,
+        rawData: input.record.rawData as Prisma.InputJsonValue | undefined,
+        occurredAt: input.record.occurredAt
+          ? new Date(input.record.occurredAt)
+          : new Date(),
+      },
+    });
+
+    let opportunity = await prisma.opportunity.findFirst({
+      where: {
+        organizationId: input.organizationId,
+        companyId: company.id,
+        status: OpportunityStatus.OPEN,
+      },
+      orderBy: { updatedAt: "desc" },
+    });
+
+    const whyNow =
+      input.record.whyNow || `${input.record.signalType} signal: ${input.record.title}`;
+    const likelyProblem =
+      input.record.likelyProblem ||
+      input.record.description ||
+      "Signal indicates a potential buying moment.";
+    const recommendedAction =
+      input.record.recommendedAction ||
+      "Review signal evidence, identify decision maker, and take next outreach action.";
+
+    const ctx = await businessBrainService.getSafeContext(input.organizationId);
+    const haystack = `${input.record.title} ${input.record.description || ""}`.toLowerCase();
+    const recommendedServiceId =
+      ctx.services.find((s) =>
+        haystack.includes(s.name.toLowerCase().split(" ")[0] || "___")
+      )?.id ?? ctx.services[0]?.id ?? null;
+
+    if (!opportunity) {
+      opportunity = await prisma.opportunity.create({
+        data: {
+          organizationId: input.organizationId,
+          companyId: company.id,
+          primaryContactId: contactId,
+          sourceId: source.id,
+          primarySignalId: signal.id,
+          leadId: input.leadId || null,
+          status: OpportunityStatus.OPEN,
+          stage: OpportunityStage.NEW,
+          whyNow,
+          likelyProblem,
+          recommendedAction,
+          recommendedServiceId,
+          recommendedContactReason: contactId
+            ? "Associated with normalized signal"
+            : null,
+          estimatedValue: input.record.estimatedValue,
+          lastSignalAt: signal.detectedAt,
+          nextActionAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
+          ownerId: input.userId,
+          campaignId: input.campaignId || null,
+        },
+      });
+
+      await this.addEvent(
+        input.organizationId,
+        opportunity.id,
+        OpportunityEventType.CREATED,
+        {
+          title: "Opportunity created from signal",
+          actorId: input.userId,
+          metadata: {
+            signalId: signal.id,
+            signalType: signal.type,
+            sourceKey: input.sourceKey,
+          },
+        }
+      );
+    } else {
+      opportunity = await prisma.opportunity.update({
+        where: { id: opportunity.id },
+        data: {
+          primarySignalId: signal.id,
+          primaryContactId: contactId ?? opportunity.primaryContactId,
+          leadId: input.leadId ?? opportunity.leadId,
+          whyNow,
+          likelyProblem,
+          recommendedAction,
+          recommendedServiceId:
+            recommendedServiceId ?? opportunity.recommendedServiceId,
+          lastSignalAt: signal.detectedAt,
+          campaignId: input.campaignId ?? opportunity.campaignId,
+        },
+      });
+
+      await this.addEvent(
+        input.organizationId,
+        opportunity.id,
+        OpportunityEventType.SIGNAL_ADDED,
+        {
+          title: signal.title,
+          actorId: input.userId,
+          metadata: { signalId: signal.id, signalType: signal.type },
+        }
+      );
+    }
+
+    await this.scoreOpportunity(input.organizationId, opportunity.id, {
+      signalConfidence: signal.confidence,
+      leadScore: input.record.leadScore ?? undefined,
+      budgetHint: input.record.budgetHint,
+    });
+
+    await prisma.signal.update({
+      where: { id: signal.id },
+      data: { status: SignalStatus.CONSUMED },
+    });
+
+    return {
+      skipped: false as const,
+      companyId: company.id,
+      contactId,
+      signalId: signal.id,
+      opportunityId: opportunity.id,
+    };
+  }
+
+  /** @deprecated Prefer ingestNormalizedSignal via connectors */
   async ingestHiringSignal(input: {
     organizationId: string;
     userId: string;
@@ -429,194 +676,53 @@ export class OpportunityService {
     budgetHint?: string | null;
     leadId?: string | null;
   }) {
-    const source = await this.ensureSource(
-      input.organizationId,
-      "job_post",
-      "Job posts"
-    );
-
-    const company = await companyService.findOrCreate(
-      input.organizationId,
-      input.companyName,
-      {
-        website: input.companyWebsite ?? undefined,
-        domain: extractDomain(input.companyWebsite) ?? undefined,
-        industry: input.industry ?? undefined,
-        country: input.country ?? undefined,
-        description: input.companySummary ?? undefined,
-        source: "job_post",
-      }
-    );
-
-    let contactId: string | null = null;
-    if (input.contact) {
-      const fullName = `${input.contact.firstName} ${input.contact.lastName}`.trim();
-      const existingContact = input.contact.email
-        ? await prisma.contact.findFirst({
-            where: {
-              organizationId: input.organizationId,
-              companyId: company.id,
-              email: input.contact.email.toLowerCase(),
-            },
-          })
-        : null;
-
-      const contact =
-        existingContact ??
-        (await prisma.contact.create({
-          data: {
-            organizationId: input.organizationId,
-            companyId: company.id,
-            firstName: input.contact.firstName,
-            lastName: input.contact.lastName,
-            fullName,
-            title: input.contact.title,
-            email: input.contact.email?.toLowerCase() || null,
-            linkedInUrl: input.contact.linkedInUrl,
-            source: "job_post",
-            status: ContactStatus.ACTIVE,
-            leadId: input.leadId || null,
-          },
-        }));
-
-      if (existingContact && input.leadId && !existingContact.leadId) {
-        await prisma.contact.update({
-          where: { id: existingContact.id },
-          data: { leadId: input.leadId },
-        });
-      }
-
-      contactId = contact.id;
-    }
-
-    const signal = await prisma.signal.create({
-      data: {
-        organizationId: input.organizationId,
-        companyId: company.id,
-        sourceId: source.id,
-        type: SignalType.HIRING,
+    const result = await this.ingestNormalizedSignal({
+      organizationId: input.organizationId,
+      userId: input.userId,
+      sourceKey: "job_post",
+      sourceName: "Job posts",
+      campaignId: input.campaignId,
+      leadId: input.leadId,
+      record: {
+        signalType: SignalType.HIRING,
         title: input.signal.title,
         description: input.signal.description,
         evidenceUrl: input.signal.evidenceUrl,
         evidenceText: input.signal.evidenceText,
-        confidence: clamp(input.signal.confidence ?? 60),
-        status: SignalStatus.ACTIVE,
-        rawData: input.signal.rawData as Prisma.InputJsonValue | undefined,
-        occurredAt: new Date(),
+        confidence: input.signal.confidence ?? 60,
+        company: {
+          name: input.companyName,
+          website: input.companyWebsite,
+          domain: extractDomain(input.companyWebsite),
+          industry: input.industry,
+          country: input.country,
+          description: input.companySummary,
+        },
+        contact: input.contact,
+        whyNow: input.whyNow,
+        likelyProblem: input.likelyProblem,
+        recommendedAction: input.recommendedAction,
+        estimatedValue: input.estimatedValue,
+        leadScore: input.leadScore,
+        budgetHint: input.budgetHint,
+        rawData: (input.signal.rawData as Record<string, unknown>) || null,
       },
     });
 
-    // Reuse open opportunity for same company when recent hiring signal exists
-    let opportunity = await prisma.opportunity.findFirst({
-      where: {
-        organizationId: input.organizationId,
-        companyId: company.id,
-        status: OpportunityStatus.OPEN,
-      },
-      orderBy: { updatedAt: "desc" },
-    });
-
-    const whyNow =
-      input.whyNow ||
-      `Hiring signal: ${input.signal.title}`;
-    const likelyProblem =
-      input.likelyProblem ||
-      input.signal.description ||
-      "Team is hiring — may need external delivery capacity or specialized skills.";
-    const recommendedAction =
-      input.recommendedAction ||
-      "Research decision maker, personalize outreach around the open role, and propose a relevant service.";
-
-    // Pick best matching service by name heuristics
-    const ctx = await businessBrainService.getSafeContext(input.organizationId);
-    const recommendedServiceId =
-      ctx.services.find((s) =>
-        (input.signal.title + " " + (input.signal.description || ""))
-          .toLowerCase()
-          .includes(s.name.toLowerCase().split(" ")[0] || "___")
-      )?.id ?? ctx.services[0]?.id ?? null;
-
-    if (!opportunity) {
-      opportunity = await prisma.opportunity.create({
-        data: {
-          organizationId: input.organizationId,
-          companyId: company.id,
-          primaryContactId: contactId,
-          sourceId: source.id,
-          primarySignalId: signal.id,
-          leadId: input.leadId || null,
-          status: OpportunityStatus.OPEN,
-          stage: OpportunityStage.NEW,
-          whyNow,
-          likelyProblem,
-          recommendedAction,
-          recommendedServiceId,
-          recommendedContactReason: contactId
-            ? "Listed or associated with the hiring signal"
-            : null,
-          estimatedValue: input.estimatedValue,
-          lastSignalAt: signal.detectedAt,
-          nextActionAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
-          ownerId: input.userId,
-          campaignId: input.campaignId || null,
-        },
-      });
-
-      await this.addEvent(
-        input.organizationId,
-        opportunity.id,
-        OpportunityEventType.CREATED,
-        {
-          title: "Opportunity created from hiring signal",
-          actorId: input.userId,
-          metadata: { signalId: signal.id, companyId: company.id },
-        }
-      );
-    } else {
-      opportunity = await prisma.opportunity.update({
-        where: { id: opportunity.id },
-        data: {
-          primarySignalId: signal.id,
-          primaryContactId: contactId ?? opportunity.primaryContactId,
-          leadId: input.leadId ?? opportunity.leadId,
-          whyNow,
-          likelyProblem,
-          recommendedAction,
-          recommendedServiceId:
-            recommendedServiceId ?? opportunity.recommendedServiceId,
-          lastSignalAt: signal.detectedAt,
-          campaignId: input.campaignId ?? opportunity.campaignId,
-        },
-      });
-
-      await this.addEvent(
-        input.organizationId,
-        opportunity.id,
-        OpportunityEventType.SIGNAL_ADDED,
-        {
-          title: signal.title,
-          actorId: input.userId,
-          metadata: { signalId: signal.id },
-        }
-      );
+    if (result.skipped) {
+      return {
+        companyId: result.companyId,
+        contactId: result.contactId,
+        signalId: result.signalId,
+        opportunityId: result.opportunityId,
+      };
     }
 
-    await this.scoreOpportunity(input.organizationId, opportunity.id, {
-      signalConfidence: signal.confidence,
-      leadScore: input.leadScore,
-      budgetHint: input.budgetHint,
-    });
-
-    await prisma.signal.update({
-      where: { id: signal.id },
-      data: { status: SignalStatus.CONSUMED },
-    });
-
     return {
-      companyId: company.id,
-      contactId,
-      signalId: signal.id,
-      opportunityId: opportunity.id,
+      companyId: result.companyId!,
+      contactId: result.contactId,
+      signalId: result.signalId!,
+      opportunityId: result.opportunityId!,
     };
   }
 

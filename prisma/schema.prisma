@@ -330,6 +330,30 @@ enum OpportunityEventType {
   NOTE
 }
 
+enum SourceConnectorType {
+  HIRING
+  FUNDING
+  WEB_RESEARCH
+  RFP_TENDER
+  CSV_CRM
+  CUSTOM
+}
+
+enum SourceConnectorStatus {
+  DISCONNECTED
+  CONNECTED
+  ERROR
+  DISABLED
+}
+
+enum SourceRunStatus {
+  PENDING
+  RUNNING
+  COMPLETED
+  FAILED
+  CANCELLED
+}
+
 // ─── Multi-tenancy (Phase 1) ─────────────────────────────────────────────────
 
 model Organization {
@@ -375,6 +399,8 @@ model Organization {
   signals           Signal[]
   opportunities     Opportunity[]
   opportunitySources OpportunitySource[]
+  sourceConnectors  SourceConnector[]
+  sourceRuns        SourceRun[]
 
   @@index([status])
   @@index([deletedAt])
@@ -669,35 +695,99 @@ model OpportunitySource {
   @@map("opportunity_sources")
 }
 
+/// Provider-independent source connector (Phase 4)
+model SourceConnector {
+  id                    String                @id @default(uuid())
+  organizationId        String                @map("organization_id")
+  type                  SourceConnectorType
+  name                  String
+  provider              String
+  status                SourceConnectorStatus @default(DISCONNECTED)
+  credentialsEncrypted  String?               @map("credentials_encrypted")
+  configuration         Json?
+  lastSyncAt            DateTime?             @map("last_sync_at")
+  lastError             String?               @map("last_error")
+  createdAt             DateTime              @default(now()) @map("created_at")
+  updatedAt             DateTime              @updatedAt @map("updated_at")
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  runs         SourceRun[]
+  signals      Signal[]
+
+  @@index([organizationId])
+  @@index([type])
+  @@index([status])
+  @@unique([organizationId, type, provider, name])
+  @@map("source_connectors")
+}
+
+model SourceRun {
+  id                String         @id @default(uuid())
+  organizationId    String         @map("organization_id")
+  sourceConnectorId String         @map("source_connector_id")
+  status            SourceRunStatus @default(PENDING)
+  startedAt         DateTime?      @map("started_at")
+  completedAt       DateTime?      @map("completed_at")
+  recordsFound      Int            @default(0) @map("records_found")
+  recordsCreated    Int            @default(0) @map("records_created")
+  recordsUpdated    Int            @default(0) @map("records_updated")
+  recordsFailed     Int            @default(0) @map("records_failed")
+  recordsSkipped    Int            @default(0) @map("records_skipped")
+  error             String?
+  metadata          Json?
+  createdAt         DateTime       @default(now()) @map("created_at")
+
+  organization    Organization   @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  sourceConnector SourceConnector @relation(fields: [sourceConnectorId], references: [id], onDelete: Cascade)
+  signals         Signal[]
+
+  @@index([organizationId])
+  @@index([sourceConnectorId])
+  @@index([status])
+  @@index([createdAt])
+  @@map("source_runs")
+}
+
 model Signal {
-  id             String       @id @default(uuid())
-  organizationId String       @map("organization_id")
-  companyId      String       @map("company_id")
-  sourceId       String?      @map("source_id")
-  type           SignalType
-  title          String
-  description    String?
-  evidenceUrl    String?      @map("evidence_url")
-  evidenceText   String?      @map("evidence_text")
-  confidence     Int          @default(50)
-  detectedAt     DateTime     @default(now()) @map("detected_at")
-  occurredAt     DateTime?    @map("occurred_at")
-  expiresAt      DateTime?    @map("expires_at")
-  status         SignalStatus @default(NEW)
-  rawData        Json?        @map("raw_data")
-  createdAt      DateTime     @default(now()) @map("created_at")
-  updatedAt      DateTime     @updatedAt @map("updated_at")
+  id                String       @id @default(uuid())
+  organizationId    String       @map("organization_id")
+  companyId         String       @map("company_id")
+  sourceId          String?      @map("source_id")
+  sourceConnectorId String?      @map("source_connector_id")
+  sourceRunId       String?      @map("source_run_id")
+  type              SignalType
+  title             String
+  description       String?
+  evidenceUrl       String?      @map("evidence_url")
+  evidenceText      String?      @map("evidence_text")
+  confidence        Int          @default(50)
+  /// Dedup key: org-scoped fingerprint of normalized signal content
+  fingerprint       String?
+  /// Provider-native ID when available
+  externalId        String?      @map("external_id")
+  detectedAt        DateTime     @default(now()) @map("detected_at")
+  occurredAt        DateTime?    @map("occurred_at")
+  expiresAt         DateTime?    @map("expires_at")
+  status            SignalStatus @default(NEW)
+  rawData           Json?        @map("raw_data")
+  createdAt         DateTime     @default(now()) @map("created_at")
+  updatedAt         DateTime     @updatedAt @map("updated_at")
 
-  organization Organization       @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  company      Company            @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  source       OpportunitySource? @relation(fields: [sourceId], references: [id], onDelete: SetNull)
-  opportunities Opportunity[]     @relation("OpportunityPrimarySignal")
+  organization    Organization       @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  company         Company            @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  source          OpportunitySource? @relation(fields: [sourceId], references: [id], onDelete: SetNull)
+  sourceConnector SourceConnector?   @relation(fields: [sourceConnectorId], references: [id], onDelete: SetNull)
+  sourceRun       SourceRun?         @relation(fields: [sourceRunId], references: [id], onDelete: SetNull)
+  opportunities   Opportunity[]      @relation("OpportunityPrimarySignal")
 
+  @@unique([organizationId, fingerprint])
   @@index([organizationId])
   @@index([companyId])
   @@index([type])
   @@index([status])
   @@index([detectedAt])
+  @@index([sourceConnectorId])
+  @@index([externalId])
   @@map("signals")
 }
 

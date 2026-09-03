@@ -4,32 +4,14 @@ import {
   AutomationStatus,
   LeadScoreCategory,
   LeadStatus,
+  SourceRunStatus,
 } from "@prisma/client";
-import { aiComplete, parseAIJson } from "@/lib/ai/provider";
-import { buildJobPostDiscoveryPrompt } from "@/lib/ai/prompts";
 import { activityService } from "@/services/activity.service";
 import { companyService } from "@/services/company.service";
 import { opportunityService } from "@/services/opportunity.service";
-
-export interface JobPostLead {
-  firstName: string;
-  lastName: string;
-  jobTitle: string;
-  email: string;
-  companyName: string;
-  companyWebsite?: string | null;
-  industry: string;
-  country: string;
-  jobPostTitle: string;
-  jobPostPlatform: string;
-  jobPostUrl?: string | null;
-  jobRequirements: string;
-  budgetHint?: string | null;
-  companySummary: string;
-  leadScore: number;
-  scoreCategory: string;
-  personalizationPoints: string[];
-}
+import { sourceConnectorService } from "@/services/source-connector.service";
+import { hiringSignalConnector } from "@/lib/connectors/adapters/hiring";
+import type { Prisma } from "@prisma/client";
 
 function mapScoreCategory(category: string): LeadScoreCategory {
   const map: Record<string, LeadScoreCategory> = {
@@ -41,6 +23,10 @@ function mapScoreCategory(category: string): LeadScoreCategory {
   return map[category] ?? LeadScoreCategory.POSSIBLE;
 }
 
+/**
+ * Job discovery is now a thin orchestrator over the Hiring Signal Connector.
+ * The Opportunity Engine only sees NormalizedSignalRecord — not job boards.
+ */
 export class JobDiscoveryService {
   async discoverFromJobPosts(
     organizationId: string,
@@ -55,233 +41,238 @@ export class JobDiscoveryService {
     userId: string,
     campaignContext?: string | null
   ) {
-    const result = await aiComplete({
-      feature: "job_post_discovery",
-      userId,
-      jsonMode: true,
-      temperature: 0.7,
-      messages: [
-        {
-          role: "system",
-          content:
-            "You find B2B freelance and job-posting opportunities. Return valid JSON array only. Every lead MUST have an email.",
-        },
-        {
-          role: "user",
-          content: buildJobPostDiscoveryPrompt(
-            criteria,
-            count,
-            campaignContext ?? undefined
-          ),
-        },
-      ],
+    const connector =
+      await sourceConnectorService.ensureDefaultHiringConnector(organizationId);
+
+    const run = await prisma.sourceRun.create({
+      data: {
+        organizationId,
+        sourceConnectorId: connector.id,
+        status: SourceRunStatus.RUNNING,
+        startedAt: new Date(),
+        metadata: { campaignId, count, via: "job_discovery" },
+      },
     });
 
-    const prospects = parseAIJson<JobPostLead[]>(result.content);
+    const ctx = {
+      organizationId,
+      userId,
+      connectorId: connector.id,
+      configuration: (connector.configuration as Record<string, unknown>) || {},
+      credentials: {},
+      params: {
+        count,
+        criteria,
+        campaignContext: campaignContext ?? undefined,
+        campaignId,
+      },
+    };
+
     const leadIds: string[] = [];
     const opportunityIds: string[] = [];
     const errors: string[] = [];
     let skippedNoEmail = 0;
+    let created = 0;
+    let skipped = 0;
+    let failed = 0;
 
-    for (const prospect of prospects) {
-      if (leadIds.length >= count) break;
-
-      if (!prospect.email?.includes("@")) {
-        skippedNoEmail++;
-        continue;
+    try {
+      const validation = await hiringSignalConnector.validate(ctx);
+      if (!validation.ok) {
+        throw new Error(validation.message || "Hiring connector validation failed");
       }
 
-      try {
-        const existing = await prisma.lead.findFirst({
-          where: {
+      const fetched = await hiringSignalConnector.fetch(ctx);
+      const prospectsFound = fetched.rawRecords.length;
+
+      for (const raw of fetched.rawRecords) {
+        if (leadIds.length >= count) break;
+
+        const normalized = hiringSignalConnector.normalize(raw, ctx);
+        if (!normalized) {
+          skipped++;
+          continue;
+        }
+
+        const email = normalized.contact?.email;
+        if (!email?.includes("@")) {
+          skippedNoEmail++;
+          // Still ingest signal/opportunity without lead bridge
+          try {
+            const result = await opportunityService.ingestNormalizedSignal({
+              organizationId,
+              userId,
+              record: normalized,
+              sourceKey: "hiring",
+              sourceName: "Hiring signals",
+              sourceConnectorId: connector.id,
+              sourceRunId: run.id,
+              campaignId,
+            });
+            if (result.skipped) skipped++;
+            else {
+              created++;
+              if (result.opportunityId) opportunityIds.push(result.opportunityId);
+            }
+          } catch (err) {
+            failed++;
+            errors.push(err instanceof Error ? err.message : "failed");
+          }
+          continue;
+        }
+
+        try {
+          const existing = await prisma.lead.findFirst({
+            where: {
+              organizationId,
+              deletedAt: null,
+              OR: [
+                { email: email.toLowerCase() },
+                {
+                  companyName: normalized.company.name,
+                  fullName: `${normalized.contact!.firstName} ${normalized.contact!.lastName}`,
+                },
+              ],
+            },
+          });
+          if (existing) {
+            skipped++;
+            continue;
+          }
+
+          const company = await companyService.findOrCreate(
             organizationId,
-            deletedAt: null,
-            OR: [
-              { email: prospect.email.toLowerCase() },
-              {
-                companyName: prospect.companyName,
-                fullName: `${prospect.firstName} ${prospect.lastName}`,
-              },
-            ],
-          },
-        });
-        if (existing) continue;
+            normalized.company.name,
+            {
+              website: normalized.company.website ?? undefined,
+              industry: normalized.company.industry ?? undefined,
+              country: normalized.company.country ?? undefined,
+              description: normalized.company.description ?? undefined,
+              source: "hiring",
+            }
+          );
 
-        const created = await this.createLeadFromJobPost(
-          organizationId,
-          prospect,
-          campaignId,
-          userId
-        );
-        leadIds.push(created.leadId);
-        if (created.opportunityId) opportunityIds.push(created.opportunityId);
-      } catch (err) {
-        errors.push(
-          `${prospect.firstName} ${prospect.lastName}: ${err instanceof Error ? err.message : "failed"}`
-        );
+          const rawJob = (normalized.rawData as { job?: Record<string, unknown>; scoreCategory?: string }) || {};
+          const scoreCategory = mapScoreCategory(
+            String(rawJob.scoreCategory || "POSSIBLE")
+          );
+          const leadScore = normalized.leadScore ?? normalized.confidence;
+
+          const lead = await prisma.lead.create({
+            data: {
+              organizationId,
+              firstName: normalized.contact!.firstName,
+              lastName: normalized.contact!.lastName,
+              fullName: `${normalized.contact!.firstName} ${normalized.contact!.lastName}`,
+              email: email.toLowerCase(),
+              jobTitle: normalized.contact!.title,
+              companyName: normalized.company.name,
+              companyWebsite: normalized.company.website,
+              industry: normalized.company.industry,
+              country: normalized.company.country,
+              companyDescription: normalized.company.description,
+              companyId: company.id,
+              source: "Hiring Signal",
+              campaignId,
+              createdById: userId,
+              score: leadScore,
+              scoreCategory,
+              status: LeadStatus.QUALIFIED,
+              automationStatus: AutomationStatus.IDLE,
+              automationMeta: {
+                connector: {
+                  type: "HIRING",
+                  provider: hiringSignalConnector.provider,
+                  runId: run.id,
+                },
+                jobPost: rawJob.job ?? null,
+                preResearched: true,
+                opportunityEngine: true,
+              } as Prisma.InputJsonValue,
+              notes: `Hiring signal: ${normalized.title}`,
+            },
+          });
+
+          if (campaignId) {
+            await prisma.campaignLead.create({
+              data: { campaignId, leadId: lead.id },
+            });
+          }
+
+          const result = await opportunityService.ingestNormalizedSignal({
+            organizationId,
+            userId,
+            record: normalized,
+            sourceKey: "hiring",
+            sourceName: "Hiring signals",
+            sourceConnectorId: connector.id,
+            sourceRunId: run.id,
+            campaignId,
+            leadId: lead.id,
+          });
+
+          leadIds.push(lead.id);
+          if (result.opportunityId) opportunityIds.push(result.opportunityId);
+          if (result.skipped) skipped++;
+          else created++;
+
+          await activityService.log({
+            leadId: lead.id,
+            userId,
+            type: ActivityType.LEAD_CREATED,
+            title: "Hiring connector → signal → opportunity",
+            description: `${normalized.title} at ${normalized.company.name}`,
+          });
+        } catch (err) {
+          failed++;
+          errors.push(
+            `${normalized.company.name}: ${err instanceof Error ? err.message : "failed"}`
+          );
+        }
       }
-    }
 
-    return {
-      leadIds,
-      opportunityIds,
-      errors,
-      prospectsFound: prospects.length,
-      skippedNoEmail,
-    };
-  }
-
-  /**
-   * Job post is a SIGNAL, not the opportunity itself.
-   * Creates: Company → Contact/Lead bridge → Hiring Signal → Opportunity.
-   * Legacy Lead retained for email automation / conversations.
-   */
-  private async createLeadFromJobPost(
-    organizationId: string,
-    prospect: JobPostLead,
-    campaignId: string,
-    userId: string
-  ) {
-    const fullName = `${prospect.firstName} ${prospect.lastName}`;
-    const scoreCategory = mapScoreCategory(prospect.scoreCategory);
-
-    const company = await companyService.findOrCreate(
-      organizationId,
-      prospect.companyName,
-      {
-        website: prospect.companyWebsite ?? undefined,
-        industry: prospect.industry,
-        country: prospect.country,
-        description: prospect.companySummary,
-        source: "job_post",
-      }
-    );
-
-    const lead = await prisma.lead.create({
-      data: {
-        organizationId,
-        firstName: prospect.firstName,
-        lastName: prospect.lastName,
-        fullName,
-        email: prospect.email.toLowerCase(),
-        jobTitle: prospect.jobTitle,
-        companyName: prospect.companyName,
-        companyWebsite: prospect.companyWebsite,
-        industry: prospect.industry,
-        country: prospect.country,
-        companyDescription: prospect.companySummary,
-        companyId: company.id,
-        source: "Job Post",
-        campaignId,
-        createdById: userId,
-        score: prospect.leadScore,
-        scoreCategory,
-        status: LeadStatus.QUALIFIED,
-        automationStatus: AutomationStatus.IDLE,
-        automationMeta: {
-          jobPost: {
-            jobPostTitle: prospect.jobPostTitle,
-            jobPostPlatform: prospect.jobPostPlatform,
-            jobPostUrl: prospect.jobPostUrl,
-            jobRequirements: prospect.jobRequirements,
-            budgetHint: prospect.budgetHint,
-            companySummary: prospect.companySummary,
-            personalizationPoints: prospect.personalizationPoints,
-          },
-          preResearched: true,
-          opportunityEngine: true,
+      await prisma.sourceRun.update({
+        where: { id: run.id },
+        data: {
+          status: SourceRunStatus.COMPLETED,
+          completedAt: new Date(),
+          recordsFound: prospectsFound,
+          recordsCreated: created,
+          recordsFailed: failed,
+          recordsSkipped: skipped + skippedNoEmail,
+          metadata: {
+            leadIds,
+            opportunityIds,
+            errors: errors.slice(0, 20),
+          } as Prisma.InputJsonValue,
         },
-        notes: `Hiring signal: ${prospect.jobPostTitle} (${prospect.jobPostPlatform})`,
-      },
-    });
-
-    await prisma.leadResearch.create({
-      data: {
-        leadId: lead.id,
-        companySummary: prospect.companySummary,
-        whatCompanyDoes: prospect.jobRequirements,
-        industry: prospect.industry,
-        businessChallenges: [],
-        softwareOpportunities: [prospect.jobPostTitle],
-        recommendedServices: [],
-        decisionMakerAnalysis: `${fullName} posted or manages hiring for: ${prospect.jobPostTitle}`,
-        personalizationPoints: prospect.personalizationPoints,
-        suggestedOpeningMessage: null,
-        suggestedApproach: `Respond to their ${prospect.jobPostPlatform} post about ${prospect.jobPostTitle}`,
-        leadScore: prospect.leadScore,
-        reasoning: `Matched job post requirements: ${prospect.jobRequirements}`,
-        rawResponse: prospect as object,
-      },
-    });
-
-    await prisma.leadScore.create({
-      data: {
-        leadId: lead.id,
-        score: prospect.leadScore,
-        category: scoreCategory,
-        explanation: prospect.jobRequirements,
-        recommendedAction: "Send personalized email referencing their job post",
-      },
-    });
-
-    if (campaignId) {
-      await prisma.campaignLead.create({
-        data: { campaignId, leadId: lead.id },
       });
-    }
 
-    const ingested = await opportunityService.ingestHiringSignal({
-      organizationId,
-      userId,
-      campaignId,
-      companyName: prospect.companyName,
-      companyWebsite: prospect.companyWebsite,
-      industry: prospect.industry,
-      country: prospect.country,
-      companySummary: prospect.companySummary,
-      contact: {
-        firstName: prospect.firstName,
-        lastName: prospect.lastName,
-        email: prospect.email,
-        title: prospect.jobTitle,
-      },
-      signal: {
-        title: prospect.jobPostTitle,
-        description: prospect.jobRequirements,
-        evidenceUrl: prospect.jobPostUrl,
-        evidenceText: `${prospect.jobPostPlatform}: ${prospect.jobPostTitle}`,
-        confidence: Math.min(95, Math.max(40, prospect.leadScore)),
-        rawData: {
-          platform: prospect.jobPostPlatform,
-          url: prospect.jobPostUrl,
-          personalizationPoints: prospect.personalizationPoints,
+      await prisma.sourceConnector.update({
+        where: { id: connector.id },
+        data: { lastSyncAt: new Date(), lastError: null, status: "CONNECTED" },
+      });
+
+      return {
+        leadIds,
+        opportunityIds,
+        errors,
+        prospectsFound,
+        skippedNoEmail,
+        runId: run.id,
+        connectorId: connector.id,
+      };
+    } catch (err) {
+      await prisma.sourceRun.update({
+        where: { id: run.id },
+        data: {
+          status: SourceRunStatus.FAILED,
+          completedAt: new Date(),
+          error: err instanceof Error ? err.message : "failed",
         },
-      },
-      whyNow: `Open role "${prospect.jobPostTitle}" on ${prospect.jobPostPlatform}`,
-      likelyProblem: prospect.jobRequirements,
-      recommendedAction: `Contact ${fullName} about ${prospect.jobPostTitle}`,
-      leadScore: prospect.leadScore,
-      budgetHint: prospect.budgetHint,
-      leadId: lead.id,
-    });
-
-    await activityService.log({
-      leadId: lead.id,
-      userId,
-      type: ActivityType.LEAD_CREATED,
-      title: "Hiring signal → opportunity",
-      description: `${fullName} — ${prospect.jobPostTitle} at ${prospect.companyName} (opportunity ${ingested.opportunityId})`,
-    });
-
-    await activityService.log({
-      leadId: lead.id,
-      userId,
-      type: ActivityType.RESEARCH_COMPLETED,
-      title: "Job post research saved",
-      description: `Score: ${prospect.leadScore} (${scoreCategory})`,
-    });
-
-    return { leadId: lead.id, opportunityId: ingested.opportunityId };
+      });
+      throw err;
+    }
   }
 }
 

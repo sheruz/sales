@@ -11,6 +11,7 @@ import {
   ListTodo,
   MessageSquare,
   Package,
+  Plug,
   Rocket,
   Settings,
   Target,
@@ -49,6 +50,7 @@ const revenueOsNav = [
   { title: "Services", href: "/dashboard/services", icon: Package },
   { title: "ICP", href: "/dashboard/icp", icon: Crosshair },
   { title: "Revenue Goals", href: "/dashboard/revenue-goals", icon: CircleDollarSign },
+  { title: "Sources", href: "/dashboard/sources", icon: Plug },
 ];
 
 const settingsNav = [
