@@ -195,6 +195,177 @@ enum LinkedInConnectionType {
   SESSION
 }
 
+enum OrganizationStatus {
+  ACTIVE
+  SUSPENDED
+  TRIAL
+  CANCELLED
+}
+
+enum MembershipStatus {
+  ACTIVE
+  INVITED
+  DISABLED
+}
+
+enum InvitationStatus {
+  PENDING
+  ACCEPTED
+  EXPIRED
+  REVOKED
+}
+
+enum RoleScope {
+  PLATFORM
+  ORGANIZATION
+}
+
+// ─── Multi-tenancy (Phase 1) ─────────────────────────────────────────────────
+
+model Organization {
+  id              String             @id @default(uuid())
+  name            String
+  slug            String             @unique
+  legalName       String?            @map("legal_name")
+  website         String?
+  status          OrganizationStatus @default(ACTIVE)
+  timezone        String             @default("UTC")
+  defaultCurrency String             @default("USD") @map("default_currency")
+  createdAt       DateTime           @default(now()) @map("created_at")
+  updatedAt       DateTime           @updatedAt @map("updated_at")
+  deletedAt       DateTime?          @map("deleted_at")
+
+  members           OrganizationUser[]
+  settings          OrganizationSettings?
+  invitations       OrganizationInvitation[]
+  companies         Company[]
+  leads             Lead[]
+  tags              Tag[]
+  campaigns         Campaign[]
+  services          Service[]
+  deals             Deal[]
+  tasks             Task[]
+  meetings          Meeting[]
+  proposals         Proposal[]
+  conversations     Conversation[]
+  emailAccounts     EmailAccount[]
+  discoveryJobs     LinkedInDiscoveryJob[]
+  followUpJobs      FollowUpJob[]
+  autopilotConfigs  AutopilotConfig[]
+  userIntegrations  UserIntegration[]
+  aiUsageLogs       AIUsageLog[]
+  auditLogs         AuditLog[]
+  sessions          Session[]
+
+  @@index([status])
+  @@index([deletedAt])
+  @@map("organizations")
+}
+
+model Role {
+  id        String    @id @default(uuid())
+  key       String    @unique
+  name      String
+  scope     RoleScope
+  isSystem  Boolean   @default(true) @map("is_system")
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @updatedAt @map("updated_at")
+
+  permissions RolePermission[]
+  members     OrganizationUser[]
+  invitations OrganizationInvitation[]
+
+  @@map("roles")
+}
+
+model Permission {
+  id          String   @id @default(uuid())
+  key         String   @unique
+  name        String
+  description String?
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  roles RolePermission[]
+
+  @@map("permissions")
+}
+
+model RolePermission {
+  roleId       String @map("role_id")
+  permissionId String @map("permission_id")
+
+  role       Role       @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  permission Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+
+  @@id([roleId, permissionId])
+  @@map("role_permissions")
+}
+
+model OrganizationUser {
+  id               String           @id @default(uuid())
+  organizationId   String           @map("organization_id")
+  userId           String           @map("user_id")
+  roleId           String           @map("role_id")
+  status           MembershipStatus @default(ACTIVE)
+  isPrimaryAdmin   Boolean          @default(false) @map("is_primary_admin")
+  invitedAt        DateTime?        @map("invited_at")
+  joinedAt         DateTime?        @map("joined_at")
+  lastActiveAt     DateTime?        @map("last_active_at")
+  createdAt        DateTime         @default(now()) @map("created_at")
+  updatedAt        DateTime         @updatedAt @map("updated_at")
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role         Role         @relation(fields: [roleId], references: [id])
+
+  @@unique([organizationId, userId])
+  @@index([userId])
+  @@index([roleId])
+  @@index([status])
+  @@map("organization_users")
+}
+
+model OrganizationSettings {
+  organizationId      String   @id @map("organization_id")
+  timezone            String   @default("UTC")
+  currency            String   @default("USD")
+  locale              String   @default("en-US")
+  defaultEmailAccount String?  @map("default_email_account")
+  defaultAiProvider   String?  @map("default_ai_provider")
+  defaultAiModel      String?  @map("default_ai_model")
+  dailyEmailLimit     Int      @default(50) @map("daily_email_limit")
+  dailyAiLimit        Int      @default(100) @map("daily_ai_limit")
+  settings            Json?
+  createdAt           DateTime @default(now()) @map("created_at")
+  updatedAt           DateTime @updatedAt @map("updated_at")
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@map("organization_settings")
+}
+
+model OrganizationInvitation {
+  id             String           @id @default(uuid())
+  organizationId String           @map("organization_id")
+  email          String
+  roleId         String           @map("role_id")
+  invitedById    String           @map("invited_by")
+  tokenHash      String           @unique @map("token_hash")
+  expiresAt      DateTime         @map("expires_at")
+  acceptedAt     DateTime?        @map("accepted_at")
+  status         InvitationStatus @default(PENDING)
+  createdAt      DateTime         @default(now()) @map("created_at")
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  role         Role         @relation(fields: [roleId], references: [id])
+  invitedBy    User         @relation("InvitationsSent", fields: [invitedById], references: [id])
+
+  @@index([organizationId, email])
+  @@index([status])
+  @@map("organization_invitations")
+}
+
 // ─── Auth & Users ────────────────────────────────────────────────────────────
 
 model User {
@@ -203,6 +374,7 @@ model User {
   passwordHash String   @map("password_hash")
   firstName    String   @map("first_name")
   lastName     String   @map("last_name")
+  /// Legacy role kept for backward compatibility; org membership uses Role via OrganizationUser
   role         UserRole @default(SALES_REPRESENTATIVE)
   isActive     Boolean  @default(true) @map("is_active")
   avatarUrl    String?  @map("avatar_url")
@@ -228,6 +400,9 @@ model User {
   autopilotConfig   AutopilotConfig?
   userIntegrations  UserIntegration[]
   outreachSettings  UserOutreachSettings?
+  memberships       OrganizationUser[]
+  invitationsSent   OrganizationInvitation[] @relation("InvitationsSent")
+  passwordResets    PasswordResetToken[]
 
   @@index([email])
   @@index([role])
@@ -235,26 +410,45 @@ model User {
 }
 
 model Session {
-  id        String   @id @default(uuid())
-  userId    String   @map("user_id")
-  token     String   @unique
-  expiresAt DateTime @map("expires_at")
-  createdAt DateTime @default(now()) @map("created_at")
-  ipAddress String?  @map("ip_address")
-  userAgent String?  @map("user_agent")
+  id                    String   @id @default(uuid())
+  userId                String   @map("user_id")
+  token                 String   @unique
+  expiresAt             DateTime @map("expires_at")
+  createdAt             DateTime @default(now()) @map("created_at")
+  ipAddress             String?  @map("ip_address")
+  userAgent             String?  @map("user_agent")
+  activeOrganizationId  String?  @map("active_organization_id")
 
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user         User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  organization Organization? @relation(fields: [activeOrganizationId], references: [id], onDelete: SetNull)
 
   @@index([userId])
   @@index([token])
   @@index([expiresAt])
+  @@index([activeOrganizationId])
   @@map("sessions")
+}
+
+model PasswordResetToken {
+  id        String    @id @default(uuid())
+  userId    String    @map("user_id")
+  tokenHash String    @unique @map("token_hash")
+  expiresAt DateTime  @map("expires_at")
+  usedAt    DateTime? @map("used_at")
+  createdAt DateTime  @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([expiresAt])
+  @@map("password_reset_tokens")
 }
 
 // ─── Companies ───────────────────────────────────────────────────────────────
 
 model Company {
   id              String   @id @default(uuid())
+  organizationId  String   @map("organization_id")
   name            String
   website         String?
   linkedInUrl     String?  @map("linkedin_url")
@@ -267,9 +461,11 @@ model Company {
   updatedAt       DateTime @updatedAt @map("updated_at")
   deletedAt       DateTime? @map("deleted_at")
 
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   leads Lead[]
   deals Deal[]
 
+  @@index([organizationId])
   @@index([name])
   @@index([industry])
   @@map("companies")
@@ -279,6 +475,7 @@ model Company {
 
 model Lead {
   id                  String     @id @default(uuid())
+  organizationId      String     @map("organization_id")
   firstName           String     @map("first_name")
   lastName            String     @map("last_name")
   fullName            String     @map("full_name")
@@ -316,6 +513,7 @@ model Lead {
   updatedAt           DateTime   @updatedAt @map("updated_at")
   deletedAt           DateTime?  @map("deleted_at")
 
+  organization  Organization   @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   campaign      Campaign?      @relation(fields: [campaignId], references: [id])
   company       Company?       @relation(fields: [companyId], references: [id])
   assignedTo    User?          @relation("AssignedLeads", fields: [assignedToId], references: [id])
@@ -335,6 +533,7 @@ model Lead {
   proposals     Proposal[]
   followUpJobs  FollowUpJob[]
 
+  @@index([organizationId])
   @@index([automationStatus])
   @@index([nextAutomationAt])
   @@index([status])
@@ -352,13 +551,17 @@ model Lead {
 // ─── Tags ────────────────────────────────────────────────────────────────────
 
 model Tag {
-  id        String   @id @default(uuid())
-  name      String   @unique
-  color     String   @default("#6366f1")
-  createdAt DateTime @default(now()) @map("created_at")
+  id             String   @id @default(uuid())
+  organizationId String   @map("organization_id")
+  name           String
+  color          String   @default("#6366f1")
+  createdAt      DateTime @default(now()) @map("created_at")
 
-  leads LeadTag[]
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  leads        LeadTag[]
 
+  @@unique([organizationId, name])
+  @@index([organizationId])
   @@map("tags")
 }
 
@@ -377,6 +580,7 @@ model LeadTag {
 
 model Campaign {
   id                String         @id @default(uuid())
+  organizationId    String         @map("organization_id")
   name              String
   description       String?
   targetAudience    String?        @map("target_audience")
@@ -390,6 +594,7 @@ model Campaign {
   updatedAt         DateTime       @updatedAt @map("updated_at")
   deletedAt         DateTime?      @map("deleted_at")
 
+  organization     Organization       @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   service          Service?           @relation(fields: [serviceId], references: [id])
   leads            Lead[]
   campaignLeads    CampaignLead[]
@@ -397,6 +602,7 @@ model Campaign {
   linkedInJobs     LinkedInDiscoveryJob[]
   autopilotConfigs AutopilotConfig[]
 
+  @@index([organizationId])
   @@index([status])
   @@map("campaigns")
 }
@@ -416,6 +622,7 @@ model CampaignLead {
 
 model LinkedInDiscoveryJob {
   id             String    @id @default(uuid())
+  organizationId String    @map("organization_id")
   campaignId     String?   @map("campaign_id")
   createdById    String    @map("created_by_id")
   status         JobStatus @default(PENDING)
@@ -429,9 +636,11 @@ model LinkedInDiscoveryJob {
   updatedAt      DateTime  @updatedAt @map("updated_at")
   completedAt    DateTime? @map("completed_at")
 
-  campaign  Campaign? @relation(fields: [campaignId], references: [id])
-  createdBy User      @relation(fields: [createdById], references: [id])
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  campaign     Campaign?    @relation(fields: [campaignId], references: [id])
+  createdBy    User         @relation(fields: [createdById], references: [id])
 
+  @@index([organizationId])
   @@index([status])
   @@index([campaignId])
   @@map("linkedin_discovery_jobs")
@@ -501,24 +710,27 @@ model Note {
 }
 
 model Task {
-  id           String       @id @default(uuid())
-  title        String
-  description  String?
-  leadId       String?      @map("lead_id")
-  dealId       String?      @map("deal_id")
-  assignedToId String?      @map("assigned_to_id")
-  createdById  String?      @map("created_by_id")
-  dueDate      DateTime?    @map("due_date")
-  priority     TaskPriority @default(MEDIUM)
-  status       TaskStatus   @default(PENDING)
-  createdAt    DateTime     @default(now()) @map("created_at")
-  updatedAt    DateTime     @updatedAt @map("updated_at")
+  id             String       @id @default(uuid())
+  organizationId String       @map("organization_id")
+  title          String
+  description    String?
+  leadId         String?      @map("lead_id")
+  dealId         String?      @map("deal_id")
+  assignedToId   String?      @map("assigned_to_id")
+  createdById    String?      @map("created_by_id")
+  dueDate        DateTime?    @map("due_date")
+  priority       TaskPriority @default(MEDIUM)
+  status         TaskStatus   @default(PENDING)
+  createdAt      DateTime     @default(now()) @map("created_at")
+  updatedAt      DateTime     @updatedAt @map("updated_at")
 
-  lead       Lead? @relation(fields: [leadId], references: [id], onDelete: SetNull)
-  deal       Deal? @relation(fields: [dealId], references: [id], onDelete: SetNull)
-  assignedTo User? @relation("AssignedTasks", fields: [assignedToId], references: [id])
-  createdBy  User? @relation("CreatedTasks", fields: [createdById], references: [id])
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  lead         Lead?        @relation(fields: [leadId], references: [id], onDelete: SetNull)
+  deal         Deal?        @relation(fields: [dealId], references: [id], onDelete: SetNull)
+  assignedTo   User?        @relation("AssignedTasks", fields: [assignedToId], references: [id])
+  createdBy    User?        @relation("CreatedTasks", fields: [createdById], references: [id])
 
+  @@index([organizationId])
   @@index([assignedToId])
   @@index([leadId])
   @@index([dueDate])
@@ -551,20 +763,23 @@ model Activity {
 }
 
 model Conversation {
-  id          String              @id @default(uuid())
-  leadId      String              @map("lead_id")
-  channel     ConversationChannel
-  subject     String?
-  content     String?
-  summary     String?
-  metadata    Json?
-  isInbound   Boolean             @default(false) @map("is_inbound")
+  id             String              @id @default(uuid())
+  organizationId String              @map("organization_id")
+  leadId         String              @map("lead_id")
+  channel        ConversationChannel
+  subject        String?
+  content        String?
+  summary        String?
+  metadata       Json?
+  isInbound      Boolean             @default(false) @map("is_inbound")
   classification ReplyClassification?
-  aiAnalysis  Json?               @map("ai_analysis")
-  createdAt   DateTime            @default(now()) @map("created_at")
+  aiAnalysis     Json?               @map("ai_analysis")
+  createdAt      DateTime            @default(now()) @map("created_at")
 
-  lead Lead @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  lead         Lead         @relation(fields: [leadId], references: [id], onDelete: Cascade)
 
+  @@index([organizationId])
   @@index([leadId])
   @@index([channel])
   @@index([createdAt])
@@ -574,22 +789,26 @@ model Conversation {
 // ─── Email ───────────────────────────────────────────────────────────────────
 
 model EmailAccount {
-  id           String   @id @default(uuid())
-  name         String
-  email        String   @unique
-  smtpHost     String   @map("smtp_host")
-  smtpPort     Int      @map("smtp_port")
-  smtpSecure   Boolean  @default(true) @map("smtp_secure")
-  smtpUser     String   @map("smtp_user")
-  smtpPassword String   @map("smtp_password")
-  isDefault    Boolean  @default(false) @map("is_default")
-  isActive     Boolean  @default(true) @map("is_active")
-  createdAt    DateTime @default(now()) @map("created_at")
-  updatedAt    DateTime @updatedAt @map("updated_at")
+  id             String   @id @default(uuid())
+  organizationId String   @map("organization_id")
+  name           String
+  email          String
+  smtpHost       String   @map("smtp_host")
+  smtpPort       Int      @map("smtp_port")
+  smtpSecure     Boolean  @default(true) @map("smtp_secure")
+  smtpUser       String   @map("smtp_user")
+  smtpPassword   String   @map("smtp_password")
+  isDefault      Boolean  @default(false) @map("is_default")
+  isActive       Boolean  @default(true) @map("is_active")
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
 
-  threads  EmailThread[]
-  messages EmailMessage[]
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  threads      EmailThread[]
+  messages     EmailMessage[]
 
+  @@unique([organizationId, email])
+  @@index([organizationId])
   @@map("email_accounts")
 }
 
@@ -670,21 +889,24 @@ model FollowUpSequence {
 }
 
 model FollowUpJob {
-  id          String            @id @default(uuid())
-  leadId      String            @map("lead_id")
-  stepIndex   Int               @map("step_index")
-  scheduledAt DateTime          @map("scheduled_at")
-  status      FollowUpJobStatus @default(PENDING)
-  attempts    Int               @default(0)
-  maxAttempts Int               @default(3) @map("max_attempts")
-  lastError   String?           @map("last_error")
-  completedAt DateTime?         @map("completed_at")
-  metadata    Json?
-  createdAt   DateTime          @default(now()) @map("created_at")
-  updatedAt   DateTime          @updatedAt @map("updated_at")
+  id             String            @id @default(uuid())
+  organizationId String            @map("organization_id")
+  leadId         String            @map("lead_id")
+  stepIndex      Int               @map("step_index")
+  scheduledAt    DateTime          @map("scheduled_at")
+  status         FollowUpJobStatus @default(PENDING)
+  attempts       Int               @default(0)
+  maxAttempts    Int               @default(3) @map("max_attempts")
+  lastError      String?           @map("last_error")
+  completedAt    DateTime?         @map("completed_at")
+  metadata       Json?
+  createdAt      DateTime          @default(now()) @map("created_at")
+  updatedAt      DateTime          @updatedAt @map("updated_at")
 
-  lead Lead @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  lead         Lead         @relation(fields: [leadId], references: [id], onDelete: Cascade)
 
+  @@index([organizationId])
   @@index([status])
   @@index([scheduledAt])
   @@index([leadId])
@@ -710,6 +932,7 @@ model JobLog {
 
 model Deal {
   id               String    @id @default(uuid())
+  organizationId   String    @map("organization_id")
   name             String
   leadId           String    @map("lead_id")
   companyId        String?   @map("company_id")
@@ -727,15 +950,17 @@ model Deal {
   updatedAt        DateTime  @updatedAt @map("updated_at")
   deletedAt        DateTime? @map("deleted_at")
 
-  lead       Lead           @relation(fields: [leadId], references: [id])
-  company    Company?       @relation(fields: [companyId], references: [id])
-  assignedTo User?          @relation(fields: [assignedToId], references: [id])
-  activities DealActivity[]
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  lead         Lead         @relation(fields: [leadId], references: [id])
+  company      Company?     @relation(fields: [companyId], references: [id])
+  assignedTo   User?        @relation(fields: [assignedToId], references: [id])
+  activities   DealActivity[]
   leadActivities Activity[] @relation("DealActivities")
-  tasks      Task[]
-  proposals  Proposal[]
-  meetings   Meeting[]
+  tasks        Task[]
+  proposals    Proposal[]
+  meetings     Meeting[]
 
+  @@index([organizationId])
   @@index([stage])
   @@index([assignedToId])
   @@index([leadId])
@@ -759,25 +984,28 @@ model DealActivity {
 // ─── Meetings ────────────────────────────────────────────────────────────────
 
 model Meeting {
-  id          String         @id @default(uuid())
-  leadId      String         @map("lead_id")
-  dealId      String?        @map("deal_id")
-  userId      String         @map("user_id")
-  title       String
-  date        DateTime
-  duration    Int            @default(30)
-  type        MeetingType    @default(DISCOVERY)
-  meetingLink String?        @map("meeting_link")
-  outcome     MeetingOutcome @default(SCHEDULED)
-  aiPrepNotes Json?          @map("ai_prep_notes")
-  createdAt   DateTime       @default(now()) @map("created_at")
-  updatedAt   DateTime       @updatedAt @map("updated_at")
+  id             String         @id @default(uuid())
+  organizationId String         @map("organization_id")
+  leadId         String         @map("lead_id")
+  dealId         String?        @map("deal_id")
+  userId         String         @map("user_id")
+  title          String
+  date           DateTime
+  duration       Int            @default(30)
+  type           MeetingType    @default(DISCOVERY)
+  meetingLink    String?        @map("meeting_link")
+  outcome        MeetingOutcome @default(SCHEDULED)
+  aiPrepNotes    Json?          @map("ai_prep_notes")
+  createdAt      DateTime       @default(now()) @map("created_at")
+  updatedAt      DateTime       @updatedAt @map("updated_at")
 
-  lead  Lead          @relation(fields: [leadId], references: [id])
-  deal  Deal?         @relation(fields: [dealId], references: [id])
-  user  User          @relation(fields: [userId], references: [id])
-  notes MeetingNote[]
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  lead         Lead         @relation(fields: [leadId], references: [id])
+  deal         Deal?        @relation(fields: [dealId], references: [id])
+  user         User         @relation(fields: [userId], references: [id])
+  notes        MeetingNote[]
 
+  @@index([organizationId])
   @@index([leadId])
   @@index([date])
   @@index([userId])
@@ -804,23 +1032,26 @@ model MeetingNote {
 // ─── Proposals ───────────────────────────────────────────────────────────────
 
 model Proposal {
-  id          String         @id @default(uuid())
-  leadId      String         @map("lead_id")
-  dealId      String?        @map("deal_id")
-  createdById String         @map("created_by_id")
-  title       String
-  status      ProposalStatus @default(DRAFT)
-  totalPrice  Decimal?       @map("total_price") @db.Decimal(12, 2)
-  currency    String         @default("USD")
-  isPriceApproved Boolean    @default(false) @map("is_price_approved")
-  createdAt   DateTime       @default(now()) @map("created_at")
-  updatedAt   DateTime       @updatedAt @map("updated_at")
+  id             String         @id @default(uuid())
+  organizationId String         @map("organization_id")
+  leadId         String         @map("lead_id")
+  dealId         String?        @map("deal_id")
+  createdById    String         @map("created_by_id")
+  title          String
+  status         ProposalStatus @default(DRAFT)
+  totalPrice     Decimal?       @map("total_price") @db.Decimal(12, 2)
+  currency       String         @default("USD")
+  isPriceApproved Boolean       @default(false) @map("is_price_approved")
+  createdAt      DateTime       @default(now()) @map("created_at")
+  updatedAt      DateTime       @updatedAt @map("updated_at")
 
-  lead      Lead              @relation(fields: [leadId], references: [id])
-  deal      Deal?             @relation(fields: [dealId], references: [id])
-  createdBy User              @relation(fields: [createdById], references: [id])
-  versions  ProposalVersion[]
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  lead         Lead         @relation(fields: [leadId], references: [id])
+  deal         Deal?        @relation(fields: [dealId], references: [id])
+  createdBy    User         @relation(fields: [createdById], references: [id])
+  versions     ProposalVersion[]
 
+  @@index([organizationId])
   @@index([leadId])
   @@index([status])
   @@map("proposals")
@@ -852,23 +1083,27 @@ model ProposalVersion {
 // ─── Services Configuration ──────────────────────────────────────────────────
 
 model Service {
-  id              String   @id @default(uuid())
-  name            String   @unique
-  description     String
-  targetClientType String? @map("target_client_type")
-  minBudget       Decimal? @map("min_budget") @db.Decimal(12, 2)
-  maxBudget       Decimal? @map("max_budget") @db.Decimal(12, 2)
-  typicalTimeline String?  @map("typical_timeline")
-  technologies    String[]
-  caseStudies     Json?    @map("case_studies")
-  talkingPoints   Json?    @map("talking_points")
-  isActive        Boolean  @default(true) @map("is_active")
-  createdAt       DateTime @default(now()) @map("created_at")
-  updatedAt       DateTime @updatedAt @map("updated_at")
+  id               String   @id @default(uuid())
+  organizationId   String   @map("organization_id")
+  name             String
+  description      String
+  targetClientType String?  @map("target_client_type")
+  minBudget        Decimal? @map("min_budget") @db.Decimal(12, 2)
+  maxBudget        Decimal? @map("max_budget") @db.Decimal(12, 2)
+  typicalTimeline  String?  @map("typical_timeline")
+  technologies     String[]
+  caseStudies      Json?    @map("case_studies")
+  talkingPoints    Json?    @map("talking_points")
+  isActive         Boolean  @default(true) @map("is_active")
+  createdAt        DateTime @default(now()) @map("created_at")
+  updatedAt        DateTime @updatedAt @map("updated_at")
 
-  campaigns Campaign[]
+  organization     Organization      @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  campaigns        Campaign[]
   autopilotConfigs AutopilotConfig[]
 
+  @@unique([organizationId, name])
+  @@index([organizationId])
   @@map("services")
 }
 
@@ -892,6 +1127,7 @@ model IntegrationProduct {
 
 model UserIntegration {
   id                   String              @id @default(uuid())
+  organizationId       String              @map("organization_id")
   userId               String              @map("user_id")
   platform             IntegrationPlatform
   productId            String?             @map("product_id")
@@ -905,10 +1141,12 @@ model UserIntegration {
   createdAt            DateTime            @default(now()) @map("created_at")
   updatedAt            DateTime            @updatedAt @map("updated_at")
 
-  user    User                @relation(fields: [userId], references: [id], onDelete: Cascade)
-  product IntegrationProduct? @relation(fields: [productId], references: [id])
+  organization Organization       @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  user         User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  product      IntegrationProduct? @relation(fields: [productId], references: [id])
 
-  @@unique([userId, platform])
+  @@unique([organizationId, userId, platform])
+  @@index([organizationId])
   @@index([userId])
   @@map("user_integrations")
 }
@@ -958,6 +1196,7 @@ model LinkedInAccount {
 
 model AutopilotConfig {
   id                  String    @id @default(uuid())
+  organizationId      String    @map("organization_id")
   userId              String    @unique @map("user_id")
   isEnabled           Boolean   @default(false) @map("is_enabled")
   goal                String?
@@ -982,10 +1221,12 @@ model AutopilotConfig {
   createdAt           DateTime  @default(now()) @map("created_at")
   updatedAt           DateTime  @updatedAt @map("updated_at")
 
-  user           User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  service        Service?  @relation(fields: [serviceId], references: [id])
-  activeCampaign Campaign? @relation(fields: [activeCampaignId], references: [id])
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  user           User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  service        Service?     @relation(fields: [serviceId], references: [id])
+  activeCampaign Campaign?    @relation(fields: [activeCampaignId], references: [id])
 
+  @@index([organizationId])
   @@map("autopilot_configs")
 }
 
@@ -1006,36 +1247,43 @@ model AIConversation {
 }
 
 model AIUsageLog {
-  id           String   @id @default(uuid())
-  userId       String?  @map("user_id")
-  feature      String
-  model        String?
-  promptTokens Int?     @map("prompt_tokens")
-  outputTokens Int?     @map("output_tokens")
-  totalTokens  Int?     @map("total_tokens")
-  cost         Decimal? @db.Decimal(10, 6)
-  metadata     Json?
-  createdAt    DateTime @default(now()) @map("created_at")
+  id             String   @id @default(uuid())
+  organizationId String?  @map("organization_id")
+  userId         String?  @map("user_id")
+  feature        String
+  model          String?
+  promptTokens   Int?     @map("prompt_tokens")
+  outputTokens   Int?     @map("output_tokens")
+  totalTokens    Int?     @map("total_tokens")
+  cost           Decimal? @db.Decimal(10, 6)
+  metadata       Json?
+  createdAt      DateTime @default(now()) @map("created_at")
 
+  organization Organization? @relation(fields: [organizationId], references: [id], onDelete: SetNull)
+
+  @@index([organizationId])
   @@index([feature])
   @@index([createdAt])
   @@map("ai_usage_logs")
 }
 
 model AuditLog {
-  id         String   @id @default(uuid())
-  userId     String?  @map("user_id")
-  action     String
-  entityType String   @map("entity_type")
-  entityId   String?  @map("entity_id")
-  oldValues  Json?    @map("old_values")
-  newValues  Json?    @map("new_values")
-  ipAddress  String?  @map("ip_address")
-  userAgent  String?  @map("user_agent")
-  createdAt  DateTime @default(now()) @map("created_at")
+  id             String   @id @default(uuid())
+  organizationId String?  @map("organization_id")
+  userId         String?  @map("user_id")
+  action         String
+  entityType     String   @map("entity_type")
+  entityId       String?  @map("entity_id")
+  oldValues      Json?    @map("old_values")
+  newValues      Json?    @map("new_values")
+  ipAddress      String?  @map("ip_address")
+  userAgent      String?  @map("user_agent")
+  createdAt      DateTime @default(now()) @map("created_at")
 
-  user User? @relation(fields: [userId], references: [id])
+  organization Organization? @relation(fields: [organizationId], references: [id], onDelete: SetNull)
+  user         User?         @relation(fields: [userId], references: [id])
 
+  @@index([organizationId])
   @@index([entityType, entityId])
   @@index([userId])
   @@index([createdAt])

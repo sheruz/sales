@@ -23,9 +23,9 @@ const LOCKABLE_STATUSES: AutomationStatus[] = [
 ];
 
 export class AutomationService {
-  async lockLead(leadId: string, userId?: string) {
+  async lockLead(organizationId: string, leadId: string, userId?: string) {
     const lead = await prisma.lead.findFirst({
-      where: { id: leadId, deletedAt: null },
+      where: { id: leadId, organizationId, deletedAt: null },
     });
     if (!lead) throw new NotFoundError("Lead not found");
 
@@ -46,8 +46,10 @@ export class AutomationService {
     });
   }
 
-  async unlockLead(leadId: string, userId?: string) {
-    const lead = await prisma.lead.findFirst({ where: { id: leadId } });
+  async unlockLead(organizationId: string, leadId: string, userId?: string) {
+    const lead = await prisma.lead.findFirst({
+      where: { id: leadId, organizationId },
+    });
     if (!lead) throw new NotFoundError("Lead not found");
 
     await prisma.lead.update({
@@ -71,17 +73,19 @@ export class AutomationService {
   }
 
   async startBatch(
+    organizationId: string,
     leadIds: string[],
     campaignId?: string,
     userId?: string,
     channels?: OutreachChannel[]
   ) {
-    const resolvedChannels = channels ?? (userId ? await getOutreachChannelsForUser(userId) : ["email"]);
+    const resolvedChannels =
+      channels ?? (userId ? await getOutreachChannelsForUser(userId) : ["email"]);
     const results = [];
 
     for (const leadId of leadIds) {
       try {
-        await this.lockLead(leadId, userId);
+        await this.lockLead(organizationId, leadId, userId);
 
         if (campaignId) {
           await prisma.lead.update({
@@ -95,7 +99,9 @@ export class AutomationService {
           data: { nextAutomationAt: new Date() },
         });
 
-        await this.runPipeline(leadId, userId, { channels: resolvedChannels });
+        await this.runPipeline(organizationId, leadId, userId, {
+          channels: resolvedChannels,
+        });
 
         results.push({ leadId, status: "completed" });
       } catch (err) {
@@ -111,6 +117,7 @@ export class AutomationService {
   }
 
   async runPipeline(
+    organizationId: string,
     leadId: string,
     userId?: string,
     options?: {
@@ -124,7 +131,7 @@ export class AutomationService {
     const useEmail = channels.includes("email");
 
     const lead = await prisma.lead.findFirst({
-      where: { id: leadId, deletedAt: null },
+      where: { id: leadId, organizationId, deletedAt: null },
       include: { campaign: { include: { followUpSequence: true } } },
     });
     if (!lead) throw new NotFoundError("Lead not found");
@@ -150,7 +157,7 @@ export class AutomationService {
       throw new ValidationError("No email address — cannot send email outreach");
     }
 
-    if (emailOnly && !(await isEmailConfiguredForOutreach(userId))) {
+    if (emailOnly && !(await isEmailConfiguredForOutreach(organizationId, userId))) {
       throw new ValidationError(
         "Email not configured. Connect SMTP in Settings → Integrations."
       );
@@ -163,7 +170,7 @@ export class AutomationService {
         lead.automationStatus === AutomationStatus.PAUSED ||
         lead.automationStatus === AutomationStatus.OUTREACH_READY
       ) {
-        await this.lockLead(leadId, userId);
+        await this.lockLead(organizationId, leadId, userId);
       }
 
       const preResearched = Boolean(
@@ -182,36 +189,53 @@ export class AutomationService {
 
       if (useLinkedIn) {
         const linkedInDraft = await prisma.conversation.findFirst({
-          where: { leadId, channel: "LINKEDIN", isInbound: false },
+          where: { leadId, organizationId, channel: "LINKEDIN", isInbound: false },
         });
         if (!linkedInDraft && lead.linkedInUrl) {
           const { conversation } = await aiOutreachService.generateOutreach(
+            organizationId,
             leadId,
             "linkedin",
             userId,
             lead.campaignId ?? undefined
           );
-          await aiOutreachService.sendOutreach(leadId, conversation.id, userId);
+          await aiOutreachService.sendOutreach(
+            organizationId,
+            leadId,
+            conversation.id,
+            userId
+          );
         }
       }
 
       if (useEmail && lead.email) {
         const emailDraft = await prisma.conversation.findFirst({
-          where: { leadId, channel: "EMAIL", isInbound: false },
+          where: { leadId, organizationId, channel: "EMAIL", isInbound: false },
         });
         if (!emailDraft) {
           const { conversation } = await aiOutreachService.generateOutreach(
+            organizationId,
             leadId,
             "email",
             userId,
             lead.campaignId ?? undefined
           );
-          await aiOutreachService.sendOutreach(leadId, conversation.id, userId);
+          await aiOutreachService.sendOutreach(
+            organizationId,
+            leadId,
+            conversation.id,
+            userId
+          );
           emailSent = true;
         } else {
           const meta = emailDraft.metadata as { status?: string } | null;
           if (meta?.status !== "sent") {
-            await aiOutreachService.sendOutreach(leadId, emailDraft.id, userId);
+            await aiOutreachService.sendOutreach(
+              organizationId,
+              leadId,
+              emailDraft.id,
+              userId
+            );
             emailSent = true;
           } else {
             emailSent = true;
@@ -224,7 +248,12 @@ export class AutomationService {
       }
 
       if (lead.campaign?.followUpSequence) {
-        await this.scheduleFollowUps(leadId, lead.campaign.followUpSequence.steps, channels);
+        await this.scheduleFollowUps(
+          organizationId,
+          leadId,
+          lead.campaign.followUpSequence.steps,
+          channels
+        );
       }
 
       await prisma.lead.update({
@@ -264,6 +293,7 @@ export class AutomationService {
   }
 
   async scheduleFollowUps(
+    organizationId: string,
     leadId: string,
     steps: unknown,
     channels: OutreachChannel[] = ["email"]
@@ -285,6 +315,7 @@ export class AutomationService {
 
       await prisma.followUpJob.create({
         data: {
+          organizationId,
           leadId,
           stepIndex,
           scheduledAt,
@@ -304,37 +335,54 @@ export class AutomationService {
   }
 
   async processPendingJobs() {
-    const dueLeads = await prisma.lead.findMany({
-      where: {
-        deletedAt: null,
-        automationStatus: AutomationStatus.LOCKED,
-        nextAutomationAt: { lte: new Date() },
-      },
-      take: 10,
+    const orgs = await prisma.organization.findMany({
+      where: { deletedAt: null, status: "ACTIVE" },
+      select: { id: true },
     });
 
     const pipelineResults = [];
-    for (const lead of dueLeads) {
-      try {
-        await this.runPipeline(lead.id);
-        pipelineResults.push({ leadId: lead.id, status: "completed" });
-      } catch (err) {
-        pipelineResults.push({
-          leadId: lead.id,
-          status: "failed",
-          error: err instanceof Error ? err.message : "failed",
-        });
-      }
-    }
+    const followUpResults = [];
 
-    const followUpResults = await this.processFollowUpJobs();
+    for (const org of orgs) {
+      const dueLeads = await prisma.lead.findMany({
+        where: {
+          organizationId: org.id,
+          deletedAt: null,
+          automationStatus: AutomationStatus.LOCKED,
+          nextAutomationAt: { lte: new Date() },
+        },
+        take: 10,
+      });
+
+      for (const lead of dueLeads) {
+        try {
+          await this.runPipeline(org.id, lead.id);
+          pipelineResults.push({
+            organizationId: org.id,
+            leadId: lead.id,
+            status: "completed",
+          });
+        } catch (err) {
+          pipelineResults.push({
+            organizationId: org.id,
+            leadId: lead.id,
+            status: "failed",
+            error: err instanceof Error ? err.message : "failed",
+          });
+        }
+      }
+
+      const orgFollowUps = await this.processFollowUpJobs(org.id);
+      followUpResults.push(...orgFollowUps);
+    }
 
     return { pipelines: pipelineResults, followUps: followUpResults };
   }
 
-  async processFollowUpJobs() {
+  async processFollowUpJobs(organizationId: string) {
     const jobs = await prisma.followUpJob.findMany({
       where: {
+        organizationId,
         status: FollowUpJobStatus.PENDING,
         scheduledAt: { lte: new Date() },
       },
@@ -375,10 +423,11 @@ export class AutomationService {
         }
 
         const { conversation } = await aiOutreachService.generateOutreach(
+          organizationId,
           job.leadId,
           "email"
         );
-        await aiOutreachService.sendOutreach(job.leadId, conversation.id);
+        await aiOutreachService.sendOutreach(organizationId, job.leadId, conversation.id);
 
         await prisma.followUpJob.update({
           where: { id: job.id },

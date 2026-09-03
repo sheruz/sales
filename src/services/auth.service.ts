@@ -11,6 +11,11 @@ import { canAssignRole, canManageTargetUser } from "@/lib/auth/role-policy";
 import { UserRole } from "@prisma/client";
 import type { AuthUser } from "@/types/auth";
 import type { CreateUserInput, UpdateUserInput } from "@/lib/auth/schemas";
+import { ensureMembershipFromLegacyUser } from "@/services/organization.service";
+import {
+  generateInviteToken,
+  hashInviteToken,
+} from "@/lib/tenant/rbac";
 
 interface SessionMeta {
   ipAddress?: string;
@@ -51,21 +56,27 @@ export class AuthService {
       throw new UnauthorizedError("Invalid email or password");
     }
 
-    const token = await createSession(user.id, meta);
+    const primaryMembership = await prisma.organizationUser.findFirst({
+      where: { userId: user.id, status: "ACTIVE" },
+      orderBy: [{ isPrimaryAdmin: "desc" }, { createdAt: "asc" }],
+    });
+
+    const token = await createSession(user.id, {
+      ...meta,
+      organizationId:
+        user.role === UserRole.SUPER_ADMIN
+          ? null
+          : primaryMembership?.organizationId ?? null,
+    });
 
     logger.info("User logged in", { userId: user.id, email: user.email });
 
-    return {
-      user: {
-        id: user.id,
-        email: user.email,
-        firstName: user.firstName,
-        lastName: user.lastName,
-        role: user.role,
-        avatarUrl: user.avatarUrl,
-      },
-      token,
-    };
+    const authUser = await getSessionUser(token);
+    if (!authUser) {
+      throw new UnauthorizedError("Failed to establish session");
+    }
+
+    return { user: authUser, token };
   }
 
   async logout(token: string): Promise<void> {
@@ -93,7 +104,11 @@ export class AuthService {
     });
   }
 
-  async createUser(input: CreateUserInput, actorRole: UserRole) {
+  async createUser(
+    input: CreateUserInput,
+    actorRole: UserRole,
+    organizationId?: string | null
+  ) {
     if (!canAssignRole(actorRole, input.role)) {
       throw new ValidationError("You cannot assign this role");
     }
@@ -127,7 +142,19 @@ export class AuthService {
       },
     });
 
-    logger.info("User created", { userId: user.id, email: user.email });
+    if (organizationId && input.role !== UserRole.SUPER_ADMIN) {
+      await ensureMembershipFromLegacyUser(
+        organizationId,
+        user.id,
+        input.role
+      );
+    }
+
+    logger.info("User created", {
+      userId: user.id,
+      email: user.email,
+      organizationId: organizationId ?? undefined,
+    });
     return user;
   }
 
@@ -203,6 +230,70 @@ export class AuthService {
       where: { id: userId },
       data: { passwordHash },
     });
+    await prisma.session.deleteMany({ where: { userId } });
+  }
+
+  /**
+   * Request password reset. Always returns success shape; token only returned
+   * when user exists (caller may email it — never log the raw token).
+   */
+  async requestPasswordReset(email: string): Promise<{ token?: string }> {
+    const user = await prisma.user.findUnique({
+      where: { email: email.toLowerCase().trim() },
+      select: { id: true, isActive: true, deletedAt: true },
+    });
+
+    if (!user || !user.isActive || user.deletedAt) {
+      return {};
+    }
+
+    const token = generateInviteToken();
+    const tokenHash = hashInviteToken(token);
+    const expiresAt = new Date(Date.now() + 60 * 60 * 1000);
+
+    await prisma.passwordResetToken.create({
+      data: { userId: user.id, tokenHash, expiresAt },
+    });
+
+    logger.info("Password reset requested", { userId: user.id });
+    return { token };
+  }
+
+  async resetPasswordWithToken(token: string, newPassword: string) {
+    const tokenHash = hashInviteToken(token);
+    const record = await prisma.passwordResetToken.findUnique({
+      where: { tokenHash },
+    });
+
+    if (!record || record.usedAt || record.expiresAt < new Date()) {
+      throw new ValidationError("Invalid or expired reset token");
+    }
+
+    const passwordHash = await hashPassword(newPassword);
+    await prisma.$transaction([
+      prisma.user.update({
+        where: { id: record.userId },
+        data: { passwordHash },
+      }),
+      prisma.passwordResetToken.update({
+        where: { id: record.id },
+        data: { usedAt: new Date() },
+      }),
+      prisma.session.deleteMany({ where: { userId: record.userId } }),
+    ]);
+
+    logger.info("Password reset completed", { userId: record.userId });
+  }
+
+  /** Super Admin / company admin support: force-set password and invalidate sessions */
+  async adminResetPassword(userId: string, newPassword: string, actorId: string) {
+    const passwordHash = await hashPassword(newPassword);
+    await prisma.user.update({
+      where: { id: userId },
+      data: { passwordHash },
+    });
+    await prisma.session.deleteMany({ where: { userId } });
+    logger.info("Admin password reset", { userId, actorId });
   }
 
   async deactivateUser(userId: string, actorId: string, actorRole: UserRole) {

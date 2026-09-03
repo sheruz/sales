@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { serviceCatalogService } from "@/services/service-catalog.service";
-import { requirePermission } from "@/lib/auth/api-auth";
+import { requirePermission, requireOrganizationContext } from "@/lib/auth/api-auth";
 import { apiSuccess } from "@/lib/api/response";
 import { handleApiError } from "@/lib/api/error-handler";
 
@@ -19,7 +19,8 @@ const createSchema = z.object({
 export async function GET() {
   try {
     await requirePermission("campaigns:read");
-    const services = await serviceCatalogService.list();
+    const user = await requireOrganizationContext();
+    const services = await serviceCatalogService.list(user.organizationId);
     return NextResponse.json(apiSuccess(services));
   } catch (error) {
     return handleApiError(error);
@@ -29,8 +30,9 @@ export async function GET() {
 export async function POST(request: NextRequest) {
   try {
     await requirePermission("settings:write");
+    const user = await requireOrganizationContext();
     const input = createSchema.parse(await request.json());
-    const service = await serviceCatalogService.create(input);
+    const service = await serviceCatalogService.create(user.organizationId, input);
     return NextResponse.json(apiSuccess(service), { status: 201 });
   } catch (error) {
     return handleApiError(error);

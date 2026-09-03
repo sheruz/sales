@@ -1,8 +1,13 @@
+import { redirect } from "next/navigation";
 import { conversationService } from "@/services/conversation.service";
 import { ConversationsInbox } from "@/components/conversations/conversations-inbox";
+import { getCurrentUser } from "@/lib/auth/session";
 
 export default async function ConversationsPage() {
-  const conversations = await conversationService.list();
+  const user = await getCurrentUser();
+  if (!user?.organizationId) redirect("/dashboard");
+
+  const conversations = await conversationService.list(user.organizationId);
 
   const serialized = conversations.map((c) => ({
     ...c,

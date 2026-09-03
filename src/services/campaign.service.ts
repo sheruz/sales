@@ -4,9 +4,9 @@ import type { CreateCampaignInput, UpdateCampaignInput } from "@/lib/validations
 import { DEFAULT_FOLLOW_UP_STEPS } from "@/lib/constants/automation";
 
 export class CampaignService {
-  async list() {
+  async list(organizationId: string) {
     return prisma.campaign.findMany({
-      where: { deletedAt: null },
+      where: { organizationId, deletedAt: null },
       include: {
         service: { select: { id: true, name: true } },
         _count: { select: { leads: true, campaignLeads: true } },
@@ -15,9 +15,9 @@ export class CampaignService {
     });
   }
 
-  async getById(id: string) {
+  async getById(organizationId: string, id: string) {
     const campaign = await prisma.campaign.findFirst({
-      where: { id, deletedAt: null },
+      where: { id, organizationId, deletedAt: null },
       include: {
         service: true,
         followUpSequence: true,
@@ -28,9 +28,10 @@ export class CampaignService {
     return campaign;
   }
 
-  async create(input: CreateCampaignInput) {
+  async create(organizationId: string, input: CreateCampaignInput) {
     const campaign = await prisma.campaign.create({
       data: {
+        organizationId,
         name: input.name,
         description: input.description,
         targetAudience: input.targetAudience,
@@ -55,8 +56,8 @@ export class CampaignService {
     return campaign;
   }
 
-  async update(id: string, input: UpdateCampaignInput) {
-    await this.getById(id);
+  async update(organizationId: string, id: string, input: UpdateCampaignInput) {
+    await this.getById(organizationId, id);
     return prisma.campaign.update({
       where: { id },
       data: input,
@@ -64,30 +65,36 @@ export class CampaignService {
     });
   }
 
-  async delete(id: string) {
-    await this.getById(id);
+  async delete(organizationId: string, id: string) {
+    await this.getById(organizationId, id);
     return prisma.campaign.update({
       where: { id },
       data: { deletedAt: new Date() },
     });
   }
 
-  async getStats(id: string) {
-    const campaign = await this.getById(id);
+  async getStats(organizationId: string, id: string) {
+    const campaign = await this.getById(organizationId, id);
     const [totalLeads, automatedLeads, repliedLeads, hotLeads] = await Promise.all([
-      prisma.lead.count({ where: { campaignId: id, deletedAt: null } }),
+      prisma.lead.count({ where: { organizationId, campaignId: id, deletedAt: null } }),
       prisma.lead.count({
         where: {
+          organizationId,
           campaignId: id,
           deletedAt: null,
           automationStatus: { not: "IDLE" },
         },
       }),
       prisma.lead.count({
-        where: { campaignId: id, deletedAt: null, status: { in: ["REPLIED", "INTERESTED", "MEETING"] } },
+        where: {
+          organizationId,
+          campaignId: id,
+          deletedAt: null,
+          status: { in: ["REPLIED", "INTERESTED", "MEETING"] },
+        },
       }),
       prisma.lead.count({
-        where: { campaignId: id, deletedAt: null, scoreCategory: "HOT" },
+        where: { organizationId, campaignId: id, deletedAt: null, scoreCategory: "HOT" },
       }),
     ]);
 

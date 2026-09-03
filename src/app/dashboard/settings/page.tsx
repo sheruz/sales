@@ -5,6 +5,7 @@ import { hasPermission } from "@/lib/auth/permissions";
 import { userIntegrationService } from "@/services/user-integration.service";
 import { serviceCatalogService } from "@/services/service-catalog.service";
 import { UserManagementPanel } from "@/components/dashboard/user-management-panel";
+import { OrgTeamPanel } from "@/components/dashboard/org-team-panel";
 import { IntegrationsPanel } from "@/components/settings/integrations-panel";
 import { ProfileSettings } from "@/components/settings/profile-settings";
 import { ServicesPanel } from "@/components/settings/services-panel";
@@ -32,8 +33,12 @@ export default async function SettingsPage({
   const canManageServices = hasPermission(user.role, "settings:write");
 
   const [integrationData, services] = await Promise.all([
-    canManageIntegrations ? userIntegrationService.listForUser(user.id) : null,
-    canManageServices ? serviceCatalogService.list() : [],
+    canManageIntegrations && user.organizationId
+      ? userIntegrationService.listForUser(user.organizationId, user.id)
+      : null,
+    canManageServices && user.organizationId
+      ? serviceCatalogService.list(user.organizationId)
+      : [],
   ]);
 
   return (
@@ -100,7 +105,15 @@ export default async function SettingsPage({
 
         {canManageUsers && (
           <TabsContent value="users" className="mt-4">
-            <UserManagementPanel actorRole={user.role} />
+            {user.organizationId ? (
+              <OrgTeamPanel
+                organizationId={user.organizationId}
+                permissions={user.permissions}
+                currentUserId={user.id}
+              />
+            ) : (
+              <UserManagementPanel actorRole={user.role} />
+            )}
           </TabsContent>
         )}
       </Tabs>

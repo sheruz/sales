@@ -1,11 +1,20 @@
 import { PrismaClient, UserRole } from "@prisma/client";
 import bcrypt from "bcryptjs";
 import { INTEGRATION_CATALOG } from "../src/lib/integrations/catalog";
+import {
+  seedRolesAndPermissions,
+  getRoleByKey,
+  ensureUniqueOrgSlug,
+} from "../src/lib/tenant/rbac";
+import { ROLE_KEYS } from "../src/lib/auth/permission-catalog";
 
 const prisma = new PrismaClient();
 
 async function main() {
   console.log("Seeding database...");
+
+  await seedRolesAndPermissions();
+  console.log("  Roles & permissions seeded");
 
   const passwordHash = await bcrypt.hash("Admin@123", 12);
 
@@ -56,6 +65,49 @@ async function main() {
       role: UserRole.SALES_REPRESENTATIVE,
     },
   });
+
+  const slug = await ensureUniqueOrgSlug("default-workspace");
+  let org = await prisma.organization.findFirst({
+    where: { slug: "default-workspace", deletedAt: null },
+  });
+  if (!org) {
+    org = await prisma.organization.create({
+      data: {
+        name: "Default Workspace",
+        slug,
+        status: "ACTIVE",
+        settings: { create: {} },
+      },
+    });
+  }
+
+  const memberships: Array<{ userId: string; roleKey: string; primary: boolean }> = [
+    { userId: admin.id, roleKey: ROLE_KEYS.COMPANY_ADMIN, primary: true },
+    { userId: manager.id, roleKey: ROLE_KEYS.SALES_MANAGER, primary: false },
+    { userId: rep.id, roleKey: ROLE_KEYS.SALES_REP, primary: false },
+  ];
+
+  for (const m of memberships) {
+    const role = await getRoleByKey(m.roleKey);
+    await prisma.organizationUser.upsert({
+      where: {
+        organizationId_userId: { organizationId: org.id, userId: m.userId },
+      },
+      create: {
+        organizationId: org.id,
+        userId: m.userId,
+        roleId: role.id,
+        status: "ACTIVE",
+        isPrimaryAdmin: m.primary,
+        joinedAt: new Date(),
+      },
+      update: {
+        roleId: role.id,
+        status: "ACTIVE",
+        isPrimaryAdmin: m.primary,
+      },
+    });
+  }
 
   const services = [
     {
@@ -167,28 +219,24 @@ async function main() {
 
   for (const service of services) {
     await prisma.service.upsert({
-      where: { name: service.name },
+      where: {
+        organizationId_name: { organizationId: org.id, name: service.name },
+      },
       update: service,
-      create: service,
+      create: { ...service, organizationId: org.id },
     });
   }
 
   const tags = ["Hot Lead", "Enterprise", "Startup", "Referral", "Inbound", "Outbound"];
   for (const tagName of tags) {
     await prisma.tag.upsert({
-      where: { name: tagName },
+      where: {
+        organizationId_name: { organizationId: org.id, name: tagName },
+      },
       update: {},
-      create: { name: tagName },
+      create: { name: tagName, organizationId: org.id },
     });
   }
-
-  console.log("Seed completed:");
-  console.log(`  Super Admin: ${superAdmin.email}`);
-  console.log(`  Company Admin: ${admin.email}`);
-  console.log(`  Manager: ${manager.email}`);
-  console.log(`  Rep: ${rep.email}`);
-  console.log(`  Services: ${services.length}`);
-  console.log(`  Tags: ${tags.length}`);
 
   for (const item of INTEGRATION_CATALOG) {
     await prisma.integrationProduct.upsert({
@@ -209,6 +257,14 @@ async function main() {
     });
   }
 
+  console.log("Seed completed:");
+  console.log(`  Super Admin: ${superAdmin.email} (no org — /platform)`);
+  console.log(`  Organization: ${org.name} (${org.slug})`);
+  console.log(`  Company Admin: ${admin.email}`);
+  console.log(`  Manager: ${manager.email}`);
+  console.log(`  Rep: ${rep.email}`);
+  console.log(`  Services: ${services.length}`);
+  console.log(`  Tags: ${tags.length}`);
   console.log(`  Integration products: ${INTEGRATION_CATALOG.length}`);
   console.log("\nDefault password for all users: Admin@123");
 }

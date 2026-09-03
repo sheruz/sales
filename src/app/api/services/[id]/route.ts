@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { serviceCatalogService } from "@/services/service-catalog.service";
-import { requirePermission } from "@/lib/auth/api-auth";
+import { requirePermission, requireOrganizationContext } from "@/lib/auth/api-auth";
 import { apiSuccess } from "@/lib/api/response";
 import { handleApiError } from "@/lib/api/error-handler";
 
@@ -24,9 +24,14 @@ interface RouteParams {
 export async function PATCH(request: NextRequest, { params }: RouteParams) {
   try {
     await requirePermission("settings:write");
+    const user = await requireOrganizationContext();
     const { id } = await params;
     const input = updateSchema.parse(await request.json());
-    const service = await serviceCatalogService.update(id, input);
+    const service = await serviceCatalogService.update(
+      user.organizationId,
+      id,
+      input
+    );
     return NextResponse.json(apiSuccess(service));
   } catch (error) {
     return handleApiError(error);
@@ -36,8 +41,9 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
 export async function DELETE(_request: Request, { params }: RouteParams) {
   try {
     await requirePermission("settings:write");
+    const user = await requireOrganizationContext();
     const { id } = await params;
-    await serviceCatalogService.delete(id);
+    await serviceCatalogService.delete(user.organizationId, id);
     return NextResponse.json(apiSuccess({ deleted: true }));
   } catch (error) {
     return handleApiError(error);

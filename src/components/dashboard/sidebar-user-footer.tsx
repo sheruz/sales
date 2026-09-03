@@ -5,14 +5,18 @@ import { toast } from "sonner";
 import { LogOut, Settings } from "lucide-react";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
-import { ROLE_LABELS, isSuperAdmin } from "@/lib/auth/permissions";
+import { ROLE_LABELS } from "@/lib/auth/permissions";
 import type { AuthUser } from "@/types/auth";
 
 interface SidebarUserFooterProps {
   user: AuthUser;
+  settingsHref?: string;
 }
 
-export function SidebarUserFooter({ user }: SidebarUserFooterProps) {
+export function SidebarUserFooter({
+  user,
+  settingsHref = "/dashboard/settings",
+}: SidebarUserFooterProps) {
   const router = useRouter();
   const initials = `${user.firstName[0]}${user.lastName[0]}`.toUpperCase();
 
@@ -46,21 +50,11 @@ export function SidebarUserFooter({ user }: SidebarUserFooterProps) {
           variant="ghost"
           size="sm"
           className="w-full justify-start"
-          onClick={() => router.push("/dashboard/settings")}
+          onClick={() => router.push(settingsHref)}
         >
           <Settings className="mr-2 h-4 w-4" />
           Settings
         </Button>
-        {isSuperAdmin(user.role) && (
-          <Button
-            variant="ghost"
-            size="sm"
-            className="w-full justify-start"
-            onClick={() => router.push("/dashboard/platform")}
-          >
-            Platform Admin
-          </Button>
-        )}
         <Button
           variant="ghost"
           size="sm"

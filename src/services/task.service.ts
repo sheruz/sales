@@ -5,14 +5,18 @@ import { activityService } from "@/services/activity.service";
 import type { CreateTaskInput } from "@/lib/validations/lead";
 
 export class TaskService {
-  async list(filters?: {
-    leadId?: string;
-    assignedToId?: string;
-    status?: TaskStatus;
-    overdue?: boolean;
-  }) {
+  async list(
+    organizationId: string,
+    filters?: {
+      leadId?: string;
+      assignedToId?: string;
+      status?: TaskStatus;
+      overdue?: boolean;
+    }
+  ) {
     return prisma.task.findMany({
       where: {
+        organizationId,
         ...(filters?.leadId ? { leadId: filters.leadId } : {}),
         ...(filters?.assignedToId ? { assignedToId: filters.assignedToId } : {}),
         ...(filters?.status ? { status: filters.status } : {}),
@@ -32,18 +36,20 @@ export class TaskService {
   }
 
   async create(
+    organizationId: string,
     input: CreateTaskInput & { leadId?: string },
     userId: string
   ) {
     if (input.leadId) {
       const lead = await prisma.lead.findFirst({
-        where: { id: input.leadId, deletedAt: null },
+        where: { id: input.leadId, organizationId, deletedAt: null },
       });
       if (!lead) throw new NotFoundError("Lead not found");
     }
 
     const task = await prisma.task.create({
       data: {
+        organizationId,
         title: input.title,
         description: input.description || null,
         leadId: input.leadId || null,
@@ -71,7 +77,17 @@ export class TaskService {
     return task;
   }
 
-  async updateStatus(taskId: string, status: TaskStatus, userId: string) {
+  async updateStatus(
+    organizationId: string,
+    taskId: string,
+    status: TaskStatus,
+    userId: string
+  ) {
+    const existing = await prisma.task.findFirst({
+      where: { id: taskId, organizationId },
+    });
+    if (!existing) throw new NotFoundError("Task not found");
+
     const task = await prisma.task.update({
       where: { id: taskId },
       data: { status },
@@ -93,7 +109,11 @@ export class TaskService {
     return task;
   }
 
-  async delete(taskId: string) {
+  async delete(organizationId: string, taskId: string) {
+    const existing = await prisma.task.findFirst({
+      where: { id: taskId, organizationId },
+    });
+    if (!existing) throw new NotFoundError("Task not found");
     await prisma.task.delete({ where: { id: taskId } });
   }
 }

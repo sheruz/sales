@@ -1,12 +1,17 @@
+import { redirect } from "next/navigation";
 import { campaignService } from "@/services/campaign.service";
 import prisma from "@/lib/db/prisma";
 import { CampaignsList } from "@/components/campaigns/campaigns-list";
+import { getCurrentUser } from "@/lib/auth/session";
 
 export default async function CampaignsPage() {
+  const user = await getCurrentUser();
+  if (!user?.organizationId) redirect("/dashboard");
+
   const [campaigns, services] = await Promise.all([
-    campaignService.list(),
+    campaignService.list(user.organizationId),
     prisma.service.findMany({
-      where: { isActive: true },
+      where: { organizationId: user.organizationId, isActive: true },
       select: { id: true, name: true },
       orderBy: { name: "asc" },
     }),

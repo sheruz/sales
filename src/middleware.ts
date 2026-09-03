@@ -1,35 +1,41 @@
 import { NextRequest, NextResponse } from "next/server";
 import { SESSION_COOKIE } from "@/lib/auth/permissions";
 
-const publicRoutes = ["/", "/login"];
-const authRoutes = ["/login"];
+const publicPages = [
+  "/",
+  "/login",
+  "/invite",
+  "/forgot-password",
+  "/reset-password",
+];
 
 export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
   const sessionToken = request.cookies.get(SESSION_COOKIE)?.value;
 
-  const isPublicRoute = publicRoutes.some(
-    (route) => pathname === route || pathname.startsWith("/api/auth/login")
-  );
-  const isAuthRoute = authRoutes.some((route) => pathname.startsWith(route));
-  const isDashboardRoute = pathname.startsWith("/dashboard");
   const isApiRoute = pathname.startsWith("/api");
-
-  if (isApiRoute && !pathname.startsWith("/api/auth")) {
+  // Route handlers enforce auth; cron/webhook/public APIs stay open here.
+  if (isApiRoute) {
     return NextResponse.next();
   }
 
-  if (isDashboardRoute && !sessionToken) {
+  const isPublicPage = publicPages.some(
+    (route) => pathname === route || pathname.startsWith(`${route}/`)
+  );
+  const isDashboardRoute = pathname.startsWith("/dashboard");
+  const isPlatformRoute = pathname.startsWith("/platform");
+
+  if ((isDashboardRoute || isPlatformRoute) && !sessionToken) {
     const loginUrl = new URL("/login", request.url);
     loginUrl.searchParams.set("redirect", pathname);
     return NextResponse.redirect(loginUrl);
   }
 
-  if (isAuthRoute && sessionToken) {
+  if (pathname === "/login" && sessionToken) {
     return NextResponse.redirect(new URL("/dashboard", request.url));
   }
 
-  if (!isPublicRoute && !isDashboardRoute && !isApiRoute && !sessionToken) {
+  if (!isPublicPage && !isDashboardRoute && !isPlatformRoute && !sessionToken) {
     return NextResponse.redirect(new URL("/login", request.url));
   }
 

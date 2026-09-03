@@ -35,7 +35,9 @@ export class AIResearchService {
     });
     if (!lead) throw new NotFoundError("Lead not found");
 
-    const services = await prisma.service.findMany({ where: { isActive: true } });
+    const services = await prisma.service.findMany({
+      where: { organizationId: lead.organizationId, isActive: true },
+    });
 
     await prisma.lead.update({
       where: { id: leadId },

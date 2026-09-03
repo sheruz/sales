@@ -3,7 +3,7 @@ import { z } from "zod";
 import prisma from "@/lib/db/prisma";
 import { autopilotService } from "@/services/autopilot.service";
 import { assertAutopilotCanRun } from "@/lib/autopilot/limits";
-import { requirePermission } from "@/lib/auth/api-auth";
+import { requirePermission, requireOrganizationContext } from "@/lib/auth/api-auth";
 import { apiSuccess } from "@/lib/api/response";
 import { handleApiError } from "@/lib/api/error-handler";
 
@@ -24,10 +24,11 @@ const updateSchema = z.object({
 
 export async function GET() {
   try {
-    const user = await requirePermission("ai:use");
+    await requirePermission("ai:use");
+    const user = await requireOrganizationContext();
     const [config, usage] = await Promise.all([
-      autopilotService.getOrCreateConfig(user.id),
-      autopilotService.getUsage(user.id),
+      autopilotService.getOrCreateConfig(user.organizationId, user.id),
+      autopilotService.getUsage(user.organizationId, user.id),
     ]);
     return NextResponse.json(apiSuccess({ ...config, usage }));
   } catch (error) {
@@ -37,10 +38,15 @@ export async function GET() {
 
 export async function PATCH(request: NextRequest) {
   try {
-    const user = await requirePermission("ai:use");
+    await requirePermission("ai:use");
+    const user = await requireOrganizationContext();
     const body = await request.json();
     const input = updateSchema.parse(body);
-    const config = await autopilotService.updateConfig(user.id, input);
+    const config = await autopilotService.updateConfig(
+      user.organizationId,
+      user.id,
+      input
+    );
     return NextResponse.json(apiSuccess(config));
   } catch (error) {
     return handleApiError(error);
@@ -49,11 +55,15 @@ export async function PATCH(request: NextRequest) {
 
 export async function POST() {
   try {
-    const user = await requirePermission("ai:use");
+    await requirePermission("ai:use");
+    const user = await requireOrganizationContext();
 
     await assertAutopilotCanRun(user.id);
 
-    const existing = await autopilotService.getOrCreateConfig(user.id);
+    const existing = await autopilotService.getOrCreateConfig(
+      user.organizationId,
+      user.id
+    );
     const lastResult = existing.lastRunResult as { status?: string } | null;
     if (lastResult?.status === "running") {
       return NextResponse.json(
@@ -72,7 +82,7 @@ export async function POST() {
       },
     });
 
-    autopilotService.run(user.id).catch(async (err) => {
+    autopilotService.run(user.organizationId, user.id).catch(async (err) => {
       console.error("Autopilot run failed:", err);
       await prisma.autopilotConfig.update({
         where: { userId: user.id },

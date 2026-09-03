@@ -3,9 +3,10 @@ import { NotFoundError } from "@/lib/api/response";
 import type { CreateCompanyInput } from "@/lib/validations/lead";
 
 export class CompanyService {
-  async list(search?: string) {
+  async list(organizationId: string, search?: string) {
     return prisma.company.findMany({
       where: {
+        organizationId,
         deletedAt: null,
         ...(search
           ? { name: { contains: search, mode: "insensitive" as const } }
@@ -16,12 +17,12 @@ export class CompanyService {
     });
   }
 
-  async getById(id: string) {
+  async getById(organizationId: string, id: string) {
     const company = await prisma.company.findFirst({
-      where: { id, deletedAt: null },
+      where: { id, organizationId, deletedAt: null },
       include: {
         leads: {
-          where: { deletedAt: null },
+          where: { deletedAt: null, organizationId },
           take: 10,
           orderBy: { createdAt: "desc" },
         },
@@ -31,9 +32,10 @@ export class CompanyService {
     return company;
   }
 
-  async create(input: CreateCompanyInput) {
+  async create(organizationId: string, input: CreateCompanyInput) {
     return prisma.company.create({
       data: {
+        organizationId,
         name: input.name,
         website: input.website || null,
         linkedInUrl: input.linkedInUrl || null,
@@ -46,14 +48,23 @@ export class CompanyService {
     });
   }
 
-  async findOrCreate(name: string, data?: Partial<CreateCompanyInput>) {
+  async findOrCreate(
+    organizationId: string,
+    name: string,
+    data?: Partial<CreateCompanyInput>
+  ) {
     const existing = await prisma.company.findFirst({
-      where: { name: { equals: name, mode: "insensitive" }, deletedAt: null },
+      where: {
+        organizationId,
+        name: { equals: name, mode: "insensitive" },
+        deletedAt: null,
+      },
     });
     if (existing) return existing;
 
     return prisma.company.create({
       data: {
+        organizationId,
         name,
         website: data?.website || null,
         linkedInUrl: data?.linkedInUrl || null,

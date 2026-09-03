@@ -69,7 +69,9 @@ export default async function DashboardPage() {
 
   const [stats, readiness] = await Promise.all([
     getDashboardStats(user.id, user.role),
-    getUserReadiness(user.id),
+    user.organizationId
+      ? getUserReadiness(user.organizationId, user.id)
+      : Promise.resolve(null),
   ]);
 
   const statCards = [

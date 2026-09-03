@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { leadService } from "@/services/lead.service";
-import { requirePermission } from "@/lib/auth/api-auth";
+import { requireOrgPermission, requireOrganizationContext } from "@/lib/auth/api-auth";
 import { apiSuccess } from "@/lib/api/response";
 import { handleApiError } from "@/lib/api/error-handler";
 
@@ -25,7 +25,8 @@ function parseCsv(text: string): Record<string, string>[] {
 
 export async function POST(request: NextRequest) {
   try {
-    const user = await requirePermission("leads:write");
+    await requireOrgPermission("leads.create");
+    const user = await requireOrganizationContext();
     const formData = await request.formData();
     const file = formData.get("file");
 
@@ -46,7 +47,11 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const result = await leadService.importFromCsv(rows, user.id);
+    const result = await leadService.importFromCsv(
+      user.organizationId,
+      rows,
+      user.id
+    );
     return NextResponse.json(apiSuccess(result));
   } catch (error) {
     return handleApiError(error);

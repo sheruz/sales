@@ -16,11 +16,14 @@ interface AICampaignPlan {
 
 export class AutoCampaignService {
   async createFromGoal(
+    organizationId: string,
     goal: string,
     userId: string,
     serviceId?: string
   ) {
-    const services = await prisma.service.findMany({ where: { isActive: true } });
+    const services = await prisma.service.findMany({
+      where: { organizationId, isActive: true },
+    });
 
     const result = await aiComplete({
       feature: "auto_campaign",
@@ -67,7 +70,7 @@ Return JSON:
       resolvedServiceId = match?.id;
     }
 
-    const campaign = await campaignService.create({
+    const campaign = await campaignService.create(organizationId, {
       name: plan.name,
       description: plan.description,
       targetAudience: plan.targetAudience,

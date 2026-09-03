@@ -9,12 +9,12 @@ interface PageProps {
 
 export default async function TasksPage({ searchParams }: PageProps) {
   const user = await getCurrentUser();
-  if (!user) redirect("/login");
+  if (!user?.organizationId) redirect("/login");
 
   const { filter } = await searchParams;
   const overdue = filter === "overdue";
 
-  const tasks = await taskService.list({
+  const tasks = await taskService.list(user.organizationId, {
     assignedToId: user.role === "SALES_REPRESENTATIVE" ? user.id : undefined,
     overdue,
     status: filter === "pending" ? "PENDING" : undefined,

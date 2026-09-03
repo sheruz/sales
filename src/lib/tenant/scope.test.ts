@@ -1,0 +1,100 @@
+import { describe, expect, it } from "vitest";
+import {
+  assertSameOrganization,
+  hasOrgPermission,
+  requireOrganizationId,
+} from "@/lib/tenant/scope";
+import {
+  ROLE_PERMISSION_MAP,
+  ROLE_KEYS,
+  PERMISSION_KEYS,
+} from "@/lib/auth/permission-catalog";
+import { ForbiddenError } from "@/lib/api/response";
+import type { AuthUser } from "@/types/auth";
+import { UserRole } from "@prisma/client";
+
+function mockUser(overrides: Partial<AuthUser> = {}): AuthUser {
+  return {
+    id: "user-a",
+    email: "a@example.com",
+    firstName: "A",
+    lastName: "User",
+    role: UserRole.ADMIN,
+    avatarUrl: null,
+    isPlatformAdmin: false,
+    organizationId: "org-a",
+    organizationName: "Org A",
+    organizationSlug: "org-a",
+    organizationRoleKey: ROLE_KEYS.COMPANY_ADMIN,
+    permissions: ROLE_PERMISSION_MAP.company_admin,
+    ...overrides,
+  };
+}
+
+describe("tenant scope", () => {
+  it("requireOrganizationId returns active org", () => {
+    expect(requireOrganizationId(mockUser())).toBe("org-a");
+  });
+
+  it("requireOrganizationId rejects missing org", () => {
+    expect(() =>
+      requireOrganizationId(mockUser({ organizationId: null }))
+    ).toThrow(ForbiddenError);
+  });
+
+  it("assertSameOrganization blocks cross-tenant ID access", () => {
+    expect(() =>
+      assertSameOrganization(mockUser(), "org-b")
+    ).toThrow(ForbiddenError);
+  });
+
+  it("assertSameOrganization allows matching org", () => {
+    expect(() =>
+      assertSameOrganization(mockUser(), "org-a")
+    ).not.toThrow();
+  });
+
+  it("platform admin bypasses org assertion", () => {
+    expect(() =>
+      assertSameOrganization(
+        mockUser({
+          isPlatformAdmin: true,
+          organizationId: null,
+          permissions: ["platform.manage"],
+        }),
+        "org-b"
+      )
+    ).not.toThrow();
+  });
+});
+
+describe("org RBAC", () => {
+  it("company admin cannot platform.manage", () => {
+    expect(
+      hasOrgPermission(mockUser(), "platform.manage")
+    ).toBe(false);
+  });
+
+  it("sales_rep cannot manage billing", () => {
+    const rep = mockUser({
+      organizationRoleKey: ROLE_KEYS.SALES_REP,
+      permissions: ROLE_PERMISSION_MAP.sales_rep,
+      role: UserRole.SALES_REPRESENTATIVE,
+    });
+    expect(hasOrgPermission(rep, "billing.manage")).toBe(false);
+    expect(hasOrgPermission(rep, "leads.view")).toBe(true);
+  });
+
+  it("viewer is read-mostly", () => {
+    const viewer = mockUser({
+      organizationRoleKey: ROLE_KEYS.VIEWER,
+      permissions: ROLE_PERMISSION_MAP.viewer,
+    });
+    expect(hasOrgPermission(viewer, "leads.create")).toBe(false);
+    expect(hasOrgPermission(viewer, "analytics.view")).toBe(true);
+  });
+
+  it("permission catalog is complete for platform_admin", () => {
+    expect(ROLE_PERMISSION_MAP.platform_admin).toEqual([...PERMISSION_KEYS]);
+  });
+});

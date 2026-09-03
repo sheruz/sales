@@ -3,28 +3,37 @@ import { NotFoundError, ValidationError } from "@/lib/api/response";
 import type { Prisma } from "@prisma/client";
 
 export class ServiceCatalogService {
-  async list(includeInactive = false) {
+  async list(organizationId: string, includeInactive = false) {
     return prisma.service.findMany({
-      where: includeInactive ? {} : { isActive: true },
+      where: {
+        organizationId,
+        ...(includeInactive ? {} : { isActive: true }),
+      },
       orderBy: { name: "asc" },
     });
   }
 
-  async create(data: {
-    name: string;
-    description: string;
-    targetClientType?: string;
-    minBudget?: number;
-    maxBudget?: number;
-    typicalTimeline?: string;
-    technologies?: string[];
-    talkingPoints?: string[];
-  }) {
-    const existing = await prisma.service.findUnique({ where: { name: data.name } });
+  async create(
+    organizationId: string,
+    data: {
+      name: string;
+      description: string;
+      targetClientType?: string;
+      minBudget?: number;
+      maxBudget?: number;
+      typicalTimeline?: string;
+      technologies?: string[];
+      talkingPoints?: string[];
+    }
+  ) {
+    const existing = await prisma.service.findFirst({
+      where: { organizationId, name: data.name },
+    });
     if (existing) throw new ValidationError("Service name already exists");
 
     return prisma.service.create({
       data: {
+        organizationId,
         name: data.name,
         description: data.description,
         targetClientType: data.targetClientType,
@@ -38,6 +47,7 @@ export class ServiceCatalogService {
   }
 
   async update(
+    organizationId: string,
     id: string,
     data: Partial<{
       name: string;
@@ -51,7 +61,9 @@ export class ServiceCatalogService {
       isActive: boolean;
     }>
   ) {
-    const service = await prisma.service.findUnique({ where: { id } });
+    const service = await prisma.service.findFirst({
+      where: { id, organizationId },
+    });
     if (!service) throw new NotFoundError("Service not found");
 
     return prisma.service.update({
@@ -63,8 +75,10 @@ export class ServiceCatalogService {
     });
   }
 
-  async delete(id: string) {
-    const service = await prisma.service.findUnique({ where: { id } });
+  async delete(organizationId: string, id: string) {
+    const service = await prisma.service.findFirst({
+      where: { id, organizationId },
+    });
     if (!service) throw new NotFoundError("Service not found");
     return prisma.service.update({
       where: { id },

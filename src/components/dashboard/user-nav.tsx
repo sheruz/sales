@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { LogOut, Settings, Shield } from "lucide-react";
+import { LogOut, Settings } from "lucide-react";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import {
@@ -25,6 +25,9 @@ export function UserNav({ user }: UserNavProps) {
   const router = useRouter();
   const [mounted, setMounted] = useState(false);
   const initials = `${user.firstName[0]}${user.lastName[0]}`.toUpperCase();
+  const settingsHref = isSuperAdmin(user.role)
+    ? "/platform/settings"
+    : "/dashboard/settings";
 
   useEffect(() => {
     setMounted(true);
@@ -79,16 +82,10 @@ export function UserNav({ user }: UserNavProps) {
           </div>
         </DropdownMenuLabel>
         <DropdownMenuSeparator />
-        <DropdownMenuItem onClick={() => router.push("/dashboard/settings")}>
+        <DropdownMenuItem onClick={() => router.push(settingsHref)}>
           <Settings className="mr-2 h-4 w-4" />
           Settings
         </DropdownMenuItem>
-        {isSuperAdmin(user.role) && (
-          <DropdownMenuItem onClick={() => router.push("/dashboard/platform")}>
-            <Shield className="mr-2 h-4 w-4" />
-            Platform Admin
-          </DropdownMenuItem>
-        )}
         <DropdownMenuSeparator />
         <DropdownMenuItem variant="destructive" onClick={handleLogout}>
           <LogOut className="mr-2 h-4 w-4" />

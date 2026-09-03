@@ -1,17 +1,19 @@
 import { NextRequest, NextResponse } from "next/server";
 import { automationService } from "@/services/automation.service";
 import { startAutomationSchema } from "@/lib/validations/automation";
-import { requirePermission } from "@/lib/auth/api-auth";
+import { requirePermission, requireOrganizationContext } from "@/lib/auth/api-auth";
 import { apiSuccess } from "@/lib/api/response";
 import { handleApiError } from "@/lib/api/error-handler";
 
 export async function POST(request: NextRequest) {
   try {
-    const user = await requirePermission("ai:use");
+    await requirePermission("ai:use");
+    const user = await requireOrganizationContext();
     const body = await request.json();
     const input = startAutomationSchema.parse(body);
 
     const results = await automationService.startBatch(
+      user.organizationId,
       input.leadIds,
       input.campaignId,
       user.id,
@@ -21,7 +23,9 @@ export async function POST(request: NextRequest) {
     // Trigger pipeline processing
     for (const r of results) {
       if (r.status === "queued") {
-        automationService.runPipeline(r.leadId, user.id).catch(console.error);
+        automationService
+          .runPipeline(user.organizationId, r.leadId, user.id)
+          .catch(console.error);
       }
     }
 

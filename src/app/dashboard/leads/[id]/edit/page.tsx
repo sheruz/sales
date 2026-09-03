@@ -11,13 +11,13 @@ interface PageProps {
 
 export default async function EditLeadPage({ params }: PageProps) {
   const user = await getCurrentUser();
-  if (!user) notFound();
+  if (!user?.organizationId) notFound();
 
   const { id } = await params;
 
   let lead;
   try {
-    lead = await leadService.getById(id);
+    lead = await leadService.getById(user.organizationId, id);
   } catch {
     notFound();
   }

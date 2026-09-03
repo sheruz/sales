@@ -18,14 +18,20 @@ export class LinkedInOAuthService {
     return env.LINKEDIN_REDIRECT_URI ?? `${env.APP_URL}/api/integrations/linkedin/callback`;
   }
 
-  buildAuthorizeUrl(userId: string): string {
+  buildAuthorizeUrl(organizationId: string, userId: string): string {
     if (!this.isConfigured()) {
       throw new ValidationError(
         "LinkedIn OAuth is not configured on the server. Set LINKEDIN_CLIENT_ID and LINKEDIN_CLIENT_SECRET."
       );
     }
 
-    const state = encrypt(JSON.stringify({ userId, nonce: crypto.randomBytes(16).toString("hex") }));
+    const state = encrypt(
+      JSON.stringify({
+        organizationId,
+        userId,
+        nonce: crypto.randomBytes(16).toString("hex"),
+      })
+    );
 
     const params = new URLSearchParams({
       response_type: "code",
@@ -40,9 +46,15 @@ export class LinkedInOAuthService {
 
   async handleCallback(code: string, state: string) {
     let userId: string;
+    let organizationId: string;
     try {
-      const parsed = JSON.parse(decrypt(state)) as { userId: string };
+      const parsed = JSON.parse(decrypt(state)) as {
+        userId: string;
+        organizationId: string;
+      };
       userId = parsed.userId;
+      organizationId = parsed.organizationId;
+      if (!userId || !organizationId) throw new Error("missing ids");
     } catch {
       throw new ValidationError("Invalid OAuth state");
     }
@@ -117,8 +129,15 @@ export class LinkedInOAuthService {
     });
 
     await prisma.userIntegration.upsert({
-      where: { userId_platform: { userId, platform: IntegrationPlatform.LINKEDIN } },
+      where: {
+        organizationId_userId_platform: {
+          organizationId,
+          userId,
+          platform: IntegrationPlatform.LINKEDIN,
+        },
+      },
       create: {
+        organizationId,
         userId,
         platform: IntegrationPlatform.LINKEDIN,
         productId: product?.id,

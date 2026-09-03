@@ -10,7 +10,6 @@ import {
   Settings,
   Target,
   Users,
-  Shield,
   Zap,
 } from "lucide-react";
 import {
@@ -48,15 +47,6 @@ const secondaryNav = [
   },
 ];
 
-const platformNav = [
-  {
-    title: "Platform Admin",
-    href: "/dashboard/platform",
-    icon: Shield,
-    permission: "platform:manage" as const,
-  },
-];
-
 interface AppSidebarProps {
   user: AuthUser;
 }
@@ -65,9 +55,6 @@ export function AppSidebar({ user }: AppSidebarProps) {
   const pathname = usePathname();
 
   const filteredSecondary = secondaryNav.filter(
-    (item) => !item.permission || hasPermission(user.role, item.permission)
-  );
-  const filteredPlatform = platformNav.filter(
     (item) => !item.permission || hasPermission(user.role, item.permission)
   );
 
@@ -83,7 +70,7 @@ export function AppSidebar({ user }: AppSidebarProps) {
               <div className="grid flex-1 text-left text-sm leading-tight">
                 <span className="truncate font-semibold">Sales Platform</span>
                 <span className="truncate text-xs text-muted-foreground">
-                  Client Acquisition
+                  Company workspace
                 </span>
               </div>
             </SidebarMenuButton>
@@ -115,28 +102,6 @@ export function AppSidebar({ user }: AppSidebarProps) {
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
-
-        {filteredPlatform.length > 0 && (
-          <SidebarGroup>
-            <SidebarGroupLabel>Platform</SidebarGroupLabel>
-            <SidebarGroupContent>
-              <SidebarMenu>
-                {filteredPlatform.map((item) => (
-                  <SidebarMenuItem key={item.href}>
-                    <SidebarMenuButton
-                      isActive={pathname.startsWith(item.href)}
-                      tooltip={item.title}
-                      render={<Link href={item.href} />}
-                    >
-                      <item.icon />
-                      <span>{item.title}</span>
-                    </SidebarMenuButton>
-                  </SidebarMenuItem>
-                ))}
-              </SidebarMenu>
-            </SidebarGroupContent>
-          </SidebarGroup>
-        )}
 
         <SidebarGroup>
           <SidebarGroupLabel>Tools</SidebarGroupLabel>

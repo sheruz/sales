@@ -10,21 +10,22 @@ import { AutopilotPanel } from "@/components/autopilot/autopilot-panel";
 export default async function AutopilotPage() {
   const user = await getCurrentUser();
   if (!user) redirect("/login");
+  if (!user.organizationId) redirect("/dashboard");
   if (!hasPermission(user.role, "ai:use")) redirect("/dashboard");
 
   const [config, services, usage] = await Promise.all([
-    autopilotService.getOrCreateConfig(user.id),
+    autopilotService.getOrCreateConfig(user.organizationId, user.id),
     prisma.service.findMany({
-      where: { isActive: true },
+      where: { organizationId: user.organizationId, isActive: true },
       select: { id: true, name: true },
       orderBy: { name: "asc" },
     }),
-    autopilotService.getUsage(user.id),
+    autopilotService.getUsage(user.organizationId, user.id),
   ]);
 
   const [emailConfigured, aiConfigured] = await Promise.all([
-    userIntegrationService.isEmailConfigured(user.id),
-    isAiConfigured(user.id),
+    userIntegrationService.isEmailConfigured(user.organizationId, user.id),
+    isAiConfigured(user.organizationId, user.id),
   ]);
 
   return (

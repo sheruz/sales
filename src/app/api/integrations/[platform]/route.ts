@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { IntegrationPlatform } from "@prisma/client";
 import { userIntegrationService } from "@/services/user-integration.service";
-import { requirePermission } from "@/lib/auth/api-auth";
+import { requirePermission, requireOrganizationContext } from "@/lib/auth/api-auth";
 import { apiSuccess } from "@/lib/api/response";
 import { handleApiError } from "@/lib/api/error-handler";
 
@@ -18,13 +18,21 @@ interface RouteParams {
 
 export async function DELETE(_request: Request, { params }: RouteParams) {
   try {
-    const user = await requirePermission("integrations:manage");
+    await requirePermission("integrations:manage");
+    const user = await requireOrganizationContext();
     const { platform } = await params;
     const mapped = PLATFORM_MAP[platform.toLowerCase()];
     if (!mapped) {
-      return NextResponse.json({ success: false, error: { message: "Unknown platform" } }, { status: 400 });
+      return NextResponse.json(
+        { success: false, error: { message: "Unknown platform" } },
+        { status: 400 }
+      );
     }
-    await userIntegrationService.disconnect(user.id, mapped);
+    await userIntegrationService.disconnect(
+      user.organizationId,
+      user.id,
+      mapped
+    );
     return NextResponse.json(apiSuccess({ disconnected: true }));
   } catch (error) {
     return handleApiError(error);

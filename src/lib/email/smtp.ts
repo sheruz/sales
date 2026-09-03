@@ -5,11 +5,15 @@ import { userIntegrationService } from "@/services/user-integration.service";
 export type { SendEmailParams } from "@/lib/email/send-mail";
 
 export async function sendEmailForUser(
+  organizationId: string | undefined,
   userId: string | undefined,
   params: { to: string; subject: string; text: string; html?: string }
 ) {
-  if (userId) {
-    const userConfig = await userIntegrationService.getEmailConfig(userId);
+  if (organizationId && userId) {
+    const userConfig = await userIntegrationService.getEmailConfig(
+      organizationId,
+      userId
+    );
     if (userConfig) {
       return sendEmailWithConfig(userConfig, params);
     }
@@ -37,9 +41,12 @@ export async function sendEmailForUser(
   return sendEmailWithConfig(platformConfig, params);
 }
 
-export async function isEmailConfiguredForUser(userId?: string): Promise<boolean> {
-  if (userId) {
-    return userIntegrationService.isEmailConfigured(userId);
+export async function isEmailConfiguredForUser(
+  organizationId?: string,
+  userId?: string
+): Promise<boolean> {
+  if (organizationId && userId) {
+    return userIntegrationService.isEmailConfigured(organizationId, userId);
   }
   return Boolean(env.SMTP_HOST && env.SMTP_USER && env.SMTP_PASSWORD);
 }

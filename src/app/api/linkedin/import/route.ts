@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { linkedInService } from "@/services/linkedin.service";
 import { automationService } from "@/services/automation.service";
-import { requirePermission } from "@/lib/auth/api-auth";
+import { requirePermission, requireOrganizationContext } from "@/lib/auth/api-auth";
 import { apiSuccess } from "@/lib/api/response";
 import { handleApiError } from "@/lib/api/error-handler";
 import { z } from "zod";
@@ -14,7 +14,8 @@ const importSchema = z.object({
 
 export async function POST(request: NextRequest) {
   try {
-    const user = await requirePermission("ai:use");
+    await requirePermission("ai:use");
+    const user = await requireOrganizationContext();
     const body = await request.json();
     const input = importSchema.parse(body);
 
@@ -24,6 +25,7 @@ export async function POST(request: NextRequest) {
     for (const url of input.urls) {
       try {
         const leadId = await linkedInService.importFromProfileUrl(
+          user.organizationId,
           url,
           input.campaignId,
           user.id
@@ -35,9 +37,16 @@ export async function POST(request: NextRequest) {
     }
 
     if (input.autoStartAutomation && leadIds.length > 0) {
-      await automationService.startBatch(leadIds, input.campaignId, user.id);
+      await automationService.startBatch(
+        user.organizationId,
+        leadIds,
+        input.campaignId,
+        user.id
+      );
       for (const leadId of leadIds) {
-        automationService.runPipeline(leadId, user.id).catch(console.error);
+        automationService
+          .runPipeline(user.organizationId, leadId, user.id)
+          .catch(console.error);
       }
     }
 

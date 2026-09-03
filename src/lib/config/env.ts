@@ -1,18 +1,8 @@
 import { z } from "zod";
+import { ensureDatabaseUrl } from "@/lib/db/ensure-database-url";
 
 function resolveDatabaseUrl(): void {
-  if (process.env.DATABASE_URL) return;
-
-  const user = process.env.POSTGRES_USER;
-  const password = process.env.POSTGRES_PASSWORD;
-  const db = process.env.POSTGRES_DB;
-
-  if (!user || !password || !db) return;
-
-  const host = process.env.POSTGRES_HOST ?? "localhost";
-  const port = process.env.POSTGRES_PORT ?? "5432";
-
-  process.env.DATABASE_URL = `postgresql://${user}:${encodeURIComponent(password)}@${host}:${port}/${db}?schema=public`;
+  ensureDatabaseUrl();
 }
 
 function sanitizeEnv(env: NodeJS.ProcessEnv): Record<string, string | undefined> {

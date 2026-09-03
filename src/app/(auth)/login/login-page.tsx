@@ -43,7 +43,17 @@ export default function LoginPage() {
       }
 
       toast.success(`Welcome back, ${data.data.user.firstName}!`);
-      router.push(redirect);
+      const role = data.data.user.role as string;
+      let home = redirect;
+      if (role === "SUPER_ADMIN") {
+        home =
+          !redirect || redirect === "/dashboard" || redirect.startsWith("/dashboard")
+            ? "/platform"
+            : redirect;
+      } else if (redirect.startsWith("/platform")) {
+        home = "/dashboard";
+      }
+      router.push(home);
       router.refresh();
     } catch (error) {
       toast.error(
@@ -90,7 +100,15 @@ export default function LoginPage() {
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="password">Password</Label>
+                <div className="flex items-center justify-between gap-2">
+                  <Label htmlFor="password">Password</Label>
+                  <Link
+                    href="/forgot-password"
+                    className="text-xs text-muted-foreground hover:underline"
+                  >
+                    Forgot password?
+                  </Link>
+                </div>
                 <Input
                   id="password"
                   type="password"

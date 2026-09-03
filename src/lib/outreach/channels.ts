@@ -46,7 +46,10 @@ export function isLinkedInOutreachEnabled(): boolean {
   return getDefaultOutreachChannelsFromEnv().includes("linkedin");
 }
 
-export async function isEmailConfiguredForOutreach(userId?: string): Promise<boolean> {
+export async function isEmailConfiguredForOutreach(
+  organizationId?: string,
+  userId?: string
+): Promise<boolean> {
   const { isEmailConfiguredForUser } = await import("@/lib/email/smtp");
-  return isEmailConfiguredForUser(userId);
+  return isEmailConfiguredForUser(organizationId, userId);
 }

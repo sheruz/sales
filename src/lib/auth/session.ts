@@ -4,7 +4,9 @@ import { NextResponse } from "next/server";
 import prisma from "@/lib/db/prisma";
 import { getEnv } from "@/lib/config/env";
 import { SESSION_COOKIE } from "@/lib/auth/permissions";
+import { resolveMembershipPermissions } from "@/lib/tenant/rbac";
 import type { AuthUser } from "@/types/auth";
+import { UserRole } from "@prisma/client";
 
 function generateSessionToken(): string {
   return randomBytes(32).toString("hex");
@@ -12,7 +14,11 @@ function generateSessionToken(): string {
 
 export async function createSession(
   userId: string,
-  meta?: { ipAddress?: string; userAgent?: string }
+  meta?: {
+    ipAddress?: string;
+    userAgent?: string;
+    organizationId?: string | null;
+  }
 ): Promise<string> {
   const { SESSION_EXPIRY_HOURS } = getEnv();
   const token = generateSessionToken();
@@ -25,10 +31,87 @@ export async function createSession(
       expiresAt,
       ipAddress: meta?.ipAddress,
       userAgent: meta?.userAgent,
+      activeOrganizationId: meta?.organizationId ?? null,
     },
   });
 
   return token;
+}
+
+async function buildAuthUser(
+  user: {
+    id: string;
+    email: string;
+    firstName: string;
+    lastName: string;
+    role: UserRole;
+    avatarUrl: string | null;
+  },
+  activeOrganizationId: string | null
+): Promise<AuthUser> {
+  const isPlatformAdmin = user.role === UserRole.SUPER_ADMIN;
+
+  let organizationId: string | null = null;
+  let organizationName: string | null = null;
+  let organizationSlug: string | null = null;
+  let organizationRoleKey: string | null = null;
+  let permissions: AuthUser["permissions"] = [];
+
+  if (isPlatformAdmin) {
+    permissions = ["platform.manage"];
+    // Platform admins may optionally act inside an org for support
+    if (activeOrganizationId) {
+      const org = await prisma.organization.findFirst({
+        where: { id: activeOrganizationId, deletedAt: null },
+      });
+      if (org && org.status !== "SUSPENDED" && org.status !== "CANCELLED") {
+        organizationId = org.id;
+        organizationName = org.name;
+        organizationSlug = org.slug;
+        organizationRoleKey = "platform_admin";
+      }
+    }
+  } else {
+    let orgId = activeOrganizationId;
+    if (!orgId) {
+      const primary = await prisma.organizationUser.findFirst({
+        where: { userId: user.id, status: "ACTIVE" },
+        orderBy: [{ isPrimaryAdmin: "desc" }, { createdAt: "asc" }],
+      });
+      orgId = primary?.organizationId ?? null;
+    }
+
+    if (orgId) {
+      const resolved = await resolveMembershipPermissions(user.id, orgId);
+      if (resolved) {
+        organizationId = resolved.membership.organizationId;
+        organizationName = resolved.membership.organization.name;
+        organizationSlug = resolved.membership.organization.slug;
+        organizationRoleKey = resolved.membership.role.key;
+        permissions = resolved.permissions;
+
+        await prisma.organizationUser.update({
+          where: { id: resolved.membership.id },
+          data: { lastActiveAt: new Date() },
+        });
+      }
+    }
+  }
+
+  return {
+    id: user.id,
+    email: user.email,
+    firstName: user.firstName,
+    lastName: user.lastName,
+    role: user.role,
+    avatarUrl: user.avatarUrl,
+    isPlatformAdmin,
+    organizationId,
+    organizationName,
+    organizationSlug,
+    organizationRoleKey,
+    permissions,
+  };
 }
 
 export async function getSessionUser(token: string): Promise<AuthUser | null> {
@@ -60,14 +143,17 @@ export async function getSessionUser(token: string): Promise<AuthUser | null> {
     return null;
   }
 
-  return {
-    id: session.user.id,
-    email: session.user.email,
-    firstName: session.user.firstName,
-    lastName: session.user.lastName,
-    role: session.user.role,
-    avatarUrl: session.user.avatarUrl,
-  };
+  return buildAuthUser(session.user, session.activeOrganizationId);
+}
+
+export async function setActiveOrganization(
+  token: string,
+  organizationId: string | null
+): Promise<void> {
+  await prisma.session.updateMany({
+    where: { token },
+    data: { activeOrganizationId: organizationId },
+  });
 }
 
 export async function deleteSession(token: string): Promise<void> {

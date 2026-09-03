@@ -24,11 +24,11 @@ export async function resolveAiRuntime(
   if (userId) {
     const [settings, openAi, anthropic] = await Promise.all([
       prisma.userOutreachSettings.findUnique({ where: { userId } }),
-      prisma.userIntegration.findUnique({
-        where: { userId_platform: { userId, platform: IntegrationPlatform.OPENAI } },
+      prisma.userIntegration.findFirst({
+        where: { userId, platform: IntegrationPlatform.OPENAI },
       }),
-      prisma.userIntegration.findUnique({
-        where: { userId_platform: { userId, platform: IntegrationPlatform.ANTHROPIC } },
+      prisma.userIntegration.findFirst({
+        where: { userId, platform: IntegrationPlatform.ANTHROPIC },
       }),
     ]);
 

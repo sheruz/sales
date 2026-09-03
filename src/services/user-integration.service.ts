@@ -34,7 +34,7 @@ export class UserIntegrationService {
     }
   }
 
-  async listForUser(userId: string) {
+  async listForUser(organizationId: string, userId: string) {
     await this.ensureProductsSeeded();
 
     const [products, integrations, outreachSettings] = await Promise.all([
@@ -42,7 +42,7 @@ export class UserIntegrationService {
         where: { isActive: true },
         orderBy: { sortOrder: "asc" },
       }),
-      prisma.userIntegration.findMany({ where: { userId } }),
+      prisma.userIntegration.findMany({ where: { organizationId, userId } }),
       getOrCreateOutreachSettings(userId),
     ]);
 
@@ -100,17 +100,30 @@ export class UserIntegrationService {
     }
   }
 
-  async saveOpenAi(userId: string, apiKey: string) {
+  async saveOpenAi(organizationId: string, userId: string, apiKey: string) {
     await this.verifyOpenAiKey(apiKey);
-    return this.saveCredentials(userId, IntegrationPlatform.OPENAI, { apiKey }, "OpenAI connected");
+    return this.saveCredentials(
+      organizationId,
+      userId,
+      IntegrationPlatform.OPENAI,
+      { apiKey },
+      "OpenAI connected"
+    );
   }
 
-  async saveAnthropic(userId: string, apiKey: string) {
+  async saveAnthropic(organizationId: string, userId: string, apiKey: string) {
     await this.verifyAnthropicKey(apiKey);
-    return this.saveCredentials(userId, IntegrationPlatform.ANTHROPIC, { apiKey }, "Claude connected");
+    return this.saveCredentials(
+      organizationId,
+      userId,
+      IntegrationPlatform.ANTHROPIC,
+      { apiKey },
+      "Claude connected"
+    );
   }
 
   async saveEmailSmtp(
+    organizationId: string,
     userId: string,
     data: {
       smtpHost: string;
@@ -143,8 +156,15 @@ export class UserIntegrationService {
     });
 
     return prisma.userIntegration.upsert({
-      where: { userId_platform: { userId, platform: IntegrationPlatform.EMAIL_SMTP } },
+      where: {
+        organizationId_userId_platform: {
+          organizationId,
+          userId,
+          platform: IntegrationPlatform.EMAIL_SMTP,
+        },
+      },
       create: {
+        organizationId,
         userId,
         platform: IntegrationPlatform.EMAIL_SMTP,
         productId: product?.id,
@@ -186,9 +206,18 @@ export class UserIntegrationService {
     });
   }
 
-  async getEmailConfig(userId: string): Promise<SmtpConfig | null> {
+  async getEmailConfig(
+    organizationId: string,
+    userId: string
+  ): Promise<SmtpConfig | null> {
     const integration = await prisma.userIntegration.findUnique({
-      where: { userId_platform: { userId, platform: IntegrationPlatform.EMAIL_SMTP } },
+      where: {
+        organizationId_userId_platform: {
+          organizationId,
+          userId,
+          platform: IntegrationPlatform.EMAIL_SMTP,
+        },
+      },
     });
 
     if (!integration?.isConnected || !integration.encryptedCredentials) return null;
@@ -214,12 +243,13 @@ export class UserIntegrationService {
     };
   }
 
-  async isEmailConfigured(userId: string): Promise<boolean> {
-    const cfg = await this.getEmailConfig(userId);
+  async isEmailConfigured(organizationId: string, userId: string): Promise<boolean> {
+    const cfg = await this.getEmailConfig(organizationId, userId);
     return Boolean(cfg);
   }
 
   async updateOutreachSettings(
+    organizationId: string,
     userId: string,
     data: {
       activeAiProvider?: IntegrationPlatform;
@@ -229,6 +259,7 @@ export class UserIntegrationService {
       discoveryMode?: string;
     }
   ) {
+    void organizationId;
     await getOrCreateOutreachSettings(userId);
     return prisma.userOutreachSettings.update({
       where: { userId },
@@ -242,9 +273,13 @@ export class UserIntegrationService {
     });
   }
 
-  async disconnect(userId: string, platform: IntegrationPlatform) {
+  async disconnect(
+    organizationId: string,
+    userId: string,
+    platform: IntegrationPlatform
+  ) {
     await prisma.userIntegration.updateMany({
-      where: { userId, platform },
+      where: { organizationId, userId, platform },
       data: {
         isConnected: false,
         isEnabled: false,
@@ -262,6 +297,7 @@ export class UserIntegrationService {
   }
 
   private async saveCredentials(
+    organizationId: string,
     userId: string,
     platform: IntegrationPlatform,
     credentials: Record<string, string>,
@@ -270,8 +306,11 @@ export class UserIntegrationService {
     const product = await prisma.integrationProduct.findUnique({ where: { platform } });
 
     return prisma.userIntegration.upsert({
-      where: { userId_platform: { userId, platform } },
+      where: {
+        organizationId_userId_platform: { organizationId, userId, platform },
+      },
       create: {
+        organizationId,
         userId,
         platform,
         productId: product?.id,

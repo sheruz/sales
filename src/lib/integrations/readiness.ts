@@ -3,7 +3,10 @@ import { IntegrationPlatform } from "@prisma/client";
 import { userIntegrationService } from "@/services/user-integration.service";
 import { getOrCreateOutreachSettings } from "@/lib/ai/resolve-config";
 
-export async function isAiConfigured(userId: string): Promise<boolean> {
+export async function isAiConfigured(
+  organizationId: string,
+  userId: string
+): Promise<boolean> {
   const settings = await getOrCreateOutreachSettings(userId);
   const platform =
     settings.activeAiProvider === IntegrationPlatform.ANTHROPIC
@@ -11,31 +14,57 @@ export async function isAiConfigured(userId: string): Promise<boolean> {
       : IntegrationPlatform.OPENAI;
 
   const integration = await prisma.userIntegration.findUnique({
-    where: { userId_platform: { userId, platform } },
+    where: {
+      organizationId_userId_platform: { organizationId, userId, platform },
+    },
   });
 
   return Boolean(integration?.isConnected && integration.encryptedCredentials);
 }
 
-export async function getUserReadiness(userId: string) {
+export async function getUserReadiness(organizationId: string, userId: string) {
   const [ai, email, openAi, anthropic, emailInt, linkedin, services, campaigns, autopilot] =
     await Promise.all([
-      isAiConfigured(userId),
-      userIntegrationService.isEmailConfigured(userId),
+      isAiConfigured(organizationId, userId),
+      userIntegrationService.isEmailConfigured(organizationId, userId),
       prisma.userIntegration.findUnique({
-        where: { userId_platform: { userId, platform: IntegrationPlatform.OPENAI } },
+        where: {
+          organizationId_userId_platform: {
+            organizationId,
+            userId,
+            platform: IntegrationPlatform.OPENAI,
+          },
+        },
       }),
       prisma.userIntegration.findUnique({
-        where: { userId_platform: { userId, platform: IntegrationPlatform.ANTHROPIC } },
+        where: {
+          organizationId_userId_platform: {
+            organizationId,
+            userId,
+            platform: IntegrationPlatform.ANTHROPIC,
+          },
+        },
       }),
       prisma.userIntegration.findUnique({
-        where: { userId_platform: { userId, platform: IntegrationPlatform.EMAIL_SMTP } },
+        where: {
+          organizationId_userId_platform: {
+            organizationId,
+            userId,
+            platform: IntegrationPlatform.EMAIL_SMTP,
+          },
+        },
       }),
       prisma.userIntegration.findUnique({
-        where: { userId_platform: { userId, platform: IntegrationPlatform.LINKEDIN } },
+        where: {
+          organizationId_userId_platform: {
+            organizationId,
+            userId,
+            platform: IntegrationPlatform.LINKEDIN,
+          },
+        },
       }),
-      prisma.service.count({ where: { isActive: true } }),
-      prisma.campaign.count({ where: { deletedAt: null } }),
+      prisma.service.count({ where: { organizationId, isActive: true } }),
+      prisma.campaign.count({ where: { organizationId, deletedAt: null } }),
       prisma.autopilotConfig.findUnique({ where: { userId } }),
     ]);
 

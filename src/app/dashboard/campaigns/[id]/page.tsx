@@ -1,4 +1,4 @@
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 import { campaignService } from "@/services/campaign.service";
@@ -6,17 +6,21 @@ import { CampaignDetail } from "@/components/campaigns/campaign-detail";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { CAMPAIGN_STATUS_LABELS } from "@/lib/constants/automation";
+import { getCurrentUser } from "@/lib/auth/session";
 
 interface PageProps {
   params: Promise<{ id: string }>;
 }
 
 export default async function CampaignDetailPage({ params }: PageProps) {
+  const user = await getCurrentUser();
+  if (!user?.organizationId) redirect("/dashboard");
+
   const { id } = await params;
 
   let data;
   try {
-    data = await campaignService.getStats(id);
+    data = await campaignService.getStats(user.organizationId, id);
   } catch {
     notFound();
   }

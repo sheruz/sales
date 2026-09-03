@@ -28,12 +28,13 @@ function emptyToNull(value?: string | null) {
 }
 
 export class LeadService {
-  async list(query: LeadListQuery) {
+  async list(organizationId: string, query: LeadListQuery) {
     const { page, limit, search, status, scoreCategory, assignedToId, tagId, source, sortBy, sortOrder } =
       query;
     const skip = (page - 1) * limit;
 
     const where = {
+      organizationId,
       deletedAt: null,
       ...(status ? { status } : {}),
       ...(scoreCategory ? { scoreCategory } : {}),
@@ -69,9 +70,9 @@ export class LeadService {
     };
   }
 
-  async getById(id: string) {
+  async getById(organizationId: string, id: string) {
     const lead = await prisma.lead.findFirst({
-      where: { id, deletedAt: null },
+      where: { id, organizationId, deletedAt: null },
       include: {
         ...leadInclude,
         leadNotes: {
@@ -100,10 +101,10 @@ export class LeadService {
     return lead;
   }
 
-  async create(input: CreateLeadInput, userId: string) {
+  async create(organizationId: string, input: CreateLeadInput, userId: string) {
     let companyId: string | null = null;
     if (input.companyName) {
-      const company = await companyService.findOrCreate(input.companyName, {
+      const company = await companyService.findOrCreate(organizationId, input.companyName, {
         website: input.companyWebsite || undefined,
         linkedInUrl: input.companyLinkedIn || undefined,
         industry: input.industry || undefined,
@@ -117,6 +118,7 @@ export class LeadService {
 
     const lead = await prisma.lead.create({
       data: {
+        organizationId,
         firstName: input.firstName.trim(),
         lastName: input.lastName.trim(),
         fullName: `${input.firstName.trim()} ${input.lastName.trim()}`,
@@ -158,16 +160,16 @@ export class LeadService {
     return lead;
   }
 
-  async update(id: string, input: UpdateLeadInput, userId: string) {
+  async update(organizationId: string, id: string, input: UpdateLeadInput, userId: string) {
     const existing = await prisma.lead.findFirst({
-      where: { id, deletedAt: null },
+      where: { id, organizationId, deletedAt: null },
     });
     if (!existing) throw new NotFoundError("Lead not found");
 
     let companyId = existing.companyId;
     if (input.companyName !== undefined) {
       if (input.companyName) {
-        const company = await companyService.findOrCreate(input.companyName);
+        const company = await companyService.findOrCreate(organizationId, input.companyName);
         companyId = company.id;
       } else {
         companyId = null;
@@ -267,9 +269,9 @@ export class LeadService {
     return lead;
   }
 
-  async delete(id: string, userId: string) {
+  async delete(organizationId: string, id: string, userId: string) {
     const existing = await prisma.lead.findFirst({
-      where: { id, deletedAt: null },
+      where: { id, organizationId, deletedAt: null },
     });
     if (!existing) throw new NotFoundError("Lead not found");
 
@@ -286,34 +288,44 @@ export class LeadService {
     });
   }
 
-  async bulkAction(input: BulkLeadAction, userId: string) {
+  async bulkAction(
+    organizationId: string,
+    input: BulkLeadAction,
+    userId: string
+  ) {
     const { leadIds, action } = input;
+    const scoped = { id: { in: leadIds }, organizationId, deletedAt: null };
 
     switch (action) {
       case "delete":
         await prisma.lead.updateMany({
-          where: { id: { in: leadIds }, deletedAt: null },
+          where: scoped,
           data: { deletedAt: new Date() },
         });
         break;
       case "assign":
         if (!input.assignedToId) throw new ValidationError("assignedToId required");
         await prisma.lead.updateMany({
-          where: { id: { in: leadIds }, deletedAt: null },
+          where: scoped,
           data: { assignedToId: input.assignedToId },
         });
         break;
       case "updateStatus":
         if (!input.status) throw new ValidationError("status required");
         await prisma.lead.updateMany({
-          where: { id: { in: leadIds }, deletedAt: null },
+          where: scoped,
           data: { status: input.status },
         });
         break;
       case "addTag":
         if (!input.tagId) throw new ValidationError("tagId required");
+        // Only tag leads in this organization
+        const owned = await prisma.lead.findMany({
+          where: scoped,
+          select: { id: true },
+        });
         await prisma.leadTag.createMany({
-          data: leadIds.map((leadId) => ({ leadId, tagId: input.tagId! })),
+          data: owned.map((l) => ({ leadId: l.id, tagId: input.tagId! })),
           skipDuplicates: true,
         });
         break;
@@ -323,13 +335,14 @@ export class LeadService {
       userId,
       type: ActivityType.LEAD_UPDATED,
       title: `Bulk action: ${action}`,
-      metadata: { leadIds, action },
+      metadata: { leadIds, action, organizationId },
     });
 
     return { affected: leadIds.length };
   }
 
   async importFromCsv(
+    organizationId: string,
     rows: Record<string, string>[],
     userId: string
   ): Promise<{ created: number; errors: string[] }> {
@@ -348,6 +361,7 @@ export class LeadService {
         }
 
         await this.create(
+          organizationId,
           {
             firstName,
             lastName,

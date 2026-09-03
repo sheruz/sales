@@ -15,17 +15,17 @@ import {
   resetAutopilotDailyIfNeeded,
 } from "@/lib/autopilot/limits";
 import {
-  getDefaultOutreachChannels,
   getOutreachChannelsForUser,
   isEmailConfiguredForOutreach,
 } from "@/lib/outreach/channels";
 import type { Prisma } from "@prisma/client";
 
 export class AutopilotService {
-  async getOrCreateConfig(userId: string) {
+  async getOrCreateConfig(organizationId: string, userId: string) {
     return prisma.autopilotConfig.upsert({
       where: { userId },
       create: {
+        organizationId,
         userId,
         dailySearchLimit: AUTOPILOT_SAFE_DEFAULTS.dailySearchLimit,
         dailyMessageLimit: AUTOPILOT_SAFE_DEFAULTS.dailyMessageLimit,
@@ -41,12 +41,13 @@ export class AutopilotService {
     });
   }
 
-  async getUsage(userId: string) {
-    await this.getOrCreateConfig(userId);
+  async getUsage(organizationId: string, userId: string) {
+    await this.getOrCreateConfig(organizationId, userId);
     return getAutopilotUsage(userId);
   }
 
   async updateConfig(
+    organizationId: string,
     userId: string,
     data: {
       isEnabled?: boolean;
@@ -63,7 +64,7 @@ export class AutopilotService {
       serviceId?: string;
     }
   ) {
-    await this.getOrCreateConfig(userId);
+    await this.getOrCreateConfig(organizationId, userId);
 
     const capped = {
       ...data,
@@ -94,9 +95,9 @@ export class AutopilotService {
     });
   }
 
-  async run(userId: string) {
+  async run(organizationId: string, userId: string) {
     await resetAutopilotDailyIfNeeded(userId);
-    const config = await this.getOrCreateConfig(userId);
+    const config = await this.getOrCreateConfig(organizationId, userId);
 
     if (!config.isEnabled) {
       throw new ValidationError("Autopilot is not enabled");
@@ -106,7 +107,7 @@ export class AutopilotService {
       throw new ValidationError("Set an autopilot goal first");
     }
 
-    if (!(await isEmailConfiguredForOutreach(userId))) {
+    if (!(await isEmailConfiguredForOutreach(organizationId, userId))) {
       throw new ValidationError(
         "Email not configured. Connect Email (SMTP) in Settings → Integrations."
       );
@@ -129,6 +130,7 @@ export class AutopilotService {
     if (!campaignId && config.autoCreateCampaigns) {
       log.push("Creating campaign from AI goal...");
       const { campaign } = await autoCampaignService.createFromGoal(
+        organizationId,
         config.goal,
         userId,
         config.serviceId ?? undefined
@@ -151,6 +153,7 @@ export class AutopilotService {
 
     const { leadIds, errors, prospectsFound, skippedNoEmail } =
       await jobDiscoveryService.discoverFromJobPosts(
+        organizationId,
         {
           jobTitles: config.targetJobTitles,
           industries: config.targetIndustries,
@@ -190,7 +193,7 @@ export class AutopilotService {
         break;
       }
       try {
-        await automationService.runPipeline(leadId, userId, {
+        await automationService.runPipeline(organizationId, leadId, userId, {
           channels,
           skipResearch: true,
         });
@@ -228,6 +231,7 @@ export class AutopilotService {
 
     await prisma.linkedInDiscoveryJob.create({
       data: {
+        organizationId,
         campaignId,
         createdById: userId,
         status: JobStatus.COMPLETED,
@@ -251,27 +255,43 @@ export class AutopilotService {
       },
     });
 
-    const results = [];
+    const byOrg = new Map<string, typeof configs>();
     for (const config of configs) {
-      try {
-        const usage = await getAutopilotUsage(config.userId);
-        if (usage && usage.remainingLeadsToday <= 0) {
-          results.push({
-            userId: config.userId,
-            status: "skipped",
-            reason: "Daily lead limit reached",
-          });
-          continue;
-        }
+      const list = byOrg.get(config.organizationId) ?? [];
+      list.push(config);
+      byOrg.set(config.organizationId, list);
+    }
 
-        const result = await this.run(config.userId);
-        results.push({ userId: config.userId, status: "success", result });
-      } catch (err) {
-        results.push({
-          userId: config.userId,
-          status: "failed",
-          error: err instanceof Error ? err.message : "failed",
-        });
+    const results = [];
+    for (const [organizationId, orgConfigs] of byOrg) {
+      for (const config of orgConfigs) {
+        try {
+          const usage = await getAutopilotUsage(config.userId);
+          if (usage && usage.remainingLeadsToday <= 0) {
+            results.push({
+              organizationId,
+              userId: config.userId,
+              status: "skipped",
+              reason: "Daily lead limit reached",
+            });
+            continue;
+          }
+
+          const result = await this.run(organizationId, config.userId);
+          results.push({
+            organizationId,
+            userId: config.userId,
+            status: "success",
+            result,
+          });
+        } catch (err) {
+          results.push({
+            organizationId,
+            userId: config.userId,
+            status: "failed",
+            error: err instanceof Error ? err.message : "failed",
+          });
+        }
       }
     }
     return results;

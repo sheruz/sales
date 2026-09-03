@@ -12,8 +12,8 @@ import type { getUserReadiness } from "@/lib/integrations/readiness";
 
 type Readiness = Awaited<ReturnType<typeof getUserReadiness>>;
 
-export function SetupChecklist({ readiness }: { readiness: Readiness }) {
-  if (readiness.percentComplete === 100) return null;
+export function SetupChecklist({ readiness }: { readiness: Readiness | null }) {
+  if (!readiness || readiness.percentComplete === 100) return null;
 
   return (
     <Card className="border-primary/30">

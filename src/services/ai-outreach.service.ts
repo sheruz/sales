@@ -20,13 +20,14 @@ interface OutreachResult {
 
 export class AIOutreachService {
   async generateOutreach(
+    organizationId: string,
     leadId: string,
     channel: "linkedin" | "email",
     userId?: string,
     campaignId?: string
   ) {
     const lead = await prisma.lead.findFirst({
-      where: { id: leadId, deletedAt: null },
+      where: { id: leadId, organizationId, deletedAt: null },
       include: {
         researches: { orderBy: { createdAt: "desc" }, take: 1 },
         campaign: true,
@@ -36,7 +37,9 @@ export class AIOutreachService {
 
     const research = lead.researches[0];
     const campaign = campaignId
-      ? await prisma.campaign.findUnique({ where: { id: campaignId } })
+      ? await prisma.campaign.findFirst({
+          where: { id: campaignId, organizationId },
+        })
       : lead.campaign;
 
     const jobMeta = (lead.automationMeta as { jobPost?: Record<string, unknown> } | null)?.jobPost;
@@ -83,6 +86,7 @@ export class AIOutreachService {
 
     const conversation = await prisma.conversation.create({
       data: {
+        organizationId,
         leadId,
         channel: convChannel,
         subject: data.subject,
@@ -101,12 +105,13 @@ export class AIOutreachService {
   }
 
   async sendOutreach(
+    organizationId: string,
     leadId: string,
     conversationId: string,
     userId?: string
   ) {
     const conversation = await prisma.conversation.findFirst({
-      where: { id: conversationId, leadId },
+      where: { id: conversationId, leadId, organizationId },
       include: { lead: true },
     });
     if (!conversation) throw new NotFoundError("Conversation not found");
@@ -138,7 +143,7 @@ export class AIOutreachService {
         throw new Error("User ID required for LinkedIn messaging");
       }
     } else if (conversation.channel === ConversationChannel.EMAIL && lead.email) {
-      await sendEmailForUser(userId, {
+      await sendEmailForUser(organizationId, userId, {
         to: lead.email,
         subject: conversation.subject ?? `Hello ${lead.firstName}`,
         text: conversation.content ?? "",
@@ -147,7 +152,13 @@ export class AIOutreachService {
 
     await prisma.conversation.update({
       where: { id: conversationId },
-      data: { metadata: { ...(conversation.metadata as object), status: "sent", sentAt: new Date() } },
+      data: {
+        metadata: {
+          ...(conversation.metadata as object),
+          status: "sent",
+          sentAt: new Date(),
+        },
+      },
     });
 
     const activityType =

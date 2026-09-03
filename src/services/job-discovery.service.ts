@@ -41,6 +41,7 @@ function mapScoreCategory(category: string): LeadScoreCategory {
 
 export class JobDiscoveryService {
   async discoverFromJobPosts(
+    organizationId: string,
     criteria: {
       jobTitles?: string[];
       industries?: string[];
@@ -86,6 +87,7 @@ export class JobDiscoveryService {
       try {
         const existing = await prisma.lead.findFirst({
           where: {
+            organizationId,
             deletedAt: null,
             OR: [
               { email: prospect.email.toLowerCase() },
@@ -98,7 +100,12 @@ export class JobDiscoveryService {
         });
         if (existing) continue;
 
-        const leadId = await this.createLeadFromJobPost(prospect, campaignId, userId);
+        const leadId = await this.createLeadFromJobPost(
+          organizationId,
+          prospect,
+          campaignId,
+          userId
+        );
         leadIds.push(leadId);
       } catch (err) {
         errors.push(
@@ -111,6 +118,7 @@ export class JobDiscoveryService {
   }
 
   private async createLeadFromJobPost(
+    organizationId: string,
     prospect: JobPostLead,
     campaignId: string,
     userId: string
@@ -120,6 +128,7 @@ export class JobDiscoveryService {
 
     const lead = await prisma.lead.create({
       data: {
+        organizationId,
         firstName: prospect.firstName,
         lastName: prospect.lastName,
         fullName,

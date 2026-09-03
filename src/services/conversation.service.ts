@@ -23,9 +23,13 @@ interface ReplyAnalysis {
 }
 
 export class ConversationService {
-  async list(filters?: { leadId?: string; channel?: ConversationChannel }) {
+  async list(
+    organizationId: string,
+    filters?: { leadId?: string; channel?: ConversationChannel }
+  ) {
     return prisma.conversation.findMany({
       where: {
+        organizationId,
         ...(filters?.leadId ? { leadId: filters.leadId } : {}),
         ...(filters?.channel ? { channel: filters.channel } : {}),
       },
@@ -47,6 +51,7 @@ export class ConversationService {
   }
 
   async processInboundReply(params: {
+    organizationId: string;
     leadId: string;
     channel: ConversationChannel;
     content: string;
@@ -55,7 +60,11 @@ export class ConversationService {
     autoRespond?: boolean;
   }) {
     const lead = await prisma.lead.findFirst({
-      where: { id: params.leadId, deletedAt: null },
+      where: {
+        id: params.leadId,
+        organizationId: params.organizationId,
+        deletedAt: null,
+      },
     });
     if (!lead) throw new NotFoundError("Lead not found");
 
@@ -66,6 +75,7 @@ export class ConversationService {
 
     const inbound = await prisma.conversation.create({
       data: {
+        organizationId: params.organizationId,
         leadId: params.leadId,
         channel: params.channel,
         subject: params.subject,
@@ -75,7 +85,7 @@ export class ConversationService {
     });
 
     const history = await prisma.conversation.findMany({
-      where: { leadId: params.leadId },
+      where: { leadId: params.leadId, organizationId: params.organizationId },
       orderBy: { createdAt: "asc" },
       take: 20,
     });
@@ -132,6 +142,7 @@ export class ConversationService {
     if (params.autoRespond !== false && lead.autoReplyEnabled && analysis.suggestedResponse) {
       responseConversation = await prisma.conversation.create({
         data: {
+          organizationId: params.organizationId,
           leadId: params.leadId,
           channel: params.channel,
           content: analysis.suggestedResponse,
@@ -145,6 +156,7 @@ export class ConversationService {
 
       if (analysis.shouldAutoSend && params.channel === ConversationChannel.EMAIL && lead.email) {
         await aiOutreachService.sendOutreach(
+          params.organizationId,
           params.leadId,
           responseConversation.id,
           params.userId

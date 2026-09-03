@@ -38,9 +38,14 @@ export class LinkedInService {
     return { isValid, slug };
   }
 
-  async createDiscoveryJob(input: LinkedInDiscoveryInput, userId: string) {
+  async createDiscoveryJob(
+    organizationId: string,
+    input: LinkedInDiscoveryInput,
+    userId: string
+  ) {
     return prisma.linkedInDiscoveryJob.create({
       data: {
+        organizationId,
         campaignId: input.campaignId,
         createdById: userId,
         profileUrls: input.profileUrls ?? [],
@@ -58,6 +63,8 @@ export class LinkedInService {
     });
     if (!job) throw new NotFoundError("Discovery job not found");
 
+    const organizationId = job.organizationId;
+
     await prisma.linkedInDiscoveryJob.update({
       where: { id: jobId },
       data: { status: JobStatus.PROCESSING },
@@ -71,6 +78,7 @@ export class LinkedInService {
         for (const url of job.profileUrls) {
           try {
             const leadId = await this.importFromProfileUrl(
+              organizationId,
               url,
               job.campaignId,
               job.createdById
@@ -102,6 +110,7 @@ export class LinkedInService {
             for (const profile of results) {
               try {
                 const leadId = await this.createLeadFromLinkedInProfile(
+                  organizationId,
                   {
                     firstName: profile.firstName,
                     lastName: profile.lastName,
@@ -117,7 +126,9 @@ export class LinkedInService {
                 );
                 createdLeadIds.push(leadId);
               } catch (err) {
-                errors.push(`${profile.fullName}: ${err instanceof Error ? err.message : "failed"}`);
+                errors.push(
+                  `${profile.fullName}: ${err instanceof Error ? err.message : "failed"}`
+                );
               }
             }
             usedRealSearch = results.length > 0;
@@ -127,31 +138,36 @@ export class LinkedInService {
         }
 
         if (!usedRealSearch) {
-        const prospects = await this.discoverProspects(
-          criteria,
-          job.targetCount,
-          job.campaign?.aiInstructions,
-          job.createdById
-        );
+          const prospects = await this.discoverProspects(
+            criteria,
+            job.targetCount,
+            job.campaign?.aiInstructions,
+            job.createdById
+          );
 
-        for (const prospect of prospects) {
-          try {
-            const leadId = await this.createLeadFromProspect(
-              prospect,
-              job.campaignId,
-              job.createdById
-            );
-            createdLeadIds.push(leadId);
-          } catch (err) {
-            errors.push(`${prospect.fullName}: ${err instanceof Error ? err.message : "failed"}`);
+          for (const prospect of prospects) {
+            try {
+              const leadId = await this.createLeadFromProspect(
+                organizationId,
+                prospect,
+                job.campaignId,
+                job.createdById
+              );
+              createdLeadIds.push(leadId);
+            } catch (err) {
+              errors.push(
+                `${prospect.fullName}: ${err instanceof Error ? err.message : "failed"}`
+              );
+            }
           }
-        }
         }
       }
 
       if (job.campaignId && createdLeadIds.length > 0) {
         for (const leadId of createdLeadIds) {
-          automationService.runPipeline(leadId, job.createdById).catch(console.error);
+          automationService
+            .runPipeline(organizationId, leadId, job.createdById)
+            .catch(console.error);
         }
       }
 
@@ -178,12 +194,17 @@ export class LinkedInService {
     }
   }
 
-  async importFromProfileUrl(url: string, campaignId?: string | null, userId?: string) {
+  async importFromProfileUrl(
+    organizationId: string,
+    url: string,
+    campaignId?: string | null,
+    userId?: string
+  ) {
     const { isValid } = this.parseProfileUrl(url);
     if (!isValid) throw new Error("Invalid LinkedIn profile URL");
 
     const existing = await prisma.lead.findFirst({
-      where: { linkedInUrl: url, deletedAt: null },
+      where: { organizationId, linkedInUrl: url, deletedAt: null },
     });
     if (existing) return existing.id;
 
@@ -203,6 +224,7 @@ export class LinkedInService {
 
     const profile = parseAIJson<ProspectProfile>(result.content);
     return this.createLeadFromProspect(
+      organizationId,
       { ...profile, linkedInUrl: url },
       campaignId,
       userId
@@ -210,6 +232,7 @@ export class LinkedInService {
   }
 
   async discoverWithAI(
+    organizationId: string,
     criteria: LinkedInDiscoveryInput["searchCriteria"],
     count: number,
     campaignId: string | null | undefined,
@@ -232,6 +255,7 @@ export class LinkedInService {
       try {
         const existing = await prisma.lead.findFirst({
           where: {
+            organizationId,
             deletedAt: null,
             OR: [
               ...(prospect.linkedInUrl ? [{ linkedInUrl: prospect.linkedInUrl }] : []),
@@ -244,7 +268,12 @@ export class LinkedInService {
         });
         if (existing) continue;
 
-        const leadId = await this.createLeadFromProspect(prospect, campaignId, userId);
+        const leadId = await this.createLeadFromProspect(
+          organizationId,
+          prospect,
+          campaignId,
+          userId
+        );
         leadIds.push(leadId);
       } catch (err) {
         errors.push(`${prospect.fullName}: ${err instanceof Error ? err.message : "failed"}`);
@@ -285,6 +314,7 @@ export class LinkedInService {
   }
 
   async createLeadFromLinkedInProfile(
+    organizationId: string,
     profile: {
       firstName: string;
       lastName: string;
@@ -301,6 +331,7 @@ export class LinkedInService {
     userId?: string
   ) {
     return this.createLeadFromProspect(
+      organizationId,
       {
         firstName: profile.firstName,
         lastName: profile.lastName,
@@ -320,6 +351,7 @@ export class LinkedInService {
   }
 
   private async createLeadFromProspect(
+    organizationId: string,
     prospect: ProspectProfile & { fullName?: string },
     campaignId?: string | null,
     userId?: string
@@ -328,6 +360,7 @@ export class LinkedInService {
 
     const lead = await prisma.lead.create({
       data: {
+        organizationId,
         firstName: prospect.firstName,
         lastName: prospect.lastName,
         fullName,
