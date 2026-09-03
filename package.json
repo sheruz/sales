@@ -17,6 +17,7 @@
     "db:migrate:deploy": "node scripts/prisma-cli.js migrate deploy",
     "db:seed": "node scripts/run-with-env.js npx tsx prisma/seed.ts",
     "db:backfill:phase1": "node scripts/run-with-env.js npx tsx scripts/phase1-backfill.ts",
+    "db:migrate:safe": "node scripts/run-with-env.js node scripts/safe-migrate-tenancy.js",
     "db:studio": "node scripts/prisma-cli.js studio",
     "db:reset": "node scripts/prisma-cli.js migrate reset",
     "docker:up": "docker compose up -d postgres",

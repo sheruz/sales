@@ -124,13 +124,18 @@ None added. AI parse runs synchronously via existing BYOK `aiComplete`.
 
 ```bash
 cd /var/www/html/sales   # or local project root
-npm run db:push
-npm run db:backfill:phase1   # refreshes role→permission links
+
+# Production DB with existing leads/campaigns (keeps data):
+npm run db:migrate:safe
+
+# Fresh empty DB only:
+# npm run db:push && npm run db:seed
+
 npm run build
 pm2 restart sales
 ```
 
-No data loss expected for existing `services` rows; new columns have defaults/nullables.
+`db:migrate:safe` preserves existing rows. **Never** use `db push --force-reset` on production.
 
 ---
 

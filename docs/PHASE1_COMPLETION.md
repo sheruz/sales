@@ -154,14 +154,17 @@ pm2 restart sales        # production
 
 ### Existing database with data
 ```bash
-npm run db:push          # apply Organization + organization_id columns
-npm run db:backfill:phase1
-# optional: npm run db:seed  (idempotent RBAC + default users)
+# DO NOT use --force-reset (wipes data)
+
+npm run db:migrate:safe
+# optional if migrate:safe already ran backfill:
+# npm run db:backfill:phase1
 npm run build
 pm2 restart sales
 ```
 
-Backfill creates `default-workspace`, attaches non–super-admin users, and sets NULL `organization_id` rows to that org.
+`db:migrate:safe` adds nullable `organization_id`, creates `default-workspace`,
+backfills existing rows, sets NOT NULL, then runs `db push` + RBAC backfill.
 
 ### Verify isolation (required on deploy host)
 ```bash
