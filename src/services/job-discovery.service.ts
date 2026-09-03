@@ -8,6 +8,8 @@ import {
 import { aiComplete, parseAIJson } from "@/lib/ai/provider";
 import { buildJobPostDiscoveryPrompt } from "@/lib/ai/prompts";
 import { activityService } from "@/services/activity.service";
+import { companyService } from "@/services/company.service";
+import { opportunityService } from "@/services/opportunity.service";
 
 export interface JobPostLead {
   firstName: string;
@@ -66,13 +68,18 @@ export class JobDiscoveryService {
         },
         {
           role: "user",
-          content: buildJobPostDiscoveryPrompt(criteria, count, campaignContext ?? undefined),
+          content: buildJobPostDiscoveryPrompt(
+            criteria,
+            count,
+            campaignContext ?? undefined
+          ),
         },
       ],
     });
 
     const prospects = parseAIJson<JobPostLead[]>(result.content);
     const leadIds: string[] = [];
+    const opportunityIds: string[] = [];
     const errors: string[] = [];
     let skippedNoEmail = 0;
 
@@ -100,13 +107,14 @@ export class JobDiscoveryService {
         });
         if (existing) continue;
 
-        const leadId = await this.createLeadFromJobPost(
+        const created = await this.createLeadFromJobPost(
           organizationId,
           prospect,
           campaignId,
           userId
         );
-        leadIds.push(leadId);
+        leadIds.push(created.leadId);
+        if (created.opportunityId) opportunityIds.push(created.opportunityId);
       } catch (err) {
         errors.push(
           `${prospect.firstName} ${prospect.lastName}: ${err instanceof Error ? err.message : "failed"}`
@@ -114,9 +122,20 @@ export class JobDiscoveryService {
       }
     }
 
-    return { leadIds, errors, prospectsFound: prospects.length, skippedNoEmail };
+    return {
+      leadIds,
+      opportunityIds,
+      errors,
+      prospectsFound: prospects.length,
+      skippedNoEmail,
+    };
   }
 
+  /**
+   * Job post is a SIGNAL, not the opportunity itself.
+   * Creates: Company → Contact/Lead bridge → Hiring Signal → Opportunity.
+   * Legacy Lead retained for email automation / conversations.
+   */
   private async createLeadFromJobPost(
     organizationId: string,
     prospect: JobPostLead,
@@ -125,6 +144,18 @@ export class JobDiscoveryService {
   ) {
     const fullName = `${prospect.firstName} ${prospect.lastName}`;
     const scoreCategory = mapScoreCategory(prospect.scoreCategory);
+
+    const company = await companyService.findOrCreate(
+      organizationId,
+      prospect.companyName,
+      {
+        website: prospect.companyWebsite ?? undefined,
+        industry: prospect.industry,
+        country: prospect.country,
+        description: prospect.companySummary,
+        source: "job_post",
+      }
+    );
 
     const lead = await prisma.lead.create({
       data: {
@@ -139,6 +170,7 @@ export class JobDiscoveryService {
         industry: prospect.industry,
         country: prospect.country,
         companyDescription: prospect.companySummary,
+        companyId: company.id,
         source: "Job Post",
         campaignId,
         createdById: userId,
@@ -157,8 +189,9 @@ export class JobDiscoveryService {
             personalizationPoints: prospect.personalizationPoints,
           },
           preResearched: true,
+          opportunityEngine: true,
         },
-        notes: `Job post: ${prospect.jobPostTitle} (${prospect.jobPostPlatform})`,
+        notes: `Hiring signal: ${prospect.jobPostTitle} (${prospect.jobPostPlatform})`,
       },
     });
 
@@ -197,12 +230,47 @@ export class JobDiscoveryService {
       });
     }
 
+    const ingested = await opportunityService.ingestHiringSignal({
+      organizationId,
+      userId,
+      campaignId,
+      companyName: prospect.companyName,
+      companyWebsite: prospect.companyWebsite,
+      industry: prospect.industry,
+      country: prospect.country,
+      companySummary: prospect.companySummary,
+      contact: {
+        firstName: prospect.firstName,
+        lastName: prospect.lastName,
+        email: prospect.email,
+        title: prospect.jobTitle,
+      },
+      signal: {
+        title: prospect.jobPostTitle,
+        description: prospect.jobRequirements,
+        evidenceUrl: prospect.jobPostUrl,
+        evidenceText: `${prospect.jobPostPlatform}: ${prospect.jobPostTitle}`,
+        confidence: Math.min(95, Math.max(40, prospect.leadScore)),
+        rawData: {
+          platform: prospect.jobPostPlatform,
+          url: prospect.jobPostUrl,
+          personalizationPoints: prospect.personalizationPoints,
+        },
+      },
+      whyNow: `Open role "${prospect.jobPostTitle}" on ${prospect.jobPostPlatform}`,
+      likelyProblem: prospect.jobRequirements,
+      recommendedAction: `Contact ${fullName} about ${prospect.jobPostTitle}`,
+      leadScore: prospect.leadScore,
+      budgetHint: prospect.budgetHint,
+      leadId: lead.id,
+    });
+
     await activityService.log({
       leadId: lead.id,
       userId,
       type: ActivityType.LEAD_CREATED,
-      title: "Lead discovered from job post",
-      description: `${fullName} — ${prospect.jobPostTitle} at ${prospect.companyName}`,
+      title: "Hiring signal → opportunity",
+      description: `${fullName} — ${prospect.jobPostTitle} at ${prospect.companyName} (opportunity ${ingested.opportunityId})`,
     });
 
     await activityService.log({
@@ -213,7 +281,7 @@ export class JobDiscoveryService {
       description: `Score: ${prospect.leadScore} (${scoreCategory})`,
     });
 
-    return lead.id;
+    return { leadId: lead.id, opportunityId: ingested.opportunityId };
   }
 }
 

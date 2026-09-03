@@ -6,6 +6,7 @@ import {
   Brain,
   CircleDollarSign,
   Crosshair,
+  Flame,
   LayoutDashboard,
   ListTodo,
   MessageSquare,
@@ -35,6 +36,7 @@ import type { AuthUser } from "@/types/auth";
 
 const mainNav = [
   { title: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
+  { title: "Opportunities", href: "/dashboard/opportunities", icon: Flame },
   { title: "Leads", href: "/dashboard/leads", icon: Users },
   { title: "Campaigns", href: "/dashboard/campaigns", icon: Target },
   { title: "Autopilot", href: "/dashboard/autopilot", icon: Rocket },

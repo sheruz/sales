@@ -254,6 +254,82 @@ enum RevenueGoalStatus {
   CANCELLED
 }
 
+enum SignalType {
+  HIRING
+  FUNDING
+  EXPANSION
+  TECHNOLOGY_CHANGE
+  LEADERSHIP_CHANGE
+  PRODUCT_LAUNCH
+  RFP
+  TENDER
+  WEBSITE_CHANGE
+  JOB_GROWTH
+  ACQUISITION
+  NEWS
+  SOCIAL_ACTIVITY
+  CRM_ACTIVITY
+  WEBSITE_VISIT
+  OTHER
+}
+
+enum SignalStatus {
+  NEW
+  ACTIVE
+  CONSUMED
+  EXPIRED
+  DISMISSED
+}
+
+enum CompanyStatus {
+  ACTIVE
+  INACTIVE
+  ARCHIVED
+}
+
+enum ContactStatus {
+  ACTIVE
+  INACTIVE
+  BOUNCED
+  UNSUBSCRIBED
+}
+
+enum OpportunityStatus {
+  OPEN
+  WON
+  LOST
+  DISQUALIFIED
+}
+
+enum OpportunityStage {
+  NEW
+  QUALIFIED
+  CONTACTED
+  REPLIED
+  MEETING
+  PROPOSAL
+  NEGOTIATION
+  WON
+  LOST
+}
+
+enum OpportunityEventType {
+  CREATED
+  SIGNAL_ADDED
+  SCORED
+  RESEARCHED
+  CONTACTED
+  REPLIED
+  MEETING_BOOKED
+  PROPOSAL_SENT
+  WON
+  LOST
+  SCORE_CHANGED
+  OWNER_CHANGED
+  STAGE_CHANGED
+  NOTE
+}
+
 // ─── Multi-tenancy (Phase 1) ─────────────────────────────────────────────────
 
 model Organization {
@@ -295,6 +371,10 @@ model Organization {
   businessBrainDocuments BusinessBrainDocument[]
   icps              Icp[]
   revenueGoals      RevenueGoal[]
+  contacts          Contact[]
+  signals           Signal[]
+  opportunities     Opportunity[]
+  opportunitySources OpportunitySource[]
 
   @@index([status])
   @@index([deletedAt])
@@ -444,6 +524,8 @@ model User {
   passwordResets    PasswordResetToken[]
   businessBrainDocuments BusinessBrainDocument[] @relation("BrainDocumentAuthor")
   businessBrainVersions  BusinessBrainVersion[]  @relation("BrainVersionAuthor")
+  ownedOpportunities     Opportunity[]           @relation("OpportunityOwner")
+  opportunityEvents      OpportunityEvent[]      @relation("OpportunityEventActor")
 
   @@index([email])
   @@index([role])
@@ -486,30 +568,237 @@ model PasswordResetToken {
 }
 
 // ─── Companies ───────────────────────────────────────────────────────────────
+// Prospect buyer accounts (not SaaS tenants). Extended in Phase 3.
 
 model Company {
-  id              String   @id @default(uuid())
-  organizationId  String   @map("organization_id")
-  name            String
-  website         String?
-  linkedInUrl     String?  @map("linkedin_url")
-  industry        String?
-  size            String?  @map("company_size")
-  description     String?
-  country         String?
-  city            String?
-  createdAt       DateTime @default(now()) @map("created_at")
-  updatedAt       DateTime @updatedAt @map("updated_at")
-  deletedAt       DateTime? @map("deleted_at")
+  id             String        @id @default(uuid())
+  organizationId String        @map("organization_id")
+  name           String
+  domain         String?
+  website        String?
+  industry       String?
+  description    String?
+  country        String?
+  state          String?
+  city           String?
+  employeeCount  Int?          @map("employee_count")
+  /// Legacy company_size / employee_range
+  size           String?       @map("company_size")
+  employeeRange  String?       @map("employee_range")
+  revenueRange   String?       @map("revenue_range")
+  foundedYear    Int?          @map("founded_year")
+  linkedInUrl    String?       @map("linkedin_url")
+  instagramUrl   String?       @map("instagram_url")
+  facebookUrl    String?       @map("facebook_url")
+  technologies   String[]      @default([])
+  fundingTotal   Decimal?      @map("funding_total") @db.Decimal(14, 2)
+  lastFundingDate DateTime?    @map("last_funding_date") @db.Date
+  status         CompanyStatus @default(ACTIVE)
+  source         String?
+  metadata       Json?
+  createdAt      DateTime      @default(now()) @map("created_at")
+  updatedAt      DateTime      @updatedAt @map("updated_at")
+  deletedAt      DateTime?     @map("deleted_at")
 
-  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  leads Lead[]
-  deals Deal[]
+  organization  Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  leads         Lead[]
+  deals         Deal[]
+  contacts      Contact[]
+  signals       Signal[]
+  opportunities Opportunity[]
 
+  @@unique([organizationId, domain])
   @@index([organizationId])
   @@index([name])
   @@index([industry])
+  @@index([status])
   @@map("companies")
+}
+
+model Contact {
+  id             String        @id @default(uuid())
+  organizationId String        @map("organization_id")
+  companyId      String        @map("company_id")
+  firstName      String        @map("first_name")
+  lastName       String        @map("last_name")
+  fullName       String        @map("full_name")
+  title          String?
+  department     String?
+  seniority      String?
+  email          String?
+  emailStatus    String?       @map("email_status")
+  phone          String?
+  linkedInUrl    String?       @map("linkedin_url")
+  source         String?
+  verifiedAt     DateTime?     @map("verified_at")
+  status         ContactStatus @default(ACTIVE)
+  metadata       Json?
+  /// Optional bridge to legacy Lead for automation/conversations
+  leadId         String?       @unique @map("lead_id")
+  createdAt      DateTime      @default(now()) @map("created_at")
+  updatedAt      DateTime      @updatedAt @map("updated_at")
+
+  organization          Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  company               Company       @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  lead                  Lead?         @relation(fields: [leadId], references: [id], onDelete: SetNull)
+  primaryOpportunities  Opportunity[] @relation("PrimaryContact")
+
+  @@index([organizationId])
+  @@index([companyId])
+  @@index([email])
+  @@index([status])
+  @@map("contacts")
+}
+
+model OpportunitySource {
+  id             String   @id @default(uuid())
+  organizationId String   @map("organization_id")
+  key            String
+  name           String
+  description    String?
+  isActive       Boolean  @default(true) @map("is_active")
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  organization  Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  signals       Signal[]
+  opportunities Opportunity[]
+
+  @@unique([organizationId, key])
+  @@index([organizationId])
+  @@map("opportunity_sources")
+}
+
+model Signal {
+  id             String       @id @default(uuid())
+  organizationId String       @map("organization_id")
+  companyId      String       @map("company_id")
+  sourceId       String?      @map("source_id")
+  type           SignalType
+  title          String
+  description    String?
+  evidenceUrl    String?      @map("evidence_url")
+  evidenceText   String?      @map("evidence_text")
+  confidence     Int          @default(50)
+  detectedAt     DateTime     @default(now()) @map("detected_at")
+  occurredAt     DateTime?    @map("occurred_at")
+  expiresAt      DateTime?    @map("expires_at")
+  status         SignalStatus @default(NEW)
+  rawData        Json?        @map("raw_data")
+  createdAt      DateTime     @default(now()) @map("created_at")
+  updatedAt      DateTime     @updatedAt @map("updated_at")
+
+  organization Organization       @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  company      Company            @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  source       OpportunitySource? @relation(fields: [sourceId], references: [id], onDelete: SetNull)
+  opportunities Opportunity[]     @relation("OpportunityPrimarySignal")
+
+  @@index([organizationId])
+  @@index([companyId])
+  @@index([type])
+  @@index([status])
+  @@index([detectedAt])
+  @@map("signals")
+}
+
+model Opportunity {
+  id                       String            @id @default(uuid())
+  organizationId           String            @map("organization_id")
+  companyId                String            @map("company_id")
+  primaryContactId         String?           @map("primary_contact_id")
+  sourceId                 String?           @map("source_id")
+  primarySignalId          String?           @map("primary_signal_id")
+  /// Bridge to legacy Lead automation / conversations
+  leadId                   String?           @unique @map("lead_id")
+  status                   OpportunityStatus @default(OPEN)
+  stage                    OpportunityStage  @default(NEW)
+  score                    Int               @default(0)
+  confidence               Int               @default(50)
+  estimatedValue           Decimal?          @map("estimated_value") @db.Decimal(14, 2)
+  currency                 String            @default("USD")
+  urgency                  Int               @default(50)
+  whyNow                   String?           @map("why_now")
+  likelyProblem            String?           @map("likely_problem")
+  recommendedServiceId     String?           @map("recommended_service_id")
+  recommendedOfferId       String?           @map("recommended_offer_id")
+  recommendedContactReason String?           @map("recommended_contact_reason")
+  recommendedAction        String?           @map("recommended_action")
+  lastSignalAt             DateTime?         @map("last_signal_at")
+  nextActionAt             DateTime?         @map("next_action_at")
+  ownerId                  String?           @map("owner_id")
+  campaignId               String?           @map("campaign_id")
+  createdAt                DateTime          @default(now()) @map("created_at")
+  updatedAt                DateTime          @updatedAt @map("updated_at")
+
+  organization       Organization       @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  company            Company            @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  primaryContact     Contact?           @relation("PrimaryContact", fields: [primaryContactId], references: [id], onDelete: SetNull)
+  source             OpportunitySource? @relation(fields: [sourceId], references: [id], onDelete: SetNull)
+  primarySignal      Signal?            @relation("OpportunityPrimarySignal", fields: [primarySignalId], references: [id], onDelete: SetNull)
+  lead               Lead?              @relation(fields: [leadId], references: [id], onDelete: SetNull)
+  recommendedService Service?           @relation(fields: [recommendedServiceId], references: [id], onDelete: SetNull)
+  owner              User?              @relation("OpportunityOwner", fields: [ownerId], references: [id], onDelete: SetNull)
+  campaign           Campaign?          @relation(fields: [campaignId], references: [id], onDelete: SetNull)
+  events             OpportunityEvent[]
+  scores             OpportunityScore[]
+
+  @@index([organizationId])
+  @@index([companyId])
+  @@index([status])
+  @@index([stage])
+  @@index([score])
+  @@index([ownerId])
+  @@index([campaignId])
+  @@index([lastSignalAt])
+  @@index([nextActionAt])
+  @@map("opportunities")
+}
+
+model OpportunityEvent {
+  id             String               @id @default(uuid())
+  organizationId String               @map("organization_id")
+  opportunityId  String               @map("opportunity_id")
+  type           OpportunityEventType
+  title          String?
+  description    String?
+  metadata       Json?
+  actorId        String?              @map("actor_id")
+  createdAt      DateTime             @default(now()) @map("created_at")
+
+  opportunity Opportunity @relation(fields: [opportunityId], references: [id], onDelete: Cascade)
+  actor       User?       @relation("OpportunityEventActor", fields: [actorId], references: [id], onDelete: SetNull)
+
+  @@index([opportunityId])
+  @@index([organizationId])
+  @@index([type])
+  @@index([createdAt])
+  @@map("opportunity_events")
+}
+
+model OpportunityScore {
+  id                    String   @id @default(uuid())
+  organizationId        String   @map("organization_id")
+  opportunityId         String   @map("opportunity_id")
+  totalScore            Int      @map("total_score")
+  icpFit                Int      @map("icp_fit")
+  signalStrength        Int      @map("signal_strength")
+  freshness             Int
+  urgency               Int
+  budgetPotential       Int      @map("budget_potential")
+  growth                Int
+  serviceFit            Int      @map("service_fit")
+  reachability          Int
+  historicalConversion  Int      @map("historical_conversion")
+  explanation           String
+  model                 String?
+  createdAt             DateTime @default(now()) @map("created_at")
+
+  opportunity Opportunity @relation(fields: [opportunityId], references: [id], onDelete: Cascade)
+
+  @@index([opportunityId])
+  @@index([organizationId])
+  @@index([createdAt])
+  @@map("opportunity_scores")
 }
 
 // ─── Leads ───────────────────────────────────────────────────────────────────
@@ -573,6 +862,8 @@ model Lead {
   meetings      Meeting[]
   proposals     Proposal[]
   followUpJobs  FollowUpJob[]
+  contact       Contact?
+  opportunity   Opportunity?
 
   @@index([organizationId])
   @@index([automationStatus])
@@ -642,6 +933,7 @@ model Campaign {
   followUpSequence FollowUpSequence?
   linkedInJobs     LinkedInDiscoveryJob[]
   autopilotConfigs AutopilotConfig[]
+  opportunities    Opportunity[]
 
   @@index([organizationId])
   @@index([status])
@@ -1154,6 +1446,7 @@ model Service {
   campaigns        Campaign[]
   autopilotConfigs AutopilotConfig[]
   serviceCaseStudies ServiceCaseStudy[]
+  opportunities    Opportunity[]
 
   @@unique([organizationId, name])
   @@index([organizationId])
