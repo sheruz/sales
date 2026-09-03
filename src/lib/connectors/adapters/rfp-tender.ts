@@ -51,6 +51,8 @@ export const rfpTenderConnector: SourceConnectorAdapter = {
 
     const result = await aiComplete({
       feature: "rfp_tender_signals",
+      operation: "rfp_tender_signals",
+      organizationId: ctx.organizationId,
       userId: ctx.userId,
       jsonMode: true,
       temperature: 0.3,

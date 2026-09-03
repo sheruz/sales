@@ -92,6 +92,7 @@ export default async function OpportunityDetailPage({ params }: PageProps) {
         score={opportunity.score}
         stage={opportunity.stage}
         status={opportunity.status}
+        hasIntelligence={Boolean(opportunity.intelligence)}
       />
 
       <div className="grid gap-4 md:grid-cols-2">
@@ -99,16 +100,20 @@ export default async function OpportunityDetailPage({ params }: PageProps) {
           <CardHeader>
             <CardTitle className="text-base">Why now</CardTitle>
           </CardHeader>
-          <CardContent className="text-sm text-muted-foreground">
-            {opportunity.whyNow || "—"}
+          <CardContent className="text-sm text-muted-foreground whitespace-pre-wrap">
+            {opportunity.intelligence?.whyNow ||
+              opportunity.whyNow ||
+              "Generate intelligence to get an evidence-backed answer."}
           </CardContent>
         </Card>
         <Card>
           <CardHeader>
             <CardTitle className="text-base">Likely problem</CardTitle>
           </CardHeader>
-          <CardContent className="text-sm text-muted-foreground">
-            {opportunity.likelyProblem || "—"}
+          <CardContent className="text-sm text-muted-foreground whitespace-pre-wrap">
+            {opportunity.intelligence?.likelyProblem ||
+              opportunity.likelyProblem ||
+              "—"}
           </CardContent>
         </Card>
         <Card>
@@ -116,15 +121,135 @@ export default async function OpportunityDetailPage({ params }: PageProps) {
             <CardTitle className="text-base">Recommended service</CardTitle>
           </CardHeader>
           <CardContent className="text-sm text-muted-foreground">
-            {opportunity.recommendedService?.name || "—"}
+            {opportunity.recommendedService?.name ||
+              opportunity.intelligence?.recommendedServiceId ||
+              "—"}
           </CardContent>
         </Card>
         <Card>
           <CardHeader>
-            <CardTitle className="text-base">Recommended action</CardTitle>
+            <CardTitle className="text-base">What to do next</CardTitle>
           </CardHeader>
-          <CardContent className="text-sm text-muted-foreground">
-            {opportunity.recommendedAction || "—"}
+          <CardContent className="text-sm text-muted-foreground whitespace-pre-wrap">
+            {opportunity.intelligence?.recommendedAction ||
+              opportunity.recommendedAction ||
+              "—"}
+          </CardContent>
+        </Card>
+      </div>
+
+      <div className="grid gap-4 lg:grid-cols-2">
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">Recommended offer</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3 text-sm">
+            {opportunity.intelligence?.offerTitle ||
+            opportunity.recommendedOffer ? (
+              <>
+                <Field label="Title">
+                  {opportunity.intelligence?.offerTitle ||
+                    opportunity.recommendedOffer?.name}
+                </Field>
+                <Field label="Problem">
+                  {opportunity.intelligence?.offerProblem ||
+                    opportunity.recommendedOffer?.problem ||
+                    "—"}
+                </Field>
+                <Field label="Solution">
+                  {opportunity.intelligence?.offerSolution ||
+                    opportunity.recommendedOffer?.solution ||
+                    "—"}
+                </Field>
+                <Field label="Scope">
+                  {opportunity.intelligence?.offerScope ||
+                    opportunity.recommendedOffer?.description ||
+                    "—"}
+                </Field>
+                <Field label="Expected outcome">
+                  {opportunity.intelligence?.offerExpectedOutcome ||
+                    opportunity.recommendedOffer?.outcome ||
+                    "—"}
+                </Field>
+                <Field label="Estimated value">
+                  {decimalToNumber(
+                    opportunity.intelligence?.offerEstimatedValue ??
+                      opportunity.estimatedValue
+                  ) != null
+                    ? `${opportunity.currency} ${decimalToNumber(
+                        opportunity.intelligence?.offerEstimatedValue ??
+                          opportunity.estimatedValue
+                      )?.toLocaleString()}`
+                    : "—"}
+                </Field>
+                <Field label="Reasoning">
+                  {opportunity.intelligence?.offerReasoning || "—"}
+                </Field>
+              </>
+            ) : (
+              <p className="text-muted-foreground">
+                No offer yet — generate intelligence to recommend a configured
+                service offer.
+              </p>
+            )}
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">Who to contact & what to say</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3 text-sm">
+            <Field label="Recommended contact">
+              {opportunity.recommendedContact ||
+              opportunity.intelligence?.recommendedContactId ? (
+                <div className="space-y-1">
+                  <p className="font-medium text-foreground">
+                    {opportunity.recommendedContact?.fullName ||
+                      "Selected contact"}
+                  </p>
+                  {opportunity.recommendedContact?.title && (
+                    <p className="text-muted-foreground">
+                      {opportunity.recommendedContact.title}
+                    </p>
+                  )}
+                  {opportunity.recommendedContact?.email && (
+                    <p className="text-muted-foreground">
+                      {opportunity.recommendedContact.email}
+                    </p>
+                  )}
+                  <p className="text-muted-foreground">
+                    {opportunity.intelligence?.recommendedContactReason ||
+                      opportunity.recommendedContactReason ||
+                      "—"}
+                  </p>
+                  {(opportunity.intelligence?.recommendedContactConfidence ??
+                    opportunity.recommendedContactConfidence) != null && (
+                    <Badge variant="outline">
+                      Confidence{" "}
+                      {opportunity.intelligence?.recommendedContactConfidence ??
+                        opportunity.recommendedContactConfidence}
+                    </Badge>
+                  )}
+                </div>
+              ) : (
+                "—"
+              )}
+            </Field>
+            <Field label="Outreach message">
+              <p className="whitespace-pre-wrap text-muted-foreground">
+                {opportunity.intelligence?.outreachMessage ||
+                  opportunity.outreachMessage ||
+                  "—"}
+              </p>
+            </Field>
+            {opportunity.intelligence?.summary && (
+              <Field label="Summary">
+                <p className="text-muted-foreground">
+                  {opportunity.intelligence.summary}
+                </p>
+              </Field>
+            )}
           </CardContent>
         </Card>
       </div>
@@ -232,6 +357,11 @@ export default async function OpportunityDetailPage({ params }: PageProps) {
                           Primary
                         </Badge>
                       )}
+                      {opportunity.recommendedContactId === contact.id && (
+                        <Badge variant="secondary" className="text-xs">
+                          Recommended
+                        </Badge>
+                      )}
                     </div>
                     {contact.title && (
                       <p className="text-xs text-muted-foreground">
@@ -322,20 +452,20 @@ export default async function OpportunityDetailPage({ params }: PageProps) {
                       {latestScore.model ? ` · ${latestScore.model}` : ""}
                     </span>
                   </div>
-                  <p className="text-sm text-muted-foreground">
+                  <p className="text-sm text-muted-foreground whitespace-pre-wrap">
                     {latestScore.explanation}
                   </p>
                   <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
                     {[
-                      ["ICP fit", latestScore.icpFit],
-                      ["Signal", latestScore.signalStrength],
-                      ["Freshness", latestScore.freshness],
+                      ["ICP Fit", latestScore.icpFit],
+                      ["Signal Strength", latestScore.signalStrength],
                       ["Urgency", latestScore.urgency],
-                      ["Budget", latestScore.budgetPotential],
-                      ["Growth", latestScore.growth],
-                      ["Service fit", latestScore.serviceFit],
+                      ["Service Fit", latestScore.serviceFit],
                       ["Reachability", latestScore.reachability],
-                      ["Hist. conv.", latestScore.historicalConversion],
+                      ["Freshness", latestScore.freshness],
+                      ["Budget Potential", latestScore.budgetPotential],
+                      ["Growth", latestScore.growth],
+                      ["Hist. Conversion", latestScore.historicalConversion],
                     ].map(([label, value]) => (
                       <div
                         key={String(label)}
@@ -346,6 +476,9 @@ export default async function OpportunityDetailPage({ params }: PageProps) {
                       </div>
                     ))}
                   </div>
+                  <p className="text-sm font-medium">
+                    Overall: {latestScore.totalScore}/100
+                  </p>
                 </div>
               )}
             </CardContent>

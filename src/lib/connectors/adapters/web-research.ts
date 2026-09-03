@@ -45,6 +45,8 @@ export const webResearchConnector: SourceConnectorAdapter = {
 
     const result = await aiComplete({
       feature: "web_research_signals",
+      operation: "web_research_signals",
+      organizationId: ctx.organizationId,
       userId: ctx.userId,
       jsonMode: true,
       temperature: 0.4,

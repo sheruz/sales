@@ -39,8 +39,13 @@ export async function GET() {
         })),
         recent: logs.slice(0, 20).map((l) => ({
           feature: l.feature,
+          operation: l.operation,
+          provider: l.provider,
           model: l.model,
           tokens: l.totalTokens,
+          cost: l.cost,
+          requestId: l.requestId,
+          status: l.status,
           createdAt: l.createdAt,
         })),
       })

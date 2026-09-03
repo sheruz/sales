@@ -41,7 +41,7 @@ const mainNav = [
   { title: "Leads", href: "/dashboard/leads", icon: Users },
   { title: "Campaigns", href: "/dashboard/campaigns", icon: Target },
   { title: "Autopilot", href: "/dashboard/autopilot", icon: Rocket },
-  { title: "Conversations", href: "/dashboard/conversations", icon: MessageSquare },
+  { title: "Inbox", href: "/dashboard/conversations", icon: MessageSquare },
   { title: "Tasks", href: "/dashboard/tasks", icon: ListTodo },
 ];
 

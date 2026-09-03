@@ -1,6 +1,8 @@
 import { env } from "@/lib/config/env";
 import { sendEmailWithConfig, type SmtpConfig } from "@/lib/email/send-mail";
 import { userIntegrationService } from "@/services/user-integration.service";
+import { emailAccountService } from "@/services/email-account.service";
+import { emailProviderService } from "@/services/email-provider.service";
 
 export type { SendEmailParams } from "@/lib/email/send-mail";
 
@@ -10,6 +12,19 @@ export async function sendEmailForUser(
   params: { to: string; subject: string; text: string; html?: string }
 ) {
   if (organizationId && userId) {
+    const account = await emailAccountService.getDefaultForUser(
+      organizationId,
+      userId
+    );
+    if (account) {
+      return emailProviderService.send(account, {
+        to: params.to,
+        subject: params.subject,
+        text: params.text,
+        html: params.html,
+      });
+    }
+
     const userConfig = await userIntegrationService.getEmailConfig(
       organizationId,
       userId
@@ -18,7 +33,7 @@ export async function sendEmailForUser(
       return sendEmailWithConfig(userConfig, params);
     }
     throw new Error(
-      "Email not configured. Go to Settings → Integrations and connect your SMTP account."
+      "Email not configured. Go to Settings → Integrations and connect Gmail, Outlook, or SMTP."
     );
   }
 
@@ -46,6 +61,11 @@ export async function isEmailConfiguredForUser(
   userId?: string
 ): Promise<boolean> {
   if (organizationId && userId) {
+    const account = await emailAccountService.getDefaultForUser(
+      organizationId,
+      userId
+    );
+    if (account) return true;
     return userIntegrationService.isEmailConfigured(organizationId, userId);
   }
   return Boolean(env.SMTP_HOST && env.SMTP_USER && env.SMTP_PASSWORD);

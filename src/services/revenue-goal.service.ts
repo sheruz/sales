@@ -155,6 +155,8 @@ export class RevenueGoalService {
 
     const result = await aiComplete({
       feature: "revenue_goal_parse",
+      operation: "revenue_goal_parse",
+      organizationId,
       userId,
       jsonMode: true,
       temperature: 0.2,

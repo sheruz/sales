@@ -59,6 +59,8 @@ export const hiringSignalConnector: SourceConnectorAdapter = {
 
     const result = await aiComplete({
       feature: "job_post_discovery",
+      operation: "hiring_signal_discovery",
+      organizationId: ctx.organizationId,
       userId: ctx.userId,
       jsonMode: true,
       temperature: 0.7,

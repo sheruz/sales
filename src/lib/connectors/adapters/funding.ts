@@ -43,6 +43,8 @@ export const fundingSignalConnector: SourceConnectorAdapter = {
 
     const result = await aiComplete({
       feature: "funding_signal_discovery",
+      operation: "funding_signal_discovery",
+      organizationId: ctx.organizationId,
       userId: ctx.userId,
       jsonMode: true,
       temperature: 0.4,

@@ -51,8 +51,77 @@ enum EmailStatus {
   SENT
   DELIVERED
   OPENED
+  CLICKED
+  REPLIED
+  BOUNCED
+  FAILED
+  UNSUBSCRIBED
+}
+
+enum EmailProvider {
+  GMAIL
+  OUTLOOK
+  SMTP
+}
+
+enum EmailAccountStatus {
+  ACTIVE
+  DISCONNECTED
+  ERROR
+  DISABLED
+}
+
+enum MessageDirection {
+  OUTBOUND
+  INBOUND
+}
+
+enum InboxConversationStatus {
+  OPEN
+  WAITING
+  NEEDS_ACTION
+  CLOSED
+  SNOOZED
+}
+
+enum EmailEventType {
+  SENT
+  DELIVERED
+  BOUNCED
+  OPENED
+  CLICKED
   REPLIED
   FAILED
+  UNSUBSCRIBED
+  COMPLAINT
+}
+
+enum SuppressionReason {
+  UNSUBSCRIBE
+  BOUNCE
+  COMPLAINT
+  MANUAL
+  LEGAL_REQUEST
+}
+
+enum MessageAiClassification {
+  INTERESTED
+  POSITIVE
+  NEGATIVE
+  OBJECTION
+  QUESTION
+  UNSUBSCRIBE
+  OUT_OF_OFFICE
+  NOT_RELEVANT
+  REFERRAL
+  UNKNOWN
+}
+
+enum OutreachSequenceStatus {
+  DRAFT
+  ACTIVE
+  PAUSED
+  ARCHIVED
 }
 
 enum ReplyClassification {
@@ -354,6 +423,25 @@ enum SourceRunStatus {
   CANCELLED
 }
 
+enum OfferStatus {
+  DRAFT
+  ACTIVE
+  ARCHIVED
+}
+
+enum OfferRecommendationStatus {
+  SUGGESTED
+  ACCEPTED
+  REJECTED
+  SUPERSEDED
+}
+
+enum AIUsageStatus {
+  SUCCESS
+  ERROR
+  PARTIAL
+}
+
 // ─── Multi-tenancy (Phase 1) ─────────────────────────────────────────────────
 
 model Organization {
@@ -384,6 +472,11 @@ model Organization {
   proposals         Proposal[]
   conversations     Conversation[]
   emailAccounts     EmailAccount[]
+  inboxConversations InboxConversation[]
+  messages          Message[]
+  emailEvents       EmailEvent[]
+  emailSuppressions EmailSuppression[]
+  outreachSequences OutreachSequence[]
   discoveryJobs     LinkedInDiscoveryJob[]
   followUpJobs      FollowUpJob[]
   autopilotConfigs  AutopilotConfig[]
@@ -401,6 +494,9 @@ model Organization {
   opportunitySources OpportunitySource[]
   sourceConnectors  SourceConnector[]
   sourceRuns        SourceRun[]
+  offers            Offer[]
+  opportunityOfferRecommendations OpportunityOfferRecommendation[]
+  opportunityIntelligences OpportunityIntelligence[]
 
   @@index([status])
   @@index([deletedAt])
@@ -552,6 +648,8 @@ model User {
   businessBrainVersions  BusinessBrainVersion[]  @relation("BrainVersionAuthor")
   ownedOpportunities     Opportunity[]           @relation("OpportunityOwner")
   opportunityEvents      OpportunityEvent[]      @relation("OpportunityEventActor")
+  emailAccounts          EmailAccount[]
+  assignedInboxConversations InboxConversation[] @relation("InboxAssignee")
 
   @@index([email])
   @@index([role])
@@ -632,6 +730,7 @@ model Company {
   contacts      Contact[]
   signals       Signal[]
   opportunities Opportunity[]
+  inboxConversations InboxConversation[]
 
   @@unique([organizationId, domain])
   @@index([organizationId])
@@ -668,6 +767,8 @@ model Contact {
   company               Company       @relation(fields: [companyId], references: [id], onDelete: Cascade)
   lead                  Lead?         @relation(fields: [leadId], references: [id], onDelete: SetNull)
   primaryOpportunities  Opportunity[] @relation("PrimaryContact")
+  recommendedForOpportunities Opportunity[] @relation("RecommendedContact")
+  inboxConversations InboxConversation[]
 
   @@index([organizationId])
   @@index([companyId])
@@ -811,8 +912,12 @@ model Opportunity {
   likelyProblem            String?           @map("likely_problem")
   recommendedServiceId     String?           @map("recommended_service_id")
   recommendedOfferId       String?           @map("recommended_offer_id")
+  recommendedContactId     String?           @map("recommended_contact_id")
   recommendedContactReason String?           @map("recommended_contact_reason")
+  recommendedContactConfidence Int?          @map("recommended_contact_confidence")
+  outreachMessage          String?           @map("outreach_message")
   recommendedAction        String?           @map("recommended_action")
+  intelligenceGeneratedAt  DateTime?         @map("intelligence_generated_at")
   lastSignalAt             DateTime?         @map("last_signal_at")
   nextActionAt             DateTime?         @map("next_action_at")
   ownerId                  String?           @map("owner_id")
@@ -823,14 +928,19 @@ model Opportunity {
   organization       Organization       @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   company            Company            @relation(fields: [companyId], references: [id], onDelete: Cascade)
   primaryContact     Contact?           @relation("PrimaryContact", fields: [primaryContactId], references: [id], onDelete: SetNull)
+  recommendedContact Contact?           @relation("RecommendedContact", fields: [recommendedContactId], references: [id], onDelete: SetNull)
   source             OpportunitySource? @relation(fields: [sourceId], references: [id], onDelete: SetNull)
   primarySignal      Signal?            @relation("OpportunityPrimarySignal", fields: [primarySignalId], references: [id], onDelete: SetNull)
   lead               Lead?              @relation(fields: [leadId], references: [id], onDelete: SetNull)
   recommendedService Service?           @relation(fields: [recommendedServiceId], references: [id], onDelete: SetNull)
+  recommendedOffer   Offer?             @relation(fields: [recommendedOfferId], references: [id], onDelete: SetNull)
   owner              User?              @relation("OpportunityOwner", fields: [ownerId], references: [id], onDelete: SetNull)
   campaign           Campaign?          @relation(fields: [campaignId], references: [id], onDelete: SetNull)
   events             OpportunityEvent[]
   scores             OpportunityScore[]
+  offerRecommendations OpportunityOfferRecommendation[]
+  intelligence       OpportunityIntelligence?
+  inboxConversations InboxConversation[]
 
   @@index([organizationId])
   @@index([companyId])
@@ -947,13 +1057,13 @@ model Lead {
   scores        LeadScore[]
   campaignLeads CampaignLead[]
   conversations Conversation[]
-  emailThreads  EmailThread[]
   deals         Deal[]
   meetings      Meeting[]
   proposals     Proposal[]
   followUpJobs  FollowUpJob[]
   contact       Contact?
   opportunity   Opportunity?
+  inboxConversations InboxConversation[]
 
   @@index([organizationId])
   @@index([automationStatus])
@@ -1209,90 +1319,227 @@ model Conversation {
   @@map("conversations")
 }
 
-// ─── Email ───────────────────────────────────────────────────────────────────
+// ─── Email / Unified Inbox (Phase 6) ─────────────────────────────────────────
+// Legacy `Conversation` (lead outreach log) remains above for automation.
+// InboxConversation + Message are the unified Gmail/Outlook/SMTP inbox.
 
 model EmailAccount {
-  id             String   @id @default(uuid())
-  organizationId String   @map("organization_id")
-  name           String
-  email          String
-  smtpHost       String   @map("smtp_host")
-  smtpPort       Int      @map("smtp_port")
-  smtpSecure     Boolean  @default(true) @map("smtp_secure")
-  smtpUser       String   @map("smtp_user")
-  smtpPassword   String   @map("smtp_password")
-  isDefault      Boolean  @default(false) @map("is_default")
-  isActive       Boolean  @default(true) @map("is_active")
-  createdAt      DateTime @default(now()) @map("created_at")
-  updatedAt      DateTime @updatedAt @map("updated_at")
+  id                      String             @id @default(uuid())
+  organizationId          String             @map("organization_id")
+  userId                  String             @map("user_id")
+  provider                EmailProvider
+  email                   String
+  displayName             String?            @map("display_name")
+  status                  EmailAccountStatus @default(ACTIVE)
+  encryptedAccessToken    String?            @map("encrypted_access_token")
+  encryptedRefreshToken   String?            @map("encrypted_refresh_token")
+  tokenExpiresAt          DateTime?          @map("token_expires_at")
+  smtpHost                String?            @map("smtp_host")
+  smtpPort                Int?               @map("smtp_port")
+  smtpSecure              Boolean?           @map("smtp_secure")
+  smtpUser                String?            @map("smtp_user")
+  encryptedSmtpPassword   String?            @map("encrypted_smtp_password")
+  dailyLimit              Int                @default(50) @map("daily_limit")
+  dailySent               Int                @default(0) @map("daily_sent")
+  dailySentResetAt        DateTime?          @map("daily_sent_reset_at")
+  lastSyncAt              DateTime?          @map("last_sync_at")
+  syncCursor              String?            @map("sync_cursor")
+  lastError               String?            @map("last_error")
+  isDefault               Boolean            @default(false) @map("is_default")
+  createdAt               DateTime           @default(now()) @map("created_at")
+  updatedAt               DateTime           @updatedAt @map("updated_at")
 
-  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  threads      EmailThread[]
-  messages     EmailMessage[]
+  organization  Organization        @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  user          User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  conversations InboxConversation[]
+  messages      Message[]
+  events        EmailEvent[]
 
   @@unique([organizationId, email])
   @@index([organizationId])
+  @@index([userId])
+  @@index([provider])
+  @@index([status])
   @@map("email_accounts")
 }
 
-model EmailThread {
-  id             String   @id @default(uuid())
-  leadId         String   @map("lead_id")
-  emailAccountId String   @map("email_account_id")
-  subject        String
-  externalId     String?  @map("external_id")
-  createdAt      DateTime @default(now()) @map("created_at")
-  updatedAt      DateTime @updatedAt @map("updated_at")
+/// Unified inbox conversation (Phase 6 conversations entity)
+model InboxConversation {
+  id               String                  @id @default(uuid())
+  organizationId   String                  @map("organization_id")
+  companyId        String?                 @map("company_id")
+  contactId        String?                 @map("contact_id")
+  opportunityId    String?                 @map("opportunity_id")
+  leadId           String?                 @map("lead_id")
+  emailAccountId   String?                 @map("email_account_id")
+  channel          ConversationChannel     @default(EMAIL)
+  status           InboxConversationStatus @default(OPEN)
+  sentiment        String?
+  intent           String?
+  subject          String?
+  providerThreadId String?                 @map("provider_thread_id")
+  lastMessageAt    DateTime?               @map("last_message_at")
+  nextActionAt     DateTime?               @map("next_action_at")
+  assignedToId     String?                 @map("assigned_to")
+  createdAt        DateTime                @default(now()) @map("created_at")
+  updatedAt        DateTime                @updatedAt @map("updated_at")
 
-  lead         Lead          @relation(fields: [leadId], references: [id], onDelete: Cascade)
-  emailAccount EmailAccount  @relation(fields: [emailAccountId], references: [id])
-  messages     EmailMessage[]
+  organization Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  company      Company?      @relation(fields: [companyId], references: [id], onDelete: SetNull)
+  contact      Contact?      @relation(fields: [contactId], references: [id], onDelete: SetNull)
+  opportunity  Opportunity?  @relation(fields: [opportunityId], references: [id], onDelete: SetNull)
+  lead         Lead?         @relation(fields: [leadId], references: [id], onDelete: SetNull)
+  emailAccount EmailAccount? @relation(fields: [emailAccountId], references: [id], onDelete: SetNull)
+  assignedTo   User?         @relation("InboxAssignee", fields: [assignedToId], references: [id], onDelete: SetNull)
+  messages     Message[]
+  events       EmailEvent[]
 
+  @@index([organizationId])
+  @@index([companyId])
+  @@index([contactId])
+  @@index([opportunityId])
   @@index([leadId])
-  @@map("email_threads")
-}
-
-model EmailMessage {
-  id             String      @id @default(uuid())
-  threadId       String      @map("thread_id")
-  emailAccountId String      @map("email_account_id")
-  fromEmail      String      @map("from_email")
-  toEmail        String      @map("to_email")
-  ccEmails       String[]    @map("cc_emails")
-  subject        String
-  bodyHtml       String?     @map("body_html")
-  bodyText       String?     @map("body_text")
-  status         EmailStatus @default(DRAFT)
-  scheduledAt    DateTime?   @map("scheduled_at")
-  sentAt         DateTime?   @map("sent_at")
-  externalId     String?     @map("external_id")
-  errorMessage   String?     @map("error_message")
-  metadata       Json?
-  createdAt      DateTime    @default(now()) @map("created_at")
-  updatedAt      DateTime    @updatedAt @map("updated_at")
-
-  thread       EmailThread  @relation(fields: [threadId], references: [id], onDelete: Cascade)
-  emailAccount EmailAccount @relation(fields: [emailAccountId], references: [id])
-  attachments  EmailAttachment[]
-
-  @@index([threadId])
   @@index([status])
-  @@index([scheduledAt])
-  @@map("email_messages")
+  @@index([lastMessageAt])
+  @@index([providerThreadId])
+  @@map("inbox_conversations")
 }
 
-model EmailAttachment {
+model Message {
+  id                  String                   @id @default(uuid())
+  organizationId      String                   @map("organization_id")
+  conversationId      String                   @map("conversation_id")
+  emailAccountId      String?                  @map("email_account_id")
+  direction           MessageDirection
+  providerMessageId   String?                  @map("provider_message_id")
+  threadId            String?                  @map("thread_id")
+  subject             String?
+  body                String?
+  bodyHtml            String?                  @map("body_html")
+  fromEmail           String?                  @map("from_email")
+  toEmail             String?                  @map("to_email")
+  status              EmailStatus              @default(DRAFT)
+  aiClassification    MessageAiClassification? @map("ai_classification")
+  aiSummary           String?                  @map("ai_summary")
+  suggestedNextAction String?                  @map("suggested_next_action")
+  idempotencyKey      String?                  @map("idempotency_key")
+  sentAt              DateTime?                @map("sent_at")
+  receivedAt          DateTime?                @map("received_at")
+  metadata            Json?
+  createdAt           DateTime                 @default(now()) @map("created_at")
+  updatedAt           DateTime                 @updatedAt @map("updated_at")
+
+  organization Organization        @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  conversation InboxConversation   @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  emailAccount EmailAccount?       @relation(fields: [emailAccountId], references: [id], onDelete: SetNull)
+  events       EmailEvent[]
+  attachments  MessageAttachment[]
+
+  @@unique([organizationId, idempotencyKey])
+  @@unique([organizationId, providerMessageId])
+  @@index([organizationId])
+  @@index([conversationId])
+  @@index([direction])
+  @@index([status])
+  @@index([threadId])
+  @@map("messages")
+}
+
+model MessageAttachment {
   id        String   @id @default(uuid())
   messageId String   @map("message_id")
   filename  String
   mimeType  String   @map("mime_type")
   size      Int
-  url       String
+  url       String?
   createdAt DateTime @default(now()) @map("created_at")
 
-  message EmailMessage @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  message Message @relation(fields: [messageId], references: [id], onDelete: Cascade)
 
-  @@map("email_attachments")
+  @@map("message_attachments")
+}
+
+model EmailEvent {
+  id              String         @id @default(uuid())
+  organizationId  String         @map("organization_id")
+  messageId       String?        @map("message_id")
+  conversationId  String?        @map("conversation_id")
+  emailAccountId  String?        @map("email_account_id")
+  type            EmailEventType
+  providerEventId String?        @map("provider_event_id")
+  recipientEmail  String?        @map("recipient_email")
+  metadata        Json?
+  occurredAt      DateTime       @default(now()) @map("occurred_at")
+  createdAt       DateTime       @default(now()) @map("created_at")
+
+  organization Organization       @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  message      Message?           @relation(fields: [messageId], references: [id], onDelete: SetNull)
+  conversation InboxConversation? @relation(fields: [conversationId], references: [id], onDelete: SetNull)
+  emailAccount EmailAccount?      @relation(fields: [emailAccountId], references: [id], onDelete: SetNull)
+
+  @@index([organizationId])
+  @@index([messageId])
+  @@index([type])
+  @@index([occurredAt])
+  @@map("email_events")
+}
+
+model EmailSuppression {
+  id             String            @id @default(uuid())
+  organizationId String            @map("organization_id")
+  email          String?
+  domain         String?
+  reason         SuppressionReason
+  source         String?
+  createdAt      DateTime          @default(now()) @map("created_at")
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId])
+  @@index([email])
+  @@index([domain])
+  @@index([reason])
+  @@map("email_suppressions")
+}
+
+model OutreachSequence {
+  id                String                 @id @default(uuid())
+  organizationId    String                 @map("organization_id")
+  name              String
+  description       String?
+  status            OutreachSequenceStatus @default(DRAFT)
+  stopOnReply       Boolean                @default(true) @map("stop_on_reply")
+  stopOnMeeting     Boolean                @default(true) @map("stop_on_meeting")
+  stopOnUnsubscribe Boolean                @default(true) @map("stop_on_unsubscribe")
+  createdAt         DateTime               @default(now()) @map("created_at")
+  updatedAt         DateTime               @updatedAt @map("updated_at")
+
+  organization Organization           @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  steps        OutreachSequenceStep[]
+
+  @@index([organizationId])
+  @@index([status])
+  @@map("outreach_sequences")
+}
+
+model OutreachSequenceStep {
+  id              String              @id @default(uuid())
+  sequenceId      String              @map("sequence_id")
+  stepOrder       Int                 @map("step_order")
+  delayMinutes    Int                 @default(0) @map("delay_minutes")
+  channel         ConversationChannel @default(EMAIL)
+  subjectTemplate String?             @map("subject_template")
+  bodyTemplate    String              @map("body_template")
+  condition       Json?
+  isActive        Boolean             @default(true) @map("is_active")
+  createdAt       DateTime            @default(now()) @map("created_at")
+  updatedAt       DateTime            @updatedAt @map("updated_at")
+
+  sequence OutreachSequence @relation(fields: [sequenceId], references: [id], onDelete: Cascade)
+
+  @@unique([sequenceId, stepOrder])
+  @@index([sequenceId])
+  @@map("outreach_sequence_steps")
 }
 
 // ─── Follow-up Automation ────────────────────────────────────────────────────
@@ -1537,11 +1784,101 @@ model Service {
   autopilotConfigs AutopilotConfig[]
   serviceCaseStudies ServiceCaseStudy[]
   opportunities    Opportunity[]
+  offers           Offer[]
 
   @@unique([organizationId, name])
   @@index([organizationId])
   @@index([status])
   @@map("services")
+}
+
+model Offer {
+  id             String      @id @default(uuid())
+  organizationId String      @map("organization_id")
+  serviceId      String      @map("service_id")
+  name           String
+  description    String?
+  problem        String?
+  solution       String?
+  outcome        String?
+  pricingModel   String?     @map("pricing_model")
+  minValue       Decimal?    @map("min_value") @db.Decimal(14, 2)
+  maxValue       Decimal?    @map("max_value") @db.Decimal(14, 2)
+  currency       String      @default("USD")
+  deliveryTime   String?     @map("delivery_time")
+  status         OfferStatus @default(ACTIVE)
+  createdAt      DateTime    @default(now()) @map("created_at")
+  updatedAt      DateTime    @updatedAt @map("updated_at")
+
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  service        Service      @relation(fields: [serviceId], references: [id], onDelete: Cascade)
+  recommendations OpportunityOfferRecommendation[]
+  opportunities  Opportunity[]
+  intelligences  OpportunityIntelligence[]
+
+  @@index([organizationId])
+  @@index([serviceId])
+  @@index([status])
+  @@map("offers")
+}
+
+model OpportunityOfferRecommendation {
+  id             String                    @id @default(uuid())
+  organizationId String                    @map("organization_id")
+  opportunityId  String                    @map("opportunity_id")
+  offerId        String                    @map("offer_id")
+  confidence     Int                       @default(50)
+  fitReason      String?                   @map("fit_reason")
+  expectedValue  Decimal?                  @map("expected_value") @db.Decimal(14, 2)
+  explanation    String?
+  status         OfferRecommendationStatus @default(SUGGESTED)
+  createdAt      DateTime                  @default(now()) @map("created_at")
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  opportunity  Opportunity  @relation(fields: [opportunityId], references: [id], onDelete: Cascade)
+  offer        Offer        @relation(fields: [offerId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId])
+  @@index([opportunityId])
+  @@index([offerId])
+  @@map("opportunity_offer_recommendations")
+}
+
+/// Concise AI sales intelligence for an opportunity (no private chain-of-thought)
+model OpportunityIntelligence {
+  id                           String   @id @default(uuid())
+  organizationId               String   @map("organization_id")
+  opportunityId                String   @unique @map("opportunity_id")
+  whyNow                       String   @map("why_now")
+  likelyProblem                String   @map("likely_problem")
+  recommendedServiceId         String?  @map("recommended_service_id")
+  recommendedOfferId           String?  @map("recommended_offer_id")
+  recommendedContactId         String?  @map("recommended_contact_id")
+  recommendedContactReason     String?  @map("recommended_contact_reason")
+  recommendedContactConfidence Int?     @map("recommended_contact_confidence")
+  outreachMessage              String?  @map("outreach_message")
+  recommendedAction            String?  @map("recommended_action")
+  offerTitle                   String?  @map("offer_title")
+  offerProblem                 String?  @map("offer_problem")
+  offerSolution                String?  @map("offer_solution")
+  offerScope                   String?  @map("offer_scope")
+  offerExpectedOutcome         String?  @map("offer_expected_outcome")
+  offerEstimatedValue          Decimal? @map("offer_estimated_value") @db.Decimal(14, 2)
+  offerReasoning               String?  @map("offer_reasoning")
+  relevantCaseStudyId          String?  @map("relevant_case_study_id")
+  scoreBreakdown               Json?    @map("score_breakdown")
+  summary                      String?
+  model                        String?
+  generatedAt                  DateTime @default(now()) @map("generated_at")
+  createdAt                    DateTime @default(now()) @map("created_at")
+  updatedAt                    DateTime @updatedAt @map("updated_at")
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  opportunity  Opportunity  @relation(fields: [opportunityId], references: [id], onDelete: Cascade)
+  recommendedOffer Offer?   @relation(fields: [recommendedOfferId], references: [id], onDelete: SetNull)
+
+  @@index([organizationId])
+  @@map("opportunity_intelligences")
 }
 
 model ServiceCaseStudy {
@@ -1831,22 +2168,29 @@ model AIConversation {
 }
 
 model AIUsageLog {
-  id             String   @id @default(uuid())
-  organizationId String?  @map("organization_id")
-  userId         String?  @map("user_id")
+  id             String         @id @default(uuid())
+  organizationId String?        @map("organization_id")
+  userId         String?        @map("user_id")
   feature        String
+  /// Canonical operation name (e.g. opportunity_intelligence)
+  operation      String?
+  provider       String?
   model          String?
-  promptTokens   Int?     @map("prompt_tokens")
-  outputTokens   Int?     @map("output_tokens")
-  totalTokens    Int?     @map("total_tokens")
-  cost           Decimal? @db.Decimal(10, 6)
+  promptTokens   Int?           @map("prompt_tokens")
+  outputTokens   Int?           @map("output_tokens")
+  totalTokens    Int?           @map("total_tokens")
+  cost           Decimal?       @db.Decimal(10, 6)
+  requestId      String?        @map("request_id")
+  status         AIUsageStatus  @default(SUCCESS)
   metadata       Json?
-  createdAt      DateTime @default(now()) @map("created_at")
+  createdAt      DateTime       @default(now()) @map("created_at")
 
   organization Organization? @relation(fields: [organizationId], references: [id], onDelete: SetNull)
 
   @@index([organizationId])
   @@index([feature])
+  @@index([operation])
+  @@index([requestId])
   @@index([createdAt])
   @@map("ai_usage_logs")
 }

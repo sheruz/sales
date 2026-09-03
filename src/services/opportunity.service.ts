@@ -149,6 +149,20 @@ export class OpportunityService {
         primaryContact: true,
         primarySignal: true,
         recommendedService: true,
+        recommendedOffer: {
+          include: { service: { select: { id: true, name: true } } },
+        },
+        recommendedContact: true,
+        intelligence: true,
+        offerRecommendations: {
+          orderBy: { createdAt: "desc" },
+          take: 10,
+          include: {
+            offer: {
+              include: { service: { select: { id: true, name: true } } },
+            },
+          },
+        },
         owner: { select: { id: true, firstName: true, lastName: true, email: true } },
         campaign: { select: { id: true, name: true } },
         source: true,
@@ -348,20 +362,26 @@ export class OpportunityService {
         leadBoost
     );
 
+    const icpFitScore = clamp(icpFit);
     const explanation = [
-      `ICP fit ${icpFit}`,
-      `signal ${signalStrength}`,
-      `freshness ${freshness}`,
-      `service fit ${serviceFit}`,
-      `reachability ${reachability}`,
-    ].join(" · ");
+      `ICP Fit: ${icpFitScore}`,
+      `Signal Strength: ${signalStrength}`,
+      `Urgency: ${urgency}`,
+      `Service Fit: ${serviceFit}`,
+      `Reachability: ${reachability}`,
+      `Freshness: ${freshness}`,
+      `Budget Potential: ${budgetPotential}`,
+      `Growth: ${growth}`,
+      `Historical Conversion: ${historicalConversion}`,
+      `Overall: ${totalScore}/100`,
+    ].join("\n");
 
     const scoreRow = await prisma.opportunityScore.create({
       data: {
         organizationId,
         opportunityId,
         totalScore,
-        icpFit: clamp(icpFit),
+        icpFit: icpFitScore,
         signalStrength,
         freshness,
         urgency,

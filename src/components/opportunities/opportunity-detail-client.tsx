@@ -4,7 +4,9 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { OpportunityStage } from "@prisma/client";
 import { toast } from "sonner";
+import { Loader2, Sparkles } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import {
   Select,
   SelectContent,
@@ -26,6 +28,7 @@ interface OpportunityDetailClientProps {
   score: number;
   stage: OpportunityStage;
   status: OpportunityStatus;
+  hasIntelligence: boolean;
 }
 
 export function OpportunityDetailClient({
@@ -34,10 +37,12 @@ export function OpportunityDetailClient({
   score,
   stage: initialStage,
   status,
+  hasIntelligence,
 }: OpportunityDetailClientProps) {
   const router = useRouter();
   const [stage, setStage] = useState(initialStage);
   const [saving, setSaving] = useState(false);
+  const [researching, setResearching] = useState(false);
 
   async function onStageChange(value: string | null) {
     if (!value || value === stage) return;
@@ -61,6 +66,31 @@ export function OpportunityDetailClient({
     }
   }
 
+  async function generateIntelligence(force = false) {
+    setResearching(true);
+    try {
+      const res = await fetch(`/api/opportunities/${opportunityId}/research`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ force }),
+      });
+      const data = await res.json();
+      if (!data.success) throw new Error(data.error?.message);
+      toast.success(
+        data.data?.cached
+          ? "Showing recent intelligence (cached)"
+          : "AI opportunity intelligence ready"
+      );
+      router.refresh();
+    } catch (err) {
+      toast.error(
+        err instanceof Error ? err.message : "Failed to generate intelligence"
+      );
+    } finally {
+      setResearching(false);
+    }
+  }
+
   return (
     <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
       <div className="space-y-2">
@@ -76,10 +106,26 @@ export function OpportunityDetailClient({
             {OPPORTUNITY_STATUS_LABELS[status] ?? status}
           </Badge>
         </div>
-        <p className="text-muted-foreground">Opportunity detail</p>
+        <p className="text-muted-foreground">
+          {hasIntelligence
+            ? "Sales intelligence is ready for this opportunity"
+            : "Generate AI intelligence for why now, what to sell, and who to contact"}
+        </p>
       </div>
 
-      <div className="flex items-center gap-2">
+      <div className="flex flex-wrap items-center gap-2">
+        <Button
+          variant={hasIntelligence ? "outline" : "default"}
+          disabled={researching}
+          onClick={() => generateIntelligence(hasIntelligence)}
+        >
+          {researching ? (
+            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+          ) : (
+            <Sparkles className="mr-2 h-4 w-4" />
+          )}
+          {hasIntelligence ? "Refresh intelligence" : "Generate intelligence"}
+        </Button>
         <span className="text-sm text-muted-foreground">Stage</span>
         <Select
           value={stage}

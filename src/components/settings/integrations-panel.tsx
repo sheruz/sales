@@ -75,11 +75,26 @@ export function IntegrationsPanel({ initialData }: IntegrationsPanelProps) {
 
   const linkedinConnected = searchParams.get("linkedin_connected");
   const linkedinError = searchParams.get("linkedin_error");
+  const gmailConnected = searchParams.get("gmail_connected");
+  const gmailError = searchParams.get("gmail_error");
+  const outlookConnected = searchParams.get("outlook_connected");
+  const outlookError = searchParams.get("outlook_error");
 
   useEffect(() => {
     if (linkedinConnected) toast.success("LinkedIn account connected");
     if (linkedinError) toast.error(`LinkedIn: ${linkedinError}`);
-  }, [linkedinConnected, linkedinError]);
+    if (gmailConnected) toast.success("Gmail connected");
+    if (gmailError) toast.error(`Gmail: ${gmailError}`);
+    if (outlookConnected) toast.success("Outlook connected");
+    if (outlookError) toast.error(`Outlook: ${outlookError}`);
+  }, [
+    linkedinConnected,
+    linkedinError,
+    gmailConnected,
+    gmailError,
+    outlookConnected,
+    outlookError,
+  ]);
 
   function getIntegration(platform: string) {
     return data.integrations.find((i) => i.platform === platform);
@@ -153,6 +168,32 @@ export function IntegrationsPanel({ initialData }: IntegrationsPanelProps) {
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Failed");
     } finally {
+      setSaving(null);
+    }
+  }
+
+  async function connectGmail() {
+    setSaving("GMAIL");
+    try {
+      const res = await fetch("/api/integrations/gmail/oauth");
+      const json = await res.json();
+      if (!json.success) throw new Error(json.error?.message);
+      window.location.href = json.data.url;
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed");
+      setSaving(null);
+    }
+  }
+
+  async function connectOutlook() {
+    setSaving("OUTLOOK");
+    try {
+      const res = await fetch("/api/integrations/outlook/oauth");
+      const json = await res.json();
+      if (!json.success) throw new Error(json.error?.message);
+      window.location.href = json.data.url;
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed");
       setSaving(null);
     }
   }
@@ -357,8 +398,44 @@ export function IntegrationsPanel({ initialData }: IntegrationsPanelProps) {
 
       <IntegrationCard
         icon={<Mail className="h-5 w-5" />}
+        title="Gmail"
+        description="Connect Gmail via OAuth to send outreach and sync inbox replies."
+        price="Bring your own Google account"
+        connected={Boolean(gmailConnected)}
+        preview={null}
+      >
+        <Button onClick={connectGmail} disabled={saving === "GMAIL"}>
+          {saving === "GMAIL" ? (
+            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+          ) : (
+            <Plug className="mr-2 h-4 w-4" />
+          )}
+          Connect Gmail
+        </Button>
+      </IntegrationCard>
+
+      <IntegrationCard
+        icon={<Mail className="h-5 w-5" />}
+        title="Microsoft Outlook"
+        description="Connect Outlook / Microsoft 365 via OAuth for send + inbox sync."
+        price="Bring your own Microsoft account"
+        connected={Boolean(outlookConnected)}
+        preview={null}
+      >
+        <Button onClick={connectOutlook} disabled={saving === "OUTLOOK"}>
+          {saving === "OUTLOOK" ? (
+            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+          ) : (
+            <Plug className="mr-2 h-4 w-4" />
+          )}
+          Connect Outlook
+        </Button>
+      </IntegrationCard>
+
+      <IntegrationCard
+        icon={<Mail className="h-5 w-5" />}
         title="Email (SMTP)"
-        description={email?.description ?? ""}
+        description={email?.description ?? "SMTP fallback when OAuth is unavailable"}
         price={email?.monthlyPriceLabel ?? "Bring your own key"}
         connected={email?.isConnected ?? false}
         preview={email?.maskedPreview}
