@@ -3,9 +3,13 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
+  Brain,
+  CircleDollarSign,
+  Crosshair,
   LayoutDashboard,
   ListTodo,
   MessageSquare,
+  Package,
   Rocket,
   Settings,
   Target,
@@ -38,7 +42,14 @@ const mainNav = [
   { title: "Tasks", href: "/dashboard/tasks", icon: ListTodo },
 ];
 
-const secondaryNav = [
+const revenueOsNav = [
+  { title: "Business Brain", href: "/dashboard/business-brain", icon: Brain },
+  { title: "Services", href: "/dashboard/services", icon: Package },
+  { title: "ICP", href: "/dashboard/icp", icon: Crosshair },
+  { title: "Revenue Goals", href: "/dashboard/revenue-goals", icon: CircleDollarSign },
+];
+
+const settingsNav = [
   {
     title: "Settings",
     href: "/dashboard/settings",
@@ -54,7 +65,7 @@ interface AppSidebarProps {
 export function AppSidebar({ user }: AppSidebarProps) {
   const pathname = usePathname();
 
-  const filteredSecondary = secondaryNav.filter(
+  const filteredSettings = settingsNav.filter(
     (item) => !item.permission || hasPermission(user.role, item.permission)
   );
 
@@ -104,10 +115,30 @@ export function AppSidebar({ user }: AppSidebarProps) {
         </SidebarGroup>
 
         <SidebarGroup>
-          <SidebarGroupLabel>Tools</SidebarGroupLabel>
+          <SidebarGroupLabel>Revenue OS</SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
-              {filteredSecondary.map((item) => (
+              {revenueOsNav.map((item) => (
+                <SidebarMenuItem key={item.href}>
+                  <SidebarMenuButton
+                    isActive={pathname.startsWith(item.href)}
+                    tooltip={item.title}
+                    render={<Link href={item.href} />}
+                  >
+                    <item.icon />
+                    <span>{item.title}</span>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              ))}
+            </SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarGroup>
+
+        <SidebarGroup>
+          <SidebarGroupLabel>Settings</SidebarGroupLabel>
+          <SidebarGroupContent>
+            <SidebarMenu>
+              {filteredSettings.map((item) => (
                 <SidebarMenuItem key={item.href}>
                   <SidebarMenuButton
                     isActive={pathname.startsWith(item.href)}

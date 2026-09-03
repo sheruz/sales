@@ -85,7 +85,7 @@ export async function getUserReadiness(organizationId: string, userId: string) {
       id: "services",
       label: "Configure at least one company service",
       done: services > 0,
-      href: "/dashboard/settings?tab=services",
+      href: "/dashboard/services",
     },
     {
       id: "campaign",

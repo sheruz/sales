@@ -220,6 +220,40 @@ enum RoleScope {
   ORGANIZATION
 }
 
+enum BrainDocumentType {
+  COMPANY_PROFILE
+  SERVICE
+  CASE_STUDY
+  PROPOSAL
+  SALES_SCRIPT
+  SUCCESSFUL_DEAL
+  LOST_DEAL
+  CUSTOMER_PROFILE
+  COMPETITOR
+  FAQ
+  PRICING
+  CUSTOM
+}
+
+enum BrainDocumentStatus {
+  DRAFT
+  ACTIVE
+  ARCHIVED
+}
+
+enum CatalogItemStatus {
+  DRAFT
+  ACTIVE
+  INACTIVE
+}
+
+enum RevenueGoalStatus {
+  DRAFT
+  ACTIVE
+  COMPLETED
+  CANCELLED
+}
+
 // ─── Multi-tenancy (Phase 1) ─────────────────────────────────────────────────
 
 model Organization {
@@ -243,6 +277,7 @@ model Organization {
   tags              Tag[]
   campaigns         Campaign[]
   services          Service[]
+  serviceCaseStudies ServiceCaseStudy[]
   deals             Deal[]
   tasks             Task[]
   meetings          Meeting[]
@@ -256,6 +291,10 @@ model Organization {
   aiUsageLogs       AIUsageLog[]
   auditLogs         AuditLog[]
   sessions          Session[]
+  businessProfile   BusinessProfile?
+  businessBrainDocuments BusinessBrainDocument[]
+  icps              Icp[]
+  revenueGoals      RevenueGoal[]
 
   @@index([status])
   @@index([deletedAt])
@@ -403,6 +442,8 @@ model User {
   memberships       OrganizationUser[]
   invitationsSent   OrganizationInvitation[] @relation("InvitationsSent")
   passwordResets    PasswordResetToken[]
+  businessBrainDocuments BusinessBrainDocument[] @relation("BrainDocumentAuthor")
+  businessBrainVersions  BusinessBrainVersion[]  @relation("BrainVersionAuthor")
 
   @@index([email])
   @@index([role])
@@ -1081,30 +1122,190 @@ model ProposalVersion {
 }
 
 // ─── Services Configuration ──────────────────────────────────────────────────
+// Extended in Phase 2 — do not create a second services table.
 
 model Service {
-  id               String   @id @default(uuid())
-  organizationId   String   @map("organization_id")
+  id               String            @id @default(uuid())
+  organizationId   String            @map("organization_id")
   name             String
   description      String
-  targetClientType String?  @map("target_client_type")
-  minBudget        Decimal? @map("min_budget") @db.Decimal(12, 2)
-  maxBudget        Decimal? @map("max_budget") @db.Decimal(12, 2)
-  typicalTimeline  String?  @map("typical_timeline")
+  category         String?
+  pricingModel     String?           @map("pricing_model")
+  /// Legacy alias for minPrice — kept for backward compatibility
+  minBudget        Decimal?          @map("min_budget") @db.Decimal(12, 2)
+  /// Legacy alias for maxPrice
+  maxBudget        Decimal?          @map("max_budget") @db.Decimal(12, 2)
+  currency         String            @default("USD")
+  /// Legacy delivery_time field
+  typicalTimeline  String?           @map("typical_timeline")
+  /// Legacy ideal customer summary
+  targetClientType String?           @map("target_client_type")
+  idealCustomer    String?           @map("ideal_customer")
+  problemsSolved   String[]          @default([]) @map("problems_solved")
   technologies     String[]
-  caseStudies      Json?    @map("case_studies")
-  talkingPoints    Json?    @map("talking_points")
-  isActive         Boolean  @default(true) @map("is_active")
-  createdAt        DateTime @default(now()) @map("created_at")
-  updatedAt        DateTime @updatedAt @map("updated_at")
+  caseStudies      Json?             @map("case_studies")
+  talkingPoints    Json?             @map("talking_points")
+  status           CatalogItemStatus @default(ACTIVE)
+  isActive         Boolean           @default(true) @map("is_active")
+  createdAt        DateTime          @default(now()) @map("created_at")
+  updatedAt        DateTime          @updatedAt @map("updated_at")
 
-  organization     Organization      @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  organization     Organization       @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   campaigns        Campaign[]
   autopilotConfigs AutopilotConfig[]
+  serviceCaseStudies ServiceCaseStudy[]
 
   @@unique([organizationId, name])
   @@index([organizationId])
+  @@index([status])
   @@map("services")
+}
+
+model ServiceCaseStudy {
+  id               String   @id @default(uuid())
+  organizationId   String   @map("organization_id")
+  serviceId        String   @map("service_id")
+  title            String
+  customerIndustry String?  @map("customer_industry")
+  problem          String?
+  solution         String?
+  outcome          String?
+  metrics          Json?
+  content          String?
+  createdAt        DateTime @default(now()) @map("created_at")
+  updatedAt        DateTime @updatedAt @map("updated_at")
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  service      Service      @relation(fields: [serviceId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId])
+  @@index([serviceId])
+  @@map("service_case_studies")
+}
+
+// ─── Business Brain (Phase 2) ────────────────────────────────────────────────
+
+model BusinessProfile {
+  id                     String   @id @default(uuid())
+  organizationId         String   @unique @map("organization_id")
+  companyName            String   @map("company_name")
+  description            String?
+  website                String?
+  industry               String?
+  locations              String[] @default([])
+  targetMarkets          String[] @default([]) @map("target_markets")
+  companySize            String?  @map("company_size")
+  yearsInBusiness        Int?     @map("years_in_business")
+  positioning            String?
+  valueProposition       String?  @map("value_proposition")
+  competitiveAdvantages  String[] @default([]) @map("competitive_advantages")
+  metadata               Json?
+  createdAt              DateTime @default(now()) @map("created_at")
+  updatedAt              DateTime @updatedAt @map("updated_at")
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@map("business_profiles")
+}
+
+model BusinessBrainDocument {
+  id           String              @id @default(uuid())
+  organizationId String            @map("organization_id")
+  type         BrainDocumentType
+  title        String
+  content      String
+  sourceType   String?             @map("source_type")
+  sourceUrl    String?             @map("source_url")
+  status       BrainDocumentStatus @default(DRAFT)
+  createdById  String?             @map("created_by")
+  createdAt    DateTime            @default(now()) @map("created_at")
+  updatedAt    DateTime            @updatedAt @map("updated_at")
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  createdBy    User?        @relation("BrainDocumentAuthor", fields: [createdById], references: [id], onDelete: SetNull)
+  versions     BusinessBrainVersion[]
+
+  @@index([organizationId])
+  @@index([type])
+  @@index([status])
+  @@map("business_brain_documents")
+}
+
+model BusinessBrainVersion {
+  id                 String   @id @default(uuid())
+  documentId         String   @map("document_id")
+  version            Int
+  content            String
+  generatedSummary   String?  @map("generated_summary")
+  embeddingReference String?  @map("embedding_reference")
+  createdById        String?  @map("created_by")
+  createdAt          DateTime @default(now()) @map("created_at")
+
+  document  BusinessBrainDocument @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  createdBy User?                 @relation("BrainVersionAuthor", fields: [createdById], references: [id], onDelete: SetNull)
+
+  @@unique([documentId, version])
+  @@index([documentId])
+  @@map("business_brain_versions")
+}
+
+model Icp {
+  id                   String            @id @default(uuid())
+  organizationId       String            @map("organization_id")
+  name                 String
+  description          String?
+  industries           String[]          @default([])
+  countries            String[]          @default([])
+  regions              String[]          @default([])
+  companySizes         String[]          @default([]) @map("company_sizes")
+  revenueRanges        String[]          @default([]) @map("revenue_ranges")
+  technologies         String[]          @default([])
+  fundingStages        String[]          @default([]) @map("funding_stages")
+  fundingMin           Decimal?          @map("funding_min") @db.Decimal(14, 2)
+  fundingMax           Decimal?          @map("funding_max") @db.Decimal(14, 2)
+  jobSignals           String[]          @default([]) @map("job_signals")
+  buyingSignals        String[]          @default([]) @map("buying_signals")
+  decisionMakerTitles  String[]          @default([]) @map("decision_maker_titles")
+  exclusions           String[]          @default([])
+  priority             Int               @default(0)
+  status               CatalogItemStatus @default(ACTIVE)
+  createdAt            DateTime          @default(now()) @map("created_at")
+  updatedAt            DateTime          @updatedAt @map("updated_at")
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId])
+  @@index([status])
+  @@map("icps")
+}
+
+model RevenueGoal {
+  id                 String            @id @default(uuid())
+  organizationId     String            @map("organization_id")
+  name               String
+  targetRevenue      Decimal           @map("target_revenue") @db.Decimal(14, 2)
+  currency           String            @default("USD")
+  targetDeals        Int?              @map("target_deals")
+  averageDealValue   Decimal?          @map("average_deal_value") @db.Decimal(14, 2)
+  startDate          DateTime?         @map("start_date") @db.Date
+  endDate            DateTime?         @map("end_date") @db.Date
+  targetRegions      String[]          @default([]) @map("target_regions")
+  targetIndustries   String[]          @default([]) @map("target_industries")
+  targetCompanySizes String[]          @default([]) @map("target_company_sizes")
+  targetServices     String[]          @default([]) @map("target_services")
+  preferredChannels  String[]          @default([]) @map("preferred_channels")
+  /// Editable AI-parsed strategy draft (concise JSON, no private chain-of-thought)
+  strategyDraft      Json?             @map("strategy_draft")
+  sourcePrompt       String?           @map("source_prompt")
+  status             RevenueGoalStatus @default(DRAFT)
+  createdAt          DateTime          @default(now()) @map("created_at")
+  updatedAt          DateTime          @updatedAt @map("updated_at")
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId])
+  @@index([status])
+  @@map("revenue_goals")
 }
 
 // ─── Integrations (SaaS BYOK) ───────────────────────────────────────────────

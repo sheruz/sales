@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { redirect } from "next/navigation";
 import { Suspense } from "react";
 import { getCurrentUser } from "@/lib/auth/session";
@@ -84,18 +85,28 @@ export default async function SettingsPage({
           </TabsContent>
         )}
 
-        <TabsContent value="services" className="mt-4">
+        <TabsContent value="services" className="mt-4 space-y-3">
           {canManageServices ? (
-            <ServicesPanel
-              initialServices={services.map((s) => ({
-                id: s.id,
-                name: s.name,
-                description: s.description,
-                targetClientType: s.targetClientType,
-                technologies: s.technologies,
-                isActive: s.isActive,
-              }))}
-            />
+            <>
+              <p className="text-sm text-muted-foreground">
+                <Link
+                  href="/dashboard/services"
+                  className="underline underline-offset-2"
+                >
+                  Manage full catalog →
+                </Link>
+              </p>
+              <ServicesPanel
+                initialServices={services.map((s) => ({
+                  id: s.id,
+                  name: s.name,
+                  description: s.description,
+                  targetClientType: s.targetClientType,
+                  technologies: s.technologies,
+                  isActive: s.isActive,
+                }))}
+              />
+            </>
           ) : (
             <p className="text-sm text-muted-foreground">
               Contact your admin to manage company services.

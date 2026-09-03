@@ -62,6 +62,9 @@ export const ROLE_PERMISSION_MAP: Record<string, PermissionKey[]> = {
     "deals.manage",
     "analytics.view",
     "integrations.manage",
+    "business_brain.manage",
+    "revenue_goals.manage",
+    "revenue.view",
   ],
   sales_rep: [
     "organization.view",
@@ -74,6 +77,7 @@ export const ROLE_PERMISSION_MAP: Record<string, PermissionKey[]> = {
     "conversations.manage",
     "deals.manage",
     "integrations.manage",
+    "revenue.view",
   ],
   viewer: [
     "organization.view",
@@ -81,6 +85,7 @@ export const ROLE_PERMISSION_MAP: Record<string, PermissionKey[]> = {
     "opportunities.view",
     "conversations.view",
     "analytics.view",
+    "revenue.view",
   ],
 };
 
