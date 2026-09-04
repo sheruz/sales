@@ -1,6 +1,8 @@
 export { authService } from "./auth.service";
 export { leadService } from "./lead.service";
 export { companyService } from "./company.service";
+export { contactService } from "./contact.service";
+export { leadMigrationService } from "./lead-migration.service";
 export { noteService } from "./note.service";
 export { taskService } from "./task.service";
 export { activityService } from "./activity.service";

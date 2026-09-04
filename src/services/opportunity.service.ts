@@ -1,6 +1,5 @@
 import prisma from "@/lib/db/prisma";
 import {
-  ContactStatus,
   OpportunityEventType,
   OpportunityStage,
   OpportunityStatus,
@@ -11,6 +10,7 @@ import {
 import { NotFoundError, ValidationError } from "@/lib/api/response";
 import { businessBrainService } from "@/services/business-brain.service";
 import { companyService, extractDomain } from "@/services/company.service";
+import { contactService } from "@/services/contact.service";
 import { entitlementService } from "@/services/entitlement.service";
 import { FEATURE_KEYS } from "@/lib/billing/features";
 
@@ -608,42 +608,28 @@ export class OpportunityService {
     let contactId: string | null = null;
     if (input.record.contact) {
       const c = input.record.contact;
-      const fullName = `${c.firstName} ${c.lastName}`.trim();
-      const existingContact = c.email
-        ? await prisma.contact.findFirst({
-            where: {
-              organizationId: input.organizationId,
-              companyId: company.id,
-              email: c.email.toLowerCase(),
-            },
-          })
-        : null;
-
-      const contact =
-        existingContact ??
-        (await prisma.contact.create({
-          data: {
-            organizationId: input.organizationId,
-            companyId: company.id,
-            firstName: c.firstName,
-            lastName: c.lastName,
-            fullName,
-            title: c.title,
-            email: c.email?.toLowerCase() || null,
-            linkedInUrl: c.linkedInUrl,
-            phone: c.phone,
-            department: c.department,
-            seniority: c.seniority,
-            source: input.sourceKey,
-            status: ContactStatus.ACTIVE,
-            leadId: input.leadId || null,
-          },
-        }));
-
-      if (existingContact && input.leadId && !existingContact.leadId) {
+      const contact = await contactService.findOrCreate(
+        input.organizationId,
+        company.id,
+        {
+          firstName: c.firstName,
+          lastName: c.lastName,
+          email: c.email,
+          title: c.title,
+          phone: c.phone,
+          linkedInUrl: c.linkedInUrl,
+          source: input.sourceKey,
+          leadId: input.leadId || null,
+        }
+      );
+      // Preserve department/seniority on fresh creates via update when provided
+      if (c.department || c.seniority) {
         await prisma.contact.update({
-          where: { id: existingContact.id },
-          data: { leadId: input.leadId },
+          where: { id: contact.id },
+          data: {
+            department: c.department ?? undefined,
+            seniority: c.seniority ?? undefined,
+          },
         });
       }
       contactId = contact.id;
@@ -890,6 +876,21 @@ export class OpportunityService {
       where: { id: input.companyId, organizationId, deletedAt: null },
     });
     if (!company) throw new ValidationError("Company not found");
+
+    if (input.primaryContactId) {
+      const contact = await prisma.contact.findFirst({
+        where: {
+          id: input.primaryContactId,
+          organizationId,
+          companyId: input.companyId,
+        },
+      });
+      if (!contact) {
+        throw new ValidationError(
+          "Contact not found for this company in your organization"
+        );
+      }
+    }
 
     const source = await this.ensureSource(organizationId, "manual", "Manual");
 

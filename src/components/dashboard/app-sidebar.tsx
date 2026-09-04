@@ -6,7 +6,9 @@ import {
   Bot,
   Brain,
   Briefcase,
+  Building2,
   CircleDollarSign,
+  Contact,
   Crosshair,
   Flame,
   LayoutDashboard,
@@ -55,6 +57,18 @@ const mainNav: NavItem[] = [
     href: "/dashboard/opportunities",
     icon: Flame,
     anyOf: ["opportunities.view"],
+  },
+  {
+    title: "Companies",
+    href: "/dashboard/companies",
+    icon: Building2,
+    anyOf: ["opportunities.view", "leads.view"],
+  },
+  {
+    title: "Contacts",
+    href: "/dashboard/contacts",
+    icon: Contact,
+    anyOf: ["opportunities.view", "leads.view"],
   },
   {
     title: "Pipeline",

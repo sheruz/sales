@@ -1,8 +1,8 @@
 import prisma from "@/lib/db/prisma";
 import { CompanyStatus, type Prisma } from "@prisma/client";
-import { NotFoundError } from "@/lib/api/response";
-import type { CreateCompanyInput } from "@/lib/validations/lead";
+import { NotFoundError, ValidationError } from "@/lib/api/response";
 
+/** Normalize a website or bare host to lowercase domain without www. */
 export function extractDomain(website?: string | null): string | null {
   if (!website?.trim()) return null;
   try {
@@ -10,11 +10,33 @@ export function extractDomain(website?: string | null): string | null {
     const host = new URL(raw).hostname.replace(/^www\./, "").toLowerCase();
     return host || null;
   } catch {
-    return null;
+    const cleaned = website
+      .trim()
+      .toLowerCase()
+      .replace(/^https?:\/\//, "")
+      .replace(/^www\./, "")
+      .split("/")[0];
+    return cleaned || null;
   }
 }
 
-export type CompanyWriteInput = CreateCompanyInput & {
+export function normalizeDomain(domain?: string | null): string | null {
+  if (!domain?.trim()) return null;
+  return (
+    extractDomain(domain) ||
+    domain.trim().toLowerCase().replace(/^www\./, "")
+  );
+}
+
+export type CompanyWriteInput = {
+  name: string;
+  website?: string | null;
+  linkedInUrl?: string | null;
+  industry?: string | null;
+  size?: string | null;
+  description?: string | null;
+  country?: string | null;
+  city?: string | null;
   domain?: string | null;
   state?: string | null;
   employeeCount?: number | null;
@@ -31,38 +53,124 @@ export type CompanyWriteInput = CreateCompanyInput & {
   metadata?: unknown;
 };
 
+export type CompanyListQuery = {
+  page?: number;
+  limit?: number;
+  search?: string;
+  domain?: string;
+};
+
 export class CompanyService {
-  async list(organizationId: string, search?: string) {
-    return prisma.company.findMany({
-      where: {
-        organizationId,
-        deletedAt: null,
-        ...(search
-          ? {
-              OR: [
-                { name: { contains: search, mode: "insensitive" as const } },
-                { domain: { contains: search, mode: "insensitive" as const } },
-              ],
-            }
-          : {}),
+  async list(organizationId: string, query: CompanyListQuery = {}) {
+    const page = Math.max(1, query.page ?? 1);
+    const limit = Math.min(100, Math.max(1, query.limit ?? 25));
+    const skip = (page - 1) * limit;
+    const domainFilter = normalizeDomain(query.domain);
+
+    const where: Prisma.CompanyWhereInput = {
+      organizationId,
+      deletedAt: null,
+      ...(domainFilter
+        ? {
+            OR: [
+              { domain: domainFilter },
+              { normalizedDomain: domainFilter },
+            ],
+          }
+        : {}),
+      ...(query.search
+        ? {
+            AND: [
+              {
+                OR: [
+                  { name: { contains: query.search, mode: "insensitive" } },
+                  { domain: { contains: query.search, mode: "insensitive" } },
+                  {
+                    normalizedDomain: {
+                      contains: query.search.toLowerCase(),
+                      mode: "insensitive",
+                    },
+                  },
+                ],
+              },
+            ],
+          }
+        : {}),
+    };
+
+    const [items, total] = await Promise.all([
+      prisma.company.findMany({
+        where,
+        orderBy: { name: "asc" },
+        skip,
+        take: limit,
+        include: {
+          _count: {
+            select: {
+              contacts: true,
+              opportunities: true,
+              signals: true,
+            },
+          },
+          signals: {
+            orderBy: { detectedAt: "desc" },
+            take: 1,
+            select: { id: true, title: true, detectedAt: true },
+          },
+          opportunities: {
+            orderBy: { updatedAt: "desc" },
+            take: 1,
+            select: { id: true, stage: true, updatedAt: true },
+          },
+        },
+      }),
+      prisma.company.count({ where }),
+    ]);
+
+    return {
+      items,
+      pagination: {
+        page,
+        limit,
+        total,
+        totalPages: Math.ceil(total / limit) || 1,
       },
-      orderBy: { name: "asc" },
-      take: 50,
-    });
+    };
   }
 
   async getById(organizationId: string, id: string) {
     const company = await prisma.company.findFirst({
       where: { id, organizationId, deletedAt: null },
       include: {
-        leads: {
-          where: { deletedAt: null, organizationId },
-          take: 10,
-          orderBy: { createdAt: "desc" },
+        contacts: { orderBy: { createdAt: "desc" }, take: 50 },
+        signals: { orderBy: { detectedAt: "desc" }, take: 30 },
+        opportunities: {
+          orderBy: { updatedAt: "desc" },
+          take: 30,
+          include: {
+            primaryContact: {
+              select: { id: true, fullName: true, email: true },
+            },
+          },
         },
-        contacts: { take: 20, orderBy: { createdAt: "desc" } },
-        signals: { take: 20, orderBy: { detectedAt: "desc" } },
-        opportunities: { take: 10, orderBy: { updatedAt: "desc" } },
+        inboxConversations: {
+          orderBy: { lastMessageAt: "desc" },
+          take: 20,
+        },
+        deals: {
+          where: { deletedAt: null },
+          orderBy: { updatedAt: "desc" },
+          take: 20,
+        },
+        meetings: { orderBy: { date: "desc" }, take: 20 },
+        _count: {
+          select: {
+            contacts: true,
+            signals: true,
+            opportunities: true,
+            deals: true,
+          },
+        },
       },
     });
     if (!company) throw new NotFoundError("Company not found");
@@ -71,13 +179,14 @@ export class CompanyService {
 
   async create(organizationId: string, input: CompanyWriteInput) {
     const domain =
-      input.domain?.trim().toLowerCase() || extractDomain(input.website);
+      normalizeDomain(input.domain) || extractDomain(input.website);
 
     return prisma.company.create({
       data: {
         organizationId,
-        name: input.name,
+        name: input.name.trim(),
         domain,
+        normalizedDomain: domain,
         website: input.website || null,
         linkedInUrl: input.linkedInUrl || null,
         industry: input.industry || null,
@@ -104,22 +213,88 @@ export class CompanyService {
     });
   }
 
+  async update(
+    organizationId: string,
+    id: string,
+    input: Partial<CompanyWriteInput>
+  ) {
+    const existing = await prisma.company.findFirst({
+      where: { id, organizationId, deletedAt: null },
+    });
+    if (!existing) throw new NotFoundError("Company not found");
+
+    const domain =
+      input.domain !== undefined
+        ? normalizeDomain(input.domain) || extractDomain(input.website)
+        : input.website !== undefined
+          ? extractDomain(input.website) || existing.domain
+          : undefined;
+
+    try {
+      return await prisma.company.update({
+        where: { id },
+        data: {
+          ...(input.name !== undefined ? { name: input.name.trim() } : {}),
+          ...(domain !== undefined
+            ? { domain, normalizedDomain: domain }
+            : {}),
+          ...(input.website !== undefined
+            ? { website: input.website || null }
+            : {}),
+          ...(input.industry !== undefined
+            ? { industry: input.industry || null }
+            : {}),
+          ...(input.description !== undefined
+            ? { description: input.description || null }
+            : {}),
+          ...(input.country !== undefined
+            ? { country: input.country || null }
+            : {}),
+          ...(input.city !== undefined ? { city: input.city || null } : {}),
+          ...(input.state !== undefined ? { state: input.state || null } : {}),
+          ...(input.status !== undefined ? { status: input.status } : {}),
+          ...(input.source !== undefined ? { source: input.source } : {}),
+          ...(input.linkedInUrl !== undefined
+            ? { linkedInUrl: input.linkedInUrl || null }
+            : {}),
+        },
+      });
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "";
+      if (msg.includes("Unique constraint") || msg.includes("unique")) {
+        throw new ValidationError(
+          "A company with this domain already exists in your organization"
+        );
+      }
+      throw err;
+    }
+  }
+
+  /**
+   * Org-scoped find-or-create. Domain match preferred, then name.
+   * Never trusts client organizationId — caller must pass membership org.
+   */
   async findOrCreate(
     organizationId: string,
     name: string,
     data?: Partial<CompanyWriteInput>
   ) {
     const domain =
-      data?.domain?.trim().toLowerCase() || extractDomain(data?.website);
+      normalizeDomain(data?.domain) || extractDomain(data?.website);
 
     if (domain) {
       const byDomain = await prisma.company.findFirst({
-        where: { organizationId, domain, deletedAt: null },
+        where: {
+          organizationId,
+          deletedAt: null,
+          OR: [{ domain }, { normalizedDomain: domain }],
+        },
       });
       if (byDomain) {
         return prisma.company.update({
           where: { id: byDomain.id },
           data: {
+            normalizedDomain: byDomain.normalizedDomain || domain,
             industry: data?.industry ?? undefined,
             description: data?.description ?? undefined,
             website: data?.website ?? undefined,
@@ -145,7 +320,11 @@ export class CompanyService {
         try {
           return await prisma.company.update({
             where: { id: existing.id },
-            data: { domain, website: data?.website ?? existing.website },
+            data: {
+              domain,
+              normalizedDomain: domain,
+              website: data?.website ?? existing.website,
+            },
           });
         } catch {
           return existing;

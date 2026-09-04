@@ -744,7 +744,10 @@ model Company {
   id             String        @id @default(uuid())
   organizationId String        @map("organization_id")
   name           String
+  /// Stored domain (prefer lowercase). Unique per org when non-null.
   domain         String?
+  /// Lowercase normalized host for stable matching (may equal domain).
+  normalizedDomain String?     @map("normalized_domain")
   website        String?
   industry       String?
   description    String?
@@ -783,6 +786,7 @@ model Company {
 
   @@unique([organizationId, domain])
   @@index([organizationId])
+  @@index([organizationId, normalizedDomain])
   @@index([name])
   @@index([industry])
   @@index([status])
@@ -800,6 +804,8 @@ model Contact {
   department     String?
   seniority      String?
   email          String?
+  /// Lowercase trimmed email for matching (not globally unique — scoped per company in app logic)
+  normalizedEmail String?      @map("normalized_email")
   emailStatus    String?       @map("email_status")
   phone          String?
   linkedInUrl    String?       @map("linkedin_url")
@@ -807,7 +813,7 @@ model Contact {
   verifiedAt     DateTime?     @map("verified_at")
   status         ContactStatus @default(ACTIVE)
   metadata       Json?
-  /// Optional bridge to legacy Lead for automation/conversations
+  /// LEGACY bridge to Lead for automation/conversations — do not require for new Revenue OS flows
   leadId         String?       @unique @map("lead_id")
   createdAt      DateTime      @default(now()) @map("created_at")
   updatedAt      DateTime      @updatedAt @map("updated_at")
@@ -826,6 +832,8 @@ model Contact {
   @@index([organizationId])
   @@index([companyId])
   @@index([email])
+  @@index([organizationId, normalizedEmail])
+  @@index([organizationId, companyId, normalizedEmail])
   @@index([status])
   @@map("contacts")
 }
@@ -952,7 +960,7 @@ model Opportunity {
   primaryContactId         String?           @map("primary_contact_id")
   sourceId                 String?           @map("source_id")
   primarySignalId          String?           @map("primary_signal_id")
-  /// Bridge to legacy Lead automation / conversations
+  /// LEGACY bridge to Lead for automation/conversations — optional; new creates must not require Lead
   leadId                   String?           @unique @map("lead_id")
   status                   OpportunityStatus @default(OPEN)
   stage                    OpportunityStage  @default(NEW)
