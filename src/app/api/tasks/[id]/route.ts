@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { TaskStatus } from "@prisma/client";
 import { taskService } from "@/services/task.service";
-import { requirePermission, requireOrganizationContext } from "@/lib/auth/api-auth";
+import { requireAnyOrgPermission } from "@/lib/auth/api-auth";
 import { apiSuccess } from "@/lib/api/response";
 import { handleApiError } from "@/lib/api/error-handler";
 
@@ -11,8 +11,10 @@ interface RouteParams {
 
 export async function PATCH(request: NextRequest, { params }: RouteParams) {
   try {
-    await requirePermission("tasks:write");
-    const user = await requireOrganizationContext();
+    const user = await requireAnyOrgPermission([
+      "leads.update",
+      "opportunities.update",
+    ]);
     const { id } = await params;
     const body = await request.json();
     const status = body.status as TaskStatus;
@@ -30,8 +32,10 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
 
 export async function DELETE(_request: NextRequest, { params }: RouteParams) {
   try {
-    await requirePermission("tasks:write");
-    const user = await requireOrganizationContext();
+    const user = await requireAnyOrgPermission([
+      "leads.update",
+      "opportunities.update",
+    ]);
     const { id } = await params;
     await taskService.delete(user.organizationId, id);
     return NextResponse.json(apiSuccess({ message: "Task deleted" }));

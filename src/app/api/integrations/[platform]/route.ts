@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { IntegrationPlatform } from "@prisma/client";
 import { userIntegrationService } from "@/services/user-integration.service";
-import { requirePermission, requireOrganizationContext } from "@/lib/auth/api-auth";
+import { requireOrgPermission } from "@/lib/auth/api-auth";
 import { apiSuccess } from "@/lib/api/response";
 import { handleApiError } from "@/lib/api/error-handler";
 
@@ -18,8 +18,7 @@ interface RouteParams {
 
 export async function DELETE(_request: Request, { params }: RouteParams) {
   try {
-    await requirePermission("integrations:manage");
-    const user = await requireOrganizationContext();
+    const user = await requireOrgPermission("integrations.manage");
     const { platform } = await params;
     const mapped = PLATFORM_MAP[platform.toLowerCase()];
     if (!mapped) {

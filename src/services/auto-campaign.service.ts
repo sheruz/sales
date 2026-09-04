@@ -28,6 +28,7 @@ export class AutoCampaignService {
     const result = await aiComplete({
       feature: "auto_campaign",
       userId,
+      organizationId,
       jsonMode: true,
       temperature: 0.6,
       messages: [

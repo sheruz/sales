@@ -1,14 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { learningService } from "@/services/learning.service";
-import { requirePermission, requireOrganizationContext } from "@/lib/auth/api-auth";
+import { requireOrgPermission } from "@/lib/auth/api-auth";
 import { apiSuccess } from "@/lib/api/response";
 import { handleApiError } from "@/lib/api/error-handler";
 import { assertCronAuthorized } from "@/lib/security/cron-auth";
 
 export async function GET(request: NextRequest) {
   try {
-    await requirePermission("analytics:read");
-    const user = await requireOrganizationContext();
+    const user = await requireOrgPermission("analytics.view");
     const patterns = request.nextUrl.searchParams.get("patterns") === "1";
     if (patterns) {
       const data = await learningService.discoverPatterns(user.organizationId);
@@ -52,8 +51,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(apiSuccess({ results }));
     }
 
-    await requirePermission("analytics:read");
-    const user = await requireOrganizationContext();
+    const user = await requireOrgPermission("analytics.view");
     const data = await learningService.discoverPatterns(user.organizationId);
     return NextResponse.json(apiSuccess(data));
   } catch (error) {

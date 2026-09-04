@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { inboxService } from "@/services/inbox.service";
-import { requirePermission, requireOrganizationContext } from "@/lib/auth/api-auth";
+import { requireOrgPermission } from "@/lib/auth/api-auth";
 import { apiSuccess } from "@/lib/api/response";
 import { handleApiError } from "@/lib/api/error-handler";
 import { assertCronAuthorized } from "@/lib/security/cron-auth";
@@ -32,8 +32,7 @@ export async function POST(request: Request) {
       return NextResponse.json(apiSuccess({ results }));
     }
 
-    await requirePermission("integrations:manage");
-    const user = await requireOrganizationContext();
+    const user = await requireOrgPermission("integrations.manage");
     const results = await inboxService.syncAllForOrg(user.organizationId);
     return NextResponse.json(apiSuccess({ results }));
   } catch (error) {

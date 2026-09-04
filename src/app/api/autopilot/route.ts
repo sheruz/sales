@@ -3,7 +3,7 @@ import { z } from "zod";
 import prisma from "@/lib/db/prisma";
 import { autopilotService } from "@/services/autopilot.service";
 import { assertAutopilotCanRun } from "@/lib/autopilot/limits";
-import { requirePermission, requireOrganizationContext } from "@/lib/auth/api-auth";
+import { requireOrgPermission } from "@/lib/auth/api-auth";
 import { apiSuccess } from "@/lib/api/response";
 import { handleApiError } from "@/lib/api/error-handler";
 
@@ -24,8 +24,7 @@ const updateSchema = z.object({
 
 export async function GET() {
   try {
-    await requirePermission("ai:use");
-    const user = await requireOrganizationContext();
+    const user = await requireOrgPermission("campaigns.manage");
     const [config, usage] = await Promise.all([
       autopilotService.getOrCreateConfig(user.organizationId, user.id),
       autopilotService.getUsage(user.organizationId, user.id),
@@ -38,8 +37,7 @@ export async function GET() {
 
 export async function PATCH(request: NextRequest) {
   try {
-    await requirePermission("ai:use");
-    const user = await requireOrganizationContext();
+    const user = await requireOrgPermission("campaigns.manage");
     const body = await request.json();
     const input = updateSchema.parse(body);
     const config = await autopilotService.updateConfig(
@@ -55,8 +53,7 @@ export async function PATCH(request: NextRequest) {
 
 export async function POST() {
   try {
-    await requirePermission("ai:use");
-    const user = await requireOrganizationContext();
+    const user = await requireOrgPermission("campaigns.manage");
 
     await assertAutopilotCanRun(user.id);
 

@@ -540,6 +540,9 @@ model Organization {
   agentGoals        AgentGoal[]
   agentRuns         AgentRun[]
   agentActions      AgentAction[]
+  notes             Note[]
+  activities        Activity[]
+  jobLogs           JobLog[]
 
   @@index([status])
   @@index([deletedAt])
@@ -1283,17 +1286,21 @@ model LeadScore {
 // ─── Notes & Tasks ───────────────────────────────────────────────────────────
 
 model Note {
-  id        String   @id @default(uuid())
-  leadId    String   @map("lead_id")
-  userId    String   @map("user_id")
-  content   String
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
+  id             String   @id @default(uuid())
+  organizationId String   @map("organization_id")
+  leadId         String   @map("lead_id")
+  userId         String   @map("user_id")
+  content        String
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
 
-  lead Lead @relation(fields: [leadId], references: [id], onDelete: Cascade)
-  user User @relation(fields: [userId], references: [id])
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  lead         Lead         @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  user         User         @relation(fields: [userId], references: [id])
 
+  @@index([organizationId])
   @@index([leadId])
+  @@index([organizationId, leadId])
   @@map("notes")
 }
 
@@ -1339,22 +1346,26 @@ model Task {
 // ─── Activities & Conversations ──────────────────────────────────────────────
 
 model Activity {
-  id          String       @id @default(uuid())
-  leadId      String?      @map("lead_id")
-  dealId      String?      @map("deal_id")
-  userId      String?      @map("user_id")
-  type        ActivityType
-  title       String
-  description String?
-  metadata    Json?
-  createdAt   DateTime     @default(now()) @map("created_at")
+  id             String       @id @default(uuid())
+  organizationId String       @map("organization_id")
+  leadId         String?      @map("lead_id")
+  dealId         String?      @map("deal_id")
+  userId         String?      @map("user_id")
+  type           ActivityType
+  title          String
+  description    String?
+  metadata       Json?
+  createdAt      DateTime     @default(now()) @map("created_at")
 
-  lead Lead? @relation(fields: [leadId], references: [id], onDelete: Cascade)
-  deal Deal? @relation("DealActivities", fields: [dealId], references: [id], onDelete: Cascade)
-  user User? @relation(fields: [userId], references: [id])
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  lead         Lead?        @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  deal         Deal?        @relation("DealActivities", fields: [dealId], references: [id], onDelete: Cascade)
+  user         User?        @relation(fields: [userId], references: [id])
 
+  @@index([organizationId])
   @@index([leadId])
   @@index([dealId])
+  @@index([organizationId, leadId])
   @@index([type])
   @@index([createdAt])
   @@map("activities")
@@ -1649,17 +1660,25 @@ model FollowUpJob {
 }
 
 model JobLog {
-  id        String    @id @default(uuid())
-  jobType   String    @map("job_type")
-  jobId     String?   @map("job_id")
-  status    JobStatus
-  message   String?
-  metadata  Json?
-  createdAt DateTime  @default(now()) @map("created_at")
+  id               String    @id @default(uuid())
+  /// Null only when isPlatformScoped=true (cron/system). Tenant jobs must set organizationId.
+  organizationId   String?   @map("organization_id")
+  /// Explicit marker for global/system jobs (never treat null org as "any tenant").
+  isPlatformScoped Boolean   @default(false) @map("is_platform_scoped")
+  jobType          String    @map("job_type")
+  jobId            String?   @map("job_id")
+  status           JobStatus
+  message          String?
+  metadata         Json?
+  createdAt        DateTime  @default(now()) @map("created_at")
 
+  organization Organization? @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId])
   @@index([jobType])
   @@index([status])
   @@index([createdAt])
+  @@index([organizationId, jobType])
   @@map("job_logs")
 }
 
@@ -2295,22 +2314,24 @@ model AIConversation {
 }
 
 model AIUsageLog {
-  id             String         @id @default(uuid())
-  organizationId String?        @map("organization_id")
-  userId         String?        @map("user_id")
-  feature        String
+  id               String         @id @default(uuid())
+  /// Required for tenant AI. Null only when isPlatformScoped=true.
+  organizationId   String?        @map("organization_id")
+  isPlatformScoped Boolean        @default(false) @map("is_platform_scoped")
+  userId           String?        @map("user_id")
+  feature          String
   /// Canonical operation name (e.g. opportunity_intelligence)
-  operation      String?
-  provider       String?
-  model          String?
-  promptTokens   Int?           @map("prompt_tokens")
-  outputTokens   Int?           @map("output_tokens")
-  totalTokens    Int?           @map("total_tokens")
-  cost           Decimal?       @db.Decimal(10, 6)
-  requestId      String?        @map("request_id")
-  status         AIUsageStatus  @default(SUCCESS)
-  metadata       Json?
-  createdAt      DateTime       @default(now()) @map("created_at")
+  operation        String?
+  provider         String?
+  model            String?
+  promptTokens     Int?           @map("prompt_tokens")
+  outputTokens     Int?           @map("output_tokens")
+  totalTokens      Int?           @map("total_tokens")
+  cost             Decimal?       @db.Decimal(10, 6)
+  requestId        String?        @map("request_id")
+  status           AIUsageStatus  @default(SUCCESS)
+  metadata         Json?
+  createdAt        DateTime       @default(now()) @map("created_at")
 
   organization Organization? @relation(fields: [organizationId], references: [id], onDelete: SetNull)
 

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { inboxService } from "@/services/inbox.service";
-import { requirePermission, requireOrganizationContext } from "@/lib/auth/api-auth";
+import { requireOrgPermission } from "@/lib/auth/api-auth";
 import { apiSuccess } from "@/lib/api/response";
 import { handleApiError } from "@/lib/api/error-handler";
 
@@ -10,8 +10,7 @@ interface Params {
 
 export async function POST(_request: NextRequest, { params }: Params) {
   try {
-    await requirePermission("integrations:manage");
-    const user = await requireOrganizationContext();
+    const user = await requireOrgPermission("integrations.manage");
     const { id } = await params;
     const result = await inboxService.syncAccount(
       user.organizationId,

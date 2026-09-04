@@ -2,14 +2,19 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { ProposalStatus } from "@prisma/client";
 import { proposalService } from "@/services/proposal.service";
-import { requirePermission, requireOrganizationContext } from "@/lib/auth/api-auth";
+import {
+  requireOrgPermission,
+  requireAnyOrgPermission,
+} from "@/lib/auth/api-auth";
 import { apiSuccess } from "@/lib/api/response";
 import { handleApiError } from "@/lib/api/error-handler";
 
 export async function GET(request: NextRequest) {
   try {
-    await requirePermission("proposals:read");
-    const user = await requireOrganizationContext();
+    const user = await requireAnyOrgPermission([
+      "deals.manage",
+      "opportunities.view",
+    ]);
     const opportunityId =
       request.nextUrl.searchParams.get("opportunityId") ?? undefined;
     const proposals = await proposalService.list(user.organizationId, {
@@ -39,8 +44,7 @@ const createSchema = z.object({
 
 export async function POST(request: NextRequest) {
   try {
-    await requirePermission("proposals:write");
-    const user = await requireOrganizationContext();
+    const user = await requireOrgPermission("deals.manage");
     const input = createSchema.parse(await request.json());
     const proposal = await proposalService.create(
       user.organizationId,

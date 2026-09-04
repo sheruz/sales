@@ -54,7 +54,7 @@ describe("tenant scope", () => {
     ).not.toThrow();
   });
 
-  it("platform admin bypasses org assertion", () => {
+  it("platform admin does not bypass org assertion without membership org", () => {
     expect(() =>
       assertSameOrganization(
         mockUser({
@@ -64,7 +64,20 @@ describe("tenant scope", () => {
         }),
         "org-b"
       )
-    ).not.toThrow();
+    ).toThrow(ForbiddenError);
+  });
+
+  it("platform admin with active org still cannot access other org resources", () => {
+    expect(() =>
+      assertSameOrganization(
+        mockUser({
+          isPlatformAdmin: true,
+          organizationId: "org-a",
+          permissions: ["platform.manage"],
+        }),
+        "org-b"
+      )
+    ).toThrow(ForbiddenError);
   });
 });
 

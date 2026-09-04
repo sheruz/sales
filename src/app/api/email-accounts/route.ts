@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { emailAccountService } from "@/services/email-account.service";
 import { userIntegrationService } from "@/services/user-integration.service";
-import { requirePermission, requireOrganizationContext } from "@/lib/auth/api-auth";
+import { requireOrgPermission } from "@/lib/auth/api-auth";
 import { apiSuccess } from "@/lib/api/response";
 import { handleApiError } from "@/lib/api/error-handler";
 
@@ -21,8 +21,7 @@ const smtpSchema = z.object({
 
 export async function GET() {
   try {
-    await requirePermission("integrations:manage");
-    const user = await requireOrganizationContext();
+    const user = await requireOrgPermission("integrations.manage");
     const accounts = await emailAccountService.list(
       user.organizationId,
       user.id
@@ -37,8 +36,7 @@ export async function GET() {
 
 export async function POST(request: NextRequest) {
   try {
-    await requirePermission("integrations:manage");
-    const user = await requireOrganizationContext();
+    const user = await requireOrgPermission("integrations.manage");
     const input = smtpSchema.parse(await request.json());
 
     // Keep BYOK integration catalog in sync

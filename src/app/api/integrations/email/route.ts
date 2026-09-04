@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { userIntegrationService } from "@/services/user-integration.service";
 import { emailAccountService } from "@/services/email-account.service";
-import { requirePermission, requireOrganizationContext } from "@/lib/auth/api-auth";
+import { requireOrgPermission } from "@/lib/auth/api-auth";
 import { apiSuccess } from "@/lib/api/response";
 import { handleApiError } from "@/lib/api/error-handler";
 
@@ -18,8 +18,7 @@ const schema = z.object({
 
 export async function POST(request: NextRequest) {
   try {
-    await requirePermission("integrations:manage");
-    const user = await requireOrganizationContext();
+    const user = await requireOrgPermission("integrations.manage");
     const input = schema.parse(await request.json());
     const integration = await userIntegrationService.saveEmailSmtp(
       user.organizationId,
@@ -43,8 +42,7 @@ export async function POST(request: NextRequest) {
 
 export async function DELETE() {
   try {
-    await requirePermission("integrations:manage");
-    const user = await requireOrganizationContext();
+    const user = await requireOrgPermission("integrations.manage");
     await userIntegrationService.disconnect(
       user.organizationId,
       user.id,

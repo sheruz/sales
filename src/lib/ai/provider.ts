@@ -25,9 +25,18 @@ export async function aiComplete(
     feature: string;
     userId?: string;
     organizationId?: string | null;
+    /** Rare platform/system AI only — never for tenant features. */
+    isPlatformScoped?: boolean;
     operation?: string;
   }
 ): Promise<AICompletionResult> {
+  const isPlatformScoped = Boolean(options.isPlatformScoped);
+  if (!isPlatformScoped && !options.organizationId) {
+    throw new Error(
+      "organizationId is required for tenant AI calls (or set isPlatformScoped)"
+    );
+  }
+
   if (options.organizationId) {
     await entitlementService.assertAndConsume(
       options.organizationId,
@@ -56,6 +65,7 @@ export async function aiComplete(
 
     await logAIUsage({
       organizationId: options.organizationId,
+      isPlatformScoped,
       userId: options.userId,
       feature: options.feature,
       operation: options.operation ?? options.feature,
@@ -73,6 +83,7 @@ export async function aiComplete(
   } catch (error) {
     await logAIUsage({
       organizationId: options.organizationId,
+      isPlatformScoped,
       userId: options.userId,
       feature: options.feature,
       operation: options.operation ?? options.feature,

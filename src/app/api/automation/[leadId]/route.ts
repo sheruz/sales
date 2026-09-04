@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { automationService } from "@/services/automation.service";
-import { requirePermission, requireOrganizationContext } from "@/lib/auth/api-auth";
+import { requireOrgPermission } from "@/lib/auth/api-auth";
 import { apiSuccess } from "@/lib/api/response";
 import { handleApiError } from "@/lib/api/error-handler";
 
@@ -10,8 +10,7 @@ interface RouteParams {
 
 export async function POST(_request: Request, { params }: RouteParams) {
   try {
-    await requirePermission("ai:use");
-    const user = await requireOrganizationContext();
+    const user = await requireOrgPermission("campaigns.manage");
     const { leadId } = await params;
     const result = await automationService.runPipeline(
       user.organizationId,
@@ -26,8 +25,7 @@ export async function POST(_request: Request, { params }: RouteParams) {
 
 export async function DELETE(_request: Request, { params }: RouteParams) {
   try {
-    await requirePermission("ai:use");
-    const user = await requireOrganizationContext();
+    const user = await requireOrgPermission("campaigns.manage");
     const { leadId } = await params;
     const result = await automationService.unlockLead(
       user.organizationId,

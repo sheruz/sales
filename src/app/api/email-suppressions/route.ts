@@ -2,14 +2,13 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { SuppressionReason } from "@prisma/client";
 import { emailSafetyService } from "@/services/email-safety.service";
-import { requirePermission, requireOrganizationContext } from "@/lib/auth/api-auth";
+import { requireOrgPermission } from "@/lib/auth/api-auth";
 import { apiSuccess } from "@/lib/api/response";
 import { handleApiError } from "@/lib/api/error-handler";
 
 export async function GET() {
   try {
-    await requirePermission("integrations:manage");
-    const user = await requireOrganizationContext();
+    const user = await requireOrgPermission("integrations.manage");
     const items = await emailSafetyService.listSuppressions(user.organizationId);
     return NextResponse.json(apiSuccess(items));
   } catch (error) {
@@ -26,8 +25,7 @@ const schema = z.object({
 
 export async function POST(request: NextRequest) {
   try {
-    await requirePermission("integrations:manage");
-    const user = await requireOrganizationContext();
+    const user = await requireOrgPermission("integrations.manage");
     const input = schema.parse(await request.json());
     const item = await emailSafetyService.suppress({
       organizationId: user.organizationId,

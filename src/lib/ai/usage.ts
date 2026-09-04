@@ -1,6 +1,7 @@
 import { randomUUID } from "crypto";
 import prisma from "@/lib/db/prisma";
 import { AIUsageStatus, type Prisma } from "@prisma/client";
+import { logger } from "@/lib/logger";
 
 /** Rough USD estimates — never log API keys. */
 export function estimateTokenCostUsd(params: {
@@ -14,7 +15,6 @@ export function estimateTokenCostUsd(params: {
   if (!prompt && !output) return null;
 
   const model = (params.model || "").toLowerCase();
-  // defaults approximate public list prices (USD per 1M tokens)
   let inPerM = 0.15;
   let outPerM = 0.6;
   if (model.includes("gpt-4o") && !model.includes("mini")) {
@@ -33,6 +33,8 @@ export function estimateTokenCostUsd(params: {
 
 export async function logAIUsage(params: {
   organizationId?: string | null;
+  /** Only for genuine platform/system AI (not tenant). */
+  isPlatformScoped?: boolean;
   userId?: string;
   feature: string;
   operation?: string;
@@ -46,7 +48,20 @@ export async function logAIUsage(params: {
   metadata?: Record<string, unknown>;
 }) {
   try {
-    // Strip any accidental secret-like keys from metadata
+    const isPlatformScoped = Boolean(params.isPlatformScoped);
+    if (!isPlatformScoped && !params.organizationId) {
+      logger.warn("AI usage log skipped: missing organizationId", {
+        feature: params.feature,
+      });
+      return;
+    }
+    if (isPlatformScoped && params.organizationId) {
+      logger.warn("AI usage log skipped: platform scope with organizationId", {
+        feature: params.feature,
+      });
+      return;
+    }
+
     const safeMeta = sanitizeMetadata(params.metadata);
     const cost = estimateTokenCostUsd({
       provider: params.provider,
@@ -58,6 +73,7 @@ export async function logAIUsage(params: {
     await prisma.aIUsageLog.create({
       data: {
         organizationId: params.organizationId ?? null,
+        isPlatformScoped,
         userId: params.userId,
         feature: params.feature,
         operation: params.operation ?? params.feature,

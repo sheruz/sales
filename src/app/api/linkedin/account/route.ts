@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { linkedInAccountService } from "@/services/linkedin-account.service";
-import { requirePermission } from "@/lib/auth/api-auth";
+import { requireOrgPermission } from "@/lib/auth/api-auth";
 import { apiSuccess } from "@/lib/api/response";
 import { handleApiError } from "@/lib/api/error-handler";
 
@@ -13,7 +13,7 @@ const connectSchema = z.object({
 
 export async function GET() {
   try {
-    const user = await requirePermission("settings:write");
+    const user = await requireOrgPermission("integrations.manage");
     const status = await linkedInAccountService.getStatus(user.id);
     return NextResponse.json(apiSuccess(status));
   } catch (error) {
@@ -23,7 +23,7 @@ export async function GET() {
 
 export async function POST(request: NextRequest) {
   try {
-    const user = await requirePermission("settings:write");
+    const user = await requireOrgPermission("integrations.manage");
     const body = await request.json();
     const input = connectSchema.parse(body);
     const account = await linkedInAccountService.saveAccount(user.id, input);
@@ -35,7 +35,7 @@ export async function POST(request: NextRequest) {
 
 export async function DELETE() {
   try {
-    const user = await requirePermission("settings:write");
+    const user = await requireOrgPermission("integrations.manage");
     await linkedInAccountService.disconnect(user.id);
     return NextResponse.json(apiSuccess({ disconnected: true }));
   } catch (error) {

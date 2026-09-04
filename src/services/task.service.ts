@@ -110,6 +110,7 @@ export class TaskService {
 
     if (leadId) {
       await activityService.log({
+        organizationId,
         leadId,
         userId,
         type: ActivityType.TASK_CREATED,
@@ -145,6 +146,7 @@ export class TaskService {
 
     if (task.leadId && status === TaskStatus.COMPLETED) {
       await activityService.log({
+        organizationId,
         leadId: task.leadId,
         userId,
         type: ActivityType.TASK_COMPLETED,

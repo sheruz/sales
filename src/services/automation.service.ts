@@ -65,6 +65,7 @@ export class AutomationService {
     });
 
     await activityService.log({
+      organizationId,
       leadId,
       userId,
       type: ActivityType.LEAD_UPDATED,
@@ -188,7 +189,7 @@ export class AutomationService {
       });
 
       if (!hasResearch && !options?.skipResearch && !preResearched) {
-        await aiResearchService.researchLead(leadId, userId);
+        await aiResearchService.researchLead(organizationId, leadId, userId);
       }
 
       let emailSent = false;
@@ -275,6 +276,7 @@ export class AutomationService {
       });
 
       await activityService.log({
+        organizationId,
         leadId,
         userId,
         type: ActivityType.CAMPAIGN_ASSIGNED,
@@ -441,6 +443,7 @@ export class AutomationService {
         });
 
         await activityService.log({
+          organizationId: job.organizationId,
           leadId: job.leadId,
           type: ActivityType.FOLLOW_UP_SENT,
           title: `Follow-up ${job.stepIndex + 1} sent`,

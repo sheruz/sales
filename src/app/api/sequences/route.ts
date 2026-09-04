@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { ConversationChannel, OutreachSequenceStatus } from "@prisma/client";
 import { outreachSequenceService } from "@/services/outreach-sequence.service";
-import { requirePermission, requireOrganizationContext } from "@/lib/auth/api-auth";
+import { requireOrgPermission } from "@/lib/auth/api-auth";
 import { apiSuccess } from "@/lib/api/response";
 import { handleApiError } from "@/lib/api/error-handler";
 
@@ -28,8 +28,7 @@ const createSchema = z.object({
 
 export async function GET() {
   try {
-    await requirePermission("campaigns:write");
-    const user = await requireOrganizationContext();
+    const user = await requireOrgPermission("sequences.manage");
     const sequences = await outreachSequenceService.list(user.organizationId);
     return NextResponse.json(apiSuccess(sequences));
   } catch (error) {
@@ -39,8 +38,7 @@ export async function GET() {
 
 export async function POST(request: NextRequest) {
   try {
-    await requirePermission("campaigns:write");
-    const user = await requireOrganizationContext();
+    const user = await requireOrgPermission("sequences.manage");
     const input = createSchema.parse(await request.json());
     const sequence = await outreachSequenceService.create(
       user.organizationId,

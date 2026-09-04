@@ -1,14 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { automationService } from "@/services/automation.service";
 import { startAutomationSchema } from "@/lib/validations/automation";
-import { requirePermission, requireOrganizationContext } from "@/lib/auth/api-auth";
+import { requireOrgPermission } from "@/lib/auth/api-auth";
 import { apiSuccess } from "@/lib/api/response";
 import { handleApiError } from "@/lib/api/error-handler";
 
 export async function POST(request: NextRequest) {
   try {
-    await requirePermission("ai:use");
-    const user = await requireOrganizationContext();
+    const user = await requireOrgPermission("campaigns.manage");
     const body = await request.json();
     const input = startAutomationSchema.parse(body);
 

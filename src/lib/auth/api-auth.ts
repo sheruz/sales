@@ -3,7 +3,10 @@ import { hasPermission, type Permission } from "@/lib/auth/permissions";
 import { ForbiddenError, UnauthorizedError } from "@/lib/api/response";
 import type { AuthUser } from "@/types/auth";
 import type { PermissionKey } from "@/lib/auth/permission-catalog";
-import { hasOrgPermission } from "@/lib/tenant/scope";
+import {
+  hasAnyOrgPermission,
+  hasOrgPermission,
+} from "@/lib/tenant/scope";
 
 export async function requireUser(): Promise<AuthUser> {
   const user = await getCurrentUser();
@@ -11,7 +14,10 @@ export async function requireUser(): Promise<AuthUser> {
   return user;
 }
 
-/** Legacy role-based permission (UserRole matrix). Prefer requireOrgPermission for tenant ops. */
+/**
+ * @deprecated Legacy UserRole matrix. Do not use on customer-facing APIs.
+ * Prefer requireOrgPermission. Kept only for platform-adjacent legacy until removed.
+ */
 export async function requirePermission(
   permission: Permission
 ): Promise<AuthUser> {
@@ -23,17 +29,36 @@ export async function requirePermission(
   return user;
 }
 
+/**
+ * Authoritative customer-API authorization:
+ * active organization membership + organization permission catalog.
+ * SUPER_ADMIN does not bypass — must have org context + membership perms.
+ */
 export async function requireOrgPermission(
   permission: PermissionKey
-): Promise<AuthUser> {
+): Promise<AuthUser & { organizationId: string }> {
   const user = await requireUser();
+  if (!user.organizationId) {
+    throw new ForbiddenError("No active organization");
+  }
   if (!hasOrgPermission(user, permission)) {
     throw new ForbiddenError();
   }
-  if (!user.isPlatformAdmin && !user.organizationId) {
+  return user as AuthUser & { organizationId: string };
+}
+
+/** OR of organization permissions (e.g. deals.manage | opportunities.view). */
+export async function requireAnyOrgPermission(
+  permissions: PermissionKey[]
+): Promise<AuthUser & { organizationId: string }> {
+  const user = await requireUser();
+  if (!user.organizationId) {
     throw new ForbiddenError("No active organization");
   }
-  return user;
+  if (!hasAnyOrgPermission(user, permissions)) {
+    throw new ForbiddenError();
+  }
+  return user as AuthUser & { organizationId: string };
 }
 
 export async function requireSuperAdmin(): Promise<AuthUser> {
@@ -44,7 +69,9 @@ export async function requireSuperAdmin(): Promise<AuthUser> {
   return user;
 }
 
-export async function requireOrganizationContext(): Promise<AuthUser & { organizationId: string }> {
+export async function requireOrganizationContext(): Promise<
+  AuthUser & { organizationId: string }
+> {
   const user = await requireUser();
   if (!user.organizationId) {
     throw new ForbiddenError("No active organization");

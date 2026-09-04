@@ -66,6 +66,7 @@ export class AIOutreachService {
     const result = await aiComplete({
       feature: `outreach_${channel}`,
       userId,
+      organizationId,
       jsonMode: true,
       temperature: 0.7,
       messages: [
@@ -167,6 +168,7 @@ export class AIOutreachService {
         : ActivityType.EMAIL_SENT;
 
     await activityService.log({
+      organizationId,
       leadId,
       userId,
       type: activityType,

@@ -2,7 +2,10 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { DealStage } from "@prisma/client";
 import { dealService } from "@/services/deal.service";
-import { requirePermission, requireOrganizationContext } from "@/lib/auth/api-auth";
+import {
+  requireOrgPermission,
+  requireAnyOrgPermission,
+} from "@/lib/auth/api-auth";
 import { apiSuccess } from "@/lib/api/response";
 import { handleApiError } from "@/lib/api/error-handler";
 
@@ -12,8 +15,10 @@ interface Params {
 
 export async function GET(_request: NextRequest, { params }: Params) {
   try {
-    await requirePermission("deals:read");
-    const user = await requireOrganizationContext();
+    const user = await requireAnyOrgPermission([
+      "deals.manage",
+      "opportunities.view",
+    ]);
     const { id } = await params;
     const deal = await dealService.getById(user.organizationId, id);
     return NextResponse.json(apiSuccess(deal));
@@ -30,8 +35,7 @@ const patchSchema = z.object({
 
 export async function PATCH(request: NextRequest, { params }: Params) {
   try {
-    await requirePermission("deals:write");
-    const user = await requireOrganizationContext();
+    const user = await requireOrgPermission("deals.manage");
     const { id } = await params;
     const body = patchSchema.parse(await request.json());
     if (body.stage) {

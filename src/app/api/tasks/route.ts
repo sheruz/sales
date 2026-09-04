@@ -2,14 +2,16 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { TaskPriority, TaskStatus, TaskType } from "@prisma/client";
 import { taskService } from "@/services/task.service";
-import { requirePermission, requireOrganizationContext } from "@/lib/auth/api-auth";
+import { requireAnyOrgPermission } from "@/lib/auth/api-auth";
 import { apiSuccess } from "@/lib/api/response";
 import { handleApiError } from "@/lib/api/error-handler";
 
 export async function GET(request: NextRequest) {
   try {
-    await requirePermission("tasks:read");
-    const user = await requireOrganizationContext();
+    const user = await requireAnyOrgPermission([
+      "leads.view",
+      "opportunities.view",
+    ]);
     const params = request.nextUrl.searchParams;
     const overdue = params.get("overdue") === "true";
     const status = params.get("status") as TaskStatus | null;
@@ -44,8 +46,10 @@ const createSchema = z.object({
 
 export async function POST(request: NextRequest) {
   try {
-    await requirePermission("tasks:write");
-    const user = await requireOrganizationContext();
+    const user = await requireAnyOrgPermission([
+      "leads.update",
+      "opportunities.update",
+    ]);
     const input = createSchema.parse(await request.json());
     const task = await taskService.create(user.organizationId, input, user.id);
     return NextResponse.json(apiSuccess(task), { status: 201 });

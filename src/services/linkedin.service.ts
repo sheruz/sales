@@ -139,6 +139,7 @@ export class LinkedInService {
 
         if (!usedRealSearch) {
           const prospects = await this.discoverProspects(
+            organizationId,
             criteria,
             job.targetCount,
             job.campaign?.aiInstructions,
@@ -211,6 +212,7 @@ export class LinkedInService {
     const result = await aiComplete({
       feature: "linkedin_profile_enrichment",
       userId,
+      organizationId,
       jsonMode: true,
       temperature: 0.5,
       messages: [
@@ -240,6 +242,7 @@ export class LinkedInService {
     campaignContext?: string | null
   ) {
     const prospects = await this.discoverProspects(
+      organizationId,
       criteria,
       count,
       campaignContext,
@@ -284,6 +287,7 @@ export class LinkedInService {
   }
 
   private async discoverProspects(
+    organizationId: string,
     criteria: LinkedInDiscoveryInput["searchCriteria"],
     count: number,
     campaignContext?: string | null,
@@ -292,6 +296,7 @@ export class LinkedInService {
     const result = await aiComplete({
       feature: "linkedin_prospect_search",
       userId,
+      organizationId,
       jsonMode: true,
       temperature: 0.8,
       messages: [
@@ -393,6 +398,7 @@ export class LinkedInService {
     }
 
     await activityService.log({
+      organizationId: lead.organizationId,
       leadId: lead.id,
       userId,
       type: ActivityType.LEAD_CREATED,

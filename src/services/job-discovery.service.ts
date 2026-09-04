@@ -217,6 +217,7 @@ export class JobDiscoveryService {
           else created++;
 
           await activityService.log({
+            organizationId,
             leadId: lead.id,
             userId,
             type: ActivityType.LEAD_CREATED,

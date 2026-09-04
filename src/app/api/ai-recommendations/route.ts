@@ -2,14 +2,16 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { AiRecommendationStatus } from "@prisma/client";
 import { aiRecommendationService } from "@/services/ai-recommendation.service";
-import { requirePermission, requireOrganizationContext } from "@/lib/auth/api-auth";
+import {
+  requireOrgPermission,
+  requireAnyOrgPermission,
+} from "@/lib/auth/api-auth";
 import { apiSuccess } from "@/lib/api/response";
 import { handleApiError } from "@/lib/api/error-handler";
 
 export async function GET(request: NextRequest) {
   try {
-    await requirePermission("analytics:read");
-    const user = await requireOrganizationContext();
+    const user = await requireOrgPermission("analytics.view");
     const today = request.nextUrl.searchParams.get("today") === "1";
     const status = request.nextUrl.searchParams.get(
       "status"
@@ -28,8 +30,10 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    await requirePermission("ai:use");
-    const user = await requireOrganizationContext();
+    const user = await requireAnyOrgPermission([
+      "opportunities.update",
+      "agent.view",
+    ]);
     const body = await request.json().catch(() => ({}));
     const force = Boolean(body?.force);
     if (!force) {

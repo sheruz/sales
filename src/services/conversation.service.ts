@@ -97,6 +97,7 @@ export class ConversationService {
     const result = await aiComplete({
       feature: "reply_analysis",
       userId: params.userId,
+      organizationId: params.organizationId,
       jsonMode: true,
       temperature: 0.4,
       messages: [
@@ -130,6 +131,7 @@ export class ConversationService {
     });
 
     await activityService.log({
+      organizationId: params.organizationId,
       leadId: params.leadId,
       userId: params.userId,
       type: ActivityType.REPLY_ANALYZED,

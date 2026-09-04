@@ -28,35 +28,52 @@ interface ResearchResult {
 }
 
 export class AIResearchService {
-  async researchLead(leadId: string, userId?: string) {
+  /**
+   * Research a lead within an organization. organizationId is required and
+   * must match the lead — never trust leadId alone.
+   */
+  async researchLead(
+    organizationId: string,
+    leadId: string,
+    userId?: string
+  ) {
     const lead = await prisma.lead.findFirst({
-      where: { id: leadId, deletedAt: null },
+      where: { id: leadId, organizationId, deletedAt: null },
       include: { campaign: true },
     });
     if (!lead) throw new NotFoundError("Lead not found");
 
     const services = await prisma.service.findMany({
-      where: { organizationId: lead.organizationId, isActive: true },
+      where: { organizationId, isActive: true },
     });
 
     await prisma.lead.update({
       where: { id: leadId },
-      data: { automationStatus: AutomationStatus.RESEARCHING, status: LeadStatus.RESEARCHING },
+      data: {
+        automationStatus: AutomationStatus.RESEARCHING,
+        status: LeadStatus.RESEARCHING,
+      },
     });
 
     const result = await aiComplete({
       feature: "lead_research",
       userId,
+      organizationId,
       jsonMode: true,
       temperature: 0.5,
       messages: [
         {
           role: "system",
-          content: "You are a B2B sales research analyst. Always respond with valid JSON only.",
+          content:
+            "You are a B2B sales research analyst. Always respond with valid JSON only.",
         },
         {
           role: "user",
-          content: buildResearchPrompt(lead, services, lead.campaign?.aiInstructions),
+          content: buildResearchPrompt(
+            lead,
+            services,
+            lead.campaign?.aiInstructions
+          ),
         },
       ],
     });
@@ -104,6 +121,7 @@ export class AIResearchService {
     });
 
     await activityService.log({
+      organizationId,
       leadId,
       userId,
       type: ActivityType.RESEARCH_COMPLETED,
@@ -112,6 +130,7 @@ export class AIResearchService {
     });
 
     await activityService.log({
+      organizationId,
       leadId,
       userId,
       type: ActivityType.SCORE_UPDATED,
@@ -129,7 +148,7 @@ export class AIResearchService {
       POSSIBLE: LeadScoreCategory.POSSIBLE,
       LOW_PRIORITY: LeadScoreCategory.LOW_PRIORITY,
     };
-    return map[category] ?? LeadScoreCategory.POSSIBLE;
+    return map[category?.toUpperCase()] ?? LeadScoreCategory.POSSIBLE;
   }
 }
 

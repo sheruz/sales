@@ -2,15 +2,14 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { inboxService } from "@/services/inbox.service";
 import { conversationService } from "@/services/conversation.service";
-import { requirePermission, requireOrganizationContext } from "@/lib/auth/api-auth";
+import { requireOrgPermission } from "@/lib/auth/api-auth";
 import { apiSuccess } from "@/lib/api/response";
 import { handleApiError } from "@/lib/api/error-handler";
 import { ConversationChannel } from "@prisma/client";
 
 export async function GET(request: NextRequest) {
   try {
-    await requirePermission("conversations:read");
-    const user = await requireOrganizationContext();
+    const user = await requireOrgPermission("conversations.view");
     const legacy = request.nextUrl.searchParams.get("legacy") === "1";
     if (legacy) {
       const conversations = await conversationService.list(user.organizationId);
@@ -50,8 +49,7 @@ const legacyInboundSchema = z.object({
 
 export async function POST(request: NextRequest) {
   try {
-    await requirePermission("conversations:write");
-    const user = await requireOrganizationContext();
+    const user = await requireOrgPermission("conversations.manage");
     const raw = await request.json();
 
     if ("toEmail" in raw && "body" in raw) {

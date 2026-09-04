@@ -146,7 +146,6 @@ const revenueOsNav: NavItem[] = [
 ];
 
 function canSee(user: AuthUser, item: NavItem): boolean {
-  if (user.isPlatformAdmin) return true;
   if (!item.anyOf?.length) return true;
   return item.anyOf.some((p) => hasOrgPermission(user, p));
 }

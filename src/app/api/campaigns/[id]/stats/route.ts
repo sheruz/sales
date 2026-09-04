@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { campaignService } from "@/services/campaign.service";
-import { requirePermission, requireOrganizationContext } from "@/lib/auth/api-auth";
+import { requireOrgPermission } from "@/lib/auth/api-auth";
 import { apiSuccess } from "@/lib/api/response";
 import { handleApiError } from "@/lib/api/error-handler";
 
@@ -10,8 +10,7 @@ interface RouteParams {
 
 export async function GET(_request: Request, { params }: RouteParams) {
   try {
-    await requirePermission("campaigns:read");
-    const user = await requireOrganizationContext();
+    const user = await requireOrgPermission("campaigns.manage");
     const { id } = await params;
     const stats = await campaignService.getStats(user.organizationId, id);
     return NextResponse.json(apiSuccess(stats));

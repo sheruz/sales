@@ -1,14 +1,16 @@
 import { NextRequest, NextResponse } from "next/server";
 import { aiOutreachService } from "@/services/ai-outreach.service";
 import { generateOutreachSchema } from "@/lib/validations/automation";
-import { requirePermission, requireOrganizationContext } from "@/lib/auth/api-auth";
+import { requireAnyOrgPermission } from "@/lib/auth/api-auth";
 import { apiSuccess } from "@/lib/api/response";
 import { handleApiError } from "@/lib/api/error-handler";
 
 export async function POST(request: NextRequest) {
   try {
-    await requirePermission("ai:use");
-    const user = await requireOrganizationContext();
+    const user = await requireAnyOrgPermission([
+      "leads.update",
+      "opportunities.update",
+    ]);
     const body = await request.json();
     const input = generateOutreachSchema.parse(body);
     const result = await aiOutreachService.generateOutreach(

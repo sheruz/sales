@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { activityService } from "@/services/activity.service";
-import { requirePermission } from "@/lib/auth/api-auth";
+import { requireOrgPermission } from "@/lib/auth/api-auth";
 import { apiSuccess } from "@/lib/api/response";
 import { handleApiError } from "@/lib/api/error-handler";
 
@@ -10,9 +10,12 @@ interface RouteParams {
 
 export async function GET(_request: NextRequest, { params }: RouteParams) {
   try {
-    await requirePermission("leads:read");
+    const user = await requireOrgPermission("leads.view");
     const { id } = await params;
-    const activities = await activityService.getByLeadId(id);
+    const activities = await activityService.getByLeadId(
+      user.organizationId,
+      id
+    );
     return NextResponse.json(apiSuccess(activities));
   } catch (error) {
     return handleApiError(error);

@@ -5,9 +5,15 @@ import { activityService } from "@/services/activity.service";
 import type { CreateNoteInput } from "@/lib/validations/lead";
 
 export class NoteService {
-  async listByLead(leadId: string) {
+  async listByLead(organizationId: string, leadId: string) {
+    const lead = await prisma.lead.findFirst({
+      where: { id: leadId, organizationId, deletedAt: null },
+      select: { id: true },
+    });
+    if (!lead) throw new NotFoundError("Lead not found");
+
     return prisma.note.findMany({
-      where: { leadId },
+      where: { organizationId, leadId },
       orderBy: { createdAt: "desc" },
       include: {
         user: { select: { id: true, firstName: true, lastName: true } },
@@ -15,20 +21,32 @@ export class NoteService {
     });
   }
 
-  async create(leadId: string, input: CreateNoteInput, userId: string) {
+  async create(
+    organizationId: string,
+    leadId: string,
+    input: CreateNoteInput,
+    userId: string
+  ) {
     const lead = await prisma.lead.findFirst({
-      where: { id: leadId, deletedAt: null },
+      where: { id: leadId, organizationId, deletedAt: null },
+      select: { id: true, organizationId: true },
     });
     if (!lead) throw new NotFoundError("Lead not found");
 
     const note = await prisma.note.create({
-      data: { leadId, userId, content: input.content },
+      data: {
+        organizationId,
+        leadId,
+        userId,
+        content: input.content,
+      },
       include: {
         user: { select: { id: true, firstName: true, lastName: true } },
       },
     });
 
     await activityService.log({
+      organizationId,
       leadId,
       userId,
       type: ActivityType.NOTE_ADDED,
@@ -39,13 +57,16 @@ export class NoteService {
     return note;
   }
 
-  async delete(noteId: string, userId: string) {
-    const note = await prisma.note.findUnique({ where: { id: noteId } });
+  async delete(organizationId: string, noteId: string, userId: string) {
+    const note = await prisma.note.findFirst({
+      where: { id: noteId, organizationId },
+    });
     if (!note) throw new NotFoundError("Note not found");
 
     await prisma.note.delete({ where: { id: noteId } });
 
     await activityService.log({
+      organizationId,
       leadId: note.leadId,
       userId,
       type: ActivityType.NOTE_ADDED,

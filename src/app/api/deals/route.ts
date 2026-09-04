@@ -2,14 +2,19 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { DealStage } from "@prisma/client";
 import { dealService } from "@/services/deal.service";
-import { requirePermission, requireOrganizationContext } from "@/lib/auth/api-auth";
+import {
+  requireOrgPermission,
+  requireAnyOrgPermission,
+} from "@/lib/auth/api-auth";
 import { apiSuccess } from "@/lib/api/response";
 import { handleApiError } from "@/lib/api/error-handler";
 
 export async function GET(request: NextRequest) {
   try {
-    await requirePermission("deals:read");
-    const user = await requireOrganizationContext();
+    const user = await requireAnyOrgPermission([
+      "deals.manage",
+      "opportunities.view",
+    ]);
     const stage = request.nextUrl.searchParams.get("stage") as DealStage | null;
     const board = request.nextUrl.searchParams.get("board") === "1";
     if (board) {
@@ -41,8 +46,7 @@ const createSchema = z.object({
 
 export async function POST(request: NextRequest) {
   try {
-    await requirePermission("deals:write");
-    const user = await requireOrganizationContext();
+    const user = await requireOrgPermission("deals.manage");
     const input = createSchema.parse(await request.json());
     const deal = await dealService.create(user.organizationId, input, user.id);
     return NextResponse.json(apiSuccess(deal), { status: 201 });

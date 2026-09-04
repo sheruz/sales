@@ -1,14 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { userIntegrationService } from "@/services/user-integration.service";
-import { requirePermission, requireOrganizationContext } from "@/lib/auth/api-auth";
+import { requireOrgPermission } from "@/lib/auth/api-auth";
 import { apiSuccess } from "@/lib/api/response";
 import { handleApiError } from "@/lib/api/error-handler";
 
 export async function GET() {
   try {
-    await requirePermission("integrations:manage");
-    const user = await requireOrganizationContext();
+    const user = await requireOrgPermission("integrations.manage");
     const data = await userIntegrationService.listForUser(
       user.organizationId,
       user.id
@@ -29,8 +28,7 @@ const outreachSchema = z.object({
 
 export async function PATCH(request: NextRequest) {
   try {
-    await requirePermission("integrations:manage");
-    const user = await requireOrganizationContext();
+    const user = await requireOrgPermission("integrations.manage");
     const body = outreachSchema.parse(await request.json());
     const settings = await userIntegrationService.updateOutreachSettings(
       user.organizationId,

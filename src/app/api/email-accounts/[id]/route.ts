@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import prisma from "@/lib/db/prisma";
 import { emailAccountService } from "@/services/email-account.service";
-import { requirePermission, requireOrganizationContext } from "@/lib/auth/api-auth";
+import { requireOrgPermission } from "@/lib/auth/api-auth";
 import { apiSuccess } from "@/lib/api/response";
 import { handleApiError } from "@/lib/api/error-handler";
 
@@ -12,8 +12,7 @@ interface Params {
 
 export async function GET(_request: NextRequest, { params }: Params) {
   try {
-    await requirePermission("integrations:manage");
-    const user = await requireOrganizationContext();
+    const user = await requireOrgPermission("integrations.manage");
     const { id } = await params;
     const account = await emailAccountService.getById(user.organizationId, id);
     return NextResponse.json(
@@ -31,8 +30,7 @@ const patchSchema = z.object({
 
 export async function PATCH(request: NextRequest, { params }: Params) {
   try {
-    await requirePermission("integrations:manage");
-    const user = await requireOrganizationContext();
+    const user = await requireOrgPermission("integrations.manage");
     const { id } = await params;
     const body = patchSchema.parse(await request.json());
     if (body.isDefault) {
@@ -60,8 +58,7 @@ export async function PATCH(request: NextRequest, { params }: Params) {
 
 export async function DELETE(_request: NextRequest, { params }: Params) {
   try {
-    await requirePermission("integrations:manage");
-    const user = await requireOrganizationContext();
+    const user = await requireOrgPermission("integrations.manage");
     const { id } = await params;
     const result = await emailAccountService.disconnect(
       user.organizationId,

@@ -1,18 +1,22 @@
 import { NextResponse } from "next/server";
 import prisma from "@/lib/db/prisma";
-import { requirePermission } from "@/lib/auth/api-auth";
+import { requireOrgPermission } from "@/lib/auth/api-auth";
 import { apiSuccess } from "@/lib/api/response";
 import { handleApiError } from "@/lib/api/error-handler";
 
 export async function GET() {
   try {
-    const user = await requirePermission("integrations:manage");
+    const user = await requireOrgPermission("integrations.manage");
 
     const since = new Date();
     since.setDate(since.getDate() - 30);
 
     const logs = await prisma.aIUsageLog.findMany({
-      where: { userId: user.id, createdAt: { gte: since } },
+      where: {
+        organizationId: user.organizationId,
+        isPlatformScoped: false,
+        createdAt: { gte: since },
+      },
       orderBy: { createdAt: "desc" },
       take: 200,
     });

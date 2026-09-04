@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { campaignService } from "@/services/campaign.service";
 import { updateCampaignSchema } from "@/lib/validations/automation";
-import { requirePermission, requireOrganizationContext } from "@/lib/auth/api-auth";
+import { requireOrgPermission } from "@/lib/auth/api-auth";
 import { apiSuccess } from "@/lib/api/response";
 import { handleApiError } from "@/lib/api/error-handler";
 
@@ -11,8 +11,7 @@ interface RouteParams {
 
 export async function GET(_request: NextRequest, { params }: RouteParams) {
   try {
-    await requirePermission("campaigns:read");
-    const user = await requireOrganizationContext();
+    const user = await requireOrgPermission("campaigns.manage");
     const { id } = await params;
     const campaign = await campaignService.getById(user.organizationId, id);
     return NextResponse.json(apiSuccess(campaign));
@@ -23,8 +22,7 @@ export async function GET(_request: NextRequest, { params }: RouteParams) {
 
 export async function PATCH(request: NextRequest, { params }: RouteParams) {
   try {
-    await requirePermission("campaigns:write");
-    const user = await requireOrganizationContext();
+    const user = await requireOrgPermission("campaigns.manage");
     const { id } = await params;
     const body = await request.json();
     const input = updateCampaignSchema.parse(body);
@@ -37,8 +35,7 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
 
 export async function DELETE(_request: NextRequest, { params }: RouteParams) {
   try {
-    await requirePermission("campaigns:delete");
-    const user = await requireOrganizationContext();
+    const user = await requireOrgPermission("campaigns.manage");
     const { id } = await params;
     await campaignService.delete(user.organizationId, id);
     return NextResponse.json(apiSuccess({ deleted: true }));

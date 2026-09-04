@@ -150,6 +150,7 @@ export class LeadService {
     });
 
     await activityService.log({
+      organizationId,
       leadId: lead.id,
       userId,
       type: ActivityType.LEAD_CREATED,
@@ -229,6 +230,7 @@ export class LeadService {
 
     if (input.status && input.status !== existing.status) {
       await activityService.log({
+        organizationId,
         leadId: id,
         userId,
         type: ActivityType.STATUS_CHANGED,
@@ -240,6 +242,7 @@ export class LeadService {
 
     if (input.assignedToId && input.assignedToId !== existing.assignedToId) {
       await activityService.log({
+        organizationId,
         leadId: id,
         userId,
         type: ActivityType.LEAD_ASSIGNED,
@@ -250,6 +253,7 @@ export class LeadService {
 
     if (!input.status && !input.assignedToId) {
       await activityService.log({
+        organizationId,
         leadId: id,
         userId,
         type: ActivityType.LEAD_UPDATED,
@@ -281,6 +285,7 @@ export class LeadService {
     });
 
     await activityService.log({
+      organizationId,
       leadId: id,
       userId,
       type: ActivityType.LEAD_UPDATED,
@@ -332,10 +337,11 @@ export class LeadService {
     }
 
     await activityService.log({
+      organizationId,
       userId,
       type: ActivityType.LEAD_UPDATED,
       title: `Bulk action: ${action}`,
-      metadata: { leadIds, action, organizationId },
+      metadata: { leadIds, action },
     });
 
     return { affected: leadIds.length };

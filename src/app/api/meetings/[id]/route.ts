@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { MeetingOutcome, MeetingType } from "@prisma/client";
 import { meetingService } from "@/services/meeting.service";
-import { requirePermission, requireOrganizationContext } from "@/lib/auth/api-auth";
+import { requireAnyOrgPermission } from "@/lib/auth/api-auth";
 import { apiSuccess } from "@/lib/api/response";
 import { handleApiError } from "@/lib/api/error-handler";
 
@@ -12,8 +12,10 @@ interface Params {
 
 export async function GET(_request: NextRequest, { params }: Params) {
   try {
-    await requirePermission("meetings:read");
-    const user = await requireOrganizationContext();
+    const user = await requireAnyOrgPermission([
+      "deals.manage",
+      "opportunities.view",
+    ]);
     const { id } = await params;
     const meeting = await meetingService.getById(user.organizationId, id);
     return NextResponse.json(apiSuccess(meeting));
@@ -37,8 +39,10 @@ const patchSchema = z.object({
 
 export async function PATCH(request: NextRequest, { params }: Params) {
   try {
-    await requirePermission("meetings:write");
-    const user = await requireOrganizationContext();
+    const user = await requireAnyOrgPermission([
+      "deals.manage",
+      "opportunities.update",
+    ]);
     const { id } = await params;
     const input = patchSchema.parse(await request.json());
     const meeting = await meetingService.update(user.organizationId, id, input);
