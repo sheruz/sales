@@ -103,4 +103,10 @@ npm run db:migrate:sequences
 - **App retries:** FAILED/SCHEDULED drafts resume the same row; account `dailySent` increments only on first SENT event per message
 - **Not exactly-once at provider:** if the provider accepts mail and the process dies before persisting SENT, a later resume may call the provider again — documented limitation
 
+### Production migrate note (TEXT vs UUID)
+
+Production DB PKs are **TEXT** (from tenancy migrate), not PostgreSQL `uuid`.
+`db:migrate:sequences` detects parent `id` column types and creates FKs to match.
+If a prior run failed mid-create, re-run — the script is idempotent and does not delete legacy rows.
+
 **STOP — do not start Phase 4 until approved.**

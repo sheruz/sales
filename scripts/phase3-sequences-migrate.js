@@ -6,14 +6,19 @@
  *   - sequence_enrollment_executions
  *   - campaigns.default_sequence_id (nullable FK)
  *   - indexes + partial unique for open enrollments
+ *   - sequences.view permission (idempotent)
+ *
+ * ID column types are DETECTED from existing tables (production uses TEXT PKs,
+ * not UUID). Do not hardcode UUID FKs.
  *
  * Does NOT delete Lead/CampaignLead/FollowUpJob data.
  * Does NOT run prisma db push.
  *
- * Usage (local/staging — NOT production until approved):
+ * Usage:
  *   npm run db:migrate:sequences
  */
 const { PrismaClient } = require("@prisma/client");
+const { randomUUID } = require("crypto");
 require("./load-env");
 
 const prisma = new PrismaClient();
@@ -79,6 +84,37 @@ async function countTable(client, table) {
   return rows[0]?.c ?? 0;
 }
 
+/**
+ * Resolve SQL type for id columns from an existing table.
+ * Production (safe-migrate-tenancy) uses TEXT; some envs may use uuid.
+ */
+async function getIdSqlType(client, table, column = "id") {
+  const rows = await client.$queryRawUnsafe(
+    `SELECT data_type, udt_name
+     FROM information_schema.columns
+     WHERE table_schema = 'public' AND table_name = $1 AND column_name = $2
+     LIMIT 1`,
+    table,
+    column
+  );
+  if (!rows.length) {
+    throw new MigrationAbortError(
+      `Cannot detect type: ${table}.${column} missing — run prior migrations first`
+    );
+  }
+  const { data_type: dataType, udt_name: udt } = rows[0];
+  if (dataType === "uuid" || udt === "uuid") return "UUID";
+  // character varying / text
+  return "TEXT";
+}
+
+function idDefaultExpr(sqlType) {
+  // Works for both UUID and TEXT PKs on Postgres
+  return sqlType === "UUID"
+    ? "gen_random_uuid()"
+    : "(gen_random_uuid()::text)";
+}
+
 async function main() {
   console.log("Phase 3 sequences migrate — start");
 
@@ -87,8 +123,58 @@ async function main() {
       `CREATE EXTENSION IF NOT EXISTS "pgcrypto"`
     );
   } catch {
-    console.log("  note: pgcrypto extension skipped (may already exist / insufficient privileges)");
+    console.log(
+      "  note: pgcrypto extension skipped (may already exist / insufficient privileges)"
+    );
   }
+
+  // Required parent tables
+  for (const t of [
+    "organizations",
+    "campaigns",
+    "outreach_sequences",
+    "contacts",
+    "leads",
+    "users",
+  ]) {
+    if (!(await tableExists(prisma, t))) {
+      throw new MigrationAbortError(`Required table missing: ${t}`);
+    }
+  }
+  // opportunities / messages may be empty but should exist in Phase 2+ schema
+  if (!(await tableExists(prisma, "opportunities"))) {
+    throw new MigrationAbortError("Required table missing: opportunities");
+  }
+  if (!(await tableExists(prisma, "messages"))) {
+    throw new MigrationAbortError("Required table missing: messages");
+  }
+
+  const orgIdType = await getIdSqlType(prisma, "organizations", "id");
+  const campaignIdType = await getIdSqlType(prisma, "campaigns", "id");
+  const sequenceIdType = await getIdSqlType(prisma, "outreach_sequences", "id");
+  const contactIdType = await getIdSqlType(prisma, "contacts", "id");
+  const leadIdType = await getIdSqlType(prisma, "leads", "id");
+  const userIdType = await getIdSqlType(prisma, "users", "id");
+  const opportunityIdType = await getIdSqlType(prisma, "opportunities", "id");
+  const messageIdType = await getIdSqlType(prisma, "messages", "id");
+  const permissionIdType = (await tableExists(prisma, "permissions"))
+    ? await getIdSqlType(prisma, "permissions", "id")
+    : "TEXT";
+
+  console.log("  detected id types:", {
+    organizations: orgIdType,
+    campaigns: campaignIdType,
+    outreach_sequences: sequenceIdType,
+    contacts: contactIdType,
+    leads: leadIdType,
+    users: userIdType,
+    opportunities: opportunityIdType,
+    messages: messageIdType,
+  });
+
+  // Enrollment PK follows org id type (TEXT on production)
+  const enrollIdType = orgIdType;
+  const enrollIdDefault = idDefaultExpr(enrollIdType);
 
   const before = {
     campaigns: await countTable(prisma, "campaigns"),
@@ -132,16 +218,16 @@ async function main() {
 
   console.log("\n2) sequence_enrollments table");
   if (!(await tableExists(prisma, "sequence_enrollments"))) {
-    console.log("  create sequence_enrollments");
+    console.log(`  create sequence_enrollments (id ${enrollIdType})`);
     await prisma.$executeRawUnsafe(`
       CREATE TABLE sequence_enrollments (
-        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-        organization_id UUID NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
-        sequence_id UUID NOT NULL REFERENCES outreach_sequences(id) ON DELETE CASCADE,
-        campaign_id UUID REFERENCES campaigns(id) ON DELETE SET NULL,
-        opportunity_id UUID REFERENCES opportunities(id) ON DELETE SET NULL,
-        contact_id UUID NOT NULL REFERENCES contacts(id) ON DELETE CASCADE,
-        lead_id UUID REFERENCES leads(id) ON DELETE SET NULL,
+        id ${enrollIdType} PRIMARY KEY DEFAULT ${enrollIdDefault},
+        organization_id ${orgIdType} NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
+        sequence_id ${sequenceIdType} NOT NULL REFERENCES outreach_sequences(id) ON DELETE CASCADE,
+        campaign_id ${campaignIdType} REFERENCES campaigns(id) ON DELETE SET NULL,
+        opportunity_id ${opportunityIdType} REFERENCES opportunities(id) ON DELETE SET NULL,
+        contact_id ${contactIdType} NOT NULL REFERENCES contacts(id) ON DELETE CASCADE,
+        lead_id ${leadIdType} REFERENCES leads(id) ON DELETE SET NULL,
         status "SequenceEnrollmentStatus" NOT NULL DEFAULT 'PENDING',
         current_step_order INT NOT NULL DEFAULT 0,
         next_run_at TIMESTAMPTZ,
@@ -156,7 +242,7 @@ async function main() {
         max_retries INT NOT NULL DEFAULT 3,
         claimed_at TIMESTAMPTZ,
         claim_token TEXT,
-        enrolled_by_id UUID REFERENCES users(id) ON DELETE SET NULL,
+        enrolled_by_id ${userIdType} REFERENCES users(id) ON DELETE SET NULL,
         idempotency_key TEXT UNIQUE,
         metadata JSONB,
         created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
@@ -169,15 +255,22 @@ async function main() {
 
   console.log("\n3) sequence_enrollment_executions table");
   if (!(await tableExists(prisma, "sequence_enrollment_executions"))) {
-    console.log("  create sequence_enrollment_executions");
+    const execIdType = enrollIdType;
+    const execIdDefault = idDefaultExpr(execIdType);
+    const enrollmentIdType = await getIdSqlType(
+      prisma,
+      "sequence_enrollments",
+      "id"
+    );
+    console.log(`  create sequence_enrollment_executions (id ${execIdType})`);
     await prisma.$executeRawUnsafe(`
       CREATE TABLE sequence_enrollment_executions (
-        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-        organization_id UUID NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
-        enrollment_id UUID NOT NULL REFERENCES sequence_enrollments(id) ON DELETE CASCADE,
+        id ${execIdType} PRIMARY KEY DEFAULT ${execIdDefault},
+        organization_id ${orgIdType} NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
+        enrollment_id ${enrollmentIdType} NOT NULL REFERENCES sequence_enrollments(id) ON DELETE CASCADE,
         step_order INT NOT NULL,
         status "SequenceExecutionStatus" NOT NULL,
-        message_id UUID REFERENCES messages(id) ON DELETE SET NULL,
+        message_id ${messageIdType} REFERENCES messages(id) ON DELETE SET NULL,
         error TEXT,
         idempotency_key TEXT NOT NULL UNIQUE,
         executed_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
@@ -190,10 +283,13 @@ async function main() {
 
   console.log("\n4) campaigns.default_sequence_id");
   if (!(await columnExists(prisma, "campaigns", "default_sequence_id"))) {
-    console.log("  add campaigns.default_sequence_id");
+    console.log(
+      `  add campaigns.default_sequence_id (${sequenceIdType})`
+    );
     await prisma.$executeRawUnsafe(`
       ALTER TABLE campaigns
-      ADD COLUMN default_sequence_id UUID REFERENCES outreach_sequences(id) ON DELETE SET NULL
+      ADD COLUMN default_sequence_id ${sequenceIdType}
+      REFERENCES outreach_sequences(id) ON DELETE SET NULL
     `);
   } else {
     console.log("  skip campaigns.default_sequence_id");
@@ -248,9 +344,7 @@ async function main() {
     }
   }
 
-  // Partial unique: one open enrollment per org+sequence+contact
-  const partialName =
-    "sequence_enrollments_open_org_seq_contact_uidx";
+  const partialName = "sequence_enrollments_open_org_seq_contact_uidx";
   if (!(await indexExists(prisma, partialName))) {
     console.log(`  create partial unique ${partialName}`);
     await prisma.$executeRawUnsafe(`
@@ -263,22 +357,29 @@ async function main() {
   }
 
   console.log("\n6) Permission sequences.view (idempotent)");
-  await prisma.$executeRawUnsafe(`
-    INSERT INTO permissions (id, key, name, created_at, updated_at)
-    VALUES (gen_random_uuid(), 'sequences.view', 'sequences.view', NOW(), NOW())
-    ON CONFLICT (key) DO UPDATE SET name = EXCLUDED.name, updated_at = NOW()
-  `);
-  // Attach to sales_rep, sales_manager, company_admin, platform_admin if roles exist
-  await prisma.$executeRawUnsafe(`
-    INSERT INTO role_permissions (role_id, permission_id)
-    SELECT r.id, p.id
-    FROM roles r
-    CROSS JOIN permissions p
-    WHERE p.key = 'sequences.view'
-      AND r.key IN ('sales_rep', 'sales_manager', 'company_admin', 'platform_admin')
-    ON CONFLICT DO NOTHING
-  `);
-  console.log("  sequences.view seeded for enroll-capable roles");
+  if (await tableExists(prisma, "permissions")) {
+    const permId =
+      permissionIdType === "UUID" ? randomUUID() : randomUUID();
+    // Use parameterized insert via Prisma to avoid type mismatch on permissions.id
+    await prisma.$executeRawUnsafe(
+      `INSERT INTO permissions (id, key, name, created_at, updated_at)
+       VALUES ($1, 'sequences.view', 'sequences.view', NOW(), NOW())
+       ON CONFLICT (key) DO UPDATE SET name = EXCLUDED.name, updated_at = NOW()`,
+      permId
+    );
+    await prisma.$executeRawUnsafe(`
+      INSERT INTO role_permissions (role_id, permission_id)
+      SELECT r.id, p.id
+      FROM roles r
+      CROSS JOIN permissions p
+      WHERE p.key = 'sequences.view'
+        AND r.key IN ('sales_rep', 'sales_manager', 'company_admin', 'platform_admin')
+      ON CONFLICT DO NOTHING
+    `);
+    console.log("  sequences.view seeded for enroll-capable roles");
+  } else {
+    console.log("  skip permissions (table missing — run seed separately)");
+  }
 
   const after = {
     campaigns: await countTable(prisma, "campaigns"),
@@ -294,6 +395,15 @@ async function main() {
         `Row count changed for ${key}: ${before[key]} → ${after[key]}`
       );
     }
+  }
+
+  if (!(await tableExists(prisma, "sequence_enrollments"))) {
+    throw new MigrationAbortError("sequence_enrollments was not created");
+  }
+  if (!(await tableExists(prisma, "sequence_enrollment_executions"))) {
+    throw new MigrationAbortError(
+      "sequence_enrollment_executions was not created"
+    );
   }
 
   console.log("\n7) Validation OK — legacy row counts unchanged");
