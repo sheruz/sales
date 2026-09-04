@@ -115,25 +115,41 @@ async function buildAuthUser(
   };
 }
 
+const sessionUserSelect = {
+  user: {
+    select: {
+      id: true,
+      email: true,
+      firstName: true,
+      lastName: true,
+      role: true,
+      avatarUrl: true,
+      isActive: true,
+      deletedAt: true,
+    },
+  },
+} as const;
+
 export async function getSessionUser(token: string): Promise<AuthUser | null> {
   const tokenHash = hashToken(token);
-  const session = await prisma.session.findUnique({
+  let session = await prisma.session.findUnique({
     where: { token: tokenHash },
-    include: {
-      user: {
-        select: {
-          id: true,
-          email: true,
-          firstName: true,
-          lastName: true,
-          role: true,
-          avatarUrl: true,
-          isActive: true,
-          deletedAt: true,
-        },
-      },
-    },
+    include: sessionUserSelect,
   });
+
+  // Migrate pre-hash sessions (plaintext token in DB) on first successful lookup
+  if (!session) {
+    session = await prisma.session.findUnique({
+      where: { token },
+      include: sessionUserSelect,
+    });
+    if (session) {
+      await prisma.session.update({
+        where: { id: session.id },
+        data: { token: tokenHash },
+      });
+    }
+  }
 
   if (!session) return null;
   if (session.expiresAt < new Date()) {

@@ -4,7 +4,6 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
   Bot,
-  BarChart3,
   Brain,
   Briefcase,
   CircleDollarSign,
@@ -62,12 +61,6 @@ const mainNav: NavItem[] = [
     href: "/dashboard/pipeline",
     icon: Briefcase,
     anyOf: ["deals.manage", "opportunities.view"],
-  },
-  {
-    title: "Analytics",
-    href: "/dashboard/analytics",
-    icon: BarChart3,
-    anyOf: ["analytics.view"],
   },
   {
     title: "Leads",

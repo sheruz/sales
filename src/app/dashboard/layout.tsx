@@ -1,6 +1,7 @@
+import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth/session";
-import { isSuperAdmin } from "@/lib/auth/permissions";
+import { isSuperAdmin, SESSION_COOKIE } from "@/lib/auth/permissions";
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/dashboard/app-sidebar";
 import { DashboardHeader } from "@/components/dashboard/dashboard-header";
@@ -15,6 +16,13 @@ export default async function DashboardLayout({
   const user = await getCurrentUser();
 
   if (!user) {
+    // Drop stale cookie so middleware/login cannot loop on an invalid session
+    try {
+      const jar = await cookies();
+      jar.delete(SESSION_COOKIE);
+    } catch {
+      // Cookie mutation may be restricted in some render paths; login still works
+    }
     redirect("/login");
   }
 

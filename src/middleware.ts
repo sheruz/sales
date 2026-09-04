@@ -34,9 +34,10 @@ export function middleware(request: NextRequest) {
     return NextResponse.redirect(loginUrl);
   }
 
-  if (pathname === "/login" && sessionToken) {
-    return NextResponse.redirect(new URL("/dashboard", request.url));
-  }
+  // Do NOT redirect /login → /dashboard just because a cookie exists.
+  // Middleware cannot validate hashed sessions; an invalid/stale cookie would
+  // bounce login ↔ dashboard forever (blank page). The login page redirects
+  // only after getCurrentUser() succeeds.
 
   if (!isPublicPage && !isDashboardRoute && !isPlatformRoute && !sessionToken) {
     return NextResponse.redirect(new URL("/login", request.url));

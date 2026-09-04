@@ -1,10 +1,12 @@
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth/session";
 import { getUserReadiness } from "@/lib/integrations/readiness";
 import { hasOrgPermission } from "@/lib/tenant/scope";
 import { analyticsService } from "@/services/analytics.service";
 import { SetupChecklist } from "@/components/dashboard/setup-checklist";
 import { DailyRevenueCopilot } from "@/components/dashboard/daily-revenue-copilot";
+import { AnalyticsClient } from "@/components/dashboard/analytics-client";
 import {
   Card,
   CardContent,
@@ -14,7 +16,6 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
-  BarChart3,
   Bot,
   Briefcase,
   CircleDollarSign,
@@ -26,7 +27,7 @@ import { ROLE_LABELS } from "@/lib/auth/permissions";
 
 export default async function DashboardPage() {
   const user = await getCurrentUser();
-  if (!user) return null;
+  if (!user) redirect("/login");
 
   const canAnalytics = hasOrgPermission(user, "analytics.view");
   const canAgent = hasOrgPermission(user, "agent.view");
@@ -45,7 +46,6 @@ export default async function DashboardPage() {
   const fmt = (n: number) =>
     `${currency} ${Math.round(n).toLocaleString()}`;
 
-  // Home KPIs only — deep funnel/sources live on Analytics
   const homeStats = metrics
     ? [
         {
@@ -77,7 +77,7 @@ export default async function DashboardPage() {
           value: String(metrics.dealsWon),
           sub: `${metrics.winRate}% win rate`,
           icon: Target,
-          href: canAnalytics ? "/dashboard/analytics" : "/dashboard/pipeline",
+          href: "/dashboard/pipeline",
         },
       ]
     : [];
@@ -98,13 +98,6 @@ export default async function DashboardPage() {
       show: hasOrgPermission(user, "conversations.view"),
     },
     {
-      title: "Analytics",
-      href: "/dashboard/analytics",
-      desc: "Funnel, sources, learning",
-      icon: BarChart3,
-      show: canAnalytics,
-    },
-    {
       title: "Revenue Agent",
       href: "/dashboard/agent",
       desc: canManageAgent
@@ -122,7 +115,7 @@ export default async function DashboardPage() {
           Welcome back, {user.firstName}
         </h2>
         <p className="text-muted-foreground">
-          Your home base for today’s revenue work.
+          Overview of revenue, pipeline, and what to do next.
           <Badge variant="secondary" className="ml-2">
             {user.organizationRoleKey
               ? user.organizationRoleKey.replace(/_/g, " ")
@@ -162,7 +155,7 @@ export default async function DashboardPage() {
       )}
 
       {shortcuts.length > 0 && (
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {shortcuts.map((s) => (
             <Link key={s.href} href={s.href}>
               <Card className="h-full transition-colors hover:bg-muted/40">
@@ -183,16 +176,16 @@ export default async function DashboardPage() {
 
       {user.organizationId && <DailyRevenueCopilot />}
 
-      {canAnalytics && (
-        <p className="text-sm text-muted-foreground">
-          Need funnel, source, and learning detail?{" "}
-          <Link
-            href="/dashboard/analytics"
-            className="underline underline-offset-2"
-          >
-            Open Analytics
-          </Link>
-        </p>
+      {canAnalytics && user.organizationId && (
+        <div className="space-y-4 border-t pt-6">
+          <div>
+            <h3 className="text-lg font-semibold tracking-tight">Analytics</h3>
+            <p className="text-sm text-muted-foreground">
+              Funnel, sources, services, conversions, and learning insights.
+            </p>
+          </div>
+          <AnalyticsClient />
+        </div>
       )}
     </div>
   );
