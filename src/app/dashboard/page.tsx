@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { getCurrentUser } from "@/lib/auth/session";
 import { getUserReadiness } from "@/lib/integrations/readiness";
+import { hasOrgPermission } from "@/lib/tenant/scope";
 import { analyticsService } from "@/services/analytics.service";
 import { SetupChecklist } from "@/components/dashboard/setup-checklist";
 import { DailyRevenueCopilot } from "@/components/dashboard/daily-revenue-copilot";
@@ -13,19 +14,23 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
+  BarChart3,
+  Bot,
   Briefcase,
-  Calendar,
   CircleDollarSign,
-  FileText,
+  Flame,
+  MessageSquare,
   Target,
-  TrendingUp,
-  Users,
 } from "lucide-react";
 import { ROLE_LABELS } from "@/lib/auth/permissions";
 
 export default async function DashboardPage() {
   const user = await getCurrentUser();
   if (!user) return null;
+
+  const canAnalytics = hasOrgPermission(user, "analytics.view");
+  const canAgent = hasOrgPermission(user, "agent.view");
+  const canManageAgent = hasOrgPermission(user, "agent.manage");
 
   const [readiness, metrics] = await Promise.all([
     user.organizationId
@@ -40,65 +45,75 @@ export default async function DashboardPage() {
   const fmt = (n: number) =>
     `${currency} ${Math.round(n).toLocaleString()}`;
 
-  const statCards = metrics
+  // Home KPIs only — deep funnel/sources live on Analytics
+  const homeStats = metrics
     ? [
         {
-          label: "Revenue target",
-          value: fmt(metrics.revenueTarget),
-          icon: Target,
-          href: "/dashboard/revenue-goals",
-        },
-        {
-          label: "Revenue achieved",
+          label: "Revenue vs target",
           value: fmt(metrics.revenueAchieved),
           sub:
             metrics.revenueProgress != null
-              ? `${metrics.revenueProgress}% of target`
-              : undefined,
+              ? `${metrics.revenueProgress}% of ${fmt(metrics.revenueTarget)}`
+              : `Target ${fmt(metrics.revenueTarget)}`,
           icon: CircleDollarSign,
+          href: "/dashboard/revenue-goals",
         },
         {
-          label: "Pipeline value",
+          label: "Open opportunities",
+          value: String(metrics.opportunities),
+          sub: `${metrics.qualifiedOpportunities} qualified`,
+          icon: Flame,
+          href: "/dashboard/opportunities",
+        },
+        {
+          label: "Pipeline",
           value: fmt(metrics.pipelineValue),
+          sub: `Weighted ${fmt(metrics.weightedPipeline)}`,
           icon: Briefcase,
           href: "/dashboard/pipeline",
         },
         {
-          label: "Weighted pipeline",
-          value: fmt(metrics.weightedPipeline),
-          icon: TrendingUp,
-        },
-        {
-          label: "Opportunities",
-          value: String(metrics.opportunities),
-          sub: `${metrics.qualifiedOpportunities} qualified`,
-          icon: Users,
-          href: "/dashboard/opportunities",
-        },
-        {
-          label: "Meetings",
-          value: String(metrics.meetings),
-          icon: Calendar,
-          href: "/dashboard/meetings",
-        },
-        {
-          label: "Proposals",
-          value: String(metrics.proposals),
-          icon: FileText,
-          href: "/dashboard/proposals",
-        },
-        {
           label: "Deals won",
           value: String(metrics.dealsWon),
-          sub: `${metrics.winRate}% win rate · avg ${fmt(metrics.averageDealSize)}`,
-          icon: CircleDollarSign,
+          sub: `${metrics.winRate}% win rate`,
+          icon: Target,
+          href: canAnalytics ? "/dashboard/analytics" : "/dashboard/pipeline",
         },
       ]
     : [];
 
-  const funnelEntries = metrics
-    ? Object.entries(metrics.funnel)
-    : [];
+  const shortcuts = [
+    {
+      title: "Opportunities",
+      href: "/dashboard/opportunities",
+      desc: "Work today’s pipeline",
+      icon: Flame,
+      show: hasOrgPermission(user, "opportunities.view"),
+    },
+    {
+      title: "Inbox",
+      href: "/dashboard/conversations",
+      desc: "Replies and outreach",
+      icon: MessageSquare,
+      show: hasOrgPermission(user, "conversations.view"),
+    },
+    {
+      title: "Analytics",
+      href: "/dashboard/analytics",
+      desc: "Funnel, sources, learning",
+      icon: BarChart3,
+      show: canAnalytics,
+    },
+    {
+      title: "Revenue Agent",
+      href: "/dashboard/agent",
+      desc: canManageAgent
+        ? "Run & approve autonomous actions"
+        : "View agent activity",
+      icon: Bot,
+      show: canAgent,
+    },
+  ].filter((s) => s.show);
 
   return (
     <div className="space-y-6">
@@ -107,76 +122,77 @@ export default async function DashboardPage() {
           Welcome back, {user.firstName}
         </h2>
         <p className="text-muted-foreground">
-          Revenue command center — measure what closes, not just what you send.
+          Your home base for today’s revenue work.
           <Badge variant="secondary" className="ml-2">
-            {ROLE_LABELS[user.role]}
+            {user.organizationRoleKey
+              ? user.organizationRoleKey.replace(/_/g, " ")
+              : ROLE_LABELS[user.role]}
           </Badge>
         </p>
       </div>
 
       <SetupChecklist readiness={readiness} />
 
-      {user.organizationId && <DailyRevenueCopilot />}
-
       {metrics && (
-        <>
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-            {statCards.map((stat) => (
-              <Card key={stat.label}>
-                <CardHeader className="flex flex-row items-center justify-between pb-2">
-                  <CardTitle className="text-sm font-medium text-muted-foreground">
-                    {stat.label}
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          {homeStats.map((stat) => (
+            <Card key={stat.label}>
+              <CardHeader className="flex flex-row items-center justify-between pb-2">
+                <CardTitle className="text-sm font-medium text-muted-foreground">
+                  {stat.label}
+                </CardTitle>
+                <stat.icon className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">{stat.value}</div>
+                {stat.sub && (
+                  <p className="mt-1 text-xs text-muted-foreground">{stat.sub}</p>
+                )}
+                {stat.href && (
+                  <Link href={stat.href}>
+                    <Button variant="link" className="h-auto px-0 text-xs">
+                      Open →
+                    </Button>
+                  </Link>
+                )}
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      )}
+
+      {shortcuts.length > 0 && (
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          {shortcuts.map((s) => (
+            <Link key={s.href} href={s.href}>
+              <Card className="h-full transition-colors hover:bg-muted/40">
+                <CardHeader className="pb-2">
+                  <CardTitle className="flex items-center gap-2 text-sm">
+                    <s.icon className="h-4 w-4" />
+                    {s.title}
                   </CardTitle>
-                  <stat.icon className="h-4 w-4 text-muted-foreground" />
                 </CardHeader>
                 <CardContent>
-                  <div className="text-2xl font-bold">{stat.value}</div>
-                  {stat.sub && (
-                    <p className="text-xs text-muted-foreground mt-1">{stat.sub}</p>
-                  )}
-                  {stat.href && (
-                    <Link href={stat.href}>
-                      <Button variant="link" className="px-0 h-auto text-xs">
-                        View →
-                      </Button>
-                    </Link>
-                  )}
+                  <p className="text-xs text-muted-foreground">{s.desc}</p>
                 </CardContent>
               </Card>
-            ))}
-          </div>
+            </Link>
+          ))}
+        </div>
+      )}
 
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between">
-              <div>
-                <CardTitle className="text-base">Revenue funnel</CardTitle>
-                <p className="text-sm text-muted-foreground">
-                  Opportunities → Qualified → Contacted → Replied → Meeting →
-                  Proposal → Negotiation → Won
-                </p>
-              </div>
-              <Link href="/dashboard/analytics">
-                <Button variant="outline" size="sm">
-                  Full analytics
-                </Button>
-              </Link>
-            </CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 lg:grid-cols-8">
-                {funnelEntries.map(([label, count]) => (
-                  <div key={label} className="rounded-md border px-3 py-2">
-                    <p className="text-xs text-muted-foreground">{label}</p>
-                    <p className="text-lg font-semibold">{count}</p>
-                  </div>
-                ))}
-              </div>
-              <div className="mt-4 flex flex-wrap gap-4 text-sm text-muted-foreground">
-                <span>Sales cycle: {metrics.salesCycleDays} days</span>
-                <span>Outreach reply rate: {metrics.outreachReplyRate}%</span>
-              </div>
-            </CardContent>
-          </Card>
-        </>
+      {user.organizationId && <DailyRevenueCopilot />}
+
+      {canAnalytics && (
+        <p className="text-sm text-muted-foreground">
+          Need funnel, source, and learning detail?{" "}
+          <Link
+            href="/dashboard/analytics"
+            className="underline underline-offset-2"
+          >
+            Open Analytics
+          </Link>
+        </p>
       )}
     </div>
   );

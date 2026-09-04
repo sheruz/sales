@@ -3,6 +3,7 @@ import { z } from "zod";
 import { authService } from "@/services/auth.service";
 import { apiSuccess } from "@/lib/api/response";
 import { handleApiError } from "@/lib/api/error-handler";
+import { assertAuthRateLimit } from "@/lib/security/rate-limit";
 
 const schema = z.object({
   email: z.string().email(),
@@ -10,12 +11,17 @@ const schema = z.object({
 
 /**
  * Public password-reset request.
- * In production, email the token; never log it.
+ * Emails the token via platform SMTP when configured; never logs the raw token.
  * When NODE_ENV !== production, include resetPath for local testing only.
  */
 export async function POST(request: NextRequest) {
   try {
     const { email } = schema.parse(await request.json());
+    const ip =
+      request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ??
+      "unknown";
+    assertAuthRateLimit(ip, email);
+
     const { token } = await authService.requestPasswordReset(email);
 
     const payload: { ok: true; resetPath?: string } = { ok: true };

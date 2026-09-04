@@ -83,6 +83,9 @@ describe("org RBAC", () => {
     });
     expect(hasOrgPermission(rep, "billing.manage")).toBe(false);
     expect(hasOrgPermission(rep, "leads.view")).toBe(true);
+    expect(hasOrgPermission(rep, "analytics.view")).toBe(false);
+    expect(hasOrgPermission(rep, "agent.view")).toBe(false);
+    expect(hasOrgPermission(rep, "campaigns.manage")).toBe(false);
   });
 
   it("viewer is read-mostly", () => {
@@ -92,6 +95,20 @@ describe("org RBAC", () => {
     });
     expect(hasOrgPermission(viewer, "leads.create")).toBe(false);
     expect(hasOrgPermission(viewer, "analytics.view")).toBe(true);
+    expect(hasOrgPermission(viewer, "agent.view")).toBe(false);
+    expect(hasOrgPermission(viewer, "business_brain.manage")).toBe(false);
+  });
+
+  it("sales_manager can use analytics and revenue agent", () => {
+    const manager = mockUser({
+      organizationRoleKey: ROLE_KEYS.SALES_MANAGER,
+      permissions: ROLE_PERMISSION_MAP.sales_manager,
+      role: UserRole.SALES_MANAGER,
+    });
+    expect(hasOrgPermission(manager, "analytics.view")).toBe(true);
+    expect(hasOrgPermission(manager, "agent.view")).toBe(true);
+    expect(hasOrgPermission(manager, "agent.approve")).toBe(true);
+    expect(hasOrgPermission(manager, "campaigns.manage")).toBe(true);
   });
 
   it("permission catalog is complete for platform_admin", () => {

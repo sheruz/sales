@@ -81,6 +81,21 @@ export async function seedRolesAndPermissions() {
         update: {},
       });
     }
+
+    // Drop stale permissions no longer in ROLE_PERMISSION_MAP for this role
+    const allowedIds = new Set(perms.map((p) => p.id));
+    const existing = await prisma.rolePermission.findMany({
+      where: { roleId: role.id },
+      select: { permissionId: true },
+    });
+    const stale = existing
+      .map((e) => e.permissionId)
+      .filter((id) => !allowedIds.has(id));
+    if (stale.length) {
+      await prisma.rolePermission.deleteMany({
+        where: { roleId: role.id, permissionId: { in: stale } },
+      });
+    }
   }
 }
 

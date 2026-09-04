@@ -16,6 +16,14 @@ import {
   generateInviteToken,
   hashInviteToken,
 } from "@/lib/tenant/rbac";
+import {
+  assertNotLockedOut,
+  clearLoginFailures,
+  recordLoginFailure,
+} from "@/lib/security/brute-force";
+import { writeAuditLog } from "@/lib/security/audit";
+import { env } from "@/lib/config/env";
+import { sendEmailWithConfig } from "@/lib/email/send-mail";
 
 interface SessionMeta {
   ipAddress?: string;
@@ -28,8 +36,12 @@ export class AuthService {
     password: string,
     meta?: SessionMeta
   ): Promise<{ user: AuthUser; token: string }> {
+    const normalized = email.toLowerCase().trim();
+    const ip = meta?.ipAddress || "unknown";
+    assertNotLockedOut(normalized, ip);
+
     const user = await prisma.user.findUnique({
-      where: { email: email.toLowerCase().trim() },
+      where: { email: normalized },
       select: {
         id: true,
         email: true,
@@ -44,17 +56,30 @@ export class AuthService {
     });
 
     if (!user || user.deletedAt) {
+      recordLoginFailure(normalized, ip);
       throw new UnauthorizedError("Invalid email or password");
     }
 
     if (!user.isActive) {
+      recordLoginFailure(normalized, ip);
       throw new UnauthorizedError("Account is deactivated");
     }
 
     const isValid = await verifyPassword(password, user.passwordHash);
     if (!isValid) {
+      recordLoginFailure(normalized, ip);
+      await writeAuditLog({
+        userId: user.id,
+        action: "auth.login_failed",
+        entityType: "user",
+        entityId: user.id,
+        ipAddress: ip,
+        userAgent: meta?.userAgent,
+      });
       throw new UnauthorizedError("Invalid email or password");
     }
+
+    clearLoginFailures(normalized, ip);
 
     const primaryMembership = await prisma.organizationUser.findFirst({
       where: { userId: user.id, status: "ACTIVE" },
@@ -70,6 +95,15 @@ export class AuthService {
     });
 
     logger.info("User logged in", { userId: user.id, email: user.email });
+    await writeAuditLog({
+      organizationId: primaryMembership?.organizationId,
+      userId: user.id,
+      action: "auth.login",
+      entityType: "user",
+      entityId: user.id,
+      ipAddress: ip,
+      userAgent: meta?.userAgent,
+    });
 
     const authUser = await getSessionUser(token);
     if (!authUser) {
@@ -256,6 +290,36 @@ export class AuthService {
     });
 
     logger.info("Password reset requested", { userId: user.id });
+
+    // Email reset link via platform SMTP when configured
+    if (env.SMTP_HOST && env.SMTP_USER && env.SMTP_PASSWORD && env.SMTP_FROM_EMAIL) {
+      const resetUrl = `${env.APP_URL}/reset-password?token=${token}`;
+      try {
+        await sendEmailWithConfig(
+          {
+            host: env.SMTP_HOST,
+            port: env.SMTP_PORT,
+            secure: env.SMTP_SECURE,
+            user: env.SMTP_USER,
+            password: env.SMTP_PASSWORD,
+            fromName: env.SMTP_FROM_NAME,
+            fromEmail: env.SMTP_FROM_EMAIL,
+          },
+          {
+            to: email.toLowerCase().trim(),
+            subject: "Reset your password",
+            text: `Reset your password: ${resetUrl}\n\nThis link expires in 1 hour. If you did not request this, ignore this email.`,
+            html: `<p>Reset your password:</p><p><a href="${resetUrl}">${resetUrl}</a></p><p>This link expires in 1 hour.</p>`,
+          }
+        );
+      } catch (err) {
+        logger.error("Password reset email failed", {
+          userId: user.id,
+          error: err instanceof Error ? err.message : "send_failed",
+        });
+      }
+    }
+
     return { token };
   }
 

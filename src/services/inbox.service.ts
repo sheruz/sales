@@ -18,6 +18,7 @@ import { emailProviderService } from "@/services/email-provider.service";
 import { emailSafetyService } from "@/services/email-safety.service";
 import { entitlementService } from "@/services/entitlement.service";
 import { FEATURE_KEYS } from "@/lib/billing/features";
+import { sanitizeExternalForAI } from "@/lib/security/untrusted-content";
 
 type InboundNormalized = {
   providerMessageId: string;
@@ -425,6 +426,33 @@ export class InboxService {
       });
     }
 
+    // Bounce / complaint signals from mailbox (provider webhooks may also feed suppressions)
+    const bodyLower = `${inbound.subject || ""} ${inbound.body || ""}`.toLowerCase();
+    if (
+      bodyLower.includes("delivery status notification") ||
+      bodyLower.includes("mail delivery failed") ||
+      bodyLower.includes("undeliverable")
+    ) {
+      await emailSafetyService.suppress({
+        organizationId,
+        email: from,
+        reason: SuppressionReason.BOUNCE,
+        source: "bounce_detection",
+      });
+    }
+    if (
+      bodyLower.includes("abuse report") ||
+      bodyLower.includes("spam complaint") ||
+      bodyLower.includes("feedback-type: abuse")
+    ) {
+      await emailSafetyService.suppress({
+        organizationId,
+        email: from,
+        reason: SuppressionReason.COMPLAINT,
+        source: "complaint_detection",
+      });
+    }
+
     if (lead) {
       await prisma.conversation.create({
         data: {
@@ -475,10 +503,10 @@ export class InboxService {
           },
           {
             role: "user",
-            content: JSON.stringify({
-              subject: input.subject,
-              body: input.body.slice(0, 4000),
-            }),
+            content: sanitizeExternalForAI(
+              "email_reply",
+              `Subject: ${input.subject || ""}\n\n${input.body}`
+            ),
           },
         ],
       });

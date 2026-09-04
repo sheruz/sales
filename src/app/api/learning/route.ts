@@ -3,7 +3,7 @@ import { learningService } from "@/services/learning.service";
 import { requirePermission, requireOrganizationContext } from "@/lib/auth/api-auth";
 import { apiSuccess } from "@/lib/api/response";
 import { handleApiError } from "@/lib/api/error-handler";
-import { env } from "@/lib/config/env";
+import { assertCronAuthorized } from "@/lib/security/cron-auth";
 
 export async function GET(request: NextRequest) {
   try {
@@ -21,11 +21,14 @@ export async function GET(request: NextRequest) {
   }
 }
 
-/** Cron or manual refresh of learning patterns → optional recommendations */
+/** Cron or manual refresh of learning patterns */
 export async function POST(request: NextRequest) {
   try {
-    const cronSecret = request.headers.get("x-cron-secret");
-    if (env.CRON_SECRET && cronSecret === env.CRON_SECRET) {
+    const isCron =
+      request.headers.get("x-cron-secret") ||
+      request.headers.get("authorization");
+    if (isCron) {
+      assertCronAuthorized(request);
       const prisma = (await import("@/lib/db/prisma")).default;
       const orgs = await prisma.organization.findMany({
         where: { deletedAt: null, status: "ACTIVE" },
@@ -34,10 +37,17 @@ export async function POST(request: NextRequest) {
       });
       const results = [];
       for (const org of orgs) {
-        results.push({
-          organizationId: org.id,
-          ...(await learningService.discoverPatterns(org.id)),
-        });
+        try {
+          results.push({
+            organizationId: org.id,
+            ...(await learningService.discoverPatterns(org.id)),
+          });
+        } catch (err) {
+          results.push({
+            organizationId: org.id,
+            error: err instanceof Error ? err.message : "failed",
+          });
+        }
       }
       return NextResponse.json(apiSuccess({ results }));
     }

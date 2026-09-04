@@ -449,18 +449,30 @@ export class AutomationService {
 
         results.push({ jobId: job.id, status: "completed" });
       } catch (err) {
+        const attempts = job.attempts + 1;
+        const canRetry = attempts < job.maxAttempts;
+        const backoffMs = 60_000 * 2 ** Math.min(attempts - 1, 5);
         await prisma.followUpJob.update({
           where: { id: job.id },
           data: {
-            status: FollowUpJobStatus.FAILED,
+            status: canRetry
+              ? FollowUpJobStatus.PENDING
+              : FollowUpJobStatus.FAILED,
             attempts: { increment: 1 },
             lastError: err instanceof Error ? err.message : "failed",
+            scheduledAt: canRetry
+              ? new Date(Date.now() + backoffMs)
+              : undefined,
+            completedAt: canRetry ? null : new Date(),
           },
         });
         results.push({
           jobId: job.id,
-          status: "failed",
+          status: canRetry ? "retrying" : "dead_letter",
           error: err instanceof Error ? err.message : "failed",
+          nextAttemptAt: canRetry
+            ? new Date(Date.now() + backoffMs).toISOString()
+            : null,
         });
       }
     }

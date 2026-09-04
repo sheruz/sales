@@ -25,8 +25,9 @@ export default async function AgentPage() {
           Autonomous Revenue Agent
         </h2>
         <p className="text-muted-foreground">
-          Controlled autonomy against an approved revenue goal — every action is
-          authorized, logged, org-scoped, and auditable.
+          Controlled autonomy against an approved revenue goal. This is not
+          Analytics or the home Dashboard — run plans, review actions, and
+          approve outbound here.
         </p>
       </div>
       <AgentConsoleClient

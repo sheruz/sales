@@ -84,7 +84,6 @@ export const ROLE_PERMISSION_MAP: Record<string, PermissionKey[]> = {
     "deals.manage",
     "integrations.manage",
     "revenue.view",
-    "agent.view",
   ],
   viewer: [
     "organization.view",
@@ -93,7 +92,6 @@ export const ROLE_PERMISSION_MAP: Record<string, PermissionKey[]> = {
     "conversations.view",
     "analytics.view",
     "revenue.view",
-    "agent.view",
   ],
 };
 

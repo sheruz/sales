@@ -7,6 +7,7 @@ import { createSession, setSessionCookie } from "@/lib/auth/session";
 import { apiSuccess, ValidationError } from "@/lib/api/response";
 import { handleApiError } from "@/lib/api/error-handler";
 import prisma from "@/lib/db/prisma";
+import { assertAuthRateLimit } from "@/lib/security/rate-limit";
 
 const signupSchema = z.object({
   organizationName: z.string().min(2).max(200),
@@ -21,6 +22,10 @@ export async function POST(request: NextRequest) {
   try {
     const body = signupSchema.parse(await request.json());
     const email = body.email.toLowerCase().trim();
+    const ip =
+      request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ??
+      "unknown";
+    assertAuthRateLimit(ip, email);
 
     const existing = await prisma.user.findUnique({ where: { email } });
     if (existing) {

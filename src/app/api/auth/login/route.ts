@@ -4,6 +4,7 @@ import { loginSchema } from "@/lib/auth/schemas";
 import { setSessionCookie } from "@/lib/auth/session";
 import { apiSuccess } from "@/lib/api/response";
 import { handleApiError } from "@/lib/api/error-handler";
+import { assertAuthRateLimit } from "@/lib/security/rate-limit";
 
 export async function POST(request: NextRequest) {
   try {
@@ -13,8 +14,10 @@ export async function POST(request: NextRequest) {
     const ipAddress =
       request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ??
       request.headers.get("x-real-ip") ??
-      undefined;
+      "unknown";
     const userAgent = request.headers.get("user-agent") ?? undefined;
+
+    assertAuthRateLimit(ipAddress, input.email);
 
     const { user, token } = await authService.login(
       input.email,

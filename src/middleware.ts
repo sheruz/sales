@@ -8,6 +8,8 @@ const publicPages = [
   "/forgot-password",
   "/reset-password",
   "/signup",
+  "/privacy",
+  "/terms",
 ];
 
 export function middleware(request: NextRequest) {

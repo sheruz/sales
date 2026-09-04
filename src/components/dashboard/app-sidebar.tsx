@@ -20,6 +20,7 @@ import {
   Target,
   Users,
   Zap,
+  type LucideIcon,
 } from "lucide-react";
 import {
   Sidebar,
@@ -36,39 +37,126 @@ import {
 } from "@/components/ui/sidebar";
 import { SidebarUserFooter } from "@/components/dashboard/sidebar-user-footer";
 import { hasPermission } from "@/lib/auth/permissions";
+import { hasOrgPermission } from "@/lib/tenant/scope";
+import type { PermissionKey } from "@/lib/auth/permission-catalog";
 import type { AuthUser } from "@/types/auth";
 
-const mainNav = [
+type NavItem = {
+  title: string;
+  href: string;
+  icon: LucideIcon;
+  /** Org permission required (any of). Omit = always visible when logged in. */
+  anyOf?: PermissionKey[];
+};
+
+const mainNav: NavItem[] = [
   { title: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
-  { title: "Opportunities", href: "/dashboard/opportunities", icon: Flame },
-  { title: "Pipeline", href: "/dashboard/pipeline", icon: Briefcase },
-  { title: "Analytics", href: "/dashboard/analytics", icon: BarChart3 },
-  { title: "Leads", href: "/dashboard/leads", icon: Users },
-  { title: "Campaigns", href: "/dashboard/campaigns", icon: Target },
-  { title: "Autopilot", href: "/dashboard/autopilot", icon: Rocket },
-  { title: "Revenue Agent", href: "/dashboard/agent", icon: Bot },
-  { title: "Inbox", href: "/dashboard/conversations", icon: MessageSquare },
-  { title: "Meetings", href: "/dashboard/meetings", icon: ListTodo },
-  { title: "Proposals", href: "/dashboard/proposals", icon: Package },
-  { title: "Tasks", href: "/dashboard/tasks", icon: ListTodo },
-];
-
-const revenueOsNav = [
-  { title: "Business Brain", href: "/dashboard/business-brain", icon: Brain },
-  { title: "Services", href: "/dashboard/services", icon: Package },
-  { title: "ICP", href: "/dashboard/icp", icon: Crosshair },
-  { title: "Revenue Goals", href: "/dashboard/revenue-goals", icon: CircleDollarSign },
-  { title: "Sources", href: "/dashboard/sources", icon: Plug },
-];
-
-const settingsNav = [
   {
-    title: "Settings",
-    href: "/dashboard/settings",
-    icon: Settings,
-    permission: "settings:read" as const,
+    title: "Opportunities",
+    href: "/dashboard/opportunities",
+    icon: Flame,
+    anyOf: ["opportunities.view"],
+  },
+  {
+    title: "Pipeline",
+    href: "/dashboard/pipeline",
+    icon: Briefcase,
+    anyOf: ["deals.manage", "opportunities.view"],
+  },
+  {
+    title: "Analytics",
+    href: "/dashboard/analytics",
+    icon: BarChart3,
+    anyOf: ["analytics.view"],
+  },
+  {
+    title: "Leads",
+    href: "/dashboard/leads",
+    icon: Users,
+    anyOf: ["leads.view"],
+  },
+  {
+    title: "Campaigns",
+    href: "/dashboard/campaigns",
+    icon: Target,
+    anyOf: ["campaigns.manage"],
+  },
+  {
+    title: "Autopilot",
+    href: "/dashboard/autopilot",
+    icon: Rocket,
+    anyOf: ["campaigns.manage", "agent.manage"],
+  },
+  {
+    title: "Revenue Agent",
+    href: "/dashboard/agent",
+    icon: Bot,
+    anyOf: ["agent.view"],
+  },
+  {
+    title: "Inbox",
+    href: "/dashboard/conversations",
+    icon: MessageSquare,
+    anyOf: ["conversations.view"],
+  },
+  {
+    title: "Meetings",
+    href: "/dashboard/meetings",
+    icon: ListTodo,
+    anyOf: ["opportunities.view", "deals.manage"],
+  },
+  {
+    title: "Proposals",
+    href: "/dashboard/proposals",
+    icon: Package,
+    anyOf: ["deals.manage"],
+  },
+  {
+    title: "Tasks",
+    href: "/dashboard/tasks",
+    icon: ListTodo,
+    anyOf: ["leads.view", "opportunities.view"],
   },
 ];
+
+const revenueOsNav: NavItem[] = [
+  {
+    title: "Business Brain",
+    href: "/dashboard/business-brain",
+    icon: Brain,
+    anyOf: ["business_brain.manage"],
+  },
+  {
+    title: "Services",
+    href: "/dashboard/services",
+    icon: Package,
+    anyOf: ["business_brain.manage"],
+  },
+  {
+    title: "ICP",
+    href: "/dashboard/icp",
+    icon: Crosshair,
+    anyOf: ["business_brain.manage"],
+  },
+  {
+    title: "Revenue Goals",
+    href: "/dashboard/revenue-goals",
+    icon: CircleDollarSign,
+    anyOf: ["revenue_goals.manage", "revenue.view"],
+  },
+  {
+    title: "Sources",
+    href: "/dashboard/sources",
+    icon: Plug,
+    anyOf: ["integrations.manage"],
+  },
+];
+
+function canSee(user: AuthUser, item: NavItem): boolean {
+  if (user.isPlatformAdmin) return true;
+  if (!item.anyOf?.length) return true;
+  return item.anyOf.some((p) => hasOrgPermission(user, p));
+}
 
 interface AppSidebarProps {
   user: AuthUser;
@@ -77,9 +165,9 @@ interface AppSidebarProps {
 export function AppSidebar({ user }: AppSidebarProps) {
   const pathname = usePathname();
 
-  const filteredSettings = settingsNav.filter(
-    (item) => !item.permission || hasPermission(user.role, item.permission)
-  );
+  const visibleMain = mainNav.filter((item) => canSee(user, item));
+  const visibleRevenue = revenueOsNav.filter((item) => canSee(user, item));
+  const showSettings = hasPermission(user.role, "settings:read");
 
   return (
     <Sidebar collapsible="icon">
@@ -93,7 +181,7 @@ export function AppSidebar({ user }: AppSidebarProps) {
               <div className="grid flex-1 text-left text-sm leading-tight">
                 <span className="truncate font-semibold">Sales Platform</span>
                 <span className="truncate text-xs text-muted-foreground">
-                  Company workspace
+                  {user.organizationName || "Company workspace"}
                 </span>
               </div>
             </SidebarMenuButton>
@@ -106,7 +194,7 @@ export function AppSidebar({ user }: AppSidebarProps) {
           <SidebarGroupLabel>Main</SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
-              {mainNav.map((item) => (
+              {visibleMain.map((item) => (
                 <SidebarMenuItem key={item.href}>
                   <SidebarMenuButton
                     isActive={
@@ -126,45 +214,47 @@ export function AppSidebar({ user }: AppSidebarProps) {
           </SidebarGroupContent>
         </SidebarGroup>
 
-        <SidebarGroup>
-          <SidebarGroupLabel>Revenue OS</SidebarGroupLabel>
-          <SidebarGroupContent>
-            <SidebarMenu>
-              {revenueOsNav.map((item) => (
-                <SidebarMenuItem key={item.href}>
-                  <SidebarMenuButton
-                    isActive={pathname.startsWith(item.href)}
-                    tooltip={item.title}
-                    render={<Link href={item.href} />}
-                  >
-                    <item.icon />
-                    <span>{item.title}</span>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-              ))}
-            </SidebarMenu>
-          </SidebarGroupContent>
-        </SidebarGroup>
+        {visibleRevenue.length > 0 && (
+          <SidebarGroup>
+            <SidebarGroupLabel>Revenue OS</SidebarGroupLabel>
+            <SidebarGroupContent>
+              <SidebarMenu>
+                {visibleRevenue.map((item) => (
+                  <SidebarMenuItem key={item.href}>
+                    <SidebarMenuButton
+                      isActive={pathname.startsWith(item.href)}
+                      tooltip={item.title}
+                      render={<Link href={item.href} />}
+                    >
+                      <item.icon />
+                      <span>{item.title}</span>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                ))}
+              </SidebarMenu>
+            </SidebarGroupContent>
+          </SidebarGroup>
+        )}
 
-        <SidebarGroup>
-          <SidebarGroupLabel>Settings</SidebarGroupLabel>
-          <SidebarGroupContent>
-            <SidebarMenu>
-              {filteredSettings.map((item) => (
-                <SidebarMenuItem key={item.href}>
+        {showSettings && (
+          <SidebarGroup>
+            <SidebarGroupLabel>Settings</SidebarGroupLabel>
+            <SidebarGroupContent>
+              <SidebarMenu>
+                <SidebarMenuItem>
                   <SidebarMenuButton
-                    isActive={pathname.startsWith(item.href)}
-                    tooltip={item.title}
-                    render={<Link href={item.href} />}
+                    isActive={pathname.startsWith("/dashboard/settings")}
+                    tooltip="Settings"
+                    render={<Link href="/dashboard/settings" />}
                   >
-                    <item.icon />
-                    <span>{item.title}</span>
+                    <Settings />
+                    <span>Settings</span>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
-              ))}
-            </SidebarMenu>
-          </SidebarGroupContent>
-        </SidebarGroup>
+              </SidebarMenu>
+            </SidebarGroupContent>
+          </SidebarGroup>
+        )}
       </SidebarContent>
 
       <SidebarFooter>

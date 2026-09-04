@@ -30,9 +30,24 @@ export async function POST(request: NextRequest) {
     const formData = await request.formData();
     const file = formData.get("file");
 
-    if (!file || !(file instanceof File)) {
+    if (!(file instanceof File)) {
       return NextResponse.json(
         { success: false, error: { message: "CSV file is required" } },
+        { status: 400 }
+      );
+    }
+
+    const MAX_BYTES = 2 * 1024 * 1024;
+    if (file.size > MAX_BYTES) {
+      return NextResponse.json(
+        { success: false, error: { message: "CSV must be under 2MB" } },
+        { status: 400 }
+      );
+    }
+    const name = (file.name || "").toLowerCase();
+    if (name && !name.endsWith(".csv") && file.type && !file.type.includes("csv") && !file.type.includes("text")) {
+      return NextResponse.json(
+        { success: false, error: { message: "Only CSV files are allowed" } },
         { status: 400 }
       );
     }
@@ -43,6 +58,12 @@ export async function POST(request: NextRequest) {
     if (rows.length === 0) {
       return NextResponse.json(
         { success: false, error: { message: "CSV file is empty or invalid" } },
+        { status: 400 }
+      );
+    }
+    if (rows.length > 5000) {
+      return NextResponse.json(
+        { success: false, error: { message: "CSV limited to 5000 rows" } },
         { status: 400 }
       );
     }

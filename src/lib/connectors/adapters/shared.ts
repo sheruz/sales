@@ -23,9 +23,12 @@ export function hasOfficialCreds(
 
 export async function fetchJson(
   url: string,
-  init?: RequestInit
+  init?: RequestInit,
+  allowedHostSuffixes?: string[]
 ): Promise<{ ok: boolean; status: number; data: unknown; error?: string }> {
   try {
+    const { assertSafeOutboundUrl } = await import("@/lib/security/ssrf");
+    assertSafeOutboundUrl(url, allowedHostSuffixes);
     const res = await fetch(url, {
       ...init,
       headers: {

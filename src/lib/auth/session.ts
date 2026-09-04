@@ -5,6 +5,7 @@ import prisma from "@/lib/db/prisma";
 import { getEnv } from "@/lib/config/env";
 import { SESSION_COOKIE } from "@/lib/auth/permissions";
 import { resolveMembershipPermissions } from "@/lib/tenant/rbac";
+import { hashToken } from "@/lib/security/tokens";
 import type { AuthUser } from "@/types/auth";
 import { UserRole } from "@prisma/client";
 
@@ -27,7 +28,7 @@ export async function createSession(
   await prisma.session.create({
     data: {
       userId,
-      token,
+      token: hashToken(token),
       expiresAt,
       ipAddress: meta?.ipAddress,
       userAgent: meta?.userAgent,
@@ -115,8 +116,9 @@ async function buildAuthUser(
 }
 
 export async function getSessionUser(token: string): Promise<AuthUser | null> {
+  const tokenHash = hashToken(token);
   const session = await prisma.session.findUnique({
-    where: { token },
+    where: { token: tokenHash },
     include: {
       user: {
         select: {
@@ -151,13 +153,13 @@ export async function setActiveOrganization(
   organizationId: string | null
 ): Promise<void> {
   await prisma.session.updateMany({
-    where: { token },
+    where: { token: hashToken(token) },
     data: { activeOrganizationId: organizationId },
   });
 }
 
 export async function deleteSession(token: string): Promise<void> {
-  await prisma.session.deleteMany({ where: { token } });
+  await prisma.session.deleteMany({ where: { token: hashToken(token) } });
 }
 
 export async function deleteUserSessions(userId: string): Promise<void> {

@@ -37,6 +37,10 @@ export async function sendEmailWithConfig(
     subject: params.subject,
     text: params.text,
     html: params.html ?? params.text.replace(/\n/g, "<br>"),
+    headers: {
+      "List-Unsubscribe": `<mailto:${config.fromEmail}?subject=unsubscribe>`,
+      "List-Unsubscribe-Post": "List-Unsubscribe=One-Click",
+    },
   });
 
   return { messageId: info.messageId };
