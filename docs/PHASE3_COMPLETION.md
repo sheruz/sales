@@ -86,6 +86,21 @@ npm run db:migrate:sequences
 
 **Not** `prisma db push`.
 
-## Next recommended phase
+## Production hardening (post-approval)
 
-Phase 4 candidates: dual-write CampaignLead→Enrollment, richer sequence builder UI, SKIP LOCKED claiming, LinkedIn steps — only after approval.
+### Org daily email limit
+- Source of truth: `OrganizationSettings.dailyEmailLimit` + outbound `Message` counts (SCHEDULED|SENT|…) since UTC midnight
+- Enforced in `emailSafetyService.assertOrgDailyLimit` via `pg_advisory_xact_lock`
+- Also gated inside `inboxService.sendOutreach` under the same lock before draft create
+- Executor defers to next UTC midnight with SKIPPED execution; does **not** increment retryCount / FAILED
+
+### sequences.view
+- Added to permission catalog; Sales Rep + managers/admins; GET sequences/enrollments use `sequences.view` OR `sequences.manage`
+- `sequences.manage` still required for create/update/archive
+
+### Email idempotency (honest)
+- **DB:** unique `(organizationId, idempotencyKey)` on Message; SENT messages returned without re-calling provider
+- **App retries:** FAILED/SCHEDULED drafts resume the same row; account `dailySent` increments only on first SENT event per message
+- **Not exactly-once at provider:** if the provider accepts mail and the process dies before persisting SENT, a later resume may call the provider again — documented limitation
+
+**STOP — do not start Phase 4 until approved.**

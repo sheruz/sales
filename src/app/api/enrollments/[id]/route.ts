@@ -11,6 +11,7 @@ interface RouteParams {
 export async function GET(_request: NextRequest, { params }: RouteParams) {
   try {
     const user = await requireAnyOrgPermission([
+      "sequences.view",
       "sequences.manage",
       "campaigns.manage",
       "opportunities.view",

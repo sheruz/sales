@@ -22,6 +22,7 @@ const enrollSchema = z.object({
 export async function GET(request: NextRequest, { params }: RouteParams) {
   try {
     const user = await requireAnyOrgPermission([
+      "sequences.view",
       "sequences.manage",
       "campaigns.manage",
       "opportunities.view",

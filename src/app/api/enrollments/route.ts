@@ -9,6 +9,7 @@ import { handleApiError } from "@/lib/api/error-handler";
 export async function GET(request: NextRequest) {
   try {
     const user = await requireAnyOrgPermission([
+      "sequences.view",
       "sequences.manage",
       "campaigns.manage",
       "opportunities.view",

@@ -93,7 +93,7 @@ const mainNav: NavItem[] = [
     title: "Sequences",
     href: "/dashboard/sequences",
     icon: Workflow,
-    anyOf: ["sequences.manage"],
+    anyOf: ["sequences.view", "sequences.manage"],
   },
   {
     title: "Autopilot",

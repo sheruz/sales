@@ -2,7 +2,10 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { ConversationChannel, OutreachSequenceStatus } from "@prisma/client";
 import { outreachSequenceService } from "@/services/outreach-sequence.service";
-import { requireOrgPermission } from "@/lib/auth/api-auth";
+import {
+  requireAnyOrgPermission,
+  requireOrgPermission,
+} from "@/lib/auth/api-auth";
 import { apiSuccess } from "@/lib/api/response";
 import { handleApiError } from "@/lib/api/error-handler";
 
@@ -32,7 +35,10 @@ const updateSchema = z.object({
 
 export async function GET(_request: NextRequest, { params }: Params) {
   try {
-    const user = await requireOrgPermission("sequences.manage");
+    const user = await requireAnyOrgPermission([
+      "sequences.view",
+      "sequences.manage",
+    ]);
     const { id } = await params;
     const sequence = await outreachSequenceService.getById(
       user.organizationId,

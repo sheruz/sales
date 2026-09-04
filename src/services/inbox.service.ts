@@ -9,7 +9,6 @@ import {
   MessageDirection,
   SuppressionReason,
   type EmailAccount,
-  type Prisma,
 } from "@prisma/client";
 import { NotFoundError, ValidationError } from "@/lib/api/response";
 import { aiComplete, parseAIJson } from "@/lib/ai/provider";
@@ -137,54 +136,133 @@ export class InboxService {
       );
     }
 
-    const safety = await emailSafetyService.assertCanSend({
-      organizationId: input.organizationId,
-      account,
-      toEmail: input.toEmail,
-      idempotencyKey: input.idempotencyKey,
+    // Idempotent resume: never call provider again for an already-SENT message.
+    const existingByKey = await prisma.message.findFirst({
+      where: {
+        organizationId: input.organizationId,
+        idempotencyKey: input.idempotencyKey,
+      },
     });
-    if (!safety.ok) throw new ValidationError(safety.reason);
+    if (
+      existingByKey &&
+      ["SENT", "DELIVERED", "OPENED", "CLICKED", "REPLIED"].includes(
+        existingByKey.status
+      )
+    ) {
+      return {
+        conversationId: existingByKey.conversationId,
+        message: existingByKey,
+        resumed: true as const,
+      };
+    }
+
+    // Under org advisory lock: enforce daily limit + create/reuse draft (SCHEDULED).
+    // SCHEDULED rows count toward the org daily quota so concurrent workers cannot oversubscribe.
+    let conversationId = input.conversationId ?? existingByKey?.conversationId ?? null;
+    let draftId: string;
+
+    try {
+      const prepared = await prisma.$transaction(async (tx) => {
+        await tx.$executeRawUnsafe(
+          `SELECT pg_advisory_xact_lock(hashtext($1::text))`,
+          input.organizationId
+        );
+
+        const safety = await emailSafetyService.assertCanSend({
+          organizationId: input.organizationId,
+          account,
+          toEmail: input.toEmail,
+          idempotencyKey: input.idempotencyKey,
+          allowExistingIdempotencyKey: Boolean(existingByKey),
+          tx,
+        });
+        if (!safety.ok) {
+          throw new ValidationError(safety.reason, {
+            safetyCode: safety.code ?? "OTHER",
+          });
+        }
+
+        let convId = conversationId;
+        if (!convId) {
+          const created = await tx.inboxConversation.create({
+            data: {
+              organizationId: input.organizationId,
+              companyId: input.companyId,
+              contactId: input.contactId,
+              opportunityId: input.opportunityId,
+              leadId: input.leadId,
+              emailAccountId: account.id,
+              channel: "EMAIL",
+              subject: input.subject,
+              status: InboxConversationStatus.WAITING,
+              assignedToId: input.userId,
+              lastMessageAt: new Date(),
+            },
+          });
+          convId = created.id;
+        }
+
+        if (existingByKey) {
+          await tx.message.update({
+            where: { id: existingByKey.id },
+            data: {
+              status: EmailStatus.SCHEDULED,
+              subject: input.subject,
+              body: input.body,
+              bodyHtml: input.bodyHtml,
+              metadata: { resumeAttempt: true },
+            },
+          });
+          return { conversationId: convId, draftId: existingByKey.id };
+        }
+
+        const draft = await tx.message.create({
+          data: {
+            organizationId: input.organizationId,
+            conversationId: convId,
+            emailAccountId: account.id,
+            direction: MessageDirection.OUTBOUND,
+            subject: input.subject,
+            body: input.body,
+            bodyHtml: input.bodyHtml,
+            fromEmail: account.email,
+            toEmail: input.toEmail.trim().toLowerCase(),
+            status: EmailStatus.SCHEDULED,
+            idempotencyKey: input.idempotencyKey,
+          },
+        });
+        return { conversationId: convId, draftId: draft.id };
+      });
+      conversationId = prepared.conversationId;
+      draftId = prepared.draftId;
+    } catch (err) {
+      if (err instanceof ValidationError) throw err;
+      // Unique violation on idempotency → load and resume if already SENT
+      const raced = await prisma.message.findFirst({
+        where: {
+          organizationId: input.organizationId,
+          idempotencyKey: input.idempotencyKey,
+        },
+      });
+      if (
+        raced &&
+        ["SENT", "DELIVERED", "OPENED", "CLICKED", "REPLIED"].includes(
+          raced.status
+        )
+      ) {
+        return {
+          conversationId: raced.conversationId,
+          message: raced,
+          resumed: true as const,
+        };
+      }
+      throw err;
+    }
 
     await entitlementService.assertAndConsume(
       input.organizationId,
       FEATURE_KEYS.EMAILS
     );
-
-    let conversationId = input.conversationId ?? null;
-    if (!conversationId) {
-      const created = await prisma.inboxConversation.create({
-        data: {
-          organizationId: input.organizationId,
-          companyId: input.companyId,
-          contactId: input.contactId,
-          opportunityId: input.opportunityId,
-          leadId: input.leadId,
-          emailAccountId: account.id,
-          channel: "EMAIL",
-          subject: input.subject,
-          status: InboxConversationStatus.WAITING,
-          assignedToId: input.userId,
-          lastMessageAt: new Date(),
-        },
-      });
-      conversationId = created.id;
-    }
-
-    const draft = await prisma.message.create({
-      data: {
-        organizationId: input.organizationId,
-        conversationId,
-        emailAccountId: account.id,
-        direction: MessageDirection.OUTBOUND,
-        subject: input.subject,
-        body: input.body,
-        bodyHtml: input.bodyHtml,
-        fromEmail: account.email,
-        toEmail: input.toEmail.trim().toLowerCase(),
-        status: EmailStatus.SCHEDULED,
-        idempotencyKey: input.idempotencyKey,
-      },
-    });
 
     try {
       const sent = await emailProviderService.send(account, {
@@ -195,7 +273,7 @@ export class InboxService {
       });
 
       const message = await prisma.message.update({
-        where: { id: draft.id },
+        where: { id: draftId },
         data: {
           status: EmailStatus.SENT,
           providerMessageId: sent.providerMessageId,
@@ -205,7 +283,7 @@ export class InboxService {
       });
 
       await prisma.inboxConversation.update({
-        where: { id: conversationId },
+        where: { id: conversationId! },
         data: {
           lastMessageAt: new Date(),
           providerThreadId: sent.threadId ?? undefined,
@@ -217,16 +295,21 @@ export class InboxService {
         data: {
           organizationId: input.organizationId,
           messageId: message.id,
-          conversationId,
+          conversationId: conversationId!,
           emailAccountId: account.id,
           type: EmailEventType.SENT,
           recipientEmail: input.toEmail.trim().toLowerCase(),
         },
       });
 
-      await emailSafetyService.incrementDailySent(account.id);
+      // Increment account daily counter once per message (retries must not double-count)
+      const sentEvents = await prisma.emailEvent.count({
+        where: { messageId: message.id, type: EmailEventType.SENT },
+      });
+      if (sentEvents === 1) {
+        await emailSafetyService.incrementDailySent(account.id);
+      }
 
-      // Bridge to legacy lead conversation log when lead linked
       if (input.leadId) {
         await prisma.conversation.create({
           data: {
@@ -244,18 +327,18 @@ export class InboxService {
         });
       }
 
-      return { conversationId, message };
+      return { conversationId: conversationId!, message, resumed: false as const };
     } catch (error) {
       const errMsg = error instanceof Error ? error.message : "Send failed";
       await prisma.message.update({
-        where: { id: draft.id },
+        where: { id: draftId },
         data: { status: EmailStatus.FAILED, metadata: { error: errMsg } },
       });
       await prisma.emailEvent.create({
         data: {
           organizationId: input.organizationId,
-          messageId: draft.id,
-          conversationId,
+          messageId: draftId,
+          conversationId: conversationId!,
           emailAccountId: account.id,
           type: EmailEventType.FAILED,
           recipientEmail: input.toEmail.trim().toLowerCase(),

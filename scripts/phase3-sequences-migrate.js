@@ -262,6 +262,24 @@ async function main() {
     console.log(`  skip ${partialName}`);
   }
 
+  console.log("\n6) Permission sequences.view (idempotent)");
+  await prisma.$executeRawUnsafe(`
+    INSERT INTO permissions (id, key, name, created_at, updated_at)
+    VALUES (gen_random_uuid(), 'sequences.view', 'sequences.view', NOW(), NOW())
+    ON CONFLICT (key) DO UPDATE SET name = EXCLUDED.name, updated_at = NOW()
+  `);
+  // Attach to sales_rep, sales_manager, company_admin, platform_admin if roles exist
+  await prisma.$executeRawUnsafe(`
+    INSERT INTO role_permissions (role_id, permission_id)
+    SELECT r.id, p.id
+    FROM roles r
+    CROSS JOIN permissions p
+    WHERE p.key = 'sequences.view'
+      AND r.key IN ('sales_rep', 'sales_manager', 'company_admin', 'platform_admin')
+    ON CONFLICT DO NOTHING
+  `);
+  console.log("  sequences.view seeded for enroll-capable roles");
+
   const after = {
     campaigns: await countTable(prisma, "campaigns"),
     outreach_sequences: await countTable(prisma, "outreach_sequences"),
@@ -278,7 +296,7 @@ async function main() {
     }
   }
 
-  console.log("\n6) Validation OK — legacy row counts unchanged");
+  console.log("\n7) Validation OK — legacy row counts unchanged");
   console.log("  row counts after:", after);
   console.log("Phase 3 sequences migrate — complete");
 }

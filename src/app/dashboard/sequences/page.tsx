@@ -2,7 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { outreachSequenceService } from "@/services/outreach-sequence.service";
 import { getCurrentUser } from "@/lib/auth/session";
-import { hasOrgPermission } from "@/lib/tenant/scope";
+import { hasAnyOrgPermission } from "@/lib/tenant/scope";
 import { Badge } from "@/components/ui/badge";
 import {
   Table,
@@ -16,7 +16,11 @@ import {
 export default async function SequencesPage() {
   const user = await getCurrentUser();
   if (!user?.organizationId) redirect("/dashboard");
-  if (!hasOrgPermission(user, "sequences.manage")) redirect("/dashboard");
+  if (
+    !hasAnyOrgPermission(user, ["sequences.view", "sequences.manage"])
+  ) {
+    redirect("/dashboard");
+  }
 
   const sequences = await outreachSequenceService.list(user.organizationId);
 

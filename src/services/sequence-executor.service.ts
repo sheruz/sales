@@ -10,7 +10,11 @@ import {
   SequenceExecutionStatus,
 } from "@prisma/client";
 import { inboxService } from "@/services/inbox.service";
-import { emailSafetyService } from "@/services/email-safety.service";
+import {
+  emailSafetyService,
+  nextUtcMidnight,
+} from "@/services/email-safety.service";
+import { ValidationError } from "@/lib/api/response";
 import {
   buildSequenceTemplateVars,
   computeNextRunAt,
@@ -263,20 +267,16 @@ export class SequenceExecutorService {
       };
     }
 
-    // Org daily email limit (in addition to account limits enforced by inbox)
-    const orgLimitOk = await this.checkOrgDailyEmailLimit(orgId);
-    if (!orgLimitOk) {
-      // Defer without failing — keep ACTIVE, schedule later
-      await prisma.sequenceEnrollment.updateMany({
-        where: { id: enrollment.id, claimToken, organizationId: orgId },
-        data: {
-          status: SequenceEnrollmentStatus.ACTIVE,
-          nextRunAt: new Date(Date.now() + 60 * 60_000),
-          lastError: "Organization daily email limit reached — deferred",
-          claimToken: null,
-          claimedAt: null,
-        },
-      });
+    // Org daily email limit BEFORE sendOutreach (centralized source of truth).
+    // Concurrent-safe via advisory lock inside assertOrgDailyLimit.
+    const orgLimit = await emailSafetyService.assertOrgDailyLimit(orgId);
+    if (!orgLimit.ok) {
+      await this.deferForOrgDailyLimit(
+        enrollment.id,
+        orgId,
+        claimToken,
+        step.stepOrder
+      );
       return {
         enrollmentId: enrollment.id,
         organizationId: orgId,
@@ -343,15 +343,21 @@ export class SequenceExecutorService {
         idempotencyKey,
       });
 
-      await prisma.sequenceEnrollmentExecution.create({
-        data: {
+      // Already-sent resume: do not create a second SUCCESS execution if one exists
+      await prisma.sequenceEnrollmentExecution.upsert({
+        where: { idempotencyKey },
+        create: {
           organizationId: orgId,
           enrollmentId: enrollment.id,
           stepOrder: step.stepOrder,
           status: SequenceExecutionStatus.SUCCESS,
           messageId: sent.message.id,
           idempotencyKey,
-          metadata: { subject },
+          metadata: { subject, resumed: Boolean(sent.resumed) },
+        },
+        update: {
+          status: SequenceExecutionStatus.SUCCESS,
+          messageId: sent.message.id,
         },
       });
 
@@ -362,6 +368,28 @@ export class SequenceExecutorService {
       );
     } catch (err) {
       const message = err instanceof Error ? err.message : "send failed";
+      const details =
+        err instanceof ValidationError
+          ? (err.details as { safetyCode?: string } | undefined)
+          : undefined;
+
+      if (
+        details?.safetyCode === "ORG_DAILY_LIMIT" ||
+        message.toLowerCase().includes("organization daily email limit")
+      ) {
+        await this.deferForOrgDailyLimit(
+          enrollment.id,
+          orgId,
+          claimToken,
+          step.stepOrder
+        );
+        return {
+          enrollmentId: enrollment.id,
+          organizationId: orgId,
+          status: "deferred",
+          reason: "org_daily_limit",
+        };
+      }
 
       // Duplicate idempotency from safety layer = treat as already sent
       if (
@@ -406,6 +434,37 @@ export class SequenceExecutorService {
         reason: message,
       };
     }
+  }
+
+  /** Defer without consuming retry budget or marking FAILED. */
+  private async deferForOrgDailyLimit(
+    enrollmentId: string,
+    organizationId: string,
+    claimToken: string,
+    stepOrder: number
+  ) {
+    const nextRunAt = nextUtcMidnight();
+    await prisma.sequenceEnrollment.updateMany({
+      where: { id: enrollmentId, claimToken, organizationId },
+      data: {
+        status: SequenceEnrollmentStatus.ACTIVE,
+        nextRunAt,
+        lastError: "Organization daily email limit reached — deferred",
+        claimToken: null,
+        claimedAt: null,
+      },
+    });
+    await prisma.sequenceEnrollmentExecution.create({
+      data: {
+        organizationId,
+        enrollmentId,
+        stepOrder,
+        status: SequenceExecutionStatus.SKIPPED,
+        error: "ORG_DAILY_LIMIT",
+        idempotencyKey: `seq-enroll:${enrollmentId}:step:${stepOrder}:defer:${Date.now()}`,
+        metadata: { reason: "ORG_DAILY_LIMIT", nextRunAt: nextRunAt.toISOString() },
+      },
+    });
   }
 
   private async advanceAfterSuccess(
@@ -568,24 +627,6 @@ export class SequenceExecutorService {
     }
 
     return null;
-  }
-
-  private async checkOrgDailyEmailLimit(organizationId: string) {
-    const settings = await prisma.organizationSettings.findUnique({
-      where: { organizationId },
-    });
-    const limit = settings?.dailyEmailLimit ?? 50;
-    const start = new Date();
-    start.setUTCHours(0, 0, 0, 0);
-    const sentToday = await prisma.message.count({
-      where: {
-        organizationId,
-        direction: "OUTBOUND",
-        status: { in: ["SENT", "DELIVERED", "OPENED", "CLICKED", "REPLIED"] },
-        sentAt: { gte: start },
-      },
-    });
-    return sentToday < limit;
   }
 
   private async complete(

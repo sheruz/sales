@@ -1,8 +1,6 @@
 import { randomUUID } from "crypto";
 import prisma from "@/lib/db/prisma";
 import {
-  CampaignStatus,
-  OpportunityStatus,
   OutreachSequenceStatus,
   Prisma,
   SequenceEnrollmentStatus,
@@ -151,7 +149,7 @@ export class SequenceEnrollmentService {
       throw new ValidationError("Contact must have an email to enroll");
     }
 
-    let opportunityId = input.opportunityId ?? null;
+    const opportunityId = input.opportunityId ?? null;
     if (opportunityId) {
       const opportunity = await prisma.opportunity.findFirst({
         where: { id: opportunityId, organizationId },
@@ -166,7 +164,7 @@ export class SequenceEnrollmentService {
       }
     }
 
-    let campaignId = input.campaignId ?? null;
+    const campaignId = input.campaignId ?? null;
     if (campaignId) {
       const campaign = await prisma.campaign.findFirst({
         where: {

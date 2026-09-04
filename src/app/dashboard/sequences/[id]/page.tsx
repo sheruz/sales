@@ -3,7 +3,7 @@ import { format } from "date-fns";
 import { outreachSequenceService } from "@/services/outreach-sequence.service";
 import { sequenceEnrollmentService } from "@/services/sequence-enrollment.service";
 import { getCurrentUser } from "@/lib/auth/session";
-import { hasOrgPermission } from "@/lib/tenant/scope";
+import { hasAnyOrgPermission } from "@/lib/tenant/scope";
 import { Badge } from "@/components/ui/badge";
 import {
   Card,
@@ -18,7 +18,10 @@ interface PageProps {
 
 export default async function SequenceDetailPage({ params }: PageProps) {
   const user = await getCurrentUser();
-  if (!user?.organizationId || !hasOrgPermission(user, "sequences.manage")) {
+  if (
+    !user?.organizationId ||
+    !hasAnyOrgPermission(user, ["sequences.view", "sequences.manage"])
+  ) {
     notFound();
   }
 

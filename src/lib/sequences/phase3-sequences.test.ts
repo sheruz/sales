@@ -89,6 +89,7 @@ describe("Phase 3 — enrollment RBAC", () => {
     "opportunities.update",
   ] as const;
   const ENROLL_VIEW = [
+    "sequences.view",
     "sequences.manage",
     "campaigns.manage",
     "opportunities.view",
@@ -100,17 +101,37 @@ describe("Phase 3 — enrollment RBAC", () => {
     expect(hasAnyOrgPermission(v, [...ENROLL_MUTATE])).toBe(false);
   });
 
-  it("sales rep can enroll via opportunities.update", () => {
+  it("sales rep can enroll via opportunities.update and view sequences", () => {
     const r = roleUser(ROLE_KEYS.SALES_REP);
     expect(hasAnyOrgPermission(r, [...ENROLL_MUTATE])).toBe(true);
     expect(hasAnyOrgPermission(r, ["sequences.manage"])).toBe(false);
+    expect(hasAnyOrgPermission(r, ["sequences.view"])).toBe(true);
   });
 
   it("sales manager and company admin can manage sequences", () => {
     const m = roleUser(ROLE_KEYS.SALES_MANAGER);
     const a = roleUser(ROLE_KEYS.COMPANY_ADMIN);
     expect(hasAnyOrgPermission(m, ["sequences.manage"])).toBe(true);
+    expect(hasAnyOrgPermission(m, ["sequences.view"])).toBe(true);
     expect(hasAnyOrgPermission(a, ["campaigns.manage"])).toBe(true);
+  });
+});
+
+describe("Phase 3 hardening — org daily limit helpers", () => {
+  it("nextUtcMidnight is after startOfUtcDay", async () => {
+    const { startOfUtcDay, nextUtcMidnight } = await import(
+      "@/services/email-safety.service"
+    );
+    const now = new Date("2026-06-15T14:30:00.000Z");
+    expect(startOfUtcDay(now).toISOString()).toBe("2026-06-15T00:00:00.000Z");
+    expect(nextUtcMidnight(now).toISOString()).toBe("2026-06-16T00:00:00.000Z");
+  });
+
+  it("viewer cannot manage sequences but list uses view OR manage", () => {
+    const v = roleUser(ROLE_KEYS.VIEWER);
+    expect(hasAnyOrgPermission(v, ["sequences.view", "sequences.manage"])).toBe(
+      false
+    );
   });
 });
 
