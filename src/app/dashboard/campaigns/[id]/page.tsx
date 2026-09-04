@@ -27,6 +27,13 @@ export default async function CampaignDetailPage({ params }: PageProps) {
 
   const { campaign, stats } = data;
 
+  const { sequenceEnrollmentService } = await import(
+    "@/services/sequence-enrollment.service"
+  );
+  const enrollments = await sequenceEnrollmentService
+    .list(user.organizationId, { campaignId: id, limit: 20 })
+    .catch(() => ({ items: [] as never[] }));
+
   return (
     <div className="space-y-6">
       <div className="flex items-center gap-4">
@@ -49,6 +56,36 @@ export default async function CampaignDetailPage({ params }: PageProps) {
         </div>
       </div>
       <CampaignDetail campaign={campaign} stats={stats} />
+
+      <div className="rounded-md border p-4">
+        <h3 className="mb-2 text-sm font-semibold">
+          Opportunity/Contact enrollments (canonical)
+        </h3>
+        <p className="mb-3 text-xs text-muted-foreground">
+          Legacy lead enrollments remain in CampaignDetail above. This section
+          lists SequenceEnrollment rows for Opportunity/Contact.
+        </p>
+        {enrollments.items.length === 0 ? (
+          <p className="text-sm text-muted-foreground">No canonical enrollments</p>
+        ) : (
+          <ul className="space-y-1 text-sm">
+            {enrollments.items.map(
+              (e: {
+                id: string;
+                status: string;
+                contact: { fullName: string };
+                sequence: { name: string };
+                currentStepOrder: number;
+              }) => (
+                <li key={e.id}>
+                  {e.contact.fullName} · {e.sequence.name} · step{" "}
+                  {e.currentStepOrder} · {e.status}
+                </li>
+              )
+            )}
+          </ul>
+        )}
+      </div>
     </div>
   );
 }

@@ -1,136 +1,91 @@
-# Phase 3 Completion Report — Opportunity Engine Core
+# Phase 3 — Completion Report
 
-**Status:** Complete — awaiting approval before Phase 4  
-**Date:** 2026-09-03  
-**Codebase:** `sales-platform`
+**Status:** Implemented (additive runtime) — awaiting approval  
+**Do not start Phase 4 until approved.**
 
----
+## Audited architecture
 
-## Summary
+Inspected: Campaign / CampaignLead, OutreachSequence / Steps, FollowUpJob / Autopilot, EmailAccount / inboxService / emailSafetyService, legacy Conversation vs InboxConversation, cron `/api/cron/automation`.
 
-Job posts are **no longer the opportunity**. Discovery now creates:
+**Finding:** Sequences were definition-only; runtime was Lead `FollowUpJob`. Phase 3 adds Opportunity/Contact `SequenceEnrollment` + executor reusing inbox send.
 
-**Company → Contact (+ legacy Lead bridge) → Hiring Signal → Opportunity (+ score)**
+## New architecture
 
-Leads remain for email automation / conversations (linked via `opportunity.lead_id` / `contact.lead_id`).
+```text
+Opportunity / Contact
+→ Campaign (optional)
+→ OutreachSequence
+→ SequenceEnrollment
+→ Executor (claim ACTIVE→PROCESSING)
+→ inboxService.sendOutreach
+→ InboxConversation / Message
+→ Reply / Meeting / Stop
+```
 
----
+## Database
 
-## Acceptance criteria
-
-| Criterion | Status |
-|-----------|--------|
-| Generalized Opportunity model | Done |
-| Job post is a signal source (`HIRING` + source `job_post`) | Done |
-| Companies extended (domain, funding, social, etc.) | Done |
-| Contacts, Signals, Opportunities, Events, Scores | Done |
-| Scoring stored in `opportunity_scores` | Done |
-| UI `/opportunities` with filter views | Done |
-| Opportunity detail: company, contacts, signals, score, why now, problem, service, action, timeline, linked conversations/tasks/meetings/proposals/deals | Done |
-
----
-
-## Database changes
-
-### Extended
-- `companies` — domain (unique per org), state, employee_count/range, revenue_range, founded_year, social URLs, technologies, funding fields, status, source, metadata
-
-### Added
-- `contacts`
-- `opportunity_sources`
-- `signals`
-- `opportunities`
-- `opportunity_events`
-- `opportunity_scores`
-
-### Bridge
-- `opportunities.lead_id` (optional unique) → legacy Lead
-- `contacts.lead_id` (optional unique) → legacy Lead
-
----
+| Change | Detail |
+|--------|--------|
+| Tables | `sequence_enrollments`, `sequence_enrollment_executions` |
+| Column | `campaigns.default_sequence_id` (nullable FK) |
+| Enums | `SequenceEnrollmentStatus`, `SequenceEnrollmentStopReason`, `SequenceExecutionStatus` |
+| Indexes | org/status/next_run, FKs; **partial unique** open enrollments `(org, sequence, contact)` |
+| Migration | `npm run db:migrate:sequences` → `scripts/phase3-sequences-migrate.js` |
+| Data deleted | **None**; legacy row counts asserted |
 
 ## APIs
 
 | Method | Path |
 |--------|------|
-| GET/POST | `/api/opportunities` |
-| GET/PATCH | `/api/opportunities/[id]` |
-| POST | `/api/opportunities/[id]/score` |
+| GET/POST | `/api/sequences/[id]/enrollments` |
+| GET | `/api/enrollments` |
+| GET | `/api/enrollments/[id]` |
+| POST | `/api/enrollments/[id]/pause\|resume\|stop\|retry` |
+| POST | `/api/cron/automation` (also runs sequence executor) |
 
-Job discovery (`JobDiscoveryService`) now returns `opportunityIds` and calls `opportunityService.ingestHiringSignal`.
-
----
+Permissions: `sequences.manage` \| `campaigns.manage` \| `opportunities.view/update` (anyOf). Client `organizationId` ignored.
 
 ## UI
 
-| Path | Purpose |
-|------|---------|
-| `/dashboard/opportunities` | Filtered list (All/Hot/Warm/New/Needs Action/…) |
-| `/dashboard/opportunities/[id]` | Detail + stage update |
-| `/opportunities` | Redirect |
+- `/dashboard/sequences`, `/dashboard/sequences/[id]`
+- Opportunity + Contact detail: enrollment panel (enroll/pause/resume/stop/retry)
+- Campaign detail: canonical enrollment list (legacy leads unchanged)
+- Sidebar: Sequences
 
-Sidebar: **Opportunities** in Main nav.
+## Executor
 
----
+| Concern | Approach |
+|---------|----------|
+| Claiming | Conditional `updateMany` ACTIVE→PROCESSING + `claimToken` |
+| Stale claims | Reclaim PROCESSING older than 5 minutes |
+| Idempotency | `seq-enroll:{id}:step:{n}` → Message + Execution unique |
+| Retries | Exponential backoff; `maxRetries` → FAILED |
+| Scheduling | Persist `nextRunAt` from step `delayMinutes` |
+| Stop | Reply (inbox hook), unsubscribe, suppressed, meeting, opp closed, sequence/campaign inactive |
+| Limits | Account (emailSafety) + org `dailyEmailLimit` (defer) |
+| Email | **Only** `inboxService.sendOutreach` |
 
-## Background jobs
+## Legacy compatibility
 
-No new cron. Autopilot/job discovery continues; each job-post prospect also produces a signal + opportunity.
+CampaignLead, FollowUpJob, Autopilot, aiOutreach path **unchanged**. Lead not required for SequenceEnrollment.
 
----
+## Known limitations
 
-## Tests completed
+- Sales reps enroll via `opportunities.update` but cannot open Sequences UI (`sequences.manage` only)
+- Non-EMAIL sequence channels are skipped (not LinkedIn)
+- Reply stop depends on inbox sync creating REPLIED events
+- No sequence create/edit UI redesign (API + list/detail only)
+- Concurrent claim is optimistic (not `FOR UPDATE SKIP LOCKED`); safe via status+token
 
-| Check | Result |
-|-------|--------|
-| `npm run typecheck` | Passed |
-| `npm test` (15) | Passed |
-| `npm run build` | Passed |
-
----
-
-## Migration instructions
-
-On production (with existing data):
+## Production migration (do not run until approved)
 
 ```bash
-cd /var/www/html/sales
-git pull
-
-# If Phase 1 org columns not applied yet:
-npm run db:migrate:safe
-
-# Otherwise Phase 3 is additive — push is usually enough:
-npm run db:push
-
-npm run build
-pm2 restart sales
+npm run db:generate
+npm run db:migrate:sequences
 ```
 
-If `db push` complains about `companies` unique `(organization_id, domain)`, ensure domains are null or unique first (empty websites → null domain is fine in Postgres).
+**Not** `prisma db push`.
 
----
+## Next recommended phase
 
-## Manual verification
-
-1. Run job discovery / autopilot for an org with services + ICP configured.
-2. Open **Opportunities** — new rows appear with scores; Hot/Warm filters work.
-3. Open an opportunity — see company, hiring signal, why now, recommended action, score breakdown, events.
-4. Confirm the job post title is on the **signal**, not treated as the opportunity name alone.
-5. Legacy **Leads** still lists the linked lead for outreach automation.
-6. Org B cannot open Org A opportunity IDs.
-
----
-
-## Known issues
-
-1. Conversations/tasks/meetings on the detail page are loaded via the linked **Lead** bridge (not yet first-class `opportunity_id` on those tables).
-2. Scoring is rules-based (`rules_v1`), not ML embeddings.
-3. Manual opportunity create API exists; list UI focuses on discovery-produced opps.
-4. Apply schema on server before using the new pages.
-
----
-
-## STOP
-
-Phase 3 is complete. Do **not** start Phase 4 until explicitly approved.
+Phase 4 candidates: dual-write CampaignLead→Enrollment, richer sequence builder UI, SKIP LOCKED claiming, LinkedIn steps — only after approval.

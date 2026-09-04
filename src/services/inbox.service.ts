@@ -408,6 +408,17 @@ export class InboxService {
       },
     });
 
+    const replyContactId = conversation.contactId ?? contact?.id;
+    if (replyContactId) {
+      const { sequenceEnrollmentService } = await import(
+        "@/services/sequence-enrollment.service"
+      );
+      await sequenceEnrollmentService.stopForContactReply(
+        organizationId,
+        replyContactId
+      );
+    }
+
     if (classification === MessageAiClassification.UNSUBSCRIBE) {
       await emailSafetyService.suppress({
         organizationId,
@@ -415,6 +426,15 @@ export class InboxService {
         reason: SuppressionReason.UNSUBSCRIBE,
         source: "inbox_ai",
       });
+      if (contact?.id) {
+        const { sequenceEnrollmentService } = await import(
+          "@/services/sequence-enrollment.service"
+        );
+        await sequenceEnrollmentService.stopForContactUnsubscribe(
+          organizationId,
+          contact.id
+        );
+      }
       await prisma.emailEvent.create({
         data: {
           organizationId,

@@ -14,6 +14,12 @@ import { opportunityService } from "@/services/opportunity.service";
 import { getCurrentUser } from "@/lib/auth/session";
 import { OpportunityDetailClient } from "@/components/opportunities/opportunity-detail-client";
 import { OpportunityCrmActions } from "@/components/crm/opportunity-crm-actions";
+import { SequenceEnrollmentPanel } from "@/components/sequences/sequence-enrollment-panel";
+import { sequenceEnrollmentService } from "@/services/sequence-enrollment.service";
+import { outreachSequenceService } from "@/services/outreach-sequence.service";
+import { campaignService } from "@/services/campaign.service";
+import prisma from "@/lib/db/prisma";
+import { hasAnyOrgPermission } from "@/lib/tenant/scope";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -76,6 +82,52 @@ export default async function OpportunityDetailPage({ params }: PageProps) {
   const latestScore = opportunity.scores[0] ?? null;
   const estimatedValue = decimalToNumber(opportunity.estimatedValue);
   const fundingTotal = decimalToNumber(opportunity.company.fundingTotal);
+
+  const [enrollmentResult, sequences, campaigns, companyContacts] =
+    await Promise.all([
+      sequenceEnrollmentService.list(user.organizationId, {
+        opportunityId: opportunity.id,
+        limit: 20,
+      }),
+      outreachSequenceService.list(user.organizationId).catch(() => []),
+      campaignService.list(user.organizationId).catch(() => []),
+      prisma.contact.findMany({
+        where: {
+          organizationId: user.organizationId,
+          companyId: opportunity.companyId,
+        },
+        select: { id: true, fullName: true, email: true },
+        take: 50,
+      }),
+    ]);
+
+  const canManageEnrollments = hasAnyOrgPermission(user, [
+    "sequences.manage",
+    "campaigns.manage",
+    "opportunities.update",
+  ]);
+
+  const enrollmentRows = enrollmentResult.items.map((e) => ({
+    id: e.id,
+    status: e.status,
+    currentStepOrder: e.currentStepOrder,
+    nextRunAt: e.nextRunAt?.toISOString() ?? null,
+    stopReason: e.stopReason,
+    sequence: e.sequence,
+    contact: e.contact,
+    campaign: e.campaign,
+  }));
+
+  const sequenceOptions = sequences.map((s) => ({
+    id: s.id,
+    name: s.name,
+    status: s.status,
+  }));
+
+  const campaignOptions = campaigns.map((c) => ({
+    id: c.id,
+    name: c.name,
+  }));
 
   return (
     <div className="space-y-6">
@@ -755,6 +807,16 @@ export default async function OpportunityDetailPage({ params }: PageProps) {
           )}
         </div>
       </div>
+
+      <SequenceEnrollmentPanel
+        opportunityId={opportunity.id}
+        contactId={opportunity.primaryContactId ?? undefined}
+        companyContactIds={companyContacts}
+        sequences={sequenceOptions}
+        campaigns={campaignOptions}
+        enrollments={enrollmentRows}
+        canManage={canManageEnrollments}
+      />
     </div>
   );
 }

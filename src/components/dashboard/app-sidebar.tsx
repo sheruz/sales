@@ -20,6 +20,7 @@ import {
   Settings,
   Target,
   Users,
+  Workflow,
   Zap,
   type LucideIcon,
 } from "lucide-react";
@@ -87,6 +88,12 @@ const mainNav: NavItem[] = [
     href: "/dashboard/campaigns",
     icon: Target,
     anyOf: ["campaigns.manage"],
+  },
+  {
+    title: "Sequences",
+    href: "/dashboard/sequences",
+    icon: Workflow,
+    anyOf: ["sequences.manage"],
   },
   {
     title: "Autopilot",

@@ -22,7 +22,14 @@ export class OutreachSequenceService {
   async list(organizationId: string) {
     return prisma.outreachSequence.findMany({
       where: { organizationId },
-      include: { steps: { orderBy: { stepOrder: "asc" } } },
+      include: {
+        steps: { orderBy: { stepOrder: "asc" } },
+        _count: {
+          select: {
+            enrollments: true,
+          },
+        },
+      },
       orderBy: { updatedAt: "desc" },
     });
   }
@@ -30,10 +37,38 @@ export class OutreachSequenceService {
   async getById(organizationId: string, id: string) {
     const sequence = await prisma.outreachSequence.findFirst({
       where: { id, organizationId },
-      include: { steps: { orderBy: { stepOrder: "asc" } } },
+      include: {
+        steps: { orderBy: { stepOrder: "asc" } },
+        _count: {
+          select: { enrollments: true },
+        },
+      },
     });
     if (!sequence) throw new NotFoundError("Sequence not found");
-    return sequence;
+
+    const [active, completed, stopped, paused] = await Promise.all([
+      prisma.sequenceEnrollment.count({
+        where: {
+          organizationId,
+          sequenceId: id,
+          status: { in: ["ACTIVE", "PENDING", "PROCESSING"] },
+        },
+      }),
+      prisma.sequenceEnrollment.count({
+        where: { organizationId, sequenceId: id, status: "COMPLETED" },
+      }),
+      prisma.sequenceEnrollment.count({
+        where: { organizationId, sequenceId: id, status: "STOPPED" },
+      }),
+      prisma.sequenceEnrollment.count({
+        where: { organizationId, sequenceId: id, status: "PAUSED" },
+      }),
+    ]);
+
+    return {
+      ...sequence,
+      enrollmentStats: { active, completed, stopped, paused },
+    };
   }
 
   async create(

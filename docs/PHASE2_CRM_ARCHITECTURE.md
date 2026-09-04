@@ -212,11 +212,12 @@ Company + Contact (+ optional Opportunity link)
 
 ## 12. Future phases to retire Leads
 
-1. Opportunity/Contact enrollment for campaigns  
-2. Automation on Opportunity/Contact + inbox only  
-3. Dual-write then cutover from CampaignLead  
-4. Freeze lead writes; read-only legacy  
-5. Optional archive/export of leads  
+1. **Phase 3 (done):** SequenceEnrollment runtime for Opportunity/Contact  
+2. Opportunity/Contact enrollment dual-write from CampaignLead  
+3. Automation on Opportunity/Contact + inbox only  
+4. Dual-write then cutover from CampaignLead / FollowUpJob  
+5. Freeze lead writes; read-only legacy  
+6. Optional archive/export of leads  
 
 ---
 

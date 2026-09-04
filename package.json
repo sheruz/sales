@@ -20,6 +20,7 @@
     "db:migrate:safe": "node scripts/run-with-env.js node scripts/safe-migrate-tenancy.js",
     "db:migrate:security": "node scripts/run-with-env.js node scripts/phase1-security-migrate.js",
     "db:migrate:crm": "node scripts/run-with-env.js node scripts/phase2-crm-migrate.js",
+    "db:migrate:sequences": "node scripts/run-with-env.js node scripts/phase3-sequences-migrate.js",
     "db:studio": "node scripts/prisma-cli.js studio",
     "db:reset": "node scripts/prisma-cli.js migrate reset",
     "docker:up": "docker compose up -d postgres",

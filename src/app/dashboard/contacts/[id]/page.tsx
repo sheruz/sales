@@ -5,6 +5,10 @@ import { Building2, Mail, Phone, ExternalLink } from "lucide-react";
 import { contactService } from "@/services/contact.service";
 import { getCurrentUser } from "@/lib/auth/session";
 import { hasAnyOrgPermission } from "@/lib/tenant/scope";
+import { SequenceEnrollmentPanel } from "@/components/sequences/sequence-enrollment-panel";
+import { sequenceEnrollmentService } from "@/services/sequence-enrollment.service";
+import { outreachSequenceService } from "@/services/outreach-sequence.service";
+import { campaignService } from "@/services/campaign.service";
 import {
   Card,
   CardContent,
@@ -31,6 +35,21 @@ export default async function ContactDetailPage({ params }: PageProps) {
   } catch {
     notFound();
   }
+
+  const [enrollmentResult, sequences, campaigns] = await Promise.all([
+    sequenceEnrollmentService.list(user.organizationId, {
+      contactId: contact.id,
+      limit: 20,
+    }),
+    outreachSequenceService.list(user.organizationId).catch(() => []),
+    campaignService.list(user.organizationId).catch(() => []),
+  ]);
+
+  const canManageEnrollments = hasAnyOrgPermission(user, [
+    "sequences.manage",
+    "campaigns.manage",
+    "opportunities.update",
+  ]);
 
   return (
     <div className="space-y-6">
@@ -176,6 +195,27 @@ export default async function ContactDetailPage({ params }: PageProps) {
           </Card>
         </div>
       </div>
+
+      <SequenceEnrollmentPanel
+        contactId={contact.id}
+        sequences={sequences.map((s) => ({
+          id: s.id,
+          name: s.name,
+          status: s.status,
+        }))}
+        campaigns={campaigns.map((c) => ({ id: c.id, name: c.name }))}
+        enrollments={enrollmentResult.items.map((e) => ({
+          id: e.id,
+          status: e.status,
+          currentStepOrder: e.currentStepOrder,
+          nextRunAt: e.nextRunAt?.toISOString() ?? null,
+          stopReason: e.stopReason,
+          sequence: e.sequence,
+          contact: e.contact,
+          campaign: e.campaign,
+        }))}
+        canManage={canManageEnrollments}
+      />
     </div>
   );
 }
