@@ -1,13 +1,16 @@
-import { ModulePlaceholder } from "@/components/dashboard/module-placeholder";
-import { BarChart3 } from "lucide-react";
+import { AnalyticsClient } from "@/components/dashboard/analytics-client";
 
 export default function AnalyticsPage() {
   return (
-    <ModulePlaceholder
-      title="Analytics"
-      description="Sales metrics, campaign performance, and conversion analytics."
-      phase="Phase 11"
-      icon={BarChart3}
-    />
+    <div className="space-y-6">
+      <div>
+        <h2 className="text-2xl font-bold tracking-tight">Revenue analytics</h2>
+        <p className="text-muted-foreground">
+          Funnel, sources, services, conversions, and what historically produces
+          revenue for your organization.
+        </p>
+      </div>
+      <AnalyticsClient />
+    </div>
   );
 }

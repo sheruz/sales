@@ -1,14 +1,14 @@
 import prisma from "@/lib/db/prisma";
-import { ActivityType, TaskStatus } from "@prisma/client";
+import { ActivityType, TaskStatus, TaskType, TaskPriority } from "@prisma/client";
 import { NotFoundError } from "@/lib/api/response";
 import { activityService } from "@/services/activity.service";
-import type { CreateTaskInput } from "@/lib/validations/lead";
 
 export class TaskService {
   async list(
     organizationId: string,
     filters?: {
       leadId?: string;
+      opportunityId?: string;
       assignedToId?: string;
       status?: TaskStatus;
       overdue?: boolean;
@@ -18,6 +18,9 @@ export class TaskService {
       where: {
         organizationId,
         ...(filters?.leadId ? { leadId: filters.leadId } : {}),
+        ...(filters?.opportunityId
+          ? { opportunityId: filters.opportunityId }
+          : {}),
         ...(filters?.assignedToId ? { assignedToId: filters.assignedToId } : {}),
         ...(filters?.status ? { status: filters.status } : {}),
         ...(filters?.overdue
@@ -30,6 +33,15 @@ export class TaskService {
       orderBy: [{ dueDate: "asc" }, { createdAt: "desc" }],
       include: {
         lead: { select: { id: true, fullName: true, companyName: true } },
+        opportunity: {
+          select: {
+            id: true,
+            stage: true,
+            company: { select: { name: true } },
+          },
+        },
+        company: { select: { id: true, name: true } },
+        contact: { select: { id: true, fullName: true } },
         assignedTo: { select: { id: true, firstName: true, lastName: true } },
       },
     });
@@ -37,12 +49,38 @@ export class TaskService {
 
   async create(
     organizationId: string,
-    input: CreateTaskInput & { leadId?: string },
+    input: {
+      title: string;
+      description?: string | null;
+      type?: TaskType;
+      priority?: TaskPriority;
+      dueDate?: string | null;
+      assignedToId?: string | null;
+      leadId?: string | null;
+      opportunityId?: string | null;
+      companyId?: string | null;
+      contactId?: string | null;
+      dealId?: string | null;
+    },
     userId: string
   ) {
-    if (input.leadId) {
+    let companyId = input.companyId;
+    let contactId = input.contactId;
+    let leadId = input.leadId;
+
+    if (input.opportunityId) {
+      const opp = await prisma.opportunity.findFirst({
+        where: { id: input.opportunityId, organizationId },
+      });
+      if (!opp) throw new NotFoundError("Opportunity not found");
+      companyId = companyId ?? opp.companyId;
+      contactId = contactId ?? opp.primaryContactId;
+      leadId = leadId ?? opp.leadId;
+    }
+
+    if (leadId) {
       const lead = await prisma.lead.findFirst({
-        where: { id: input.leadId, organizationId, deletedAt: null },
+        where: { id: leadId, organizationId, deletedAt: null },
       });
       if (!lead) throw new NotFoundError("Lead not found");
     }
@@ -52,21 +90,27 @@ export class TaskService {
         organizationId,
         title: input.title,
         description: input.description || null,
-        leadId: input.leadId || null,
+        type: input.type ?? TaskType.OTHER,
+        leadId: leadId || null,
+        opportunityId: input.opportunityId || null,
+        companyId: companyId || null,
+        contactId: contactId || null,
+        dealId: input.dealId || null,
         assignedToId: input.assignedToId ?? userId,
         createdById: userId,
         dueDate: input.dueDate ? new Date(input.dueDate) : null,
-        priority: input.priority ?? "MEDIUM",
+        priority: input.priority ?? TaskPriority.MEDIUM,
       },
       include: {
         lead: { select: { id: true, fullName: true } },
+        opportunity: { select: { id: true, stage: true } },
         assignedTo: { select: { id: true, firstName: true, lastName: true } },
       },
     });
 
-    if (input.leadId) {
+    if (leadId) {
       await activityService.log({
-        leadId: input.leadId,
+        leadId,
         userId,
         type: ActivityType.TASK_CREATED,
         title: "Task created",
@@ -90,7 +134,10 @@ export class TaskService {
 
     const task = await prisma.task.update({
       where: { id: taskId },
-      data: { status },
+      data: {
+        status,
+        completedAt: status === TaskStatus.COMPLETED ? new Date() : null,
+      },
       include: {
         lead: { select: { id: true, fullName: true } },
       },

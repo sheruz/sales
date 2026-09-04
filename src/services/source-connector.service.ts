@@ -12,6 +12,8 @@ import {
 } from "@/lib/integrations/credentials";
 import { getConnectorAdapter, catalogConnectorTypes } from "@/lib/connectors/registry";
 import { opportunityService } from "@/services/opportunity.service";
+import { entitlementService } from "@/services/entitlement.service";
+import { FEATURE_KEYS } from "@/lib/billing/features";
 
 function sourceKeyForType(type: SourceConnectorType): { key: string; name: string } {
   switch (type) {
@@ -79,6 +81,11 @@ export class SourceConnectorService {
   ) {
     const adapter = getConnectorAdapter(input.type, input.provider);
     if (!adapter) throw new ValidationError("Unknown connector type");
+
+    await entitlementService.assertSeatAvailable(
+      organizationId,
+      FEATURE_KEYS.CONNECTORS
+    );
 
     return prisma.sourceConnector.create({
       data: {
@@ -155,6 +162,11 @@ export class SourceConnectorService {
     if (connector.status === SourceConnectorStatus.DISABLED) {
       throw new ValidationError("Connector is disabled");
     }
+
+    await entitlementService.assertAndConsume(
+      organizationId,
+      FEATURE_KEYS.SOURCES
+    );
 
     const adapter = getConnectorAdapter(connector.type, connector.provider);
     if (!adapter) throw new ValidationError("No adapter for connector");

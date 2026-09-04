@@ -5,6 +5,8 @@ import {
   type Prisma,
 } from "@prisma/client";
 import { NotFoundError, ValidationError } from "@/lib/api/response";
+import { entitlementService } from "@/services/entitlement.service";
+import { FEATURE_KEYS } from "@/lib/billing/features";
 
 export type SequenceStepInput = {
   stepOrder: number;
@@ -47,6 +49,10 @@ export class OutreachSequenceService {
     }
   ) {
     if (!input.name.trim()) throw new ValidationError("Sequence name required");
+    await entitlementService.assertSeatAvailable(
+      organizationId,
+      FEATURE_KEYS.SEQUENCES
+    );
     return prisma.outreachSequence.create({
       data: {
         organizationId,

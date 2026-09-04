@@ -7,6 +7,8 @@ import {
 import { encrypt, decrypt } from "@/lib/crypto/encrypt";
 import { NotFoundError, ValidationError } from "@/lib/api/response";
 import { userIntegrationService } from "@/services/user-integration.service";
+import { entitlementService } from "@/services/entitlement.service";
+import { FEATURE_KEYS } from "@/lib/billing/features";
 
 export class EmailAccountService {
   async list(organizationId: string, userId?: string) {
@@ -66,6 +68,13 @@ export class EmailAccountService {
       where: { organizationId, email },
     });
 
+    if (!existing) {
+      await entitlementService.assertSeatAvailable(
+        organizationId,
+        FEATURE_KEYS.INBOX_ACCOUNTS
+      );
+    }
+
     const data = {
       userId,
       provider: EmailProvider.SMTP,
@@ -112,6 +121,13 @@ export class EmailAccountService {
     const existing = await prisma.emailAccount.findFirst({
       where: { organizationId: input.organizationId, email },
     });
+
+    if (!existing) {
+      await entitlementService.assertSeatAvailable(
+        input.organizationId,
+        FEATURE_KEYS.INBOX_ACCOUNTS
+      );
+    }
 
     const data = {
       userId: input.userId,

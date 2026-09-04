@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { Suspense } from "react";
 import { getCurrentUser } from "@/lib/auth/session";
 import { hasPermission } from "@/lib/auth/permissions";
+import { hasOrgPermission } from "@/lib/tenant/scope";
 import { userIntegrationService } from "@/services/user-integration.service";
 import { serviceCatalogService } from "@/services/service-catalog.service";
 import { UserManagementPanel } from "@/components/dashboard/user-management-panel";
@@ -11,6 +12,7 @@ import { IntegrationsPanel } from "@/components/settings/integrations-panel";
 import { ProfileSettings } from "@/components/settings/profile-settings";
 import { ServicesPanel } from "@/components/settings/services-panel";
 import { AiUsageCard } from "@/components/settings/ai-usage-card";
+import { BillingPanel } from "@/components/settings/billing-panel";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 export default async function SettingsPage({
@@ -27,11 +29,16 @@ export default async function SettingsPage({
       ? "integrations"
       : params.tab === "services"
         ? "services"
-        : "profile";
+        : params.tab === "billing"
+          ? "billing"
+          : params.tab === "users"
+            ? "users"
+            : "profile";
 
   const canManageUsers = hasPermission(user.role, "users:manage");
   const canManageIntegrations = hasPermission(user.role, "integrations:manage");
   const canManageServices = hasPermission(user.role, "settings:write");
+  const canManageBilling = hasOrgPermission(user, "billing.manage");
 
   const [integrationData, services] = await Promise.all([
     canManageIntegrations && user.organizationId
@@ -47,13 +54,16 @@ export default async function SettingsPage({
       <div>
         <h2 className="text-2xl font-bold tracking-tight">Settings</h2>
         <p className="text-muted-foreground">
-          Manage your profile, integrations, and company services.
+          Manage your profile, billing, integrations, and company services.
         </p>
       </div>
 
       <Tabs defaultValue={defaultTab}>
         <TabsList>
           <TabsTrigger value="profile">Profile</TabsTrigger>
+          {canManageBilling && (
+            <TabsTrigger value="billing">Billing</TabsTrigger>
+          )}
           {canManageIntegrations && (
             <TabsTrigger value="integrations">Integrations</TabsTrigger>
           )}
@@ -75,6 +85,12 @@ export default async function SettingsPage({
             }}
           />
         </TabsContent>
+
+        {canManageBilling && (
+          <TabsContent value="billing" className="mt-4">
+            <BillingPanel />
+          </TabsContent>
+        )}
 
         {canManageIntegrations && integrationData && (
           <TabsContent value="integrations" className="mt-4 space-y-6">

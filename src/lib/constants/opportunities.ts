@@ -23,6 +23,7 @@ export const OPPORTUNITY_STAGE_LABELS: Record<OpportunityStage, string> = {
   QUALIFIED: "Qualified",
   CONTACTED: "Contacted",
   REPLIED: "Replied",
+  DISCOVERY: "Discovery",
   MEETING: "Meeting",
   PROPOSAL: "Proposal",
   NEGOTIATION: "Negotiation",

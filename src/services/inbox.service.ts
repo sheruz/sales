@@ -16,6 +16,8 @@ import { aiComplete, parseAIJson } from "@/lib/ai/provider";
 import { emailAccountService } from "@/services/email-account.service";
 import { emailProviderService } from "@/services/email-provider.service";
 import { emailSafetyService } from "@/services/email-safety.service";
+import { entitlementService } from "@/services/entitlement.service";
+import { FEATURE_KEYS } from "@/lib/billing/features";
 
 type InboundNormalized = {
   providerMessageId: string;
@@ -141,6 +143,11 @@ export class InboxService {
       idempotencyKey: input.idempotencyKey,
     });
     if (!safety.ok) throw new ValidationError(safety.reason);
+
+    await entitlementService.assertAndConsume(
+      input.organizationId,
+      FEATURE_KEYS.EMAILS
+    );
 
     let conversationId = input.conversationId ?? null;
     if (!conversationId) {

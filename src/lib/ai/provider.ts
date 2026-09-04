@@ -4,6 +4,9 @@ import { OpenAIProvider } from "./openai";
 import { resolveAiRuntime } from "./resolve-config";
 import { logAIUsage } from "./usage";
 import type { AICompletionOptions, AICompletionResult, AIProvider } from "./types";
+import { entitlementService } from "@/services/entitlement.service";
+import { FEATURE_KEYS } from "@/lib/billing/features";
+import { UsageMetric } from "@prisma/client";
 
 const openaiProvider = new OpenAIProvider();
 const anthropicProvider = new AnthropicProvider();
@@ -25,6 +28,13 @@ export async function aiComplete(
     operation?: string;
   }
 ): Promise<AICompletionResult> {
+  if (options.organizationId) {
+    await entitlementService.assertAndConsume(
+      options.organizationId,
+      FEATURE_KEYS.AI_CALLS
+    );
+  }
+
   const runtime = await resolveAiRuntime(options.userId, options.feature);
   const provider = getProvider(runtime.provider);
   const requestId = crypto.randomUUID();
@@ -35,6 +45,14 @@ export async function aiComplete(
       apiKey: runtime.apiKey,
       model: runtime.model,
     });
+
+    if (options.organizationId && (result.totalTokens ?? 0) > 0) {
+      await entitlementService.incrementUsage(
+        options.organizationId,
+        UsageMetric.TOKENS,
+        result.totalTokens ?? 0
+      );
+    }
 
     await logAIUsage({
       organizationId: options.organizationId,

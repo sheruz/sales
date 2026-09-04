@@ -3,7 +3,9 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
+  BarChart3,
   Brain,
+  Briefcase,
   CircleDollarSign,
   Crosshair,
   Flame,
@@ -38,10 +40,14 @@ import type { AuthUser } from "@/types/auth";
 const mainNav = [
   { title: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
   { title: "Opportunities", href: "/dashboard/opportunities", icon: Flame },
+  { title: "Pipeline", href: "/dashboard/pipeline", icon: Briefcase },
+  { title: "Analytics", href: "/dashboard/analytics", icon: BarChart3 },
   { title: "Leads", href: "/dashboard/leads", icon: Users },
   { title: "Campaigns", href: "/dashboard/campaigns", icon: Target },
   { title: "Autopilot", href: "/dashboard/autopilot", icon: Rocket },
   { title: "Inbox", href: "/dashboard/conversations", icon: MessageSquare },
+  { title: "Meetings", href: "/dashboard/meetings", icon: ListTodo },
+  { title: "Proposals", href: "/dashboard/proposals", icon: Package },
   { title: "Tasks", href: "/dashboard/tasks", icon: ListTodo },
 ];
 

@@ -18,6 +18,8 @@ import {
 import { ROLE_KEYS } from "@/lib/auth/permission-catalog";
 import { deleteUserSessions } from "@/lib/auth/session";
 import { logger } from "@/lib/logger";
+import { entitlementService } from "@/services/entitlement.service";
+import { FEATURE_KEYS } from "@/lib/billing/features";
 
 export class OrganizationService {
   async ensureRbacSeeded() {
@@ -86,8 +88,8 @@ export class OrganizationService {
     const slug = await ensureUniqueOrgSlug(input.slug ?? input.name);
     const companyAdminRole = await getRoleByKey(ROLE_KEYS.COMPANY_ADMIN);
 
-    return prisma.$transaction(async (tx) => {
-      const org = await tx.organization.create({
+    const org = await prisma.$transaction(async (tx) => {
+      const created = await tx.organization.create({
         data: {
           name: input.name.trim(),
           slug,
@@ -123,7 +125,7 @@ export class OrganizationService {
         });
         await tx.organizationUser.create({
           data: {
-            organizationId: org.id,
+            organizationId: created.id,
             userId: admin.id,
             roleId: companyAdminRole.id,
             status: MembershipStatus.ACTIVE,
@@ -133,8 +135,11 @@ export class OrganizationService {
         });
       }
 
-      return org;
+      return created;
     });
+
+    await entitlementService.ensureSubscription(org.id);
+    return org;
   }
 
   async updateOrganization(
@@ -213,6 +218,11 @@ export class OrganizationService {
     if (role.scope !== "ORGANIZATION") {
       throw new ValidationError("Invalid organization role");
     }
+
+    await entitlementService.assertSeatAvailable(
+      input.organizationId,
+      FEATURE_KEYS.USERS
+    );
 
     const email = input.email.toLowerCase().trim();
     const token = generateInviteToken();

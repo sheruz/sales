@@ -9,6 +9,8 @@ import { aiComplete, parseAIJson } from "@/lib/ai/provider";
 import { businessBrainService } from "@/services/business-brain.service";
 import { opportunityService } from "@/services/opportunity.service";
 import { offerService } from "@/services/offer.service";
+import { entitlementService } from "@/services/entitlement.service";
+import { FEATURE_KEYS } from "@/lib/billing/features";
 
 interface IntelligenceAIResult {
   whyNow: string;
@@ -137,6 +139,15 @@ export class OpportunityIntelligenceService {
         }),
       };
     }
+
+    await entitlementService.assertFeature(
+      organizationId,
+      FEATURE_KEYS.ADVANCED_AI
+    );
+    await entitlementService.assertAndConsume(
+      organizationId,
+      FEATURE_KEYS.ENRICHMENT
+    );
 
     const brain = await businessBrainService.getSafeContext(organizationId);
     if (!brain.services.length) {

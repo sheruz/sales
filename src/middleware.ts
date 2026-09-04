@@ -7,6 +7,7 @@ const publicPages = [
   "/invite",
   "/forgot-password",
   "/reset-password",
+  "/signup",
 ];
 
 export function middleware(request: NextRequest) {

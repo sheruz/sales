@@ -13,6 +13,7 @@ import {
 import { opportunityService } from "@/services/opportunity.service";
 import { getCurrentUser } from "@/lib/auth/session";
 import { OpportunityDetailClient } from "@/components/opportunities/opportunity-detail-client";
+import { OpportunityCrmActions } from "@/components/crm/opportunity-crm-actions";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -253,6 +254,90 @@ export default async function OpportunityDetailPage({ params }: PageProps) {
           </CardContent>
         </Card>
       </div>
+
+      <OpportunityCrmActions
+        opportunityId={opportunity.id}
+        companyId={opportunity.companyId}
+        contactId={opportunity.primaryContactId ?? opportunity.recommendedContactId}
+        currency={opportunity.currency}
+        estimatedValue={estimatedValue}
+      />
+
+      {(opportunity.meetings.length > 0 ||
+        opportunity.proposals.length > 0 ||
+        opportunity.deals.length > 0 ||
+        opportunity.tasks.length > 0) && (
+        <div className="grid gap-4 md:grid-cols-2">
+          {opportunity.meetings.length > 0 && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-base">Meetings</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-2 text-sm">
+                {opportunity.meetings.map((m) => (
+                  <div key={m.id} className="flex justify-between gap-2">
+                    <span>{m.title}</span>
+                    <Badge variant="outline">{m.outcome}</Badge>
+                  </div>
+                ))}
+              </CardContent>
+            </Card>
+          )}
+          {opportunity.proposals.length > 0 && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-base">Proposals</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-2 text-sm">
+                {opportunity.proposals.map((p) => (
+                  <div key={p.id} className="flex justify-between gap-2">
+                    <span>{p.title}</span>
+                    <Badge variant="outline">{p.status}</Badge>
+                  </div>
+                ))}
+              </CardContent>
+            </Card>
+          )}
+          {opportunity.deals.length > 0 && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-base">Deal & revenue</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-2 text-sm">
+                {opportunity.deals.map((d) => (
+                  <div key={d.id} className="space-y-1">
+                    <div className="flex justify-between gap-2">
+                      <span>{d.name}</span>
+                      <Badge variant="outline">{d.stage}</Badge>
+                    </div>
+                    {d.revenueEntries?.map((r) => (
+                      <p key={r.id} className="text-xs text-muted-foreground">
+                        Revenue {r.currency} {Number(r.amount).toLocaleString()} ·{" "}
+                        {r.status}
+                      </p>
+                    ))}
+                  </div>
+                ))}
+              </CardContent>
+            </Card>
+          )}
+          {opportunity.tasks.length > 0 && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-base">Tasks</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-2 text-sm">
+                {opportunity.tasks.map((t) => (
+                  <div key={t.id} className="flex justify-between gap-2">
+                    <span>{t.title}</span>
+                    <Badge variant="outline">{t.status}</Badge>
+                  </div>
+                ))}
+              </CardContent>
+            </Card>
+          )}
+        </div>
+      )}
 
       <div className="grid gap-6 lg:grid-cols-3">
         <div className="space-y-4 lg:col-span-1">

@@ -14,6 +14,8 @@ import {
   isEmailConfiguredForOutreach,
   type OutreachChannel,
 } from "@/lib/outreach/channels";
+import { entitlementService } from "@/services/entitlement.service";
+import { FEATURE_KEYS } from "@/lib/billing/features";
 
 const LOCKABLE_STATUSES: AutomationStatus[] = [
   AutomationStatus.IDLE,
@@ -79,6 +81,10 @@ export class AutomationService {
     userId?: string,
     channels?: OutreachChannel[]
   ) {
+    await entitlementService.assertAndConsume(
+      organizationId,
+      FEATURE_KEYS.AUTOMATION
+    );
     const resolvedChannels =
       channels ?? (userId ? await getOutreachChannelsForUser(userId) : ["email"]);
     const results = [];

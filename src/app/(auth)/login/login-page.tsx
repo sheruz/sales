@@ -128,6 +128,11 @@ export default function LoginPage() {
         </Card>
 
         <p className="text-center text-xs text-muted-foreground">
+          No account?{" "}
+          <Link href="/signup" className="hover:underline">
+            Sign up
+          </Link>
+          {" · "}
           <Link href="/" className="hover:underline">
             Back to home
           </Link>

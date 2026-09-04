@@ -11,6 +11,8 @@ import {
 import { NotFoundError, ValidationError } from "@/lib/api/response";
 import { businessBrainService } from "@/services/business-brain.service";
 import { companyService, extractDomain } from "@/services/company.service";
+import { entitlementService } from "@/services/entitlement.service";
+import { FEATURE_KEYS } from "@/lib/billing/features";
 
 export type OpportunityListFilter =
   | "all"
@@ -163,6 +165,25 @@ export class OpportunityService {
             },
           },
         },
+        deals: {
+          where: { deletedAt: null },
+          orderBy: { updatedAt: "desc" },
+          take: 5,
+          include: {
+            revenueEntries: { orderBy: { recognizedAt: "desc" }, take: 3 },
+          },
+        },
+        meetings: { orderBy: { date: "desc" }, take: 10 },
+        proposals: { orderBy: { updatedAt: "desc" }, take: 10 },
+        tasks: {
+          orderBy: { dueDate: "asc" },
+          take: 20,
+          include: {
+            assignedTo: {
+              select: { id: true, firstName: true, lastName: true },
+            },
+          },
+        },
         owner: { select: { id: true, firstName: true, lastName: true, email: true } },
         campaign: { select: { id: true, name: true } },
         source: true,
@@ -229,6 +250,53 @@ export class OpportunityService {
         await this.addEvent(organizationId, id, OpportunityEventType.WON, {
           actorId,
         });
+        // Close the revenue path: ensure deal + recognize revenue
+        const { dealService } = await import("@/services/deal.service");
+        const deal = await dealService.ensureForOpportunity(
+          organizationId,
+          id,
+          actorId
+        );
+        if (deal.stage !== "WON") {
+          await prisma.deal.update({
+            where: { id: deal.id },
+            data: {
+              stage: "WON",
+              probability: 100,
+              wonAt: new Date(),
+              actualCloseDate: new Date(),
+            },
+          });
+          await prisma.dealActivity.create({
+            data: {
+              dealId: deal.id,
+              fromStage: deal.stage,
+              toStage: "WON",
+              notes: "Won via opportunity stage",
+            },
+          });
+        }
+        const revenue = await dealService.recognizeRevenue(organizationId, deal.id);
+        const { learningService } = await import("@/services/learning.service");
+        const snap = await learningService.snapshotOpportunity(organizationId, id);
+        await learningService.record({
+          organizationId,
+          opportunityId: id,
+          eventType: "WON",
+          inputContext: snap ?? undefined,
+          action: "mark_won",
+          result: "won",
+          revenue: revenue ? Number(revenue.amount) : Number(deal.estimatedValue),
+        });
+        await learningService.record({
+          organizationId,
+          opportunityId: id,
+          eventType: "REVENUE",
+          inputContext: snap ?? undefined,
+          action: "recognize_revenue",
+          result: "recognized",
+          revenue: revenue ? Number(revenue.amount) : Number(deal.estimatedValue),
+        });
       }
       if (data.stage === OpportunityStage.LOST) {
         await prisma.opportunity.update({
@@ -237,6 +305,62 @@ export class OpportunityService {
         });
         await this.addEvent(organizationId, id, OpportunityEventType.LOST, {
           actorId,
+        });
+        const { dealService } = await import("@/services/deal.service");
+        const deal = await dealService.ensureForOpportunity(
+          organizationId,
+          id,
+          actorId
+        );
+        if (deal.stage !== "LOST") {
+          await prisma.deal.update({
+            where: { id: deal.id },
+            data: {
+              stage: "LOST",
+              probability: 0,
+              lostAt: new Date(),
+              actualCloseDate: new Date(),
+            },
+          });
+        }
+        const { learningService } = await import("@/services/learning.service");
+        const snap = await learningService.snapshotOpportunity(organizationId, id);
+        await learningService.record({
+          organizationId,
+          opportunityId: id,
+          eventType: "LOST",
+          inputContext: snap ?? undefined,
+          action: "mark_lost",
+          result: "lost",
+        });
+      }
+
+      // Stage transition learning for mid-funnel
+      if (
+        data.stage &&
+        data.stage !== OpportunityStage.WON &&
+        data.stage !== OpportunityStage.LOST
+      ) {
+        const { learningService } = await import("@/services/learning.service");
+        const snap = await learningService.snapshotOpportunity(organizationId, id);
+        const typeMap: Partial<
+          Record<
+            OpportunityStage,
+            "CONTACTED" | "REPLIED" | "MEETING" | "PROPOSAL" | "OTHER"
+          >
+        > = {
+          CONTACTED: "CONTACTED",
+          REPLIED: "REPLIED",
+          MEETING: "MEETING",
+          PROPOSAL: "PROPOSAL",
+        };
+        await learningService.record({
+          organizationId,
+          opportunityId: id,
+          eventType: typeMap[data.stage] ?? "OTHER",
+          inputContext: snap ?? undefined,
+          action: `stage_${data.stage.toLowerCase()}`,
+          result: data.stage,
         });
       }
     }
@@ -575,6 +699,10 @@ export class OpportunityService {
       )?.id ?? ctx.services[0]?.id ?? null;
 
     if (!opportunity) {
+      await entitlementService.assertAndConsume(
+        input.organizationId,
+        FEATURE_KEYS.OPPORTUNITIES
+      );
       opportunity = await prisma.opportunity.create({
         data: {
           organizationId: input.organizationId,
@@ -764,6 +892,11 @@ export class OpportunityService {
     if (!company) throw new ValidationError("Company not found");
 
     const source = await this.ensureSource(organizationId, "manual", "Manual");
+
+    await entitlementService.assertAndConsume(
+      organizationId,
+      FEATURE_KEYS.OPPORTUNITIES
+    );
 
     const opportunity = await prisma.opportunity.create({
       data: {
