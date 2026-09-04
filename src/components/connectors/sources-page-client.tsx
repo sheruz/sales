@@ -212,7 +212,8 @@ export function SourcesPageClient({
           >
             normalized signals
           </Link>
-          — raw connector payloads stay in the source layer.
+          — connectors use official APIs, licensed providers, or customer data
+          (no scrape-based foundation).
         </p>
         <Button size="sm" onClick={() => setShowForm(!showForm)}>
           <Plus className="mr-2 h-4 w-4" />

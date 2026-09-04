@@ -26,6 +26,9 @@ export const PERMISSION_KEYS = [
   "business_brain.manage",
   "revenue_goals.manage",
   "billing.manage",
+  "agent.view",
+  "agent.manage",
+  "agent.approve",
   "platform.manage",
 ] as const;
 
@@ -65,6 +68,9 @@ export const ROLE_PERMISSION_MAP: Record<string, PermissionKey[]> = {
     "business_brain.manage",
     "revenue_goals.manage",
     "revenue.view",
+    "agent.view",
+    "agent.manage",
+    "agent.approve",
   ],
   sales_rep: [
     "organization.view",
@@ -78,6 +84,7 @@ export const ROLE_PERMISSION_MAP: Record<string, PermissionKey[]> = {
     "deals.manage",
     "integrations.manage",
     "revenue.view",
+    "agent.view",
   ],
   viewer: [
     "organization.view",
@@ -86,6 +93,7 @@ export const ROLE_PERMISSION_MAP: Record<string, PermissionKey[]> = {
     "conversations.view",
     "analytics.view",
     "revenue.view",
+    "agent.view",
   ],
 };
 

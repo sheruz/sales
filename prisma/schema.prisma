@@ -433,6 +433,13 @@ enum SourceConnectorType {
   WEB_RESEARCH
   RFP_TENDER
   CSV_CRM
+  LINKEDIN
+  META
+  INSTAGRAM
+  WEBSITE_VISITORS
+  HUBSPOT
+  SALESFORCE
+  PIPEDRIVE
   CUSTOM
 }
 
@@ -530,6 +537,9 @@ model Organization {
   learningEvents    LearningEvent[]
   subscriptions     Subscription[]
   usageRecords      UsageRecord[]
+  agentGoals        AgentGoal[]
+  agentRuns         AgentRun[]
+  agentActions      AgentAction[]
 
   @@index([status])
   @@index([deletedAt])
@@ -2138,6 +2148,7 @@ model RevenueGoal {
   updatedAt          DateTime          @updatedAt @map("updated_at")
 
   organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  agentGoals   AgentGoal[]
 
   @@index([organizationId])
   @@index([status])
@@ -2557,6 +2568,158 @@ model BillingWebhookEvent {
   @@index([eventType])
   @@index([processedAt])
   @@map("billing_webhook_events")
+}
+
+// ─── Autonomous AI Revenue Agent (Phase 12) ─────────────────────────────────
+
+enum AgentGoalStatus {
+  DRAFT
+  ACTIVE
+  PAUSED
+  COMPLETED
+  CANCELLED
+}
+
+enum AgentRunStatus {
+  PENDING
+  RUNNING
+  AWAITING_APPROVAL
+  COMPLETED
+  FAILED
+  CANCELLED
+}
+
+enum AgentActionStatus {
+  QUEUED
+  AUTHORIZED
+  AWAITING_APPROVAL
+  RUNNING
+  SUCCEEDED
+  FAILED
+  SKIPPED
+  DENIED
+}
+
+enum AgentActionType {
+  READ_CONTEXT
+  ENSURE_ICP
+  RUN_SOURCE_CONNECTOR
+  CREATE_OPPORTUNITY
+  SCORE_OPPORTUNITY
+  RESEARCH_OPPORTUNITY
+  RECOMMEND_SERVICE
+  FIND_DECISION_MAKER
+  CREATE_CAMPAIGN
+  CREATE_SEQUENCE
+  DRAFT_OUTREACH
+  SEND_OUTREACH
+  WATCH_REPLIES
+  SUGGEST_FOLLOW_UP
+  BOOK_MEETING
+  PREPARE_PROPOSAL
+  SEND_PROPOSAL
+  CHANGE_PRICE
+  TRACK_DEAL
+  MEASURE_REVENUE
+  LEARN
+  CREATE_TASK
+  INTERNAL_RECOMMENDATION
+  PRIORITIZE
+  CLASSIFY
+  SUMMARIZE
+  ENABLE_DATA_PROVIDER
+  EXPENSIVE_AI
+  UNUSUAL_VOLUME
+}
+
+model AgentGoal {
+  id               String          @id @default(uuid())
+  organizationId   String          @map("organization_id")
+  revenueGoalId    String          @map("revenue_goal_id")
+  name             String
+  objective        String
+  constraints      Json?
+  allowedChannels  String[]        @default([]) @map("allowed_channels")
+  allowedActions   String[]        @default([]) @map("allowed_actions")
+  approvalPolicy   Json            @map("approval_policy")
+  maxDailyActions  Int             @default(50) @map("max_daily_actions")
+  maxDailySpend    Decimal         @default(0) @map("max_daily_spend") @db.Decimal(12, 2)
+  status           AgentGoalStatus @default(DRAFT)
+  createdById      String?         @map("created_by_id")
+  createdAt        DateTime        @default(now()) @map("created_at")
+  updatedAt        DateTime        @updatedAt @map("updated_at")
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  revenueGoal  RevenueGoal  @relation(fields: [revenueGoalId], references: [id], onDelete: Cascade)
+  runs         AgentRun[]
+  actions      AgentAction[]
+
+  @@index([organizationId])
+  @@index([revenueGoalId])
+  @@index([status])
+  @@map("agent_goals")
+}
+
+model AgentRun {
+  id                 String         @id @default(uuid())
+  organizationId     String         @map("organization_id")
+  agentGoalId        String         @map("agent_goal_id")
+  status             AgentRunStatus @default(PENDING)
+  triggeredBy        String         @default("USER") @map("triggered_by")
+  idempotencyKey     String         @map("idempotency_key")
+  startedAt          DateTime?      @map("started_at")
+  completedAt        DateTime?      @map("completed_at")
+  actionsCount       Int            @default(0) @map("actions_count")
+  successfulActions  Int            @default(0) @map("successful_actions")
+  failedActions      Int            @default(0) @map("failed_actions")
+  summary            String?
+  error              String?
+  createdAt          DateTime       @default(now()) @map("created_at")
+  updatedAt          DateTime       @updatedAt @map("updated_at")
+
+  organization Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  agentGoal    AgentGoal     @relation(fields: [agentGoalId], references: [id], onDelete: Cascade)
+  actions      AgentAction[]
+
+  @@unique([organizationId, idempotencyKey])
+  @@index([organizationId])
+  @@index([agentGoalId])
+  @@index([status])
+  @@map("agent_runs")
+}
+
+model AgentAction {
+  id               String            @id @default(uuid())
+  organizationId   String            @map("organization_id")
+  agentRunId       String            @map("agent_run_id")
+  agentGoalId      String            @map("agent_goal_id")
+  entityType       String?           @map("entity_type")
+  entityId         String?           @map("entity_id")
+  actionType       AgentActionType   @map("action_type")
+  input            Json?
+  result           Json?
+  status           AgentActionStatus @default(QUEUED)
+  requiresApproval Boolean           @default(false) @map("requires_approval")
+  idempotencyKey   String            @map("idempotency_key")
+  approvedById     String?           @map("approved_by")
+  approvedAt       DateTime?         @map("approved_at")
+  executedAt       DateTime?         @map("executed_at")
+  error            String?
+  createdAt        DateTime          @default(now()) @map("created_at")
+  updatedAt        DateTime          @updatedAt @map("updated_at")
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  agentRun     AgentRun     @relation(fields: [agentRunId], references: [id], onDelete: Cascade)
+  agentGoal    AgentGoal    @relation(fields: [agentGoalId], references: [id], onDelete: Cascade)
+
+  @@unique([organizationId, idempotencyKey])
+  @@index([organizationId])
+  @@index([agentRunId])
+  @@index([agentGoalId])
+  @@index([status])
+  @@index([actionType])
+  @@index([requiresApproval])
+  @@map("agent_actions")
 }
 
 model Settings {

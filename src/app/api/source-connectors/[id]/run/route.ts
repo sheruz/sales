@@ -26,6 +26,10 @@ const runSchema = z.object({
   rows: z.array(z.record(z.string(), z.unknown())).optional(),
   csvText: z.string().max(2_000_000).optional(),
   companies: z.array(z.string()).optional(),
+  /** Official/licensed/customer payloads for Phase 11 connectors */
+  records: z.array(z.record(z.string(), z.unknown())).max(500).optional(),
+  licensedPayload: z.array(z.record(z.string(), z.unknown())).max(500).optional(),
+  events: z.array(z.record(z.string(), z.unknown())).max(500).optional(),
 });
 
 export async function POST(request: NextRequest, { params }: Params) {

@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
+  Bot,
   BarChart3,
   Brain,
   Briefcase,
@@ -45,6 +46,7 @@ const mainNav = [
   { title: "Leads", href: "/dashboard/leads", icon: Users },
   { title: "Campaigns", href: "/dashboard/campaigns", icon: Target },
   { title: "Autopilot", href: "/dashboard/autopilot", icon: Rocket },
+  { title: "Revenue Agent", href: "/dashboard/agent", icon: Bot },
   { title: "Inbox", href: "/dashboard/conversations", icon: MessageSquare },
   { title: "Meetings", href: "/dashboard/meetings", icon: ListTodo },
   { title: "Proposals", href: "/dashboard/proposals", icon: Package },

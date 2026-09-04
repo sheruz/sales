@@ -4,6 +4,15 @@ import { fundingSignalConnector } from "@/lib/connectors/adapters/funding";
 import { webResearchConnector } from "@/lib/connectors/adapters/web-research";
 import { rfpTenderConnector } from "@/lib/connectors/adapters/rfp-tender";
 import { csvCrmConnector } from "@/lib/connectors/adapters/csv-crm";
+import { linkedInSignalConnector } from "@/lib/connectors/adapters/linkedin";
+import { metaSignalConnector } from "@/lib/connectors/adapters/meta";
+import { instagramSignalConnector } from "@/lib/connectors/adapters/instagram";
+import { websiteVisitorsConnector } from "@/lib/connectors/adapters/website-visitors";
+import {
+  hubspotConnector,
+  salesforceConnector,
+  pipedriveConnector,
+} from "@/lib/connectors/adapters/crm";
 
 const adapters: SourceConnectorAdapter[] = [
   hiringSignalConnector,
@@ -11,6 +20,13 @@ const adapters: SourceConnectorAdapter[] = [
   webResearchConnector,
   rfpTenderConnector,
   csvCrmConnector,
+  linkedInSignalConnector,
+  metaSignalConnector,
+  instagramSignalConnector,
+  websiteVisitorsConnector,
+  hubspotConnector,
+  salesforceConnector,
+  pipedriveConnector,
 ];
 
 export function listConnectorAdapters(): SourceConnectorAdapter[] {

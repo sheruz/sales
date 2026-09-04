@@ -1,13 +1,6 @@
-import { ModulePlaceholder } from "@/components/dashboard/module-placeholder";
-import { Bot } from "lucide-react";
+import { redirect } from "next/navigation";
 
+/** Legacy assistant route → Phase 12 agent console */
 export default function AssistantPage() {
-  return (
-    <ModulePlaceholder
-      title="AI Assistant"
-      description="Internal AI chat for sales insights and recommendations."
-      phase="Phase 11"
-      icon={Bot}
-    />
-  );
+  redirect("/dashboard/agent");
 }

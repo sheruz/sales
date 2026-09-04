@@ -27,6 +27,20 @@ function sourceKeyForType(type: SourceConnectorType): { key: string; name: strin
       return { key: "rfp_tender", name: "RFP / Tender" };
     case SourceConnectorType.CSV_CRM:
       return { key: "csv_crm", name: "CSV / CRM import" };
+    case SourceConnectorType.LINKEDIN:
+      return { key: "linkedin", name: "LinkedIn signals" };
+    case SourceConnectorType.META:
+      return { key: "meta", name: "Meta / Facebook signals" };
+    case SourceConnectorType.INSTAGRAM:
+      return { key: "instagram", name: "Instagram signals" };
+    case SourceConnectorType.WEBSITE_VISITORS:
+      return { key: "website_visitors", name: "Website visitor signals" };
+    case SourceConnectorType.HUBSPOT:
+      return { key: "hubspot", name: "HubSpot CRM" };
+    case SourceConnectorType.SALESFORCE:
+      return { key: "salesforce", name: "Salesforce CRM" };
+    case SourceConnectorType.PIPEDRIVE:
+      return { key: "pipedrive", name: "Pipedrive CRM" };
     default:
       return { key: "custom", name: "Custom source" };
   }
