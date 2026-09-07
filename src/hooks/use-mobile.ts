@@ -16,6 +16,21 @@ function getServerSnapshot() {
   return false;
 }
 
+/**
+ * Mobile detection that matches SSR during hydration (always false on server /
+ * first hydrate), then updates. Avoids React #418 text/tree mismatches.
+ */
 export function useIsMobile() {
-  return React.useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot);
+  const isMobile = React.useSyncExternalStore(
+    subscribe,
+    getSnapshot,
+    getServerSnapshot
+  );
+  const [ready, setReady] = React.useState(false);
+  React.useEffect(() => {
+    setReady(true);
+  }, []);
+  // Keep server tree until after mount so mobile clients don't hydrate a different DOM
+  if (!ready) return false;
+  return isMobile;
 }

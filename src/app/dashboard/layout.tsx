@@ -31,8 +31,12 @@ export default async function DashboardLayout({
     redirect("/platform");
   }
 
+  const jar = await cookies();
+  const sidebarCookie = jar.get("sidebar_state")?.value;
+  const defaultOpen = sidebarCookie !== "false";
+
   return (
-    <SidebarProvider>
+    <SidebarProvider defaultOpen={defaultOpen}>
       <AppSidebar user={user} />
       <SidebarInset>
         <DashboardHeader user={user} />

@@ -399,7 +399,7 @@ export function IntegrationsPanel({ initialData }: IntegrationsPanelProps) {
       <IntegrationCard
         icon={<Mail className="h-5 w-5" />}
         title="Gmail"
-        description="Connect Gmail via OAuth to send outreach and sync inbox replies."
+        description="Connect Gmail via OAuth to send outreach and sync inbox replies (required for Sync inbox)."
         price="Bring your own Google account"
         connected={Boolean(gmailConnected)}
         preview={null}
@@ -435,7 +435,7 @@ export function IntegrationsPanel({ initialData }: IntegrationsPanelProps) {
       <IntegrationCard
         icon={<Mail className="h-5 w-5" />}
         title="Email (SMTP)"
-        description={email?.description ?? "SMTP fallback when OAuth is unavailable"}
+        description={email?.description ?? "Outbound SMTP only — use Connect Gmail/Outlook to sync inbound replies"}
         price={email?.monthlyPriceLabel ?? "Bring your own key"}
         connected={email?.isConnected ?? false}
         preview={email?.maskedPreview}

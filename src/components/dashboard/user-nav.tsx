@@ -1,6 +1,5 @@
 "use client";
 
-import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { LogOut, Settings } from "lucide-react";
@@ -23,15 +22,12 @@ interface UserNavProps {
 
 export function UserNav({ user }: UserNavProps) {
   const router = useRouter();
-  const [mounted, setMounted] = useState(false);
-  const initials = `${user.firstName[0]}${user.lastName[0]}`.toUpperCase();
+  const initials =
+    `${user.firstName?.[0] ?? ""}${user.lastName?.[0] ?? ""}`.toUpperCase() ||
+    "?";
   const settingsHref = isSuperAdmin(user.role)
     ? "/platform/settings"
     : "/dashboard/settings";
-
-  useEffect(() => {
-    setMounted(true);
-  }, []);
 
   async function handleLogout() {
     try {
@@ -41,16 +37,6 @@ export function UserNav({ user }: UserNavProps) {
     } catch {
       toast.error("Failed to sign out");
     }
-  }
-
-  if (!mounted) {
-    return (
-      <Button variant="ghost" size="icon" className="size-9 rounded-full" aria-label="User menu">
-        <Avatar className="size-9">
-          <AvatarFallback className="text-xs">{initials}</AvatarFallback>
-        </Avatar>
-      </Button>
-    );
   }
 
   return (
@@ -77,7 +63,7 @@ export function UserNav({ user }: UserNavProps) {
             </p>
             <p className="text-xs text-muted-foreground">{user.email}</p>
             <p className="text-xs text-muted-foreground">
-              {ROLE_LABELS[user.role]}
+              {ROLE_LABELS[user.role] ?? user.role}
             </p>
           </div>
         </DropdownMenuLabel>
@@ -86,8 +72,7 @@ export function UserNav({ user }: UserNavProps) {
           <Settings className="mr-2 h-4 w-4" />
           Settings
         </DropdownMenuItem>
-        <DropdownMenuSeparator />
-        <DropdownMenuItem variant="destructive" onClick={handleLogout}>
+        <DropdownMenuItem onClick={handleLogout}>
           <LogOut className="mr-2 h-4 w-4" />
           Sign out
         </DropdownMenuItem>

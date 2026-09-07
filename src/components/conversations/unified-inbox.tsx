@@ -99,8 +99,31 @@ export function UnifiedInbox({ initialConversations }: UnifiedInboxProps) {
     try {
       const res = await fetch("/api/inbox/sync", { method: "POST" });
       const data = await res.json();
-      if (!data.success) throw new Error(data.error?.message);
-      toast.success("Inbox synced from Gmail/Outlook");
+      if (!data.success) throw new Error(data.error?.message || "Sync failed");
+
+      const payload = data.data as {
+        warning?: string | null;
+        successMessage?: string;
+        synced?: number;
+        errors?: number;
+        oauthAccountCount?: number;
+        smtpAccountsSkipped?: number;
+        results?: Array<{ error?: string; synced?: number }>;
+      };
+
+      if (payload.warning) {
+        toast.warning(payload.warning);
+      } else if (payload.errors && payload.errors > 0 && !(payload.synced ?? 0)) {
+        const firstError = payload.results?.find((r) => r.error)?.error;
+        toast.error(firstError || "Inbox sync failed");
+      } else {
+        toast.success(
+          payload.successMessage ||
+            (payload.synced
+              ? `Imported ${payload.synced} new message(s)`
+              : "Inbox synced — no new messages")
+        );
+      }
       router.refresh();
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Sync failed");
@@ -245,7 +268,7 @@ export function UnifiedInbox({ initialConversations }: UnifiedInboxProps) {
                         <span>
                           {m.fromEmail} → {m.toEmail}
                         </span>
-                        <span>
+                        <span suppressHydrationWarning>
                           {format(
                             new Date(m.receivedAt || m.sentAt || m.createdAt),
                             "MMM d, HH:mm"

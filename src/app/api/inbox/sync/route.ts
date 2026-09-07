@@ -33,8 +33,8 @@ export async function POST(request: Request) {
     }
 
     const user = await requireOrgPermission("integrations.manage");
-    const results = await inboxService.syncAllForOrg(user.organizationId);
-    return NextResponse.json(apiSuccess({ results }));
+    const sync = await inboxService.syncAllForOrg(user.organizationId);
+    return NextResponse.json(apiSuccess(sync));
   } catch (error) {
     return handleApiError(error);
   }

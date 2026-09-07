@@ -54,9 +54,9 @@ type SequenceBuilderProps = {
   canManage: boolean;
 };
 
-function newStep(order: number): BuilderStep {
+function newStep(order: number, key?: string): BuilderStep {
   return {
-    key: `new-${order}-${Math.random().toString(36).slice(2, 8)}`,
+    key: key ?? `draft-step-${order}`,
     stepOrder: order,
     delayMinutes: order === 0 ? 0 : 60 * 24 * 2,
     channel: "EMAIL",
@@ -144,7 +144,12 @@ export function SequenceBuilder({
   }
 
   function addStep() {
-    setSteps((prev) => renumber([...prev, newStep(prev.length)]));
+    setSteps((prev) =>
+      renumber([
+        ...prev,
+        newStep(prev.length, `draft-step-${prev.length}-${Date.now()}`),
+      ])
+    );
     markDirty();
   }
 

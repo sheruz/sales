@@ -18,6 +18,14 @@ import { emailSafetyService } from "@/services/email-safety.service";
 import { entitlementService } from "@/services/entitlement.service";
 import { FEATURE_KEYS } from "@/lib/billing/features";
 import { sanitizeExternalForAI } from "@/lib/security/untrusted-content";
+import {
+  contactEmailMatchWhere,
+  extractEmailAddress,
+  extractGmailBodies,
+  normalizeMessageId,
+  parseMessageIdList,
+  summarizeSyncResults,
+} from "@/lib/email/inbound-sync";
 
 type InboundNormalized = {
   providerMessageId: string;
@@ -28,6 +36,8 @@ type InboundNormalized = {
   fromEmail: string;
   toEmail: string;
   receivedAt?: Date;
+  inReplyTo?: string | null;
+  references?: string | null;
 };
 
 type ClassificationResult = {
@@ -55,11 +65,6 @@ function mapClassification(raw: string): MessageAiClassification {
   if (key.includes("NOT_RELEVANT") || key.includes("IRRELEVANT"))
     return MessageAiClassification.NOT_RELEVANT;
   return MessageAiClassification.UNKNOWN;
-}
-
-function decodeBase64Url(data: string): string {
-  const padded = data.replace(/-/g, "+").replace(/_/g, "/");
-  return Buffer.from(padded, "base64").toString("utf8");
 }
 
 export class InboxService {
@@ -366,11 +371,17 @@ export class InboxService {
 
     const from = inbound.fromEmail.trim().toLowerCase();
     const contact = await prisma.contact.findFirst({
-      where: { organizationId, email: from },
+      where: contactEmailMatchWhere(organizationId, from),
       include: { company: true },
     });
     const lead = await prisma.lead.findFirst({
-      where: { organizationId, email: from, deletedAt: null },
+      where: {
+        organizationId,
+        deletedAt: null,
+        OR: [
+          { email: { equals: from, mode: "insensitive" } },
+        ],
+      },
     });
     const opportunity = contact
       ? await prisma.opportunity.findFirst({
@@ -399,6 +410,34 @@ export class InboxService {
         })
       : null;
 
+    // Match via In-Reply-To / References → existing outbound Message-ID (SMTP + Gmail)
+    if (!conversation) {
+      const replyIds = [
+        normalizeMessageId(inbound.inReplyTo),
+        ...parseMessageIdList(inbound.references ?? undefined),
+      ].filter((id): id is string => Boolean(id));
+
+      for (const replyId of replyIds) {
+        const related = await prisma.message.findFirst({
+          where: {
+            organizationId,
+            OR: [
+              { providerMessageId: replyId },
+              { providerMessageId: `<${replyId}>` },
+              { providerMessageId: { equals: replyId, mode: "insensitive" } },
+            ],
+          },
+          select: { conversationId: true },
+        });
+        if (related?.conversationId) {
+          conversation = await prisma.inboxConversation.findFirst({
+            where: { id: related.conversationId, organizationId },
+          });
+          if (conversation) break;
+        }
+      }
+    }
+
     if (!conversation && contact) {
       conversation = await prisma.inboxConversation.findFirst({
         where: {
@@ -409,6 +448,28 @@ export class InboxService {
         },
         orderBy: { lastMessageAt: "desc" },
       });
+    }
+
+    // Fallback: open thread that already emailed this address (SMTP outbound often lacks threadId)
+    if (!conversation) {
+      const priorOutbound = await prisma.message.findFirst({
+        where: {
+          organizationId,
+          direction: MessageDirection.OUTBOUND,
+          toEmail: from,
+        },
+        orderBy: { sentAt: "desc" },
+        select: { conversationId: true },
+      });
+      if (priorOutbound?.conversationId) {
+        conversation = await prisma.inboxConversation.findFirst({
+          where: {
+            id: priorOutbound.conversationId,
+            organizationId,
+            status: { not: InboxConversationStatus.CLOSED },
+          },
+        });
+      }
     }
 
     if (!conversation) {
@@ -629,7 +690,13 @@ export class InboxService {
     const account = await emailAccountService.getById(organizationId, accountId);
     if (account.provider === EmailProvider.SMTP) {
       await emailAccountService.markSynced(account.id);
-      return { synced: 0, note: "SMTP accounts use outbound-only; no inbox API sync" };
+      return {
+        synced: 0,
+        total: 0,
+        provider: account.provider,
+        skipped: true as const,
+        note: "SMTP is outbound-only — connect Gmail or Outlook OAuth to sync inbound replies",
+      };
     }
 
     try {
@@ -638,7 +705,15 @@ export class InboxService {
           ? await this.fetchGmailInbound(account)
           : await this.fetchOutlookInbound(account);
 
+      console.info("[inbox.sync]", {
+        organizationId,
+        accountId: account.id,
+        provider: account.provider,
+        fetched: inbound.length,
+      });
+
       let synced = 0;
+      let duplicates = 0;
       for (const item of inbound) {
         const result = await this.ingestInbound(
           organizationId,
@@ -647,26 +722,55 @@ export class InboxService {
           userId
         );
         if (result.created) synced += 1;
+        else duplicates += 1;
       }
       await emailAccountService.markSynced(account.id);
-      return { synced, total: inbound.length };
+      console.info("[inbox.sync.done]", {
+        organizationId,
+        accountId: account.id,
+        synced,
+        duplicates,
+        fetched: inbound.length,
+      });
+      return {
+        synced,
+        total: inbound.length,
+        duplicates,
+        provider: account.provider,
+      };
     } catch (error) {
       const msg = error instanceof Error ? error.message : "Sync failed";
+      console.error("[inbox.sync.error]", {
+        organizationId,
+        accountId: account.id,
+        provider: account.provider,
+        error: msg,
+      });
       await emailAccountService.markError(account.id, msg);
       throw error;
     }
   }
 
   async syncAllForOrg(organizationId: string) {
-    const accounts = await prisma.emailAccount.findMany({
-      where: {
-        organizationId,
-        status: "ACTIVE",
-        provider: { in: [EmailProvider.GMAIL, EmailProvider.OUTLOOK] },
-      },
-    });
-    const results = [];
-    for (const account of accounts) {
+    const [oauthAccounts, smtpAccountsSkipped] = await Promise.all([
+      prisma.emailAccount.findMany({
+        where: {
+          organizationId,
+          status: "ACTIVE",
+          provider: { in: [EmailProvider.GMAIL, EmailProvider.OUTLOOK] },
+        },
+      }),
+      prisma.emailAccount.count({
+        where: {
+          organizationId,
+          status: "ACTIVE",
+          provider: EmailProvider.SMTP,
+        },
+      }),
+    ]);
+
+    const results: Array<Record<string, unknown>> = [];
+    for (const account of oauthAccounts) {
       try {
         results.push({
           accountId: account.id,
@@ -676,16 +780,34 @@ export class InboxService {
         results.push({
           accountId: account.id,
           error: error instanceof Error ? error.message : "failed",
+          synced: 0,
+          total: 0,
         });
       }
     }
-    return results;
+
+    const summary = summarizeSyncResults(
+      results as Array<{ synced?: number; total?: number; error?: string }>,
+      {
+        smtpAccountsSkipped,
+        oauthAccountCount: oauthAccounts.length,
+      }
+    );
+
+    return {
+      results,
+      ...summary,
+      smtpAccountsSkipped,
+      oauthAccountCount: oauthAccounts.length,
+    };
   }
 
   private async fetchGmailInbound(account: EmailAccount): Promise<InboundNormalized[]> {
     const token = await emailProviderService.ensureFreshAccessToken(account);
+    // Include primary inbox; replies to outreach land in INBOX for the sending mailbox
     const listRes = await fetch(
-      "https://gmail.googleapis.com/gmail/v1/users/me/messages?maxResults=25&q=in:inbox newer_than:14d",
+      "https://gmail.googleapis.com/gmail/v1/users/me/messages?maxResults=40&q=" +
+        encodeURIComponent("in:inbox newer_than:14d"),
       { headers: { Authorization: `Bearer ${token}` } }
     );
     if (!listRes.ok) {
@@ -704,10 +826,16 @@ export class InboxService {
         threadId?: string;
         internalDate?: string;
         snippet?: string;
+        labelIds?: string[];
         payload?: {
+          mimeType?: string;
           headers?: Array<{ name: string; value: string }>;
           body?: { data?: string };
-          parts?: Array<{ mimeType?: string; body?: { data?: string } }>;
+          parts?: Array<{
+            mimeType?: string;
+            body?: { data?: string };
+            parts?: unknown[];
+          }>;
         };
       };
       const headers = msg.payload?.headers ?? [];
@@ -716,35 +844,28 @@ export class InboxService {
       const from = getHeader("From") || "";
       const to = getHeader("To") || account.email;
       const subject = getHeader("Subject");
-      const fromEmail = from.match(/<([^>]+)>/)?.[1] || from;
-      if (!fromEmail || fromEmail.toLowerCase() === account.email.toLowerCase()) {
+      const inReplyTo = getHeader("In-Reply-To") || null;
+      const references = getHeader("References") || null;
+      const fromEmail = extractEmailAddress(from);
+      // Skip mail that originated from this mailbox (SENT copies / self-send)
+      if (!fromEmail || fromEmail === account.email.toLowerCase()) {
         continue;
       }
-      let body = msg.snippet || "";
-      let bodyHtml: string | null = null;
-      const parts = msg.payload?.parts ?? [];
-      for (const part of parts) {
-        if (part.mimeType === "text/plain" && part.body?.data) {
-          body = decodeBase64Url(part.body.data);
-        }
-        if (part.mimeType === "text/html" && part.body?.data) {
-          bodyHtml = decodeBase64Url(part.body.data);
-        }
-      }
-      if (msg.payload?.body?.data) {
-        body = decodeBase64Url(msg.payload.body.data);
-      }
+      const bodies = extractGmailBodies(msg.payload);
+      const body = bodies.text || msg.snippet || bodies.html || "";
       out.push({
         providerMessageId: msg.id,
         threadId: msg.threadId,
         subject,
         body,
-        bodyHtml,
+        bodyHtml: bodies.html,
         fromEmail,
-        toEmail: to.match(/<([^>]+)>/)?.[1] || to,
+        toEmail: extractEmailAddress(to) || account.email.toLowerCase(),
         receivedAt: msg.internalDate
           ? new Date(Number(msg.internalDate))
           : new Date(),
+        inReplyTo,
+        references,
       });
     }
     return out;
@@ -773,8 +894,10 @@ export class InboxService {
     };
     const out: InboundNormalized[] = [];
     for (const msg of data.value ?? []) {
-      const fromEmail = msg.from?.emailAddress?.address;
-      if (!fromEmail || fromEmail.toLowerCase() === account.email.toLowerCase()) {
+      const fromEmail = extractEmailAddress(
+        msg.from?.emailAddress?.address || ""
+      );
+      if (!fromEmail || fromEmail === account.email.toLowerCase()) {
         continue;
       }
       const html =
@@ -789,7 +912,9 @@ export class InboxService {
         bodyHtml: html,
         fromEmail,
         toEmail:
-          msg.toRecipients?.[0]?.emailAddress?.address || account.email,
+          extractEmailAddress(
+            msg.toRecipients?.[0]?.emailAddress?.address || ""
+          ) || account.email.toLowerCase(),
         receivedAt: msg.receivedDateTime
           ? new Date(msg.receivedDateTime)
           : new Date(),
