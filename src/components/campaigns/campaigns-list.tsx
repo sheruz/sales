@@ -48,9 +48,14 @@ interface Service {
 interface CampaignsListProps {
   initialCampaigns: Campaign[];
   services: Service[];
+  canManage?: boolean;
 }
 
-export function CampaignsList({ initialCampaigns, services }: CampaignsListProps) {
+export function CampaignsList({
+  initialCampaigns,
+  services,
+  canManage = false,
+}: CampaignsListProps) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -65,7 +70,14 @@ export function CampaignsList({ initialCampaigns, services }: CampaignsListProps
   });
 
   async function createCampaign() {
-    if (!form.name.trim()) return;
+    if (!form.name.trim()) {
+      toast.error("Campaign name is required");
+      return;
+    }
+    if (!canManage) {
+      toast.error("You do not have permission to create campaigns");
+      return;
+    }
     setIsSubmitting(true);
     try {
       const res = await fetch("/api/campaigns", {
@@ -94,39 +106,40 @@ export function CampaignsList({ initialCampaigns, services }: CampaignsListProps
   return (
     <>
       <div className="flex justify-end">
-        <Dialog open={open} onOpenChange={setOpen}>
-          <DialogTrigger render={<Button><Plus className="mr-2 h-4 w-4" />New Campaign</Button>} />
-          <DialogContent className="max-w-lg">
-            <DialogHeader>
-              <DialogTitle>Create Campaign</DialogTitle>
-            </DialogHeader>
-            <div className="space-y-4">
-              <div>
-                <Label>Name</Label>
-                <Input
-                  value={form.name}
-                  onChange={(e) => setForm({ ...form, name: e.target.value })}
-                  placeholder="Q1 SaaS Outreach"
-                />
-              </div>
-              <div>
-                <Label>Description</Label>
-                <Textarea
-                  value={form.description}
-                  onChange={(e) => setForm({ ...form, description: e.target.value })}
-                  rows={2}
-                />
-              </div>
-              <div>
-                <Label>Target Audience</Label>
-                <Input
-                  value={form.targetAudience}
-                  onChange={(e) => setForm({ ...form, targetAudience: e.target.value })}
-                  placeholder="CTOs at mid-size SaaS companies"
-                />
-              </div>
-              <div>
-                <Label>Service</Label>
+        {canManage ? (
+          <Dialog open={open} onOpenChange={setOpen}>
+            <DialogTrigger render={<Button><Plus className="mr-2 h-4 w-4" />New Campaign</Button>} />
+            <DialogContent className="max-w-lg">
+              <DialogHeader>
+                <DialogTitle>Create Campaign</DialogTitle>
+              </DialogHeader>
+              <div className="space-y-4">
+                <div>
+                  <Label>Name</Label>
+                  <Input
+                    value={form.name}
+                    onChange={(e) => setForm({ ...form, name: e.target.value })}
+                    placeholder="Q1 SaaS Outreach"
+                  />
+                </div>
+                <div>
+                  <Label>Description</Label>
+                  <Textarea
+                    value={form.description}
+                    onChange={(e) => setForm({ ...form, description: e.target.value })}
+                    rows={2}
+                  />
+                </div>
+                <div>
+                  <Label>Target Audience</Label>
+                  <Input
+                    value={form.targetAudience}
+                    onChange={(e) => setForm({ ...form, targetAudience: e.target.value })}
+                    placeholder="CTOs at mid-size SaaS companies"
+                  />
+                </div>
+                <div>
+                  <Label>Service</Label>
                 <Select
                   value={form.serviceId}
                   onValueChange={(v) => v && setForm({ ...form, serviceId: v })}
@@ -156,6 +169,7 @@ export function CampaignsList({ initialCampaigns, services }: CampaignsListProps
             </div>
           </DialogContent>
         </Dialog>
+        ) : null}
       </div>
 
       {initialCampaigns.length === 0 ? (

@@ -83,10 +83,18 @@ Channel support for execution: **EMAIL only**. Other channels may be stored but 
 
 ## 6. Duplicate-send protection
 
-Per CampaignLead / lead:
+Per CampaignLead / lead / contact:
 
-1. On bridge: cancel PENDING FollowUpJobs for that lead
-2. On FollowUpJob processing: if `CampaignLead.bridgedAt` **or** open `SequenceEnrollment` for the lead → cancel job and skip send
+1. On bridge: cancel PENDING **and** PROCESSING FollowUpJobs for that lead
+2. On `runPipeline` / Autopilot: skip if conflict detected
+3. On FollowUpJob processing: cancel if conflict (pre-claim + post-claim)
+
+Conflict detection (`detectLegacyCanonicalConflict`):
+
+- `CampaignLead.bridgedAt` for the lead
+- Open SequenceEnrollment by `leadId`
+- Open enrollment via `Contact.leadId`
+- Open enrollment via org-scoped email match
 
 Does **not** globally disable legacy automation.
 

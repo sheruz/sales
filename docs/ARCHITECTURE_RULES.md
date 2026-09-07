@@ -55,8 +55,12 @@ Legacy Conversation
 
 ```text
 CampaignLead → Lead bridge → Company+Contact → SequenceEnrollment
-(+ cancel PENDING FollowUpJobs for that lead)
+(+ cancel PENDING/PROCESSING FollowUpJobs for that lead)
 ```
+
+**Duplicate-send protection:** `detectLegacyCanonicalConflict` blocks legacy
+`runPipeline` / Autopilot and cancels due FollowUpJobs when `CampaignLead.bridgedAt`
+or an open SequenceEnrollment exists for the lead / linked contact / matching email.
 
 Do **not** bulk dual-write every CampaignLead.
 

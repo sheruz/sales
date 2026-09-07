@@ -36,9 +36,14 @@ interface CampaignDetailProps {
     repliedLeads: number;
     hotLeads: number;
   };
+  canManageCampaigns?: boolean;
 }
 
-export function CampaignDetail({ campaign, stats }: CampaignDetailProps) {
+export function CampaignDetail({
+  campaign,
+  stats,
+  canManageCampaigns = false,
+}: CampaignDetailProps) {
   const router = useRouter();
   const [isDiscovering, setIsDiscovering] = useState(false);
   const [profileUrls, setProfileUrls] = useState("");
@@ -108,9 +113,14 @@ export function CampaignDetail({ campaign, stats }: CampaignDetailProps) {
 
   return (
     <div className="space-y-6">
+      <div className="rounded-md border border-dashed p-3 text-xs text-muted-foreground">
+        Legacy path — LinkedIn discovery creates Leads and CampaignLeads for Autopilot /
+        FollowUpJob. Canonical Contact enrollment is below.
+      </div>
+
       <div className="grid gap-4 md:grid-cols-4">
         {[
-          { label: "Total Leads", value: stats.totalLeads },
+          { label: "Total Leads (legacy)", value: stats.totalLeads },
           { label: "AI Automated", value: stats.automatedLeads },
           { label: "Replied", value: stats.repliedLeads },
           { label: "Hot Leads", value: stats.hotLeads },
@@ -124,12 +134,13 @@ export function CampaignDetail({ campaign, stats }: CampaignDetailProps) {
         ))}
       </div>
 
+      {canManageCampaigns ? (
       <div className="grid gap-6 lg:grid-cols-2">
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-base">
               <Globe className="h-4 w-4" />
-              Import LinkedIn Profiles
+              Legacy — Import LinkedIn Profiles
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
@@ -157,7 +168,7 @@ export function CampaignDetail({ campaign, stats }: CampaignDetailProps) {
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-base">
               <Search className="h-4 w-4" />
-              AI Prospect Finder
+              Legacy — AI Prospect Finder
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
@@ -209,6 +220,11 @@ export function CampaignDetail({ campaign, stats }: CampaignDetailProps) {
           </CardContent>
         </Card>
       </div>
+      ) : (
+        <p className="text-sm text-muted-foreground">
+          Legacy Lead discovery actions require campaigns.manage.
+        </p>
+      )}
 
       {campaign.aiInstructions && (
         <Card>

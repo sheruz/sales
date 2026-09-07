@@ -111,12 +111,14 @@ export class CampaignLeadBridgeService {
       );
     }
 
-    // Cancel pending legacy follow-ups BEFORE creating enrollment (duplicate-send protection)
+    // Cancel pending/processing legacy follow-ups BEFORE creating enrollment (duplicate-send protection)
     const cancelled = await prisma.followUpJob.updateMany({
       where: {
         organizationId,
         leadId: campaignLead.leadId,
-        status: FollowUpJobStatus.PENDING,
+        status: {
+          in: [FollowUpJobStatus.PENDING, FollowUpJobStatus.PROCESSING],
+        },
       },
       data: {
         status: FollowUpJobStatus.CANCELLED,

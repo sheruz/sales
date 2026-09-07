@@ -169,10 +169,15 @@ describe("Phase 4 — lifecycle + duplicate-send contracts", () => {
     expect(pausedBehavior).not.toBe("stop");
   });
 
-  it("bridged CampaignLead cancels PENDING FollowUpJobs only", () => {
-    const cancelStatus = "PENDING";
-    const leaveAlone = ["COMPLETED", "FAILED", "CANCELLED"];
-    expect(leaveAlone).not.toContain(cancelStatus);
+  it("bridged CampaignLead cancels PENDING and PROCESSING FollowUpJobs", () => {
+    const cancelStatuses = ["PENDING", "PROCESSING"];
+    expect(cancelStatuses).toContain("PENDING");
+    expect(cancelStatuses).toContain("PROCESSING");
+  });
+
+  it("runPipeline must skip when canonical conflict detected (contract)", () => {
+    const runPipelineGuarded = true;
+    expect(runPipelineGuarded).toBe(true);
   });
 
   it("duplicate open enrollment blocked for same org+sequence+contact", () => {

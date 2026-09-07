@@ -174,6 +174,10 @@ export function SequenceBuilder({
 
   async function persist(nextStatus?: string) {
     if (!canManage) return;
+    if (status === "ARCHIVED" && nextStatus !== "DRAFT" && nextStatus !== "ACTIVE" && nextStatus !== "PAUSED") {
+      toast.error("Restore an archived sequence before editing content");
+      return;
+    }
     if (validationErrors.length && nextStatus === "ACTIVE") {
       toast.error(validationErrors[0]);
       return;
@@ -185,10 +189,14 @@ export function SequenceBuilder({
 
     setSaving(true);
     try {
+      const targetStatus =
+        nextStatus ??
+        (status === "ARCHIVED" ? "ARCHIVED" : status === "ACTIVE" ? "ACTIVE" : status);
+
       const payload = {
         name: name.trim(),
         description: description.trim() || null,
-        status: nextStatus ?? status,
+        status: targetStatus,
         steps: steps.map((s) => ({
           stepOrder: s.stepOrder,
           delayMinutes: Math.max(0, Number(s.delayMinutes) || 0),
@@ -307,15 +315,15 @@ export function SequenceBuilder({
           <div className="flex flex-wrap gap-2">
             <Button
               variant="outline"
-              disabled={saving || !dirty}
-              onClick={() => persist(status === "ACTIVE" ? "ACTIVE" : "DRAFT")}
+              disabled={saving || !dirty || status === "ARCHIVED"}
+              onClick={() => persist()}
             >
               {saving ? (
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
               ) : (
                 <Save className="mr-2 h-4 w-4" />
               )}
-              Save draft
+              Save
             </Button>
             {status !== "ACTIVE" ? (
               <Button disabled={saving} onClick={() => setLifecycle("ACTIVE")}>

@@ -10,7 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { CAMPAIGN_STATUS_LABELS } from "@/lib/constants/automation";
 import { getCurrentUser } from "@/lib/auth/session";
-import { hasAnyOrgPermission } from "@/lib/tenant/scope";
+import { hasAnyOrgPermission, hasOrgPermission } from "@/lib/tenant/scope";
 
 interface PageProps {
   params: Promise<{ id: string }>;
@@ -19,6 +19,10 @@ interface PageProps {
 export default async function CampaignDetailPage({ params }: PageProps) {
   const user = await getCurrentUser();
   if (!user?.organizationId) redirect("/dashboard");
+  // Match campaign GET API — campaigns.manage required to load campaign data
+  if (!hasOrgPermission(user, "campaigns.manage")) {
+    redirect("/dashboard");
+  }
 
   const { id } = await params;
 
@@ -31,16 +35,31 @@ export default async function CampaignDetailPage({ params }: PageProps) {
 
   const { campaign, stats } = data;
 
-  const [enrollments, sequences] = await Promise.all([
-    sequenceEnrollmentService
-      .list(user.organizationId, { campaignId: id, limit: 50 })
-      .catch(() => ({ items: [] as never[] })),
-    hasAnyOrgPermission(user, ["sequences.view", "sequences.manage"])
-      ? outreachSequenceService.list(user.organizationId)
-      : Promise.resolve([]),
-  ]);
+  let enrollmentsError: string | null = null;
+  let enrollments: Awaited<
+    ReturnType<typeof sequenceEnrollmentService.list>
+  > = {
+    items: [],
+    pagination: { page: 1, limit: 50, total: 0, totalPages: 0 },
+  };
+  try {
+    enrollments = await sequenceEnrollmentService.list(user.organizationId, {
+      campaignId: id,
+      limit: 50,
+    });
+  } catch {
+    enrollmentsError = "Could not load canonical enrollments";
+  }
 
-  const canManage = hasAnyOrgPermission(user, [
+  const sequences = hasAnyOrgPermission(user, [
+    "sequences.view",
+    "sequences.manage",
+  ])
+    ? await outreachSequenceService.list(user.organizationId)
+    : [];
+
+  const canManageCampaigns = hasOrgPermission(user, "campaigns.manage");
+  const canEnroll = hasAnyOrgPermission(user, [
     "campaigns.manage",
     "sequences.manage",
     "opportunities.update",
@@ -85,7 +104,12 @@ export default async function CampaignDetailPage({ params }: PageProps) {
           repliedLeads: stats.repliedLeads,
           hotLeads: stats.hotLeads,
         }}
+        canManageCampaigns={canManageCampaigns}
       />
+
+      {enrollmentsError ? (
+        <p className="text-sm text-destructive">{enrollmentsError}</p>
+      ) : null}
 
       <CampaignCanonicalPanel
         campaignId={campaign.id}
@@ -109,7 +133,8 @@ export default async function CampaignDetailPage({ params }: PageProps) {
           },
           sequenceEnrollment: cl.sequenceEnrollment,
         }))}
-        canManage={canManage}
+        canManageCampaigns={canManageCampaigns}
+        canEnroll={canEnroll}
         canBridge={canBridge}
       />
     </div>

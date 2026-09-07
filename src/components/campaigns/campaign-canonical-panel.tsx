@@ -78,7 +78,10 @@ interface CampaignCanonicalPanelProps {
   sequences: SequenceOption[];
   enrollments: EnrollmentRow[];
   legacyLeads: LegacyLeadRow[];
-  canManage: boolean;
+  /** PATCH default sequence — campaigns.manage */
+  canManageCampaigns: boolean;
+  /** POST enrollments — campaigns.manage | sequences.manage | opportunities.update */
+  canEnroll: boolean;
   canBridge: boolean;
 }
 
@@ -88,7 +91,8 @@ export function CampaignCanonicalPanel({
   sequences,
   enrollments,
   legacyLeads,
-  canManage,
+  canManageCampaigns,
+  canEnroll,
   canBridge,
 }: CampaignCanonicalPanelProps) {
   const router = useRouter();
@@ -145,7 +149,7 @@ export function CampaignCanonicalPanel({
   }
 
   async function saveDefaultSequence(value: string) {
-    if (!canManage) return;
+    if (!canManageCampaigns) return;
     setBusy(true);
     try {
       const res = await fetch(`/api/campaigns/${campaignId}`, {
@@ -169,7 +173,7 @@ export function CampaignCanonicalPanel({
   }
 
   async function enroll() {
-    if (!canManage) return;
+    if (!canEnroll) return;
     if (!contactId) {
       toast.error("Select a contact");
       return;
@@ -261,7 +265,7 @@ export function CampaignCanonicalPanel({
               onValueChange={(v) =>
                 saveDefaultSequence(v === "__none__" || v == null ? "" : v)
               }
-              disabled={!canManage || busy}
+              disabled={!canManageCampaigns || busy}
             >
               <SelectTrigger>
                 <SelectValue placeholder="None" />
@@ -287,7 +291,7 @@ export function CampaignCanonicalPanel({
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
-          {!canManage ? (
+          {!canEnroll ? (
             <p className="text-sm text-muted-foreground">
               You can view enrollments but cannot enroll contacts.
             </p>

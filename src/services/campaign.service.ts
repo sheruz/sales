@@ -107,14 +107,18 @@ export class CampaignService {
     }
 
     const { defaultSequenceId, ...rest } = input;
-    return prisma.campaign.update({
-      where: { id },
+    const updated = await prisma.campaign.updateMany({
+      where: { id, organizationId, deletedAt: null },
       data: {
         ...rest,
         ...(defaultSequenceId !== undefined
           ? { defaultSequenceId: defaultSequenceId || null }
           : {}),
       },
+    });
+    if (updated.count === 0) throw new NotFoundError("Campaign not found");
+    return prisma.campaign.findFirstOrThrow({
+      where: { id, organizationId },
       include: {
         service: { select: { id: true, name: true } },
         defaultSequence: { select: { id: true, name: true, status: true } },

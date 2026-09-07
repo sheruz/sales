@@ -3,10 +3,14 @@ import { campaignService } from "@/services/campaign.service";
 import prisma from "@/lib/db/prisma";
 import { CampaignsList } from "@/components/campaigns/campaigns-list";
 import { getCurrentUser } from "@/lib/auth/session";
+import { hasOrgPermission } from "@/lib/tenant/scope";
 
 export default async function CampaignsPage() {
   const user = await getCurrentUser();
   if (!user?.organizationId) redirect("/dashboard");
+  if (!hasOrgPermission(user, "campaigns.manage")) {
+    redirect("/dashboard");
+  }
 
   const [campaigns, services] = await Promise.all([
     campaignService.list(user.organizationId),
@@ -28,10 +32,15 @@ export default async function CampaignsPage() {
       <div>
         <h2 className="text-2xl font-bold tracking-tight">Campaigns</h2>
         <p className="text-muted-foreground">
-          AI-powered outreach campaigns with LinkedIn lead discovery and automation.
+          Canonical Contact/Opportunity enrollments plus legacy Lead discovery.
+          Prefer Sequences for new outreach automation.
         </p>
       </div>
-      <CampaignsList initialCampaigns={serialized} services={services} />
+      <CampaignsList
+        initialCampaigns={serialized}
+        services={services}
+        canManage
+      />
     </div>
   );
 }

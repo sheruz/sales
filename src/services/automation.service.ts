@@ -16,6 +16,10 @@ import {
 } from "@/lib/outreach/channels";
 import { entitlementService } from "@/services/entitlement.service";
 import { FEATURE_KEYS } from "@/lib/billing/features";
+import {
+  conflictSkipMessage,
+  detectLegacyCanonicalConflict,
+} from "@/lib/sequences/duplicate-send-guard";
 
 const LOCKABLE_STATUSES: AutomationStatus[] = [
   AutomationStatus.IDLE,
@@ -142,6 +146,20 @@ export class AutomationService {
       include: { campaign: { include: { followUpSequence: true } } },
     });
     if (!lead) throw new NotFoundError("Lead not found");
+
+    // Phase 4: never start legacy automation when canonical path owns this recipient
+    const conflict = await detectLegacyCanonicalConflict(
+      organizationId,
+      leadId,
+      lead.email
+    );
+    if (conflict.blocked) {
+      return {
+        skipped: true,
+        leadId,
+        reason: conflictSkipMessage(conflict.reason),
+      };
+    }
 
     if (lead.unsubscribed) {
       throw new ValidationError("Lead has unsubscribed");
@@ -401,32 +419,19 @@ export class AutomationService {
     const results = [];
 
     for (const job of jobs) {
-      // Phase 4 duplicate-send guard: skip if CampaignLead bridged or open canonical enrollment for lead
-      const bridgedCl = await prisma.campaignLead.findFirst({
-        where: {
-          leadId: job.leadId,
-          bridgedAt: { not: null },
-          campaign: { organizationId, deletedAt: null },
-        },
-        select: { id: true },
-      });
-      const openEnrollment = await prisma.sequenceEnrollment.findFirst({
-        where: {
-          organizationId,
-          leadId: job.leadId,
-          status: { in: ["ACTIVE", "PENDING", "PROCESSING", "PAUSED"] },
-        },
-        select: { id: true },
-      });
-      if (bridgedCl || openEnrollment) {
+      // Phase 4 duplicate-send guard (lead + contact.leadId + email match)
+      const conflict = await detectLegacyCanonicalConflict(
+        organizationId,
+        job.leadId,
+        job.lead.email
+      );
+      if (conflict.blocked) {
         await prisma.followUpJob.update({
           where: { id: job.id },
           data: {
             status: FollowUpJobStatus.CANCELLED,
             completedAt: new Date(),
-            lastError: bridgedCl
-              ? "Skipped: CampaignLead bridged to SequenceEnrollment"
-              : "Skipped: open SequenceEnrollment exists for lead",
+            lastError: conflictSkipMessage(conflict.reason),
           },
         });
         results.push({
@@ -448,6 +453,29 @@ export class AutomationService {
           where: { id: job.id },
           data: { status: FollowUpJobStatus.PROCESSING },
         });
+
+        // Re-check after claim — covers bridge race while PENDING → PROCESSING
+        const conflictAfterClaim = await detectLegacyCanonicalConflict(
+          organizationId,
+          job.leadId,
+          job.lead.email
+        );
+        if (conflictAfterClaim.blocked) {
+          await prisma.followUpJob.update({
+            where: { id: job.id },
+            data: {
+              status: FollowUpJobStatus.CANCELLED,
+              completedAt: new Date(),
+              lastError: conflictSkipMessage(conflictAfterClaim.reason),
+            },
+          });
+          results.push({
+            jobId: job.id,
+            status: "cancelled",
+            reason: "canonical_enrollment_active",
+          });
+          continue;
+        }
 
         const meta = job.metadata as { channel?: string } | null;
         let channel = meta?.channel === "email" ? "email" : "linkedin";
