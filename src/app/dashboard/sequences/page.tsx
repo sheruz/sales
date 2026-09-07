@@ -1,9 +1,11 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
+import { Plus } from "lucide-react";
 import { outreachSequenceService } from "@/services/outreach-sequence.service";
 import { getCurrentUser } from "@/lib/auth/session";
-import { hasAnyOrgPermission } from "@/lib/tenant/scope";
+import { hasAnyOrgPermission, hasOrgPermission } from "@/lib/tenant/scope";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import {
   Table,
   TableBody,
@@ -22,16 +24,28 @@ export default async function SequencesPage() {
     redirect("/dashboard");
   }
 
+  const canManage = hasOrgPermission(user, "sequences.manage");
   const sequences = await outreachSequenceService.list(user.organizationId);
 
   return (
     <div className="space-y-6">
-      <div>
-        <h2 className="text-2xl font-bold tracking-tight">Sequences</h2>
-        <p className="text-muted-foreground">
-          Reusable outreach sequences for Opportunity/Contact enrollments
-          {user.organizationName ? ` · ${user.organizationName}` : ""}.
-        </p>
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <h2 className="text-2xl font-bold tracking-tight">Sequences</h2>
+          <p className="text-muted-foreground">
+            Build and activate outreach sequences for Contact / Opportunity
+            enrollments
+            {user.organizationName ? ` · ${user.organizationName}` : ""}.
+          </p>
+        </div>
+        {canManage ? (
+          <Link href="/dashboard/sequences/new">
+            <Button>
+              <Plus className="mr-2 h-4 w-4" />
+              New sequence
+            </Button>
+          </Link>
+        ) : null}
       </div>
 
       <div className="rounded-md border">
@@ -51,7 +65,19 @@ export default async function SequencesPage() {
                   colSpan={4}
                   className="h-24 text-center text-muted-foreground"
                 >
-                  No sequences yet — create via API or seed
+                  {canManage ? (
+                    <>
+                      No sequences yet —{" "}
+                      <Link
+                        href="/dashboard/sequences/new"
+                        className="underline"
+                      >
+                        create one
+                      </Link>
+                    </>
+                  ) : (
+                    "No sequences yet"
+                  )}
                 </TableCell>
               </TableRow>
             ) : (

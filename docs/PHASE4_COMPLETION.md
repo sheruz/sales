@@ -1,127 +1,114 @@
-# Phase 4 Completion Report — Multi-Source Opportunity Connector Framework
+# Phase 4 — Completion Report
 
-**Status:** Complete — awaiting approval before Phase 5  
-**Date:** 2026-09-03  
-**Codebase:** `sales-platform`
+Status: **COMPLETE (code) — PRODUCTION MIGRATION NOT RUN**
+Date: 2026-09-04
 
----
+## 1. What was audited
 
-## Summary
+- Campaign / CampaignLead / Lead / FollowUpJob / Autopilot (legacy intact)
+- OutreachSequence + steps, SequenceEnrollment + executor, inbox/emailSafety
+- Campaign & sequence APIs/UI; cron automation; Phase 1 org helpers
+- Gaps: no campaign Contact enrollment API, no builder UI, no CampaignLead bridge, no stepsSnapshot, defaultSequence unused in UI
 
-The Opportunity Engine is now **provider-independent**. All sources produce the same `NormalizedSignalRecord` shape; ingestion goes through `opportunityService.ingestNormalizedSignal` with deduplication.
+## 2. What was implemented
 
-Job discovery was migrated onto the **Hiring Signal Connector**.
+- Canonical campaign Contact (+ optional Opportunity) enrollment
+- Campaign default sequence wiring (API + UI)
+- Production Sequence Builder (create/edit/lifecycle/steps)
+- Lead bridge reused; CampaignLead → SequenceEnrollment bridge (on-demand)
+- Duplicate-send guards (bridge cancel + FollowUpJob skip)
+- Enrollment `stepsSnapshot` edit safety
+- PAUSED sequence/campaign defers (does not permanently stop)
+- Controlled migrate script + docs + tests
 
----
+## 3. Database changes (additive)
 
-## Acceptance criteria
+| Change | Purpose |
+|--------|---------|
+| `SequenceEnrollmentSource` enum | MANUAL / CAMPAIGN / CAMPAIGN_LEAD_BRIDGE |
+| `sequence_enrollments.source` | Enrollment provenance |
+| `sequence_enrollments.steps_snapshot` | Edit-safety snapshot |
+| `sequence_enrollments.campaign_lead_id` | Bridge link (unique) |
+| `campaign_leads.bridged_at` | Bridge marker (row kept) |
 
-| Criterion | Status |
-|-----------|--------|
-| Provider-independent connector framework | Done |
-| `source_connectors` + `source_runs` | Done |
-| Interface: connect/validate/fetch/normalize (+ disconnect hooks) | Done |
-| Hiring Signal Connector (company, job, URL, title, tech, location, date, description, confidence) | Done |
-| Funding / Web research / RFP-Tender / CSV-CRM connectors | Done |
-| Dedup: org, domain, name, email, external ID, fingerprint | Done |
-| Engine does not care about job board vs funding vs CSV vs CRM | Done |
+Script: `scripts/phase4-campaign-migrate.js` → `npm run db:migrate:campaigns`
 
----
+## 4. API changes
 
-## Architecture
+- `GET/POST /api/campaigns/[id]/enrollments`
+- `POST /api/campaigns/[id]/campaign-leads/[campaignLeadId]/bridge`
+- Campaign PATCH accepts `defaultSequenceId`
+- Sequence PATCH returns `editSafety` metadata when steps change
+- Existing `POST /api/leads/[id]/bridge` unchanged
 
-```
-SourceConnectorAdapter (HIRING | FUNDING | WEB_RESEARCH | RFP_TENDER | CSV_CRM)
-        ↓ fetch + normalize
-NormalizedSignalRecord
-        ↓ dedupe
-opportunityService.ingestNormalizedSignal
-        ↓
-Company + Contact + Signal + Opportunity + Score
-```
+## 5. UI changes
 
----
+- Campaign detail: Legacy CampaignLeads + Canonical enrollments + Enroll Contact + default sequence + Bridge action
+- Sequences list: create CTA
+- `/dashboard/sequences/new` + builder on `[id]`
 
-## Database changes
+## 6. Sequence builder
 
-| Table | Purpose |
-|-------|---------|
-| `source_connectors` | Org-configured connectors (type, provider, encrypted credentials, config, status) |
-| `source_runs` | Sync run metrics (found/created/updated/failed/skipped) |
-| `signals` (extended) | `source_connector_id`, `source_run_id`, `fingerprint`, `external_id` |
+Supports name/description, steps (delay days, subject, body), reorder, delete, save draft, activate, pause, archive. View-only for `sequences.view`. EMAIL-only execution; unsaved warning; confirmation on delete/archive.
 
-Unique: `(organization_id, fingerprint)` for signal dedupe.
+## 7. Campaign enrollment
 
----
+Lead-independent. Uses explicit `sequenceId` or `campaign.defaultSequenceId`. Source=`CAMPAIGN`. Org-scoped validation + duplicate open enrollment block.
 
-## APIs / UI
+## 8. Lead bridge
 
-| Path | Purpose |
-|------|---------|
-| `GET/POST /api/source-connectors` | List/create |
-| `GET/PATCH /api/source-connectors/[id]` | Detail/update |
-| `POST /api/source-connectors/[id]/run` | Execute fetch→normalize→ingest |
-| `GET /api/source-connectors/runs` | Run history |
-| `/dashboard/sources` (+ `/sources`) | Manage & run connectors |
+Existing Phase 2 service; still Company+Contact only (no forced Opportunity).
 
----
+## 9. CampaignLead bridge
 
-## Files (high level)
+Idempotent: Lead bridge → cancel PENDING FollowUpJobs → SequenceEnrollment → `bridgedAt`. Errors clearly if no ACTIVE sequence.
 
-- `src/lib/connectors/types.ts`, `dedupe.ts`, `registry.ts`
-- `src/lib/connectors/adapters/{hiring,funding,web-research,rfp-tender,csv-crm}.ts`
-- `src/services/source-connector.service.ts`
-- `src/services/opportunity.service.ts` — `ingestNormalizedSignal`
-- `src/services/job-discovery.service.ts` — uses Hiring connector + source runs
-- `src/app/api/source-connectors/**`
-- `src/app/dashboard/sources/**`
+## 10. Duplicate-send protection
 
----
+1. Bridge cancels PENDING FollowUpJobs for that lead  
+2. `processFollowUpJobs` skips/cancels if `bridgedAt` or open SequenceEnrollment for lead  
 
-## Tests completed
+## 11. Sequence edit safety
 
-| Check | Result |
-|-------|--------|
-| `npm run typecheck` | Passed |
-| `npm test` (20) | Passed |
-| `npm run build` | Passed |
+**Option B — enrollment stepsSnapshot.** Executor prefers snapshot; live edits affect new enrollments only.
 
----
+## 12. Authorization
 
-## Migration
+Phase 1 `requireOrgPermission` / `requireAnyOrgPermission` + org-scoped lookups. Client `organizationId` ignored.
 
-```bash
-cd /var/www/html/sales
-git pull
-npm run db:push          # additive tables/columns
-npm run build
-pm2 restart sales
-```
+## 13. Tests
 
-If Phase 1 org columns were never applied, use `npm run db:migrate:safe` first.
+`src/lib/sequences/phase4-campaign.test.ts` + full suite: **121 passed**.
 
----
+## 14. Typecheck
 
-## Manual verification
+`npm run typecheck` — **passed**.
 
-1. Open **Sources** → create Hiring connector → Run → Opportunities appear from hiring signals.
-2. Create CSV connector → paste CSV with `company_name,email,signal_title` → Run → CRM_ACTIVITY signals.
-3. Funding / Web Research → Run (needs AI key) → normalized signals, not provider-specific tables.
-4. RFP requires `complianceAcknowledged` before run.
-5. Re-run same hiring signal → skipped via fingerprint dedupe.
-6. Autopilot/job discovery still works and writes `source_runs`.
+## 15. Migration result
+
+Local/staging: run `npm run db:migrate:campaigns` when DB available.
+
+**Production migration: NOT RUN** — awaiting explicit approval.
+
+## 16. Legacy compatibility
+
+CampaignLead, Lead, FollowUpJob, Autopilot, legacy Conversation paths preserved. No Lead retirement. No second email engine.
+
+## 17. Known limitations
+
+- Opportunity picker filters client-side from opportunity list
+- No LinkedIn/Meta execution
+- No bulk CampaignLead migration
+- Pre-Phase-4 enrollments without snapshot fall back to live steps
+- Autopilot still runs for non-bridged leads
+
+## 18. Recommended Phase 5
+
+- Controlled cutover tooling / metrics for bridged vs legacy
+- Enrollment analytics
+- Snapshot backfill for older enrollments
+- Lead retirement plan only after dual-path proven
 
 ---
 
-## Known issues
-
-1. AI-based connectors (hiring/funding/web/RFP) synthesize from model knowledge — not live board scrapes; treat as assistive discovery.
-2. RFP connector requires explicit compliance acknowledgment; no paywalled portal scraping.
-3. Credentials encryption requires `ENCRYPTION_KEY` when storing API keys on connectors.
-4. Conversations still bridge via Lead for hiring path with email.
-
----
-
-## STOP
-
-Phase 4 is complete. Do **not** start Phase 5 until explicitly approved.
+**STOP — Phase 4 complete. Awaiting approval. Do not start Phase 5. Do not run production migrate without explicit approval.**

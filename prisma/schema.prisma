@@ -157,6 +157,13 @@ enum SequenceExecutionStatus {
   SKIPPED
 }
 
+/// How a SequenceEnrollment was created (Phase 4)
+enum SequenceEnrollmentSource {
+  MANUAL
+  CAMPAIGN
+  CAMPAIGN_LEAD_BRIDGE
+}
+
 enum ReplyClassification {
   INTERESTED
   NOT_INTERESTED
@@ -1255,11 +1262,15 @@ model CampaignLead {
   campaignId String   @map("campaign_id")
   leadId     String   @map("lead_id")
   addedAt    DateTime @default(now()) @map("added_at")
+  /// Set when bridged to canonical SequenceEnrollment (Phase 4) — row is never deleted
+  bridgedAt  DateTime? @map("bridged_at")
 
   campaign Campaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
   lead     Lead     @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  sequenceEnrollment SequenceEnrollment?
 
   @@unique([campaignId, leadId])
+  @@index([bridgedAt])
   @@map("campaign_leads")
 }
 
@@ -1684,6 +1695,11 @@ model SequenceEnrollment {
   contactId       String                     @map("contact_id")
   /// LEGACY bridge only — nullable; canonical enrollments do not require Lead
   leadId          String?                    @map("lead_id")
+  /// Optional link back to CampaignLead when created via Phase 4 bridge
+  campaignLeadId  String?                    @unique @map("campaign_lead_id")
+  source          SequenceEnrollmentSource   @default(MANUAL)
+  /// Snapshot of sequence steps at enrollment time — protects running enrollments from live edits
+  stepsSnapshot   Json?                      @map("steps_snapshot")
   status          SequenceEnrollmentStatus   @default(PENDING)
   currentStepOrder Int                       @default(0) @map("current_step_order")
   nextRunAt       DateTime?                  @map("next_run_at")
@@ -1710,6 +1726,7 @@ model SequenceEnrollment {
   opportunity  Opportunity? @relation(fields: [opportunityId], references: [id], onDelete: SetNull)
   contact      Contact      @relation(fields: [contactId], references: [id], onDelete: Cascade)
   lead         Lead?        @relation(fields: [leadId], references: [id], onDelete: SetNull)
+  campaignLead CampaignLead? @relation(fields: [campaignLeadId], references: [id], onDelete: SetNull)
   enrolledBy   User?        @relation("SequenceEnrollmentEnrolledBy", fields: [enrolledById], references: [id], onDelete: SetNull)
   executions   SequenceEnrollmentExecution[]
 
@@ -1719,6 +1736,7 @@ model SequenceEnrollment {
   @@index([opportunityId])
   @@index([contactId])
   @@index([leadId])
+  @@index([source])
   @@index([status, nextRunAt])
   @@index([organizationId, status, nextRunAt])
   @@map("sequence_enrollments")

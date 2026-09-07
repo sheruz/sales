@@ -1,7 +1,9 @@
 import prisma from "@/lib/db/prisma";
-import { NotFoundError } from "@/lib/api/response";
+import { SequenceEnrollmentSource } from "@prisma/client";
+import { NotFoundError, ValidationError } from "@/lib/api/response";
 import type { CreateCampaignInput, UpdateCampaignInput } from "@/lib/validations/automation";
 import { DEFAULT_FOLLOW_UP_STEPS } from "@/lib/constants/automation";
+import { sequenceEnrollmentService } from "@/services/sequence-enrollment.service";
 
 export class CampaignService {
   async list(organizationId: string) {
@@ -9,7 +11,10 @@ export class CampaignService {
       where: { organizationId, deletedAt: null },
       include: {
         service: { select: { id: true, name: true } },
-        _count: { select: { leads: true, campaignLeads: true } },
+        defaultSequence: { select: { id: true, name: true, status: true } },
+        _count: {
+          select: { leads: true, campaignLeads: true, sequenceEnrollments: true },
+        },
       },
       orderBy: { createdAt: "desc" },
     });
@@ -21,7 +26,37 @@ export class CampaignService {
       include: {
         service: true,
         followUpSequence: true,
-        _count: { select: { leads: true, campaignLeads: true } },
+        defaultSequence: {
+          select: { id: true, name: true, status: true, description: true },
+        },
+        campaignLeads: {
+          orderBy: { addedAt: "desc" },
+          take: 100,
+          include: {
+            lead: {
+              select: {
+                id: true,
+                fullName: true,
+                email: true,
+                companyName: true,
+                status: true,
+                automationStatus: true,
+              },
+            },
+            sequenceEnrollment: {
+              select: {
+                id: true,
+                status: true,
+                currentStepOrder: true,
+                nextRunAt: true,
+                stopReason: true,
+              },
+            },
+          },
+        },
+        _count: {
+          select: { leads: true, campaignLeads: true, sequenceEnrollments: true },
+        },
       },
     });
     if (!campaign) throw new NotFoundError("Campaign not found");
@@ -29,6 +64,10 @@ export class CampaignService {
   }
 
   async create(organizationId: string, input: CreateCampaignInput) {
+    if (input.defaultSequenceId) {
+      await this.assertSequenceInOrg(organizationId, input.defaultSequenceId);
+    }
+
     const campaign = await prisma.campaign.create({
       data: {
         organizationId,
@@ -41,8 +80,12 @@ export class CampaignService {
         aiInstructions: input.aiInstructions,
         dailyOutreachLimit: input.dailyOutreachLimit,
         status: input.status,
+        defaultSequenceId: input.defaultSequenceId ?? null,
       },
-      include: { service: { select: { id: true, name: true } } },
+      include: {
+        service: { select: { id: true, name: true } },
+        defaultSequence: { select: { id: true, name: true, status: true } },
+      },
     });
 
     await prisma.followUpSequence.create({
@@ -58,10 +101,24 @@ export class CampaignService {
 
   async update(organizationId: string, id: string, input: UpdateCampaignInput) {
     await this.getById(organizationId, id);
+
+    if (input.defaultSequenceId !== undefined && input.defaultSequenceId !== null) {
+      await this.assertSequenceInOrg(organizationId, input.defaultSequenceId);
+    }
+
+    const { defaultSequenceId, ...rest } = input;
     return prisma.campaign.update({
       where: { id },
-      data: input,
-      include: { service: { select: { id: true, name: true } } },
+      data: {
+        ...rest,
+        ...(defaultSequenceId !== undefined
+          ? { defaultSequenceId: defaultSequenceId || null }
+          : {}),
+      },
+      include: {
+        service: { select: { id: true, name: true } },
+        defaultSequence: { select: { id: true, name: true, status: true } },
+      },
     });
   }
 
@@ -75,30 +132,98 @@ export class CampaignService {
 
   async getStats(organizationId: string, id: string) {
     const campaign = await this.getById(organizationId, id);
-    const [totalLeads, automatedLeads, repliedLeads, hotLeads] = await Promise.all([
-      prisma.lead.count({ where: { organizationId, campaignId: id, deletedAt: null } }),
-      prisma.lead.count({
-        where: {
-          organizationId,
-          campaignId: id,
-          deletedAt: null,
-          automationStatus: { not: "IDLE" },
-        },
-      }),
-      prisma.lead.count({
-        where: {
-          organizationId,
-          campaignId: id,
-          deletedAt: null,
-          status: { in: ["REPLIED", "INTERESTED", "MEETING"] },
-        },
-      }),
-      prisma.lead.count({
-        where: { organizationId, campaignId: id, deletedAt: null, scoreCategory: "HOT" },
-      }),
-    ]);
+    const [totalLeads, automatedLeads, repliedLeads, hotLeads, canonicalEnrollments] =
+      await Promise.all([
+        prisma.lead.count({
+          where: { organizationId, campaignId: id, deletedAt: null },
+        }),
+        prisma.lead.count({
+          where: {
+            organizationId,
+            campaignId: id,
+            deletedAt: null,
+            automationStatus: { not: "IDLE" },
+          },
+        }),
+        prisma.lead.count({
+          where: {
+            organizationId,
+            campaignId: id,
+            deletedAt: null,
+            status: { in: ["REPLIED", "INTERESTED", "MEETING"] },
+          },
+        }),
+        prisma.lead.count({
+          where: {
+            organizationId,
+            campaignId: id,
+            deletedAt: null,
+            scoreCategory: "HOT",
+          },
+        }),
+        prisma.sequenceEnrollment.count({
+          where: { organizationId, campaignId: id },
+        }),
+      ]);
 
-    return { campaign, stats: { totalLeads, automatedLeads, repliedLeads, hotLeads } };
+    return {
+      campaign,
+      stats: {
+        totalLeads,
+        automatedLeads,
+        repliedLeads,
+        hotLeads,
+        canonicalEnrollments,
+      },
+    };
+  }
+
+  /**
+   * Canonical campaign enrollment — Contact required, Opportunity optional.
+   * Uses campaign.defaultSequenceId when sequenceId omitted.
+   */
+  async enrollContact(
+    organizationId: string,
+    campaignId: string,
+    input: {
+      contactId: string;
+      opportunityId?: string | null;
+      sequenceId?: string | null;
+      enrolledById?: string | null;
+    }
+  ) {
+    const campaign = await prisma.campaign.findFirst({
+      where: { id: campaignId, organizationId, deletedAt: null },
+      select: { id: true, defaultSequenceId: true },
+    });
+    if (!campaign) throw new NotFoundError("Campaign not found");
+
+    const sequenceId = input.sequenceId || campaign.defaultSequenceId;
+    if (!sequenceId) {
+      throw new ValidationError(
+        "sequenceId required — or set a default sequence on the campaign"
+      );
+    }
+
+    return sequenceEnrollmentService.enroll(organizationId, {
+      sequenceId,
+      contactId: input.contactId,
+      opportunityId: input.opportunityId,
+      campaignId,
+      source: SequenceEnrollmentSource.CAMPAIGN,
+      enrolledById: input.enrolledById,
+      startImmediately: true,
+    });
+  }
+
+  private async assertSequenceInOrg(organizationId: string, sequenceId: string) {
+    const sequence = await prisma.outreachSequence.findFirst({
+      where: { id: sequenceId, organizationId },
+      select: { id: true },
+    });
+    if (!sequence) {
+      throw new ValidationError("Sequence not found in your organization");
+    }
   }
 }
 

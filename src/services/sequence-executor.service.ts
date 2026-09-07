@@ -21,6 +21,10 @@ import {
   enrollmentStepIdempotencyKey,
   renderSequenceTemplate,
 } from "@/lib/sequences/runtime";
+import {
+  resolveEnrollmentSteps,
+  type StepSnapshotItem,
+} from "@/services/sequence-enrollment.service";
 
 const CLAIM_STALE_MS = 5 * 60_000;
 const BATCH_SIZE = 20;
@@ -158,6 +162,33 @@ export class SequenceExecutorService {
 
     const orgId = enrollment.organizationId;
 
+    // Phase 4: PAUSED sequence/campaign → defer, do not permanently stop
+    if (
+      enrollment.sequence.status === OutreachSequenceStatus.PAUSED ||
+      enrollment.campaign?.status === CampaignStatus.PAUSED
+    ) {
+      const nextRunAt = new Date(Date.now() + 60 * 60_000);
+      await prisma.sequenceEnrollment.updateMany({
+        where: { id: enrollment.id, claimToken, organizationId: orgId },
+        data: {
+          status: SequenceEnrollmentStatus.ACTIVE,
+          nextRunAt,
+          lastError:
+            enrollment.sequence.status === OutreachSequenceStatus.PAUSED
+              ? "Deferred: sequence paused"
+              : "Deferred: campaign paused",
+          claimToken: null,
+          claimedAt: null,
+        },
+      });
+      return {
+        enrollmentId: enrollment.id,
+        organizationId: orgId,
+        status: "deferred",
+        reason: "paused",
+      };
+    }
+
     // Stop condition checks
     const stop = await this.evaluateStopConditions(enrollment);
     if (stop) {
@@ -180,7 +211,9 @@ export class SequenceExecutorService {
       };
     }
 
-    const step = enrollment.sequence.steps.find(
+    // Prefer enrollment stepsSnapshot so live sequence edits cannot corrupt running enrollments
+    const steps = resolveEnrollmentSteps(enrollment);
+    const step = steps.find(
       (s) => s.stepOrder === enrollment.currentStepOrder && s.isActive
     );
     if (!step) {
@@ -204,11 +237,8 @@ export class SequenceExecutorService {
     }
 
     if (step.channel !== ConversationChannel.EMAIL) {
-      // Phase 3: email only — skip non-email steps without failing forever
-      const next = this.findNextStep(
-        enrollment.sequence.steps,
-        enrollment.currentStepOrder
-      );
+      // Phase 3/4: email only — skip non-email steps without failing forever
+      const next = this.findNextStep(steps, enrollment.currentStepOrder);
       if (!next) {
         await this.complete(enrollment.id, orgId, claimToken);
         return {
@@ -298,7 +328,8 @@ export class SequenceExecutorService {
       return this.advanceAfterSuccess(
         enrollment,
         claimToken,
-        step.stepOrder
+        step.stepOrder,
+        steps
       );
     }
 
@@ -364,7 +395,8 @@ export class SequenceExecutorService {
       return this.advanceAfterSuccess(
         enrollment,
         claimToken,
-        step.stepOrder
+        step.stepOrder,
+        steps
       );
     } catch (err) {
       const message = err instanceof Error ? err.message : "send failed";
@@ -411,7 +443,8 @@ export class SequenceExecutorService {
         return this.advanceAfterSuccess(
           enrollment,
           claimToken,
-          step.stepOrder
+          step.stepOrder,
+          steps
         );
       }
 
@@ -472,15 +505,12 @@ export class SequenceExecutorService {
       id: string;
       organizationId: string;
       currentStepOrder: number;
-      sequence: { steps: { stepOrder: number; delayMinutes: number; isActive: boolean }[] };
     },
     claimToken: string,
-    completedStepOrder: number
+    completedStepOrder: number,
+    steps: StepSnapshotItem[]
   ): Promise<ProcessResult> {
-    const next = this.findNextStep(
-      enrollment.sequence.steps,
-      completedStepOrder
-    );
+    const next = this.findNextStep(steps, completedStepOrder);
     const now = new Date();
 
     if (!next) {
@@ -555,11 +585,7 @@ export class SequenceExecutorService {
     ) {
       return SequenceEnrollmentStopReason.SEQUENCE_INACTIVE;
     }
-    // PAUSED sequence: do not execute — defer by returning SEQUENCE_INACTIVE for stop,
-    // or we could leave ACTIVE and skip. Spec: sequence deactivated → stop.
-    if (enrollment.sequence.status === OutreachSequenceStatus.PAUSED) {
-      return SequenceEnrollmentStopReason.SEQUENCE_INACTIVE;
-    }
+    // PAUSED sequence/campaign handled earlier via defer (not permanent stop)
 
     if (enrollment.campaign) {
       if (
@@ -567,9 +593,6 @@ export class SequenceExecutorService {
         enrollment.campaign.status === CampaignStatus.COMPLETED ||
         enrollment.campaign.status === CampaignStatus.DRAFT
       ) {
-        return SequenceEnrollmentStopReason.CAMPAIGN_INACTIVE;
-      }
-      if (enrollment.campaign.status === CampaignStatus.PAUSED) {
         return SequenceEnrollmentStopReason.CAMPAIGN_INACTIVE;
       }
     }

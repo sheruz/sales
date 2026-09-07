@@ -1,10 +1,14 @@
 import { notFound } from "next/navigation";
+import Link from "next/link";
 import { format } from "date-fns";
+import { ArrowLeft } from "lucide-react";
 import { outreachSequenceService } from "@/services/outreach-sequence.service";
 import { sequenceEnrollmentService } from "@/services/sequence-enrollment.service";
 import { getCurrentUser } from "@/lib/auth/session";
-import { hasAnyOrgPermission } from "@/lib/tenant/scope";
+import { hasAnyOrgPermission, hasOrgPermission } from "@/lib/tenant/scope";
+import { SequenceBuilder } from "@/components/sequences/sequence-builder";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import {
   Card,
   CardContent,
@@ -25,6 +29,7 @@ export default async function SequenceDetailPage({ params }: PageProps) {
     notFound();
   }
 
+  const canManage = hasOrgPermission(user, "sequences.manage");
   const { id } = await params;
   let sequence;
   try {
@@ -39,16 +44,17 @@ export default async function SequenceDetailPage({ params }: PageProps) {
   );
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-8">
+      <Link href="/dashboard/sequences">
+        <Button variant="ghost" size="sm">
+          <ArrowLeft className="mr-2 h-4 w-4" />
+          Back
+        </Button>
+      </Link>
+
       <div>
-        <div className="flex items-center gap-3">
-          <h2 className="text-2xl font-bold tracking-tight">{sequence.name}</h2>
-          <Badge variant="secondary">{sequence.status}</Badge>
-        </div>
+        <h2 className="text-2xl font-bold tracking-tight">Sequence Builder</h2>
         <p className="text-muted-foreground">
-          {sequence.description || "Outreach sequence"}
-        </p>
-        <p className="mt-1 text-xs text-muted-foreground">
           Active {sequence.enrollmentStats.active} · Completed{" "}
           {sequence.enrollmentStats.completed} · Stopped{" "}
           {sequence.enrollmentStats.stopped} · Paused{" "}
@@ -56,26 +62,19 @@ export default async function SequenceDetailPage({ params }: PageProps) {
         </p>
       </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">Steps</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-3 text-sm">
-          {sequence.steps.map((step) => (
-            <div key={step.id} className="border-b pb-2 last:border-0">
-              <div className="font-medium">
-                Step {step.stepOrder} · {step.channel}
-                {step.delayMinutes
-                  ? ` · wait ${step.delayMinutes} min`
-                  : " · immediate"}
-              </div>
-              <div className="text-muted-foreground">
-                {step.subjectTemplate || "(no subject)"}
-              </div>
-            </div>
-          ))}
-        </CardContent>
-      </Card>
+      <SequenceBuilder
+        sequenceId={sequence.id}
+        canManage={canManage}
+        initial={{
+          name: sequence.name,
+          description: sequence.description,
+          status: sequence.status,
+          stopOnReply: sequence.stopOnReply,
+          stopOnMeeting: sequence.stopOnMeeting,
+          stopOnUnsubscribe: sequence.stopOnUnsubscribe,
+          steps: sequence.steps,
+        }}
+      />
 
       <Card>
         <CardHeader>
@@ -93,10 +92,10 @@ export default async function SequenceDetailPage({ params }: PageProps) {
                   {" · step "}
                   {e.currentStepOrder}
                 </span>
-                <span className="text-muted-foreground">
-                  {e.status}
+                <span className="flex items-center gap-2 text-muted-foreground">
+                  <Badge variant="secondary">{e.status}</Badge>
                   {e.nextRunAt
-                    ? ` · ${format(e.nextRunAt, "MMM d HH:mm")}`
+                    ? format(e.nextRunAt, "MMM d HH:mm")
                     : ""}
                 </span>
               </div>

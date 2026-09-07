@@ -3,6 +3,7 @@ import prisma from "@/lib/db/prisma";
 import {
   OutreachSequenceStatus,
   Prisma,
+  SequenceEnrollmentSource,
   SequenceEnrollmentStatus,
   SequenceEnrollmentStopReason,
   type SequenceEnrollment,
@@ -13,6 +14,15 @@ import {
   computeNextRunAt,
 } from "@/lib/sequences/runtime";
 
+export type StepSnapshotItem = {
+  stepOrder: number;
+  delayMinutes: number;
+  channel: string;
+  subjectTemplate: string | null;
+  bodyTemplate: string;
+  isActive: boolean;
+};
+
 export type EnrollInput = {
   sequenceId: string;
   contactId: string;
@@ -20,6 +30,8 @@ export type EnrollInput = {
   campaignId?: string | null;
   /** LEGACY optional */
   leadId?: string | null;
+  campaignLeadId?: string | null;
+  source?: SequenceEnrollmentSource;
   enrolledById?: string | null;
   startImmediately?: boolean;
 };
@@ -40,6 +52,46 @@ const OPEN_DUP_STATUSES: SequenceEnrollmentStatus[] = [
   SequenceEnrollmentStatus.PROCESSING,
   SequenceEnrollmentStatus.PAUSED,
 ];
+
+export function snapshotSteps(
+  steps: {
+    stepOrder: number;
+    delayMinutes: number;
+    channel: string;
+    subjectTemplate: string | null;
+    bodyTemplate: string;
+    isActive: boolean;
+  }[]
+): StepSnapshotItem[] {
+  return steps.map((s) => ({
+    stepOrder: s.stepOrder,
+    delayMinutes: s.delayMinutes,
+    channel: s.channel,
+    subjectTemplate: s.subjectTemplate,
+    bodyTemplate: s.bodyTemplate,
+    isActive: s.isActive,
+  }));
+}
+
+/** Prefer enrollment stepsSnapshot so live sequence edits cannot corrupt running enrollments. */
+export function resolveEnrollmentSteps(enrollment: {
+  stepsSnapshot: unknown;
+  sequence?: {
+    steps: {
+      stepOrder: number;
+      delayMinutes: number;
+      channel: string;
+      subjectTemplate: string | null;
+      bodyTemplate: string;
+      isActive: boolean;
+    }[];
+  };
+}): StepSnapshotItem[] {
+  if (Array.isArray(enrollment.stepsSnapshot) && enrollment.stepsSnapshot.length) {
+    return enrollment.stepsSnapshot as StepSnapshotItem[];
+  }
+  return snapshotSteps(enrollment.sequence?.steps ?? []);
+}
 
 export class SequenceEnrollmentService {
   async list(organizationId: string, query: EnrollmentListQuery = {}) {
@@ -75,6 +127,7 @@ export class SequenceEnrollmentService {
               email: true,
               title: true,
               companyId: true,
+              company: { select: { id: true, name: true, domain: true } },
             },
           },
           executions: {
@@ -127,6 +180,7 @@ export class SequenceEnrollmentService {
   /**
    * Enroll Contact (+ optional Opportunity) into Sequence.
    * Does NOT require Lead. Prevents duplicate open enrollments per org+sequence+contact.
+   * Snapshots steps at enrollment time (Phase 4 edit safety).
    */
   async enroll(organizationId: string, input: EnrollInput) {
     const sequence = await prisma.outreachSequence.findFirst({
@@ -136,6 +190,19 @@ export class SequenceEnrollmentService {
     if (!sequence) throw new ValidationError("Sequence not found");
     if (sequence.status === OutreachSequenceStatus.ARCHIVED) {
       throw new ValidationError("Cannot enroll into an archived sequence");
+    }
+    if (sequence.status === OutreachSequenceStatus.DRAFT) {
+      throw new ValidationError(
+        "Cannot enroll into a DRAFT sequence — activate it first"
+      );
+    }
+    if (sequence.status === OutreachSequenceStatus.PAUSED) {
+      throw new ValidationError(
+        "Cannot enroll into a PAUSED sequence — activate it first"
+      );
+    }
+    if (sequence.status !== OutreachSequenceStatus.ACTIVE) {
+      throw new ValidationError("Sequence must be ACTIVE to enroll");
     }
     if (!sequence.steps.length) {
       throw new ValidationError("Sequence has no steps");
@@ -187,6 +254,18 @@ export class SequenceEnrollmentService {
       if (!lead) leadId = null;
     }
 
+    if (input.campaignLeadId) {
+      const cl = await prisma.campaignLead.findFirst({
+        where: {
+          id: input.campaignLeadId,
+          campaign: { organizationId, deletedAt: null },
+        },
+      });
+      if (!cl) {
+        throw new ValidationError("CampaignLead not found in your organization");
+      }
+    }
+
     const existing = await prisma.sequenceEnrollment.findFirst({
       where: {
         organizationId,
@@ -207,6 +286,7 @@ export class SequenceEnrollmentService {
     const nextRunAt = startImmediately
       ? now
       : computeNextRunAt(now, firstStep.delayMinutes);
+    const stepsSnapshot = snapshotSteps(sequence.steps);
 
     try {
       const enrollment = await prisma.sequenceEnrollment.create({
@@ -217,6 +297,9 @@ export class SequenceEnrollmentService {
           opportunityId,
           contactId: contact.id,
           leadId,
+          campaignLeadId: input.campaignLeadId ?? null,
+          source: input.source ?? SequenceEnrollmentSource.MANUAL,
+          stepsSnapshot: stepsSnapshot as Prisma.InputJsonValue,
           status: SequenceEnrollmentStatus.ACTIVE,
           currentStepOrder: firstStep.stepOrder,
           nextRunAt,

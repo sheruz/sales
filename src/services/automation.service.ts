@@ -401,6 +401,42 @@ export class AutomationService {
     const results = [];
 
     for (const job of jobs) {
+      // Phase 4 duplicate-send guard: skip if CampaignLead bridged or open canonical enrollment for lead
+      const bridgedCl = await prisma.campaignLead.findFirst({
+        where: {
+          leadId: job.leadId,
+          bridgedAt: { not: null },
+          campaign: { organizationId, deletedAt: null },
+        },
+        select: { id: true },
+      });
+      const openEnrollment = await prisma.sequenceEnrollment.findFirst({
+        where: {
+          organizationId,
+          leadId: job.leadId,
+          status: { in: ["ACTIVE", "PENDING", "PROCESSING", "PAUSED"] },
+        },
+        select: { id: true },
+      });
+      if (bridgedCl || openEnrollment) {
+        await prisma.followUpJob.update({
+          where: { id: job.id },
+          data: {
+            status: FollowUpJobStatus.CANCELLED,
+            completedAt: new Date(),
+            lastError: bridgedCl
+              ? "Skipped: CampaignLead bridged to SequenceEnrollment"
+              : "Skipped: open SequenceEnrollment exists for lead",
+          },
+        });
+        results.push({
+          jobId: job.id,
+          status: "cancelled",
+          reason: "canonical_enrollment_active",
+        });
+        continue;
+      }
+
       const ownerId = job.lead.assignedToId ?? job.lead.createdById ?? undefined;
       const channels = ownerId
         ? await getOutreachChannelsForUser(ownerId)

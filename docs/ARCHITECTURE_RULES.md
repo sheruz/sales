@@ -8,34 +8,34 @@ Prefer these entities for **new** product work:
 - InboxConversation / Message
 - Meeting, Proposal, Deal, Revenue
 - Business Brain, ICP, Services/Offers, Revenue Goals, Source connectors
-- **Campaign → OutreachSequence → SequenceEnrollment → Executor** (Phase 3)
+- **Campaign → OutreachSequence → SequenceEnrollment → Executor** (Phase 3–4)
 
-## Canonical campaign runtime (Phase 3)
+## Canonical campaign runtime (Phase 4)
 
 ```text
-Opportunity / Contact
+Campaign
       ↓
-Campaign (optional)
+defaultSequence / sequenceId
       ↓
-OutreachSequence
+Contact (+ optional Opportunity)
       ↓
-SequenceEnrollment
+SequenceEnrollment (stepsSnapshot)
       ↓
 Sequence Executor (cron)
       ↓
-inboxService.sendOutreach (existing email engine)
+inboxService.sendOutreach
       ↓
 InboxConversation / Message
-      ↓
-Reply / Meeting / Stop
 ```
 
 **Rules:**
 
 - New enrollments MUST NOT require `Lead`
-- `SequenceEnrollment.leadId` is optional legacy bridge only
+- `SequenceEnrollment.leadId` / `campaignLeadId` are optional bridge fields
 - Reuse `inboxService` + `emailSafetyService` — do **not** add a second email send engine
 - Duplicate open enrollments blocked (partial unique + app check)
+- Running enrollments use `stepsSnapshot` — live sequence edits do not rewrite in-flight steps
+- PAUSED sequence/campaign **defers** execution; ARCHIVED/DRAFT **stops**
 
 ## Legacy runtime (still active)
 
@@ -51,9 +51,14 @@ aiOutreachService / sendEmailForUser
 Legacy Conversation
 ```
 
-**Why both exist:** Production still depends on Lead automation; Phase 3 is additive.
+**On-demand bridge (Phase 4):**
 
-**Future migration:** dual-write → enroll Opportunities from CampaignLead → cut over FollowUpJob → retire Lead automation.
+```text
+CampaignLead → Lead bridge → Company+Contact → SequenceEnrollment
+(+ cancel PENDING FollowUpJobs for that lead)
+```
+
+Do **not** bulk dual-write every CampaignLead.
 
 ## Legacy Lead freeze
 
@@ -64,11 +69,12 @@ Legacy Conversation
 - Add new features that *require* a Lead to exist
 - Make Opportunity or SequenceEnrollment creation depend on Lead
 - Treat Lead as the long-term CRM center of gravity
+- Delete or retire Leads in Phase 4
 
 **Do:**
 
 - Keep existing lead flows working
-- Use `lead-migration.service` for optional Lead → Company/Contact bridging
+- Use `lead-migration.service` / CampaignLead bridge for optional migration
 - Prefer SequenceEnrollment for new outreach automation
 
 ## Authorization
@@ -78,3 +84,7 @@ Customer APIs use Phase 1 org RBAC only:
 `requireOrgPermission` / `requireAnyOrgPermission` + `{ id, organizationId }` lookups.
 
 Never trust client-supplied `organizationId` for authorization.
+
+## Controlled migrations
+
+Use `npm run db:migrate:*` scripts. Never `prisma db push` or `migrate reset` on production.

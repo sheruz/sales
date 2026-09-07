@@ -10,9 +10,22 @@ export const createCampaignSchema = z.object({
   aiInstructions: z.string().max(5000).optional(),
   dailyOutreachLimit: z.coerce.number().min(1).max(500).default(50),
   status: z.enum(["DRAFT", "ACTIVE", "PAUSED", "COMPLETED"]).default("DRAFT"),
+  /** Optional default OutreachSequence for canonical Contact enrollments */
+  defaultSequenceId: z.string().uuid().optional().nullable(),
 });
 
 export const updateCampaignSchema = createCampaignSchema.partial();
+
+export const campaignEnrollSchema = z.object({
+  contactId: z.string().uuid(),
+  opportunityId: z.string().uuid().optional().nullable(),
+  sequenceId: z.string().uuid().optional().nullable(),
+});
+
+export const campaignLeadBridgeSchema = z.object({
+  sequenceId: z.string().uuid().optional().nullable(),
+  opportunityId: z.string().uuid().optional().nullable(),
+});
 
 export const linkedInDiscoverySchema = z.object({
   campaignId: z.string().uuid().optional(),
@@ -53,5 +66,7 @@ export const generateOutreachSchema = z.object({
 
 export type CreateCampaignInput = z.infer<typeof createCampaignSchema>;
 export type UpdateCampaignInput = z.infer<typeof updateCampaignSchema>;
+export type CampaignEnrollInput = z.infer<typeof campaignEnrollSchema>;
+export type CampaignLeadBridgeInput = z.infer<typeof campaignLeadBridgeSchema>;
 export type LinkedInDiscoveryInput = z.infer<typeof linkedInDiscoverySchema>;
 export type StartAutomationInput = z.infer<typeof startAutomationSchema>;
