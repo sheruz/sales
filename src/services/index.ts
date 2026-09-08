@@ -9,6 +9,8 @@ export { noteService } from "./note.service";
 export { taskService } from "./task.service";
 export { activityService } from "./activity.service";
 export { campaignService } from "./campaign.service";
+export { campaignAnalyticsService } from "./campaign-analytics.service";
+export { campaignLeadBridgeService } from "./campaign-lead-bridge.service";
 export { aiResearchService } from "./ai-research.service";
 export { aiOutreachService } from "./ai-outreach.service";
 export { conversationService } from "./conversation.service";

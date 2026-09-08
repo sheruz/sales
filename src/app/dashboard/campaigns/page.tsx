@@ -3,22 +3,26 @@ import { campaignService } from "@/services/campaign.service";
 import prisma from "@/lib/db/prisma";
 import { CampaignsList } from "@/components/campaigns/campaigns-list";
 import { getCurrentUser } from "@/lib/auth/session";
-import { hasOrgPermission } from "@/lib/tenant/scope";
+import { hasAnyOrgPermission, hasOrgPermission } from "@/lib/tenant/scope";
 
 export default async function CampaignsPage() {
   const user = await getCurrentUser();
   if (!user?.organizationId) redirect("/dashboard");
-  if (!hasOrgPermission(user, "campaigns.manage")) {
+  if (!hasAnyOrgPermission(user, ["campaigns.manage", "campaigns.view"])) {
     redirect("/dashboard");
   }
 
+  const canManage = hasOrgPermission(user, "campaigns.manage");
+
   const [campaigns, services] = await Promise.all([
     campaignService.list(user.organizationId),
-    prisma.service.findMany({
-      where: { organizationId: user.organizationId, isActive: true },
-      select: { id: true, name: true },
-      orderBy: { name: "asc" },
-    }),
+    canManage
+      ? prisma.service.findMany({
+          where: { organizationId: user.organizationId, isActive: true },
+          select: { id: true, name: true },
+          orderBy: { name: "asc" },
+        })
+      : Promise.resolve([]),
   ]);
 
   const serialized = campaigns.map((c) => ({
@@ -39,7 +43,7 @@ export default async function CampaignsPage() {
       <CampaignsList
         initialCampaigns={serialized}
         services={services}
-        canManage
+        canManage={canManage}
       />
     </div>
   );

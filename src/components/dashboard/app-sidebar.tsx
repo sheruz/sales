@@ -87,7 +87,7 @@ const mainNav: NavItem[] = [
     title: "Campaigns",
     href: "/dashboard/campaigns",
     icon: Target,
-    anyOf: ["campaigns.manage"],
+    anyOf: ["campaigns.manage", "campaigns.view"],
   },
   {
     title: "Sequences",

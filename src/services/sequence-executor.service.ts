@@ -36,13 +36,24 @@ type ProcessResult = {
   reason?: string;
 };
 
+export type ExecutorRunSummary = {
+  claimed: number;
+  success: number;
+  failed: number;
+  skipped: number;
+  deferred: number;
+  error: number;
+  byStatus: Record<string, number>;
+  results: ProcessResult[];
+};
+
 /**
  * Canonical sequence executor (Phase 3).
  * Reuses inboxService.sendOutreach + emailSafetyService — does not create a second email engine.
  * Claim via conditional UPDATE (status ACTIVE → PROCESSING) for concurrency safety.
  */
 export class SequenceExecutorService {
-  async processDueEnrollments(limit = BATCH_SIZE): Promise<ProcessResult[]> {
+  async processDueEnrollments(limit = BATCH_SIZE): Promise<ExecutorRunSummary> {
     const results: ProcessResult[] = [];
     const claimed = await this.claimDue(limit);
     for (const enrollment of claimed) {
@@ -60,7 +71,32 @@ export class SequenceExecutorService {
         });
       }
     }
-    return results;
+    return this.summarizeRun(claimed.length, results);
+  }
+
+  /** Safe observability summary — counts only, no email bodies or secrets. */
+  summarizeRun(claimed: number, results: ProcessResult[]): ExecutorRunSummary {
+    const byStatus: Record<string, number> = {};
+    for (const r of results) {
+      byStatus[r.status] = (byStatus[r.status] ?? 0) + 1;
+    }
+    const success =
+      (byStatus.advanced ?? 0) +
+      (byStatus.completed ?? 0) +
+      (byStatus.success ?? 0);
+    return {
+      claimed,
+      success,
+      failed: byStatus.failed ?? 0,
+      skipped:
+        (byStatus.skipped ?? 0) +
+        (byStatus.skipped_channel ?? 0) +
+        (byStatus.stopped ?? 0),
+      deferred: byStatus.deferred ?? 0,
+      error: byStatus.error ?? 0,
+      byStatus,
+      results,
+    };
   }
 
   /**

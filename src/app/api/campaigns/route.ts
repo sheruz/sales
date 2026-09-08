@@ -1,13 +1,16 @@
 import { NextRequest, NextResponse } from "next/server";
 import { campaignService } from "@/services/campaign.service";
 import { createCampaignSchema } from "@/lib/validations/automation";
-import { requireOrgPermission } from "@/lib/auth/api-auth";
+import { requireAnyOrgPermission, requireOrgPermission } from "@/lib/auth/api-auth";
 import { apiSuccess } from "@/lib/api/response";
 import { handleApiError } from "@/lib/api/error-handler";
 
 export async function GET() {
   try {
-    const user = await requireOrgPermission("campaigns.manage");
+    const user = await requireAnyOrgPermission([
+      "campaigns.manage",
+      "campaigns.view",
+    ]);
     const campaigns = await campaignService.list(user.organizationId);
     return NextResponse.json(apiSuccess(campaigns));
   } catch (error) {

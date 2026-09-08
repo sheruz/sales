@@ -2,10 +2,13 @@ import { notFound, redirect } from "next/navigation";
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 import { campaignService } from "@/services/campaign.service";
+import { campaignAnalyticsService } from "@/services/campaign-analytics.service";
 import { outreachSequenceService } from "@/services/outreach-sequence.service";
 import { sequenceEnrollmentService } from "@/services/sequence-enrollment.service";
 import { CampaignDetail } from "@/components/campaigns/campaign-detail";
 import { CampaignCanonicalPanel } from "@/components/campaigns/campaign-canonical-panel";
+import { CampaignAnalyticsPanel } from "@/components/campaigns/campaign-analytics-panel";
+import { CampaignBridgePreviewPanel } from "@/components/campaigns/campaign-bridge-preview-panel";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { CAMPAIGN_STATUS_LABELS } from "@/lib/constants/automation";
@@ -19,8 +22,7 @@ interface PageProps {
 export default async function CampaignDetailPage({ params }: PageProps) {
   const user = await getCurrentUser();
   if (!user?.organizationId) redirect("/dashboard");
-  // Match campaign GET API — campaigns.manage required to load campaign data
-  if (!hasOrgPermission(user, "campaigns.manage")) {
+  if (!hasAnyOrgPermission(user, ["campaigns.manage", "campaigns.view"])) {
     redirect("/dashboard");
   }
 
@@ -34,6 +36,18 @@ export default async function CampaignDetailPage({ params }: PageProps) {
   }
 
   const { campaign, stats } = data;
+
+  let analytics: Awaited<
+    ReturnType<typeof campaignAnalyticsService.getCampaignAnalytics>
+  > | null = null;
+  try {
+    analytics = await campaignAnalyticsService.getCampaignAnalytics(
+      user.organizationId,
+      id
+    );
+  } catch {
+    analytics = null;
+  }
 
   let enrollmentsError: string | null = null;
   let enrollments: Awaited<
@@ -96,6 +110,15 @@ export default async function CampaignDetailPage({ params }: PageProps) {
         </div>
       </div>
 
+      {analytics ? (
+        <CampaignAnalyticsPanel
+          canonical={analytics.canonical}
+          legacy={analytics.legacy}
+        />
+      ) : (
+        <p className="text-sm text-muted-foreground">Analytics unavailable</p>
+      )}
+
       <CampaignDetail
         campaign={campaign}
         stats={{
@@ -103,8 +126,14 @@ export default async function CampaignDetailPage({ params }: PageProps) {
           automatedLeads: stats.automatedLeads,
           repliedLeads: stats.repliedLeads,
           hotLeads: stats.hotLeads,
+          canonicalEnrollments: stats.canonicalEnrollments,
         }}
         canManageCampaigns={canManageCampaigns}
+      />
+
+      <CampaignBridgePreviewPanel
+        campaignId={campaign.id}
+        canPreview={canBridge}
       />
 
       {enrollmentsError ? (

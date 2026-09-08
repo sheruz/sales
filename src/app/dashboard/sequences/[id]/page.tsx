@@ -4,9 +4,11 @@ import { format } from "date-fns";
 import { ArrowLeft } from "lucide-react";
 import { outreachSequenceService } from "@/services/outreach-sequence.service";
 import { sequenceEnrollmentService } from "@/services/sequence-enrollment.service";
+import { campaignAnalyticsService } from "@/services/campaign-analytics.service";
 import { getCurrentUser } from "@/lib/auth/session";
 import { hasAnyOrgPermission, hasOrgPermission } from "@/lib/tenant/scope";
 import { SequenceBuilder } from "@/components/sequences/sequence-builder";
+import { SequenceAnalyticsSummary } from "@/components/sequences/sequence-analytics-summary";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -38,10 +40,15 @@ export default async function SequenceDetailPage({ params }: PageProps) {
     notFound();
   }
 
-  const enrollments = await sequenceEnrollmentService.list(
-    user.organizationId,
-    { sequenceId: id, limit: 50 }
-  );
+  const [enrollments, sequenceAnalytics] = await Promise.all([
+    sequenceEnrollmentService.list(user.organizationId, {
+      sequenceId: id,
+      limit: 50,
+    }),
+    campaignAnalyticsService
+      .getSequenceAnalytics(user.organizationId, id)
+      .catch(() => null),
+  ]);
 
   return (
     <div className="space-y-8">
@@ -61,6 +68,10 @@ export default async function SequenceDetailPage({ params }: PageProps) {
           {sequence.enrollmentStats.paused}
         </p>
       </div>
+
+      {sequenceAnalytics ? (
+        <SequenceAnalyticsSummary analytics={sequenceAnalytics.analytics} />
+      ) : null}
 
       <SequenceBuilder
         sequenceId={sequence.id}

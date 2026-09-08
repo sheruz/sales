@@ -16,8 +16,36 @@ export async function POST(request: NextRequest) {
       sequenceExecutorService.processDueEnrollments(),
     ]);
 
+    // Safe observability — counts only (no bodies/secrets)
+    console.info("[cron/automation] sequence executor", {
+      claimed: sequences.claimed,
+      success: sequences.success,
+      failed: sequences.failed,
+      skipped: sequences.skipped,
+      deferred: sequences.deferred,
+      error: sequences.error,
+    });
+
     return NextResponse.json(
-      apiSuccess({ automation, autopilot, sequences })
+      apiSuccess({
+        automation,
+        autopilot,
+        sequences: {
+          claimed: sequences.claimed,
+          success: sequences.success,
+          failed: sequences.failed,
+          skipped: sequences.skipped,
+          deferred: sequences.deferred,
+          error: sequences.error,
+          byStatus: sequences.byStatus,
+          results: sequences.results.map((r) => ({
+            enrollmentId: r.enrollmentId,
+            organizationId: r.organizationId,
+            status: r.status,
+            reason: r.reason,
+          })),
+        },
+      })
     );
   } catch (error) {
     return handleApiError(error);

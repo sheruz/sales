@@ -35,6 +35,7 @@ interface CampaignDetailProps {
     automatedLeads: number;
     repliedLeads: number;
     hotLeads: number;
+    canonicalEnrollments?: number;
   };
   canManageCampaigns?: boolean;
 }
@@ -118,12 +119,16 @@ export function CampaignDetail({
         FollowUpJob. Canonical Contact enrollment is below.
       </div>
 
-      <div className="grid gap-4 md:grid-cols-4">
+      <div className="grid gap-4 md:grid-cols-5">
         {[
           { label: "Total Leads (legacy)", value: stats.totalLeads },
           { label: "AI Automated", value: stats.automatedLeads },
           { label: "Replied", value: stats.repliedLeads },
           { label: "Hot Leads", value: stats.hotLeads },
+          {
+            label: "Canonical enrollments",
+            value: stats.canonicalEnrollments ?? 0,
+          },
         ].map((s) => (
           <Card key={s.label}>
             <CardContent className="pt-4">

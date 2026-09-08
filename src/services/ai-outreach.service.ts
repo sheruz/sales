@@ -5,13 +5,17 @@ import {
   ConversationChannel,
   LeadStatus,
 } from "@prisma/client";
-import { NotFoundError } from "@/lib/api/response";
+import { NotFoundError, ValidationError } from "@/lib/api/response";
 import { aiComplete, parseAIJson } from "@/lib/ai/provider";
 import { buildOutreachPrompt, buildJobPostEmailPrompt } from "@/lib/ai/prompts";
 import { activityService } from "@/services/activity.service";
 import { sendEmailForUser } from "@/lib/email/smtp";
 import { linkedInAccountService } from "@/services/linkedin-account.service";
 import { sendConnectionOrMessage } from "@/lib/linkedin/messaging";
+import {
+  conflictSkipMessage,
+  detectLegacyCanonicalConflict,
+} from "@/lib/sequences/duplicate-send-guard";
 
 interface OutreachResult {
   subject: string | null;
@@ -118,6 +122,20 @@ export class AIOutreachService {
     if (!conversation) throw new NotFoundError("Conversation not found");
 
     const lead = conversation.lead;
+
+    // Phase 5 acceptance: legacy send must never bypass canonical duplicate-send guard
+    // (covers auto-reply and any direct callers outside runPipeline / FollowUpJob).
+    const conflict = await detectLegacyCanonicalConflict(
+      organizationId,
+      leadId,
+      lead.email
+    );
+    if (conflict.blocked) {
+      throw new ValidationError(conflictSkipMessage(conflict.reason), {
+        code: "CANONICAL_ENROLLMENT_ACTIVE",
+        reason: conflict.reason,
+      });
+    }
 
     if (conversation.channel === ConversationChannel.LINKEDIN) {
       if (!lead.linkedInUrl) {
