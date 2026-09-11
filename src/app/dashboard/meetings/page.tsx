@@ -3,12 +3,19 @@ import { redirect } from "next/navigation";
 import { format } from "date-fns";
 import { meetingService } from "@/services/meeting.service";
 import { getCurrentUser } from "@/lib/auth/session";
+import { hasAnyOrgPermission } from "@/lib/tenant/scope";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { EmptyState } from "@/components/crm/empty-state";
 
 export default async function MeetingsPage() {
   const user = await getCurrentUser();
   if (!user?.organizationId) redirect("/dashboard");
+  if (
+    !hasAnyOrgPermission(user, ["opportunities.view", "deals.manage"])
+  ) {
+    redirect("/dashboard");
+  }
 
   const meetings = await meetingService.list(user.organizationId);
 
@@ -26,9 +33,12 @@ export default async function MeetingsPage() {
         </CardHeader>
         <CardContent className="space-y-3">
           {meetings.length === 0 ? (
-            <p className="text-sm text-muted-foreground">
-              No meetings yet. Book one from an opportunity detail page.
-            </p>
+            <EmptyState
+              title="No meetings yet"
+              description="Book a meeting from an opportunity detail page."
+              actionHref="/dashboard/opportunities"
+              actionLabel="View opportunities"
+            />
           ) : (
             meetings.map((m) => (
               <div
@@ -39,21 +49,38 @@ export default async function MeetingsPage() {
                   <p className="text-sm font-medium">{m.title}</p>
                   <p className="text-xs text-muted-foreground">
                     {format(new Date(m.date), "MMM d, yyyy HH:mm")}
-                    {m.company ? ` · ${m.company.name}` : ""}
-                    {m.contact ? ` · ${m.contact.fullName}` : ""}
                   </p>
+                  <div className="mt-1 flex flex-wrap gap-2 text-xs">
+                    {m.company ? (
+                      <Link
+                        href={`/dashboard/companies/${m.company.id}`}
+                        className="text-primary hover:underline"
+                      >
+                        {m.company.name}
+                      </Link>
+                    ) : null}
+                    {m.contact ? (
+                      <Link
+                        href={`/dashboard/contacts/${m.contact.id}`}
+                        className="text-primary hover:underline"
+                      >
+                        {m.contact.fullName}
+                      </Link>
+                    ) : null}
+                    {m.opportunityId ? (
+                      <Link
+                        href={`/dashboard/opportunities/${m.opportunityId}`}
+                        className="text-primary hover:underline"
+                      >
+                        Opportunity
+                        {m.opportunity?.stage
+                          ? ` · ${m.opportunity.stage}`
+                          : ""}
+                      </Link>
+                    ) : null}
+                  </div>
                 </div>
-                <div className="flex items-center gap-2">
-                  <Badge variant="outline">{m.outcome}</Badge>
-                  {m.opportunityId && (
-                    <Link
-                      href={`/dashboard/opportunities/${m.opportunityId}`}
-                      className="text-xs text-primary hover:underline"
-                    >
-                      Opportunity
-                    </Link>
-                  )}
-                </div>
+                <Badge variant="outline">{m.outcome}</Badge>
               </div>
             ))
           )}

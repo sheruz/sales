@@ -9,6 +9,7 @@ import { getCurrentUser } from "@/lib/auth/session";
 import { hasAnyOrgPermission, hasOrgPermission } from "@/lib/tenant/scope";
 import { SequenceBuilder } from "@/components/sequences/sequence-builder";
 import { SequenceAnalyticsSummary } from "@/components/sequences/sequence-analytics-summary";
+import { EntityRelatedLinks } from "@/components/crm/entity-related-links";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -60,14 +61,23 @@ export default async function SequenceDetailPage({ params }: PageProps) {
       </Link>
 
       <div>
-        <h2 className="text-2xl font-bold tracking-tight">Sequence Builder</h2>
+        <h2 className="text-2xl font-bold tracking-tight">{sequence.name}</h2>
         <p className="text-muted-foreground">
-          Active {sequence.enrollmentStats.active} · Completed{" "}
+          Steps → Enrollments → Campaigns → Conversations → Analytics. Active{" "}
+          {sequence.enrollmentStats.active} · Completed{" "}
           {sequence.enrollmentStats.completed} · Stopped{" "}
           {sequence.enrollmentStats.stopped} · Paused{" "}
           {sequence.enrollmentStats.paused}
         </p>
       </div>
+
+      <EntityRelatedLinks
+        links={[
+          { href: "/dashboard/sequences", label: "All sequences" },
+          { href: "/dashboard/campaigns", label: "Campaigns" },
+          { href: "/dashboard/conversations", label: "Inbox" },
+        ]}
+      />
 
       {sequenceAnalytics ? (
         <SequenceAnalyticsSummary analytics={sequenceAnalytics.analytics} />
@@ -97,11 +107,32 @@ export default async function SequenceDetailPage({ params }: PageProps) {
           ) : (
             enrollments.items.map((e) => (
               <div key={e.id} className="flex justify-between gap-4">
-                <span>
-                  {e.contact.fullName}
-                  {e.opportunity ? ` · opp ${e.opportunity.stage}` : ""}
-                  {" · step "}
-                  {e.currentStepOrder}
+                <span className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                  <Link
+                    href={`/dashboard/contacts/${e.contact.id}`}
+                    className="hover:underline"
+                  >
+                    {e.contact.fullName}
+                  </Link>
+                  {e.opportunity ? (
+                    <Link
+                      href={`/dashboard/opportunities/${e.opportunity.id}`}
+                      className="text-muted-foreground hover:underline"
+                    >
+                      · {e.opportunity.stage}
+                    </Link>
+                  ) : null}
+                  {e.campaign ? (
+                    <Link
+                      href={`/dashboard/campaigns/${e.campaign.id}`}
+                      className="text-muted-foreground hover:underline"
+                    >
+                      · {e.campaign.name}
+                    </Link>
+                  ) : null}
+                  <span className="text-muted-foreground">
+                    · step {e.currentStepOrder}
+                  </span>
                 </span>
                 <span className="flex items-center gap-2 text-muted-foreground">
                   <Badge variant="secondary">{e.status}</Badge>

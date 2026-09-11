@@ -2,10 +2,12 @@ import { redirect } from "next/navigation";
 import { inboxService } from "@/services/inbox.service";
 import { UnifiedInbox } from "@/components/conversations/unified-inbox";
 import { getCurrentUser } from "@/lib/auth/session";
+import { hasOrgPermission } from "@/lib/tenant/scope";
 
 export default async function ConversationsPage() {
   const user = await getCurrentUser();
   if (!user?.organizationId) redirect("/dashboard");
+  if (!hasOrgPermission(user, "conversations.view")) redirect("/dashboard");
 
   const conversations = await inboxService.listConversations(
     user.organizationId
@@ -42,8 +44,8 @@ export default async function ConversationsPage() {
       <div>
         <h2 className="text-2xl font-bold tracking-tight">Inbox</h2>
         <p className="text-muted-foreground">
-          Gmail and Outlook replies land here, linked to company, contact, and
-          opportunity — with AI classification and next actions.
+          Unified inbox — replies link to company, contact, and opportunity when
+          those relationships exist.
         </p>
       </div>
       <UnifiedInbox initialConversations={serialized} />

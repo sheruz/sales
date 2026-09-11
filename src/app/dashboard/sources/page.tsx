@@ -1,11 +1,13 @@
 import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth/session";
+import { hasOrgPermission } from "@/lib/tenant/scope";
 import { sourceConnectorService } from "@/services/source-connector.service";
 import { SourcesPageClient } from "@/components/connectors/sources-page-client";
 
 export default async function SourcesPage() {
   const user = await getCurrentUser();
   if (!user?.organizationId) redirect("/dashboard");
+  if (!hasOrgPermission(user, "integrations.manage")) redirect("/dashboard");
 
   const [connectors, catalog] = await Promise.all([
     sourceConnectorService.list(user.organizationId),

@@ -12,6 +12,8 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { EntityRelatedLinks } from "@/components/crm/entity-related-links";
+import { EmptyState } from "@/components/crm/empty-state";
 
 interface PageProps {
   params: Promise<{ id: string }>;
@@ -34,7 +36,7 @@ export default async function CompanyDetailPage({ params }: PageProps) {
 
   return (
     <div className="space-y-6">
-      <div>
+      <div className="space-y-3">
         <div className="flex items-center gap-3">
           <h2 className="text-2xl font-bold tracking-tight">{company.name}</h2>
           <Badge variant="secondary">{company.status}</Badge>
@@ -43,6 +45,30 @@ export default async function CompanyDetailPage({ params }: PageProps) {
           {company.industry || "Company"}
           {company.domain ? ` · ${company.domain}` : ""}
         </p>
+        <EntityRelatedLinks
+          links={[
+            {
+              href: `/dashboard/contacts?companyId=${company.id}`,
+              label: `Contacts (${company._count.contacts})`,
+            },
+            {
+              href: `/dashboard/opportunities?companyId=${company.id}`,
+              label: `Opportunities (${company._count.opportunities})`,
+            },
+            {
+              href: "/dashboard/conversations",
+              label: `Inbox (${company.inboxConversations.length})`,
+            },
+            {
+              href: "/dashboard/meetings",
+              label: "Meetings",
+            },
+            {
+              href: "/dashboard/pipeline",
+              label: `Deals (${company._count.deals})`,
+            },
+          ]}
+        />
       </div>
 
       <div className="grid gap-6 lg:grid-cols-3">
@@ -171,10 +197,19 @@ export default async function CompanyDetailPage({ params }: PageProps) {
               </CardHeader>
               <CardContent className="space-y-2 text-sm">
                 {company.inboxConversations.length === 0 ? (
-                  <p className="text-muted-foreground">None</p>
+                  <EmptyState
+                    title="No conversations yet"
+                    description="Outreach and replies for contacts at this company appear in Inbox."
+                    actionHref="/dashboard/conversations"
+                    actionLabel="Open inbox"
+                  />
                 ) : (
                   company.inboxConversations.map((c) => (
-                    <div key={c.id} className="flex justify-between">
+                    <Link
+                      key={c.id}
+                      href="/dashboard/conversations"
+                      className="flex justify-between hover:underline"
+                    >
                       <span className="truncate">
                         {c.subject || c.status || c.id.slice(0, 8)}
                       </span>
@@ -183,7 +218,7 @@ export default async function CompanyDetailPage({ params }: PageProps) {
                           ? format(c.lastMessageAt, "MMM d")
                           : ""}
                       </span>
-                    </div>
+                    </Link>
                   ))
                 )}
               </CardContent>
@@ -195,13 +230,22 @@ export default async function CompanyDetailPage({ params }: PageProps) {
               </CardHeader>
               <CardContent className="space-y-2 text-sm">
                 {company.deals.length === 0 ? (
-                  <p className="text-muted-foreground">None</p>
+                  <EmptyState
+                    title="No deals yet"
+                    description="Deals are created from opportunities. Open pipeline to manage stages."
+                    actionHref="/dashboard/pipeline"
+                    actionLabel="Open pipeline"
+                  />
                 ) : (
                   company.deals.map((d) => (
-                    <div key={d.id} className="flex justify-between">
+                    <Link
+                      key={d.id}
+                      href="/dashboard/pipeline"
+                      className="flex justify-between hover:underline"
+                    >
                       <span>{d.name || d.stage}</span>
                       <span className="text-muted-foreground">{d.stage}</span>
-                    </div>
+                    </Link>
                   ))
                 )}
               </CardContent>

@@ -5,6 +5,9 @@ import { Building2, Mail, Phone, ExternalLink } from "lucide-react";
 import { contactService } from "@/services/contact.service";
 import { getCurrentUser } from "@/lib/auth/session";
 import { hasAnyOrgPermission } from "@/lib/tenant/scope";
+import { LegacyBadge } from "@/components/crm/legacy-badge";
+import { EntityRelatedLinks } from "@/components/crm/entity-related-links";
+import { EmptyState } from "@/components/crm/empty-state";
 import { SequenceEnrollmentPanel } from "@/components/sequences/sequence-enrollment-panel";
 import { sequenceEnrollmentService } from "@/services/sequence-enrollment.service";
 import { outreachSequenceService } from "@/services/outreach-sequence.service";
@@ -53,7 +56,7 @@ export default async function ContactDetailPage({ params }: PageProps) {
 
   return (
     <div className="space-y-6">
-      <div>
+      <div className="space-y-3">
         <div className="flex items-center gap-3">
           <h2 className="text-2xl font-bold tracking-tight">
             {contact.fullName}
@@ -64,6 +67,30 @@ export default async function ContactDetailPage({ params }: PageProps) {
           {contact.title || "Contact"}
           {contact.company ? ` at ${contact.company.name}` : ""}
         </p>
+        <EntityRelatedLinks
+          links={[
+            {
+              href: `/dashboard/companies/${contact.company.id}`,
+              label: "Company",
+            },
+            {
+              href: "/dashboard/opportunities",
+              label: `Opportunities (${contact.primaryOpportunities.length})`,
+            },
+            {
+              href: "/dashboard/conversations",
+              label: `Inbox (${contact.inboxConversations.length})`,
+            },
+            {
+              href: "/dashboard/meetings",
+              label: `Meetings (${contact.meetings.length})`,
+            },
+            {
+              href: "/dashboard/tasks",
+              label: "Tasks",
+            },
+          ]}
+        />
       </div>
 
       <div className="grid gap-6 lg:grid-cols-3">
@@ -109,8 +136,9 @@ export default async function ContactDetailPage({ params }: PageProps) {
               </Link>
             </div>
             {contact.lead && (
-              <p className="pt-2 text-xs text-muted-foreground">
-                Legacy lead bridge:{" "}
+              <p className="flex flex-wrap items-center gap-2 pt-2 text-xs text-muted-foreground">
+                <LegacyBadge />
+                Lead bridge:{" "}
                 <Link
                   href={`/dashboard/leads/${contact.lead.id}`}
                   className="hover:underline"
@@ -156,10 +184,19 @@ export default async function ContactDetailPage({ params }: PageProps) {
             </CardHeader>
             <CardContent className="space-y-2 text-sm">
               {contact.inboxConversations.length === 0 ? (
-                <p className="text-muted-foreground">No conversations</p>
+                <EmptyState
+                  title="No conversations yet"
+                  description="Canonical outreach replies appear in Inbox."
+                  actionHref="/dashboard/conversations"
+                  actionLabel="Open inbox"
+                />
               ) : (
                 contact.inboxConversations.map((c) => (
-                  <div key={c.id} className="flex justify-between">
+                  <Link
+                    key={c.id}
+                    href="/dashboard/conversations"
+                    className="flex justify-between hover:underline"
+                  >
                     <span className="truncate">
                       {c.subject || c.status || c.id.slice(0, 8)}
                     </span>
@@ -168,7 +205,7 @@ export default async function ContactDetailPage({ params }: PageProps) {
                         ? format(c.lastMessageAt, "MMM d")
                         : ""}
                     </span>
-                  </div>
+                  </Link>
                 ))
               )}
             </CardContent>
@@ -180,15 +217,24 @@ export default async function ContactDetailPage({ params }: PageProps) {
             </CardHeader>
             <CardContent className="space-y-2 text-sm">
               {contact.meetings.length === 0 ? (
-                <p className="text-muted-foreground">No meetings</p>
+                <EmptyState
+                  title="No meetings yet"
+                  description="Schedule meetings from an opportunity linked to this contact."
+                  actionHref="/dashboard/opportunities"
+                  actionLabel="View opportunities"
+                />
               ) : (
                 contact.meetings.map((m) => (
-                  <div key={m.id} className="flex justify-between">
+                  <Link
+                    key={m.id}
+                    href="/dashboard/meetings"
+                    className="flex justify-between hover:underline"
+                  >
                     <span>{m.title || m.outcome}</span>
                     <span className="text-muted-foreground">
                       {format(m.date, "MMM d, yyyy")}
                     </span>
-                  </div>
+                  </Link>
                 ))
               )}
             </CardContent>

@@ -1,11 +1,17 @@
 import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth/session";
+import { hasAnyOrgPermission } from "@/lib/tenant/scope";
 import { revenueGoalService } from "@/services/revenue-goal.service";
 import { RevenueGoalsClient } from "@/components/business-brain/revenue-goals-client";
 
 export default async function RevenueGoalsPage() {
   const user = await getCurrentUser();
   if (!user?.organizationId) redirect("/dashboard");
+  if (
+    !hasAnyOrgPermission(user, ["revenue_goals.manage", "revenue.view"])
+  ) {
+    redirect("/dashboard");
+  }
 
   const goals = await revenueGoalService.list(user.organizationId);
 

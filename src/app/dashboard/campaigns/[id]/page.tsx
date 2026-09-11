@@ -119,53 +119,75 @@ export default async function CampaignDetailPage({ params }: PageProps) {
         <p className="text-sm text-muted-foreground">Analytics unavailable</p>
       )}
 
-      <CampaignDetail
-        campaign={campaign}
-        stats={{
-          totalLeads: stats.totalLeads,
-          automatedLeads: stats.automatedLeads,
-          repliedLeads: stats.repliedLeads,
-          hotLeads: stats.hotLeads,
-          canonicalEnrollments: stats.canonicalEnrollments,
-        }}
-        canManageCampaigns={canManageCampaigns}
-      />
+      <section className="space-y-3">
+        <div>
+          <h3 className="text-base font-semibold">Canonical outreach</h3>
+          <p className="text-sm text-muted-foreground">
+            Default sequence, Contact enrollments, and cutover preview. Lead is
+            not required.
+          </p>
+        </div>
+        <CampaignCanonicalPanel
+          campaignId={campaign.id}
+          defaultSequenceId={campaign.defaultSequenceId}
+          sequences={sequences.map((s) => ({
+            id: s.id,
+            name: s.name,
+            status: s.status,
+          }))}
+          enrollments={enrollments.items as never[]}
+          legacyLeads={campaign.campaignLeads.map((cl) => ({
+            id: cl.id,
+            bridgedAt: cl.bridgedAt,
+            lead: {
+              id: cl.lead.id,
+              fullName: cl.lead.fullName,
+              email: cl.lead.email,
+              company: cl.lead.companyName,
+              status: cl.lead.status,
+              automationStatus: cl.lead.automationStatus,
+            },
+            sequenceEnrollment: cl.sequenceEnrollment,
+          }))}
+          canManageCampaigns={canManageCampaigns}
+          canEnroll={canEnroll}
+          canBridge={canBridge}
+        />
+        <CampaignBridgePreviewPanel
+          campaignId={campaign.id}
+          canPreview={canBridge}
+        />
+        {enrollmentsError ? (
+          <p className="text-sm text-destructive">{enrollmentsError}</p>
+        ) : null}
+      </section>
 
-      <CampaignBridgePreviewPanel
-        campaignId={campaign.id}
-        canPreview={canBridge}
-      />
-
-      {enrollmentsError ? (
-        <p className="text-sm text-destructive">{enrollmentsError}</p>
-      ) : null}
-
-      <CampaignCanonicalPanel
-        campaignId={campaign.id}
-        defaultSequenceId={campaign.defaultSequenceId}
-        sequences={sequences.map((s) => ({
-          id: s.id,
-          name: s.name,
-          status: s.status,
-        }))}
-        enrollments={enrollments.items as never[]}
-        legacyLeads={campaign.campaignLeads.map((cl) => ({
-          id: cl.id,
-          bridgedAt: cl.bridgedAt,
-          lead: {
-            id: cl.lead.id,
-            fullName: cl.lead.fullName,
-            email: cl.lead.email,
-            company: cl.lead.companyName,
-            status: cl.lead.status,
-            automationStatus: cl.lead.automationStatus,
-          },
-          sequenceEnrollment: cl.sequenceEnrollment,
-        }))}
-        canManageCampaigns={canManageCampaigns}
-        canEnroll={canEnroll}
-        canBridge={canBridge}
-      />
+      <section className="space-y-3 border-t pt-6">
+        <div className="flex items-center gap-2">
+          <h3 className="text-base font-semibold">Legacy discovery & automation</h3>
+          <Badge
+            variant="outline"
+            className="border-amber-500/40 text-amber-700 dark:text-amber-400"
+          >
+            Legacy
+          </Badge>
+        </div>
+        <p className="text-sm text-muted-foreground">
+          LinkedIn discovery creates Leads / CampaignLeads. These counts are not
+          the same population as canonical enrollments above.
+        </p>
+        <CampaignDetail
+          campaign={campaign}
+          stats={{
+            totalLeads: stats.totalLeads,
+            automatedLeads: stats.automatedLeads,
+            repliedLeads: stats.repliedLeads,
+            hotLeads: stats.hotLeads,
+            canonicalEnrollments: stats.canonicalEnrollments,
+          }}
+          canManageCampaigns={canManageCampaigns}
+        />
+      </section>
     </div>
   );
 }

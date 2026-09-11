@@ -19,7 +19,7 @@ import { sequenceEnrollmentService } from "@/services/sequence-enrollment.servic
 import { outreachSequenceService } from "@/services/outreach-sequence.service";
 import { campaignService } from "@/services/campaign.service";
 import prisma from "@/lib/db/prisma";
-import { hasAnyOrgPermission } from "@/lib/tenant/scope";
+import { hasAnyOrgPermission, hasOrgPermission } from "@/lib/tenant/scope";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -28,6 +28,8 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { EntityRelatedLinks } from "@/components/crm/entity-related-links";
+import { LegacyBadge } from "@/components/crm/legacy-badge";
 import { OPPORTUNITY_STAGE_LABELS } from "@/lib/constants/opportunities";
 
 interface PageProps {
@@ -69,6 +71,7 @@ function Field({
 export default async function OpportunityDetailPage({ params }: PageProps) {
   const user = await getCurrentUser();
   if (!user?.organizationId) notFound();
+  if (!hasOrgPermission(user, "opportunities.view")) notFound();
 
   const { id } = await params;
 
@@ -138,6 +141,60 @@ export default async function OpportunityDetailPage({ params }: PageProps) {
         <span>/</span>
         <span className="text-foreground">{opportunity.company.name}</span>
       </div>
+
+      <EntityRelatedLinks
+        links={[
+          {
+            href: `/dashboard/companies/${opportunity.companyId}`,
+            label: "Company",
+          },
+          ...(opportunity.primaryContactId
+            ? [
+                {
+                  href: `/dashboard/contacts/${opportunity.primaryContactId}`,
+                  label: "Contact",
+                },
+              ]
+            : []),
+          ...(opportunity.campaignId
+            ? [
+                {
+                  href: `/dashboard/campaigns/${opportunity.campaignId}`,
+                  label: "Campaign",
+                },
+              ]
+            : []),
+          {
+            href: "/dashboard/conversations",
+            label: "Inbox",
+          },
+          {
+            href: "/dashboard/meetings",
+            label: "Meetings",
+          },
+          {
+            href: "/dashboard/proposals",
+            label: "Proposals",
+          },
+          {
+            href: "/dashboard/pipeline",
+            label: "Pipeline / Deals",
+          },
+        ]}
+      />
+
+      {opportunity.leadId ? (
+        <p className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+          <LegacyBadge />
+          Linked legacy lead{" "}
+          <Link
+            href={`/dashboard/leads/${opportunity.leadId}`}
+            className="hover:underline"
+          >
+            open lead
+          </Link>
+        </p>
+      ) : null}
 
       <OpportunityDetailClient
         opportunityId={opportunity.id}

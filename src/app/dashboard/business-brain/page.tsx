@@ -1,11 +1,13 @@
 import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth/session";
+import { hasOrgPermission } from "@/lib/tenant/scope";
 import { businessBrainService } from "@/services/business-brain.service";
 import { BusinessBrainClient } from "@/components/business-brain/business-brain-client";
 
 export default async function BusinessBrainPage() {
   const user = await getCurrentUser();
   if (!user?.organizationId) redirect("/dashboard");
+  if (!hasOrgPermission(user, "business_brain.manage")) redirect("/dashboard");
 
   const [profile, documents] = await Promise.all([
     businessBrainService.getProfile(user.organizationId),

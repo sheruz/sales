@@ -1,17 +1,21 @@
 import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth/session";
-import { hasPermission } from "@/lib/auth/permissions";
+import { hasAnyOrgPermission } from "@/lib/tenant/scope";
 import prisma from "@/lib/db/prisma";
 import { autopilotService } from "@/services/autopilot.service";
 import { userIntegrationService } from "@/services/user-integration.service";
 import { isAiConfigured } from "@/lib/integrations/readiness";
 import { AutopilotPanel } from "@/components/autopilot/autopilot-panel";
+import { LegacyBadge } from "@/components/crm/legacy-badge";
 
 export default async function AutopilotPage() {
   const user = await getCurrentUser();
   if (!user) redirect("/login");
   if (!user.organizationId) redirect("/dashboard");
-  if (!hasPermission(user.role, "ai:use")) redirect("/dashboard");
+  // Mirror sidebar: campaigns.manage | agent.manage
+  if (!hasAnyOrgPermission(user, ["campaigns.manage", "agent.manage"])) {
+    redirect("/dashboard");
+  }
 
   const [config, services, usage] = await Promise.all([
     autopilotService.getOrCreateConfig(user.organizationId, user.id),
@@ -31,9 +35,13 @@ export default async function AutopilotPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h2 className="text-2xl font-bold tracking-tight">AI Autopilot</h2>
+        <div className="flex items-center gap-2">
+          <h2 className="text-2xl font-bold tracking-tight">AI Autopilot</h2>
+          <LegacyBadge />
+        </div>
         <p className="text-muted-foreground">
-          Finds companies posting freelance/dev jobs, creates leads with email, and sends outreach via SMTP only.
+          Legacy automation. Prefer Campaigns → Sequences → Enrollments for
+          canonical outreach.
         </p>
       </div>
       <AutopilotPanel

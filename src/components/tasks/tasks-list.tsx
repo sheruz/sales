@@ -9,6 +9,8 @@ import { CheckCircle2, ExternalLink } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
+import { LegacyBadge } from "@/components/crm/legacy-badge";
+import { EmptyState } from "@/components/crm/empty-state";
 
 interface Task {
   id: string;
@@ -18,6 +20,13 @@ interface Task {
   priority: string;
   dueDate: string | null;
   lead: { id: string; fullName: string; companyName: string | null } | null;
+  opportunity: {
+    id: string;
+    stage: string;
+    companyName: string | null;
+  } | null;
+  company: { id: string; name: string } | null;
+  contact: { id: string; fullName: string } | null;
   assignedTo: { firstName: string; lastName: string } | null;
 }
 
@@ -49,7 +58,9 @@ export function TasksList({ initialTasks, currentFilter }: TasksListProps) {
       });
       const data = await res.json();
       if (!data.success) throw new Error(data.error?.message);
-      setTasks(tasks.map((t) => (t.id === taskId ? { ...t, status: "COMPLETED" } : t)));
+      setTasks(
+        tasks.map((t) => (t.id === taskId ? { ...t, status: "COMPLETED" } : t))
+      );
       toast.success("Task completed");
       router.refresh();
     } catch (err) {
@@ -77,11 +88,12 @@ export function TasksList({ initialTasks, currentFilter }: TasksListProps) {
       </div>
 
       {tasks.length === 0 ? (
-        <Card>
-          <CardContent className="py-8 text-center text-muted-foreground">
-            No tasks found.
-          </CardContent>
-        </Card>
+        <EmptyState
+          title="No tasks yet"
+          description="Create follow-ups from an opportunity detail page."
+          actionHref="/dashboard/opportunities"
+          actionLabel="View opportunities"
+        />
       ) : (
         <div className="space-y-3">
           {tasks.map((task) => {
@@ -89,14 +101,23 @@ export function TasksList({ initialTasks, currentFilter }: TasksListProps) {
               task.dueDate &&
               isPast(new Date(task.dueDate)) &&
               task.status === "PENDING";
+            const leadOnly =
+              Boolean(task.lead) &&
+              !task.opportunity &&
+              !task.contact &&
+              !task.company;
 
             return (
               <Card key={task.id}>
                 <CardContent className="flex items-center justify-between pt-4">
                   <div className="flex-1">
-                    <div className="flex items-center gap-2">
+                    <div className="flex flex-wrap items-center gap-2">
                       <p
-                        className={`font-medium ${task.status === "COMPLETED" ? "line-through text-muted-foreground" : ""}`}
+                        className={`font-medium ${
+                          task.status === "COMPLETED"
+                            ? "line-through text-muted-foreground"
+                            : ""
+                        }`}
                       >
                         {task.title}
                       </p>
@@ -108,9 +129,35 @@ export function TasksList({ initialTasks, currentFilter }: TasksListProps) {
                           Overdue
                         </Badge>
                       )}
+                      {leadOnly ? <LegacyBadge /> : null}
                     </div>
-                    <div className="mt-1 flex items-center gap-3 text-sm text-muted-foreground">
-                      {task.lead && (
+                    <div className="mt-1 flex flex-wrap items-center gap-3 text-sm text-muted-foreground">
+                      {task.opportunity ? (
+                        <Link
+                          href={`/dashboard/opportunities/${task.opportunity.id}`}
+                          className="flex items-center gap-1 hover:underline"
+                        >
+                          Opportunity · {task.opportunity.stage}
+                          <ExternalLink className="h-3 w-3" />
+                        </Link>
+                      ) : null}
+                      {task.contact ? (
+                        <Link
+                          href={`/dashboard/contacts/${task.contact.id}`}
+                          className="hover:underline"
+                        >
+                          {task.contact.fullName}
+                        </Link>
+                      ) : null}
+                      {task.company ? (
+                        <Link
+                          href={`/dashboard/companies/${task.company.id}`}
+                          className="hover:underline"
+                        >
+                          {task.company.name}
+                        </Link>
+                      ) : null}
+                      {!task.opportunity && !task.contact && task.lead ? (
                         <Link
                           href={`/dashboard/leads/${task.lead.id}`}
                           className="flex items-center gap-1 hover:underline"
@@ -118,9 +165,11 @@ export function TasksList({ initialTasks, currentFilter }: TasksListProps) {
                           {task.lead.fullName}
                           <ExternalLink className="h-3 w-3" />
                         </Link>
-                      )}
+                      ) : null}
                       {task.dueDate && (
-                        <span>Due {format(new Date(task.dueDate), "MMM d, yyyy")}</span>
+                        <span>
+                          Due {format(new Date(task.dueDate), "MMM d, yyyy")}
+                        </span>
                       )}
                     </div>
                   </div>

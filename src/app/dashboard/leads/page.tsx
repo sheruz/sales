@@ -4,6 +4,8 @@ import { leadService } from "@/services/lead.service";
 import { LeadsList } from "@/components/leads/leads-list";
 import { Skeleton } from "@/components/ui/skeleton";
 import { getCurrentUser } from "@/lib/auth/session";
+import { hasOrgPermission } from "@/lib/tenant/scope";
+import { LegacyBadge } from "@/components/crm/legacy-badge";
 
 interface PageProps {
   searchParams: Promise<{
@@ -17,6 +19,7 @@ interface PageProps {
 export default async function LeadsPage({ searchParams }: PageProps) {
   const user = await getCurrentUser();
   if (!user?.organizationId) redirect("/dashboard");
+  if (!hasOrgPermission(user, "leads.view")) redirect("/dashboard");
 
   const params = await searchParams;
   const page = Number(params.page) || 1;
@@ -58,9 +61,13 @@ export default async function LeadsPage({ searchParams }: PageProps) {
   return (
     <div className="space-y-6">
       <div>
-        <h2 className="text-2xl font-bold tracking-tight">Leads</h2>
+        <div className="flex items-center gap-2">
+          <h2 className="text-2xl font-bold tracking-tight">Leads</h2>
+          <LegacyBadge />
+        </div>
         <p className="text-muted-foreground">
-          Manage and track your sales leads
+          Legacy lead compatibility. Prefer Companies → Contacts → Opportunities
+          for new work
           {user.organizationName ? ` · ${user.organizationName}` : ""}.
         </p>
       </div>

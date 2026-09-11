@@ -7,6 +7,7 @@ import {
 import { OpportunitiesListClient } from "@/components/opportunities/opportunities-list-client";
 import { Skeleton } from "@/components/ui/skeleton";
 import { getCurrentUser } from "@/lib/auth/session";
+import { hasOrgPermission } from "@/lib/tenant/scope";
 import { OPPORTUNITY_FILTERS } from "@/lib/constants/opportunities";
 
 interface PageProps {
@@ -29,6 +30,7 @@ function parseFilter(raw?: string): OpportunityListFilter {
 export default async function OpportunitiesPage({ searchParams }: PageProps) {
   const user = await getCurrentUser();
   if (!user?.organizationId) redirect("/dashboard");
+  if (!hasOrgPermission(user, "opportunities.view")) redirect("/dashboard");
 
   const params = await searchParams;
   const page = Number(params.page) || 1;

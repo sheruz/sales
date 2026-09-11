@@ -3,12 +3,15 @@ import { redirect } from "next/navigation";
 import { format } from "date-fns";
 import { proposalService } from "@/services/proposal.service";
 import { getCurrentUser } from "@/lib/auth/session";
+import { hasOrgPermission } from "@/lib/tenant/scope";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { EmptyState } from "@/components/crm/empty-state";
 
 export default async function ProposalsPage() {
   const user = await getCurrentUser();
   if (!user?.organizationId) redirect("/dashboard");
+  if (!hasOrgPermission(user, "deals.manage")) redirect("/dashboard");
 
   const proposals = await proposalService.list(user.organizationId);
 
@@ -26,9 +29,12 @@ export default async function ProposalsPage() {
         </CardHeader>
         <CardContent className="space-y-3">
           {proposals.length === 0 ? (
-            <p className="text-sm text-muted-foreground">
-              No proposals yet. Create one from an opportunity.
-            </p>
+            <EmptyState
+              title="No proposals yet"
+              description="Create a proposal from an opportunity detail page."
+              actionHref="/dashboard/opportunities"
+              actionLabel="View opportunities"
+            />
           ) : (
             proposals.map((p) => (
               <div
@@ -38,24 +44,40 @@ export default async function ProposalsPage() {
                 <div>
                   <p className="text-sm font-medium">{p.title}</p>
                   <p className="text-xs text-muted-foreground">
-                    {p.company?.name ?? "—"} · v{p.version} ·{" "}
-                    {format(new Date(p.updatedAt), "MMM d, yyyy")}
+                    v{p.version} · {format(new Date(p.updatedAt), "MMM d, yyyy")}
                     {p.totalPrice != null
                       ? ` · ${p.currency} ${Number(p.totalPrice).toLocaleString()}`
                       : ""}
                   </p>
+                  <div className="mt-1 flex flex-wrap gap-2 text-xs">
+                    {p.company ? (
+                      <Link
+                        href={`/dashboard/companies/${p.company.id}`}
+                        className="text-primary hover:underline"
+                      >
+                        {p.company.name}
+                      </Link>
+                    ) : null}
+                    {p.contact ? (
+                      <Link
+                        href={`/dashboard/contacts/${p.contact.id}`}
+                        className="text-primary hover:underline"
+                      >
+                        {p.contact.fullName}
+                      </Link>
+                    ) : null}
+                    {p.opportunityId ? (
+                      <Link
+                        href={`/dashboard/opportunities/${p.opportunityId}`}
+                        className="text-primary hover:underline"
+                      >
+                        Opportunity
+                        {p.opportunity?.stage ? ` · ${p.opportunity.stage}` : ""}
+                      </Link>
+                    ) : null}
+                  </div>
                 </div>
-                <div className="flex items-center gap-2">
-                  <Badge variant="outline">{p.status}</Badge>
-                  {p.opportunityId && (
-                    <Link
-                      href={`/dashboard/opportunities/${p.opportunityId}`}
-                      className="text-xs text-primary hover:underline"
-                    >
-                      Opportunity
-                    </Link>
-                  )}
-                </div>
+                <Badge variant="outline">{p.status}</Badge>
               </div>
             ))
           )}

@@ -219,17 +219,23 @@ export function UnifiedInbox({ initialConversations }: UnifiedInboxProps) {
               <>
                 <div className="flex flex-wrap gap-3 text-sm text-muted-foreground">
                   {selected.company && (
-                    <span className="inline-flex items-center gap-1">
+                    <Link
+                      href={`/dashboard/companies/${selected.company.id}`}
+                      className="inline-flex items-center gap-1 text-primary hover:underline"
+                    >
                       <Building2 className="h-3.5 w-3.5" />
                       {selected.company.name}
-                    </span>
+                    </Link>
                   )}
                   {selected.contact && (
-                    <span className="inline-flex items-center gap-1">
+                    <Link
+                      href={`/dashboard/contacts/${selected.contact.id}`}
+                      className="inline-flex items-center gap-1 text-primary hover:underline"
+                    >
                       <User className="h-3.5 w-3.5" />
                       {selected.contact.fullName}
                       {selected.contact.email ? ` · ${selected.contact.email}` : ""}
-                    </span>
+                    </Link>
                   )}
                   {selected.opportunity && (
                     <Link

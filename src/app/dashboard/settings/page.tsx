@@ -105,12 +105,14 @@ export default async function SettingsPage({
           {canManageServices ? (
             <>
               <p className="text-sm text-muted-foreground">
+                Quick edit shortcut. For the full Revenue OS catalog use{" "}
                 <Link
                   href="/dashboard/services"
                   className="underline underline-offset-2"
                 >
-                  Manage full catalog →
+                  Services
                 </Link>
+                .
               </p>
               <ServicesPanel
                 initialServices={services.map((s) => ({
