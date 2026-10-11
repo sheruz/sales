@@ -324,6 +324,25 @@ enum IntegrationPlatform {
   ANTHROPIC
   EMAIL_SMTP
   LINKEDIN
+  GOOGLE_PLACES
+}
+
+enum SearchQueryStatus {
+  ACTIVE
+  PAUSED
+  DONE
+}
+
+enum CompanyCrawlStatus {
+  PENDING
+  DONE
+  FAILED
+  BLOCKED
+}
+
+enum CompanyEmailType {
+  GENERIC
+  PERSONAL
 }
 
 enum LinkedInConnectionType {
@@ -585,6 +604,9 @@ model Organization {
   notes             Note[]
   activities        Activity[]
   jobLogs           JobLog[]
+  searchQueries     SearchQuery[]
+  companyEmails     CompanyEmail[]
+  apiUsageLogs      ApiUsageLog[]
 
   @@index([status])
   @@index([deletedAt])
@@ -806,6 +828,13 @@ model Company {
   linkedInUrl    String?       @map("linkedin_url")
   instagramUrl   String?       @map("instagram_url")
   facebookUrl    String?       @map("facebook_url")
+  /// Google Places (New) place resource id — unique per org when set
+  googlePlaceId  String?       @map("google_place_id")
+  phone          String?
+  address        String?
+  crawlStatus    CompanyCrawlStatus? @map("crawl_status")
+  crawledAt      DateTime?     @map("crawled_at")
+  crawlError     String?       @map("crawl_error")
   technologies   String[]      @default([])
   fundingTotal   Decimal?      @map("funding_total") @db.Decimal(14, 2)
   lastFundingDate DateTime?    @map("last_funding_date") @db.Date
@@ -826,14 +855,73 @@ model Company {
   tasks         Task[]
   meetings      Meeting[]
   proposals     Proposal[]
+  emails        CompanyEmail[]
 
   @@unique([organizationId, domain])
   @@index([organizationId])
   @@index([organizationId, normalizedDomain])
+  @@index([organizationId, googlePlaceId])
+  @@index([organizationId, crawlStatus])
   @@index([name])
   @@index([industry])
   @@index([status])
   @@map("companies")
+}
+
+model CompanyEmail {
+  id             String           @id @default(uuid())
+  organizationId String           @map("organization_id")
+  companyId      String           @map("company_id")
+  email          String
+  sourcePage     String?          @map("source_page")
+  type           CompanyEmailType @default(GENERIC)
+  createdAt      DateTime         @default(now()) @map("created_at")
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  company      Company      @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@unique([companyId, email])
+  @@index([organizationId])
+  @@index([organizationId, email])
+  @@map("company_emails")
+}
+
+model SearchQuery {
+  id             String            @id @default(uuid())
+  organizationId String            @map("organization_id")
+  query          String
+  country        String?
+  city           String?
+  status         SearchQueryStatus @default(ACTIVE)
+  lastRunAt      DateTime?         @map("last_run_at")
+  resultsCount   Int               @default(0) @map("results_count")
+  pageToken      String?           @map("page_token") @db.Text
+  lastError      String?           @map("last_error")
+  createdAt      DateTime          @default(now()) @map("created_at")
+  updatedAt      DateTime          @updatedAt @map("updated_at")
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId, status])
+  @@index([organizationId, lastRunAt])
+  @@map("search_queries")
+}
+
+model ApiUsageLog {
+  id               String   @id @default(uuid())
+  organizationId   String   @map("organization_id")
+  provider         String
+  operation        String
+  estimatedCostUsd Decimal  @map("estimated_cost_usd") @db.Decimal(12, 6)
+  units            Int      @default(1)
+  metadata         Json?
+  createdAt        DateTime @default(now()) @map("created_at")
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId, createdAt])
+  @@index([organizationId, provider, createdAt])
+  @@map("api_usage_logs")
 }
 
 model Contact {

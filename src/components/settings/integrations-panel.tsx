@@ -64,6 +64,7 @@ export function IntegrationsPanel({ initialData }: IntegrationsPanelProps) {
 
   const [openAiKey, setOpenAiKey] = useState("");
   const [anthropicKey, setAnthropicKey] = useState("");
+  const [googlePlacesKey, setGooglePlacesKey] = useState("");
   const [emailForm, setEmailForm] = useState({
     smtpHost: "smtp.gmail.com",
     smtpPort: "587",
@@ -172,6 +173,26 @@ export function IntegrationsPanel({ initialData }: IntegrationsPanelProps) {
     }
   }
 
+  async function connectGooglePlaces() {
+    setSaving("GOOGLE_PLACES");
+    try {
+      const res = await fetch("/api/integrations/google-places", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ apiKey: googlePlacesKey }),
+      });
+      const json = await res.json();
+      if (!json.success) throw new Error(json.error?.message);
+      toast.success("Google Places connected");
+      setGooglePlacesKey("");
+      router.refresh();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed");
+    } finally {
+      setSaving(null);
+    }
+  }
+
   async function connectGmail() {
     setSaving("GMAIL");
     try {
@@ -229,7 +250,9 @@ export function IntegrationsPanel({ initialData }: IntegrationsPanelProps) {
           ? "anthropic"
           : platform === "EMAIL_SMTP"
             ? "email"
-            : platform.toLowerCase();
+            : platform === "GOOGLE_PLACES"
+              ? "google-places"
+              : platform.toLowerCase();
     setSaving(`disconnect-${platform}`);
     try {
       const res = await fetch(`/api/integrations/${route}`, { method: "DELETE" });
@@ -390,6 +413,48 @@ export function IntegrationsPanel({ initialData }: IntegrationsPanelProps) {
           <div className="flex gap-2">
             <Input type="password" placeholder="sk-ant-..." value={anthropicKey} onChange={(e) => setAnthropicKey(e.target.value)} />
             <Button onClick={connectAnthropic} disabled={saving === "ANTHROPIC"}>
+              Connect
+            </Button>
+          </div>
+        )}
+      </IntegrationCard>
+
+      <IntegrationCard
+        icon={<Globe className="h-5 w-5" />}
+        title="Google Places"
+        description={
+          getIntegration("GOOGLE_PLACES")?.description ??
+          "Places API (New) for Autopilot business sourcing."
+        }
+        price="Bring your own key"
+        connected={getIntegration("GOOGLE_PLACES")?.isConnected ?? false}
+        preview={getIntegration("GOOGLE_PLACES")?.maskedPreview}
+      >
+        {getIntegration("GOOGLE_PLACES")?.isConnected ? (
+          <div className="flex gap-2 items-center">
+            <CheckCircle2 className="h-4 w-4 text-green-600" />
+            <span className="text-sm">Connected</span>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => disconnect("GOOGLE_PLACES")}
+              disabled={!!saving}
+            >
+              Disconnect
+            </Button>
+          </div>
+        ) : (
+          <div className="flex gap-2">
+            <Input
+              type="password"
+              placeholder="AIza..."
+              value={googlePlacesKey}
+              onChange={(e) => setGooglePlacesKey(e.target.value)}
+            />
+            <Button
+              onClick={connectGooglePlaces}
+              disabled={saving === "GOOGLE_PLACES"}
+            >
               Connect
             </Button>
           </div>

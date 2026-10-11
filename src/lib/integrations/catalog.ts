@@ -60,6 +60,23 @@ export const INTEGRATION_CATALOG: IntegrationCatalogItem[] = [
     sortOrder: 4,
     fields: [],
   },
+  {
+    platform: "GOOGLE_PLACES",
+    name: "Google Places",
+    description:
+      "Places API (New) Text Search for Autopilot business sourcing. Billed by Google Cloud.",
+    monthlyPriceCents: 0,
+    sortOrder: 5,
+    fields: [
+      {
+        key: "apiKey",
+        label: "API Key",
+        type: "password",
+        placeholder: "AIza...",
+        required: true,
+      },
+    ],
+  },
 ];
 
 export function formatPrice(cents: number): string {

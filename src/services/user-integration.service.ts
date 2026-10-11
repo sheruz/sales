@@ -122,6 +122,21 @@ export class UserIntegrationService {
     );
   }
 
+  async saveGooglePlaces(
+    organizationId: string,
+    userId: string,
+    apiKey: string
+  ) {
+    await this.verifyGooglePlacesKey(apiKey);
+    return this.saveCredentials(
+      organizationId,
+      userId,
+      IntegrationPlatform.GOOGLE_PLACES,
+      { apiKey },
+      "Google Places connected"
+    );
+  }
+
   async saveEmailSmtp(
     organizationId: string,
     userId: string,
@@ -360,6 +375,27 @@ export class UserIntegrationService {
     } catch (err) {
       throw new ValidationError(
         `Invalid Anthropic API key: ${err instanceof Error ? err.message : "verification failed"}`
+      );
+    }
+  }
+
+  private async verifyGooglePlacesKey(apiKey: string) {
+    const res = await fetch(
+      "https://places.googleapis.com/v1/places:searchText",
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "X-Goog-Api-Key": apiKey,
+          "X-Goog-FieldMask": "places.id",
+        },
+        body: JSON.stringify({ textQuery: "cafe", pageSize: 1 }),
+      }
+    );
+    if (!res.ok) {
+      const body = await res.text().catch(() => "");
+      throw new ValidationError(
+        `Invalid Google Places API key: ${res.status} ${body.slice(0, 200)}`
       );
     }
   }

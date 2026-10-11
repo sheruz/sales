@@ -75,6 +75,8 @@ const envSchema = z.object({
   SOURCES_ENABLED: z.coerce.boolean().default(false),
   META_CONNECTOR_ENABLED: z.coerce.boolean().default(false),
   LINKEDIN_DISCOVERY_UI_ENABLED: z.coerce.boolean().default(false),
+  /** Optional org-wide fallback for Autopilot Google Places sourcing */
+  GOOGLE_PLACES_API_KEY: z.string().optional(),
 });
 
 let cachedEnv: z.infer<typeof envSchema> | null = null;
