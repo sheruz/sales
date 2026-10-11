@@ -45,11 +45,37 @@ export function getConnectorAdapter(
   return byType[0];
 }
 
-export function catalogConnectorTypes() {
-  return adapters.map((a) => ({
-    type: a.type,
-    provider: a.provider,
-    displayName: a.displayName,
-    description: a.description,
-  }));
+export function catalogConnectorTypes(options?: {
+  sourcesEnabled?: boolean;
+  metaConnectorEnabled?: boolean;
+}) {
+  const sourcesEnabled = options?.sourcesEnabled ?? true;
+  const metaConnectorEnabled = options?.metaConnectorEnabled ?? true;
+
+  return adapters.map((a) => {
+    const isMeta = a.type === "META";
+    const disabled =
+      !sourcesEnabled ||
+      (isMeta && !metaConnectorEnabled) ||
+      (!sourcesEnabled &&
+        [
+          "HIRING",
+          "FUNDING",
+          "WEB_RESEARCH",
+          "RFP_TENDER",
+          "LINKEDIN",
+          "META",
+          "INSTAGRAM",
+        ].includes(a.type));
+
+    return {
+      type: a.type,
+      provider: a.provider,
+      displayName: a.displayName,
+      description: disabled
+        ? `${a.description} (disabled — Client Autopilot Phase 0)`
+        : a.description,
+      disabled,
+    };
+  });
 }

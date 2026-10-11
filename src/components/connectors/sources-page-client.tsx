@@ -49,6 +49,7 @@ export type CatalogItem = {
   provider: string;
   displayName: string;
   description: string;
+  disabled?: boolean;
 };
 
 function statusVariant(status: string): "default" | "secondary" | "destructive" | "outline" {

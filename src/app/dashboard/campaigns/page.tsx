@@ -1,9 +1,11 @@
+import Link from "next/link";
 import { redirect } from "next/navigation";
 import { campaignService } from "@/services/campaign.service";
 import prisma from "@/lib/db/prisma";
 import { CampaignsList } from "@/components/campaigns/campaigns-list";
 import { getCurrentUser } from "@/lib/auth/session";
 import { hasAnyOrgPermission, hasOrgPermission } from "@/lib/tenant/scope";
+import { Button } from "@/components/ui/button";
 
 export default async function CampaignsPage() {
   const user = await getCurrentUser();
@@ -13,6 +15,10 @@ export default async function CampaignsPage() {
   }
 
   const canManage = hasOrgPermission(user, "campaigns.manage");
+  const canSequences = hasAnyOrgPermission(user, [
+    "sequences.view",
+    "sequences.manage",
+  ]);
 
   const [campaigns, services] = await Promise.all([
     campaignService.list(user.organizationId),
@@ -33,12 +39,20 @@ export default async function CampaignsPage() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h2 className="text-2xl font-bold tracking-tight">Campaigns</h2>
-        <p className="text-muted-foreground">
-          Canonical Contact/Opportunity enrollments plus legacy Lead discovery.
-          Prefer Sequences for new outreach automation.
-        </p>
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h2 className="text-2xl font-bold tracking-tight">Campaigns</h2>
+          <p className="text-muted-foreground">
+            Outreach programs with Contact enrollments and sequences.
+          </p>
+        </div>
+        {canSequences ? (
+          <Link href="/dashboard/sequences">
+            <Button variant="outline" size="sm">
+              Sequences
+            </Button>
+          </Link>
+        ) : null}
       </div>
       <CampaignsList
         initialCampaigns={serialized}

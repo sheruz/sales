@@ -14,6 +14,7 @@ import { Badge } from "@/components/ui/badge";
 import { CAMPAIGN_STATUS_LABELS } from "@/lib/constants/automation";
 import { getCurrentUser } from "@/lib/auth/session";
 import { hasAnyOrgPermission, hasOrgPermission } from "@/lib/tenant/scope";
+import { getFeatureFlags } from "@/lib/features/flags";
 
 interface PageProps {
   params: Promise<{ id: string }>;
@@ -83,6 +84,10 @@ export default async function CampaignDetailPage({ params }: PageProps) {
     "sequences.manage",
     "leads.update",
   ]);
+
+  const flags = await getFeatureFlags(user.organizationId);
+  const showLegacyDiscovery =
+    flags.linkedin_discovery_ui_enabled || flags.legacy_enabled;
 
   return (
     <div className="space-y-6">
@@ -162,32 +167,36 @@ export default async function CampaignDetailPage({ params }: PageProps) {
         ) : null}
       </section>
 
-      <section className="space-y-3 border-t pt-6">
-        <div className="flex items-center gap-2">
-          <h3 className="text-base font-semibold">Legacy discovery & automation</h3>
-          <Badge
-            variant="outline"
-            className="border-amber-500/40 text-amber-700 dark:text-amber-400"
-          >
-            Legacy
-          </Badge>
-        </div>
-        <p className="text-sm text-muted-foreground">
-          LinkedIn discovery creates Leads / CampaignLeads. These counts are not
-          the same population as canonical enrollments above.
-        </p>
-        <CampaignDetail
-          campaign={campaign}
-          stats={{
-            totalLeads: stats.totalLeads,
-            automatedLeads: stats.automatedLeads,
-            repliedLeads: stats.repliedLeads,
-            hotLeads: stats.hotLeads,
-            canonicalEnrollments: stats.canonicalEnrollments,
-          }}
-          canManageCampaigns={canManageCampaigns}
-        />
-      </section>
+      {showLegacyDiscovery ? (
+        <section className="space-y-3 border-t pt-6">
+          <div className="flex items-center gap-2">
+            <h3 className="text-base font-semibold">
+              Legacy discovery & automation
+            </h3>
+            <Badge
+              variant="outline"
+              className="border-amber-500/40 text-amber-700 dark:text-amber-400"
+            >
+              Legacy
+            </Badge>
+          </div>
+          <p className="text-sm text-muted-foreground">
+            LinkedIn discovery creates Leads / CampaignLeads. These counts are
+            not the same population as canonical enrollments above.
+          </p>
+          <CampaignDetail
+            campaign={campaign}
+            stats={{
+              totalLeads: stats.totalLeads,
+              automatedLeads: stats.automatedLeads,
+              repliedLeads: stats.repliedLeads,
+              hotLeads: stats.hotLeads,
+              canonicalEnrollments: stats.canonicalEnrollments,
+            }}
+            canManageCampaigns={canManageCampaigns}
+          />
+        </section>
+      ) : null}
     </div>
   );
 }

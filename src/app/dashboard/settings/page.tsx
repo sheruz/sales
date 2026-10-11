@@ -14,6 +14,7 @@ import { ServicesPanel } from "@/components/settings/services-panel";
 import { AiUsageCard } from "@/components/settings/ai-usage-card";
 import { BillingPanel } from "@/components/settings/billing-panel";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Button } from "@/components/ui/button";
 
 export default async function SettingsPage({
   searchParams,
@@ -57,6 +58,35 @@ export default async function SettingsPage({
           Manage your profile, billing, integrations, and company services.
         </p>
       </div>
+
+      <section className="space-y-2">
+        <h3 className="text-sm font-medium">Configuration</h3>
+        <p className="text-xs text-muted-foreground">
+          Revenue OS setup — Business Brain, ICP, Services, and Revenue Goals.
+        </p>
+        <div className="flex flex-wrap gap-2">
+          <Link href="/dashboard/business-brain">
+            <Button variant="outline" size="sm">
+              Business Brain
+            </Button>
+          </Link>
+          <Link href="/dashboard/icp">
+            <Button variant="outline" size="sm">
+              ICP
+            </Button>
+          </Link>
+          <Link href="/dashboard/services">
+            <Button variant="outline" size="sm">
+              Services
+            </Button>
+          </Link>
+          <Link href="/dashboard/revenue-goals">
+            <Button variant="outline" size="sm">
+              Revenue Goals
+            </Button>
+          </Link>
+        </div>
+      </section>
 
       <Tabs defaultValue={defaultTab}>
         <TabsList>

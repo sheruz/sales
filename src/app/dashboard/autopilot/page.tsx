@@ -1,73 +1,52 @@
-import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth/session";
-import { hasAnyOrgPermission } from "@/lib/tenant/scope";
-import prisma from "@/lib/db/prisma";
-import { autopilotService } from "@/services/autopilot.service";
-import { userIntegrationService } from "@/services/user-integration.service";
-import { isAiConfigured } from "@/lib/integrations/readiness";
-import { AutopilotPanel } from "@/components/autopilot/autopilot-panel";
-import { LegacyBadge } from "@/components/crm/legacy-badge";
+import { redirect } from "next/navigation";
+import Link from "next/link";
+import { Button } from "@/components/ui/button";
 
+/**
+ * Client Autopilot control surface.
+ * Phase 0: placeholder only — Google sourcing lands in Phase 1.
+ * Legacy Autopilot panel is hidden (legacy_enabled=false by default).
+ */
 export default async function AutopilotPage() {
   const user = await getCurrentUser();
   if (!user) redirect("/login");
   if (!user.organizationId) redirect("/dashboard");
-  // Mirror sidebar: campaigns.manage | agent.manage
-  if (!hasAnyOrgPermission(user, ["campaigns.manage", "agent.manage"])) {
-    redirect("/dashboard");
-  }
-
-  const [config, services, usage] = await Promise.all([
-    autopilotService.getOrCreateConfig(user.organizationId, user.id),
-    prisma.service.findMany({
-      where: { organizationId: user.organizationId, isActive: true },
-      select: { id: true, name: true },
-      orderBy: { name: "asc" },
-    }),
-    autopilotService.getUsage(user.organizationId, user.id),
-  ]);
-
-  const [emailConfigured, aiConfigured] = await Promise.all([
-    userIntegrationService.isEmailConfigured(user.organizationId, user.id),
-    isAiConfigured(user.organizationId, user.id),
-  ]);
 
   return (
-    <div className="space-y-6">
+    <div className="mx-auto max-w-2xl space-y-6 py-12 text-center">
       <div>
-        <div className="flex items-center gap-2">
-          <h2 className="text-2xl font-bold tracking-tight">AI Autopilot</h2>
-          <LegacyBadge />
-        </div>
-        <p className="text-muted-foreground">
-          Legacy automation. Prefer Campaigns → Sequences → Enrollments for
-          canonical outreach.
+        <h2 className="text-2xl font-bold tracking-tight">Autopilot</h2>
+        <p className="mt-2 text-muted-foreground">
+          Coming in Phase 1 — Google business sourcing, enrichment, and
+          outbound control will live here.
         </p>
       </div>
-      <AutopilotPanel
-        initialConfig={{
-          ...config,
-          maxLeadsPerRun: config.maxLeadsPerRun ?? 5,
-          maxLeadsPerDay: config.maxLeadsPerDay ?? 10,
-          maxAiCallsPerDay: config.maxAiCallsPerDay ?? 15,
-          lastRunAt: config.lastRunAt?.toISOString() ?? null,
-          nextRunAt: config.nextRunAt?.toISOString() ?? null,
-          lastRunResult: config.lastRunResult as {
-            profilesFound?: number;
-            newLeadsCreated?: number;
-            leadsProcessed?: number;
-            emailsSent?: number;
-            discoveryMode?: string;
-            log?: string[];
-            status?: string;
-            error?: string;
-          } | null,
-        }}
-        usage={usage}
-        services={services}
-        emailConfigured={emailConfigured}
-        aiConfigured={aiConfigured}
-      />
+      <div className="rounded-lg border border-dashed p-8 text-sm text-muted-foreground">
+        <p className="font-medium text-foreground">What&apos;s next</p>
+        <ul className="mt-3 space-y-1 text-left">
+          <li>Phase 1 — Google Places sourcing from your ICP</li>
+          <li>Phase 2 — Decision-maker enrichment</li>
+          <li>Phase 3+ — Audit, outbound, AI replies, Zoom, Meta Lead Ads</li>
+        </ul>
+      </div>
+      <div className="flex flex-wrap justify-center gap-2">
+        <Link href="/dashboard/icp">
+          <Button variant="outline" size="sm">
+            Configure ICP
+          </Button>
+        </Link>
+        <Link href="/dashboard/business-brain">
+          <Button variant="outline" size="sm">
+            Business Brain
+          </Button>
+        </Link>
+        <Link href="/dashboard/settings">
+          <Button variant="outline" size="sm">
+            Settings
+          </Button>
+        </Link>
+      </div>
     </div>
   );
 }

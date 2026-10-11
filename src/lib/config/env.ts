@@ -70,6 +70,11 @@ const envSchema = z.object({
   OUTREACH_CHANNELS: z.string().default("email"),
   /** job_posts (default) or linkedin */
   AUTOPILOT_DISCOVERY_MODE: z.enum(["job_posts", "linkedin"]).default("job_posts"),
+  /** Phase 0 Client Autopilot — feature flag env defaults (org settings can override) */
+  LEGACY_ENABLED: z.coerce.boolean().default(false),
+  SOURCES_ENABLED: z.coerce.boolean().default(false),
+  META_CONNECTOR_ENABLED: z.coerce.boolean().default(false),
+  LINKEDIN_DISCOVERY_UI_ENABLED: z.coerce.boolean().default(false),
 });
 
 let cachedEnv: z.infer<typeof envSchema> | null = null;

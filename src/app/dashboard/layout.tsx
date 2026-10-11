@@ -2,6 +2,7 @@ import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth/session";
 import { isSuperAdmin, SESSION_COOKIE } from "@/lib/auth/permissions";
+import { getFeatureFlags } from "@/lib/features/flags";
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/dashboard/app-sidebar";
 import { DashboardHeader } from "@/components/dashboard/dashboard-header";
@@ -34,10 +35,11 @@ export default async function DashboardLayout({
   const jar = await cookies();
   const sidebarCookie = jar.get("sidebar_state")?.value;
   const defaultOpen = sidebarCookie !== "false";
+  const flags = await getFeatureFlags(user.organizationId);
 
   return (
     <SidebarProvider defaultOpen={defaultOpen}>
-      <AppSidebar user={user} />
+      <AppSidebar user={user} flags={flags} />
       <SidebarInset>
         <DashboardHeader user={user} />
         <main className="flex-1 overflow-auto p-4 md:p-6">{children}</main>

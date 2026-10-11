@@ -47,8 +47,13 @@ function sourceKeyForType(type: SourceConnectorType): { key: string; name: strin
 }
 
 export class SourceConnectorService {
-  catalog() {
-    return catalogConnectorTypes();
+  async catalog(organizationId?: string | null) {
+    const { getFeatureFlags } = await import("@/lib/features/flags");
+    const flags = await getFeatureFlags(organizationId);
+    return catalogConnectorTypes({
+      sourcesEnabled: flags.sources_enabled,
+      metaConnectorEnabled: flags.meta_connector_enabled,
+    });
   }
 
   async list(organizationId: string) {
@@ -95,6 +100,22 @@ export class SourceConnectorService {
   ) {
     const adapter = getConnectorAdapter(input.type, input.provider);
     if (!adapter) throw new ValidationError("Unknown connector type");
+
+    const { getFeatureFlags } = await import("@/lib/features/flags");
+    const flags = await getFeatureFlags(organizationId);
+    if (!flags.sources_enabled) {
+      throw new ValidationError(
+        "Sources connectors are disabled (sources_enabled=false)."
+      );
+    }
+    if (
+      input.type === SourceConnectorType.META &&
+      !flags.meta_connector_enabled
+    ) {
+      throw new ValidationError(
+        "Meta connector is disabled until Phase 7 Lead Ads rebuild."
+      );
+    }
 
     await entitlementService.assertSeatAvailable(
       organizationId,
@@ -175,6 +196,22 @@ export class SourceConnectorService {
     if (!connector) throw new NotFoundError("Source connector not found");
     if (connector.status === SourceConnectorStatus.DISABLED) {
       throw new ValidationError("Connector is disabled");
+    }
+
+    const { getFeatureFlags } = await import("@/lib/features/flags");
+    const flags = await getFeatureFlags(organizationId);
+    if (!flags.sources_enabled) {
+      throw new ValidationError(
+        "Sources connectors are disabled (sources_enabled=false). Google + Meta Lead Ads replace them in Client Autopilot."
+      );
+    }
+    if (
+      connector.type === SourceConnectorType.META &&
+      !flags.meta_connector_enabled
+    ) {
+      throw new ValidationError(
+        "Meta connector is disabled until Phase 7 Lead Ads rebuild (meta_connector_enabled=false)."
+      );
     }
 
     await entitlementService.assertAndConsume(

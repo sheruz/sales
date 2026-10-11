@@ -3,24 +3,15 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
-  Bot,
-  Brain,
   Briefcase,
   Building2,
-  CircleDollarSign,
+  Calendar,
   Contact,
-  Crosshair,
-  Flame,
   LayoutDashboard,
-  ListTodo,
   MessageSquare,
-  Package,
-  Plug,
   Rocket,
   Settings,
   Target,
-  Users,
-  Workflow,
   Zap,
   type LucideIcon,
 } from "lucide-react";
@@ -35,12 +26,16 @@ import {
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
+  SidebarMenuSub,
+  SidebarMenuSubButton,
+  SidebarMenuSubItem,
   SidebarRail,
 } from "@/components/ui/sidebar";
 import { SidebarUserFooter } from "@/components/dashboard/sidebar-user-footer";
 import { hasPermission } from "@/lib/auth/permissions";
 import { hasOrgPermission } from "@/lib/tenant/scope";
 import type { PermissionKey } from "@/lib/auth/permission-catalog";
+import type { FeatureFlags } from "@/lib/features/flags";
 import type { AuthUser } from "@/types/auth";
 
 type NavItem = {
@@ -48,173 +43,115 @@ type NavItem = {
   href: string;
   icon: LucideIcon;
   anyOf?: PermissionKey[];
-  legacy?: boolean;
+  children?: { title: string; href: string; anyOf?: PermissionKey[] }[];
 };
-
-type NavGroup = {
-  label: string;
-  items: NavItem[];
-};
-
-const navGroups: NavGroup[] = [
-  {
-    label: "Revenue",
-    items: [{ title: "Dashboard", href: "/dashboard", icon: LayoutDashboard }],
-  },
-  {
-    label: "Workspace",
-    items: [
-      {
-        title: "Inbox",
-        href: "/dashboard/conversations",
-        icon: MessageSquare,
-        anyOf: ["conversations.view"],
-      },
-      {
-        title: "Tasks",
-        href: "/dashboard/tasks",
-        icon: ListTodo,
-        anyOf: ["leads.view", "opportunities.view"],
-      },
-    ],
-  },
-  {
-    label: "CRM",
-    items: [
-      {
-        title: "Companies",
-        href: "/dashboard/companies",
-        icon: Building2,
-        anyOf: ["opportunities.view", "leads.view"],
-      },
-      {
-        title: "Contacts",
-        href: "/dashboard/contacts",
-        icon: Contact,
-        anyOf: ["opportunities.view", "leads.view"],
-      },
-      {
-        title: "Opportunities",
-        href: "/dashboard/opportunities",
-        icon: Flame,
-        anyOf: ["opportunities.view"],
-      },
-      {
-        title: "Pipeline",
-        href: "/dashboard/pipeline",
-        icon: Briefcase,
-        anyOf: ["deals.manage", "opportunities.view"],
-      },
-    ],
-  },
-  {
-    label: "Revenue engine",
-    items: [
-      {
-        title: "Campaigns",
-        href: "/dashboard/campaigns",
-        icon: Target,
-        anyOf: ["campaigns.manage", "campaigns.view"],
-      },
-      {
-        title: "Sequences",
-        href: "/dashboard/sequences",
-        icon: Workflow,
-        anyOf: ["sequences.view", "sequences.manage"],
-      },
-      {
-        title: "Meetings",
-        href: "/dashboard/meetings",
-        icon: ListTodo,
-        anyOf: ["opportunities.view", "deals.manage"],
-      },
-      {
-        title: "Proposals",
-        href: "/dashboard/proposals",
-        icon: Package,
-        anyOf: ["deals.manage"],
-      },
-    ],
-  },
-  {
-    label: "Intelligence",
-    items: [
-      {
-        title: "Business Brain",
-        href: "/dashboard/business-brain",
-        icon: Brain,
-        anyOf: ["business_brain.manage"],
-      },
-      {
-        title: "ICP",
-        href: "/dashboard/icp",
-        icon: Crosshair,
-        anyOf: ["business_brain.manage"],
-      },
-      {
-        title: "Services",
-        href: "/dashboard/services",
-        icon: Package,
-        anyOf: ["business_brain.manage"],
-      },
-      {
-        title: "Revenue Goals",
-        href: "/dashboard/revenue-goals",
-        icon: CircleDollarSign,
-        anyOf: ["revenue_goals.manage", "revenue.view"],
-      },
-      {
-        title: "Sources",
-        href: "/dashboard/sources",
-        icon: Plug,
-        anyOf: ["integrations.manage"],
-      },
-    ],
-  },
-  {
-    label: "Automation",
-    items: [
-      {
-        title: "Revenue Agent",
-        href: "/dashboard/agent",
-        icon: Bot,
-        anyOf: ["agent.view"],
-      },
-    ],
-  },
-  {
-    label: "Legacy / Compatibility",
-    items: [
-      {
-        title: "Leads",
-        href: "/dashboard/leads",
-        icon: Users,
-        anyOf: ["leads.view"],
-        legacy: true,
-      },
-      {
-        title: "Autopilot",
-        href: "/dashboard/autopilot",
-        icon: Rocket,
-        anyOf: ["campaigns.manage", "agent.manage"],
-        legacy: true,
-      },
-    ],
-  },
-];
-
-function canSee(user: AuthUser, item: NavItem): boolean {
-  if (!item.anyOf?.length) return true;
-  return item.anyOf.some((p) => hasOrgPermission(user, p));
-}
 
 interface AppSidebarProps {
   user: AuthUser;
+  flags: FeatureFlags;
 }
 
-export function AppSidebar({ user }: AppSidebarProps) {
+function canSee(
+  user: AuthUser,
+  anyOf?: PermissionKey[]
+): boolean {
+  if (!anyOf?.length) return true;
+  return anyOf.some((p) => hasOrgPermission(user, p));
+}
+
+export function AppSidebar({ user, flags }: AppSidebarProps) {
   const pathname = usePathname();
   const showSettings = hasPermission(user.role, "settings:read");
+
+  const primary: NavItem[] = [
+    { title: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
+    {
+      title: "Autopilot",
+      href: "/dashboard/autopilot",
+      icon: Rocket,
+    },
+    {
+      title: "Leads",
+      href: "/dashboard/companies",
+      icon: Building2,
+      anyOf: ["opportunities.view", "leads.view"],
+      children: [
+        {
+          title: "Companies",
+          href: "/dashboard/companies",
+          anyOf: ["opportunities.view", "leads.view"],
+        },
+        {
+          title: "Contacts",
+          href: "/dashboard/contacts",
+          anyOf: ["opportunities.view", "leads.view"],
+        },
+      ],
+    },
+    {
+      title: "Campaigns",
+      href: "/dashboard/campaigns",
+      icon: Target,
+      anyOf: ["campaigns.manage", "campaigns.view"],
+      children: [
+        {
+          title: "All campaigns",
+          href: "/dashboard/campaigns",
+          anyOf: ["campaigns.manage", "campaigns.view"],
+        },
+        {
+          title: "Sequences",
+          href: "/dashboard/sequences",
+          anyOf: ["sequences.view", "sequences.manage"],
+        },
+      ],
+    },
+    {
+      title: "Inbox",
+      href: "/dashboard/conversations",
+      icon: MessageSquare,
+      anyOf: ["conversations.view"],
+    },
+    {
+      title: "Meetings",
+      href: "/dashboard/meetings",
+      icon: Calendar,
+      anyOf: ["opportunities.view", "deals.manage"],
+    },
+    {
+      title: "Pipeline",
+      href: "/dashboard/pipeline",
+      icon: Briefcase,
+      anyOf: ["deals.manage", "opportunities.view"],
+      children: [
+        {
+          title: "Board",
+          href: "/dashboard/pipeline",
+          anyOf: ["deals.manage", "opportunities.view"],
+        },
+        {
+          title: "Opportunities",
+          href: "/dashboard/opportunities",
+          anyOf: ["opportunities.view"],
+        },
+        {
+          title: "Proposals",
+          href: "/dashboard/proposals",
+          anyOf: ["deals.manage"],
+        },
+      ],
+    },
+  ];
+
+  // Legacy nav only when flag on (routes still exist)
+  if (flags.legacy_enabled) {
+    primary.push({
+      title: "Legacy Leads",
+      href: "/dashboard/leads",
+      icon: Contact,
+      anyOf: ["leads.view"],
+    });
+  }
 
   return (
     <Sidebar collapsible="icon">
@@ -237,40 +174,56 @@ export function AppSidebar({ user }: AppSidebarProps) {
       </SidebarHeader>
 
       <SidebarContent>
-        {navGroups.map((group) => {
-          const visible = group.items.filter((item) => canSee(user, item));
-          if (!visible.length) return null;
-          return (
-            <SidebarGroup key={group.label}>
-              <SidebarGroupLabel>{group.label}</SidebarGroupLabel>
-              <SidebarGroupContent>
-                <SidebarMenu>
-                  {visible.map((item) => (
-                    <SidebarMenuItem key={item.href}>
+        <SidebarGroup>
+          <SidebarGroupLabel>Workspace</SidebarGroupLabel>
+          <SidebarGroupContent>
+            <SidebarMenu>
+              {primary
+                .filter((item) => canSee(user, item.anyOf))
+                .map((item) => {
+                  const childVisible =
+                    item.children?.filter((c) => canSee(user, c.anyOf)) ?? [];
+                  const active =
+                    item.href === "/dashboard"
+                      ? pathname === "/dashboard"
+                      : pathname.startsWith(item.href) ||
+                        childVisible.some((c) => pathname.startsWith(c.href));
+
+                  return (
+                    <SidebarMenuItem key={item.title}>
                       <SidebarMenuButton
-                        isActive={
-                          item.href === "/dashboard"
-                            ? pathname === "/dashboard"
-                            : pathname.startsWith(item.href)
-                        }
-                        tooltip={
-                          item.legacy ? `${item.title} (Legacy)` : item.title
-                        }
+                        isActive={active && childVisible.length === 0}
+                        tooltip={item.title}
                         render={<Link href={item.href} />}
                       >
                         <item.icon />
-                        <span>
-                          {item.title}
-                          {item.legacy ? " · Legacy" : ""}
-                        </span>
+                        <span>{item.title}</span>
                       </SidebarMenuButton>
+                      {childVisible.length > 0 ? (
+                        <SidebarMenuSub>
+                          {childVisible.map((child) => (
+                            <SidebarMenuSubItem key={child.href}>
+                              <SidebarMenuSubButton
+                                isActive={
+                                  child.href === "/dashboard/campaigns" ||
+                                  child.href === "/dashboard/pipeline"
+                                    ? pathname === child.href
+                                    : pathname.startsWith(child.href)
+                                }
+                                render={<Link href={child.href} />}
+                              >
+                                <span>{child.title}</span>
+                              </SidebarMenuSubButton>
+                            </SidebarMenuSubItem>
+                          ))}
+                        </SidebarMenuSub>
+                      ) : null}
                     </SidebarMenuItem>
-                  ))}
-                </SidebarMenu>
-              </SidebarGroupContent>
-            </SidebarGroup>
-          );
-        })}
+                  );
+                })}
+            </SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarGroup>
 
         {showSettings && (
           <SidebarGroup>
@@ -286,6 +239,44 @@ export function AppSidebar({ user }: AppSidebarProps) {
                     <Settings />
                     <span>Settings</span>
                   </SidebarMenuButton>
+                  <SidebarMenuSub>
+                    <SidebarMenuSubItem>
+                      <SidebarMenuSubButton
+                        isActive={pathname.startsWith(
+                          "/dashboard/business-brain"
+                        )}
+                        render={<Link href="/dashboard/business-brain" />}
+                      >
+                        <span>Business Brain</span>
+                      </SidebarMenuSubButton>
+                    </SidebarMenuSubItem>
+                    <SidebarMenuSubItem>
+                      <SidebarMenuSubButton
+                        isActive={pathname.startsWith("/dashboard/icp")}
+                        render={<Link href="/dashboard/icp" />}
+                      >
+                        <span>ICP</span>
+                      </SidebarMenuSubButton>
+                    </SidebarMenuSubItem>
+                    <SidebarMenuSubItem>
+                      <SidebarMenuSubButton
+                        isActive={pathname.startsWith("/dashboard/services")}
+                        render={<Link href="/dashboard/services" />}
+                      >
+                        <span>Services</span>
+                      </SidebarMenuSubButton>
+                    </SidebarMenuSubItem>
+                    <SidebarMenuSubItem>
+                      <SidebarMenuSubButton
+                        isActive={pathname.startsWith(
+                          "/dashboard/revenue-goals"
+                        )}
+                        render={<Link href="/dashboard/revenue-goals" />}
+                      >
+                        <span>Revenue Goals</span>
+                      </SidebarMenuSubButton>
+                    </SidebarMenuSubItem>
+                  </SidebarMenuSub>
                 </SidebarMenuItem>
               </SidebarMenu>
             </SidebarGroupContent>

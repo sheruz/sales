@@ -12,7 +12,7 @@ export async function GET() {
     const user = await requireOrganizationContext();
     const [connectors, catalog] = await Promise.all([
       sourceConnectorService.list(user.organizationId),
-      Promise.resolve(sourceConnectorService.catalog()),
+      sourceConnectorService.catalog(user.organizationId),
     ]);
     return NextResponse.json(apiSuccess({ connectors, catalog }));
   } catch (error) {

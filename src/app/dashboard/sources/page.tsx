@@ -1,17 +1,39 @@
 import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth/session";
 import { hasOrgPermission } from "@/lib/tenant/scope";
+import { getFeatureFlags } from "@/lib/features/flags";
 import { sourceConnectorService } from "@/services/source-connector.service";
 import { SourcesPageClient } from "@/components/connectors/sources-page-client";
+import { EmptyState } from "@/components/crm/empty-state";
 
 export default async function SourcesPage() {
   const user = await getCurrentUser();
   if (!user?.organizationId) redirect("/dashboard");
   if (!hasOrgPermission(user, "integrations.manage")) redirect("/dashboard");
 
+  const flags = await getFeatureFlags(user.organizationId);
+  if (!flags.sources_enabled) {
+    return (
+      <div className="space-y-6">
+        <div>
+          <h2 className="text-2xl font-bold tracking-tight">Sources</h2>
+          <p className="text-muted-foreground">
+            Legacy scrapers are disabled for Client Autopilot.
+          </p>
+        </div>
+        <EmptyState
+          title="Sources disabled"
+          description="Hiring/funding/Meta scrapers are off (sources_enabled=false). Google Places and Meta Lead Ads replace them in later phases."
+          actionHref="/dashboard/autopilot"
+          actionLabel="Open Autopilot"
+        />
+      </div>
+    );
+  }
+
   const [connectors, catalog] = await Promise.all([
     sourceConnectorService.list(user.organizationId),
-    Promise.resolve(sourceConnectorService.catalog()),
+    sourceConnectorService.catalog(user.organizationId),
   ]);
 
   const serialized = connectors.map((c) => ({
