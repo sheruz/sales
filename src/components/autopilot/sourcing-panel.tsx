@@ -37,6 +37,7 @@ type QueryRow = {
 
 type SourcingConfig = {
   enabled: boolean;
+  autoCrawl: boolean;
   queriesPerDay: number;
   companiesPerDay: number;
   queriesPerTick: number;
@@ -68,6 +69,14 @@ type Props = {
       crawlError: string | null;
       website: string | null;
     }>;
+    lastCronRun: {
+      startedAt: string;
+      finishedAt: string | null;
+      ok: boolean;
+      skipped: boolean;
+      skipReason: string | null;
+      stale: boolean;
+    } | null;
   };
 };
 
@@ -238,6 +247,14 @@ export function SourcingPanel({ initial }: Props) {
             </Button>
             <Button
               size="sm"
+              variant={config.autoCrawl ? "default" : "outline"}
+              disabled={busy === "config"}
+              onClick={() => patchConfig({ autoCrawl: !config.autoCrawl })}
+            >
+              {config.autoCrawl ? "Auto-crawl ON" : "Auto-crawl OFF"}
+            </Button>
+            <Button
+              size="sm"
               variant={config.enabled ? "default" : "outline"}
               disabled={busy === "config"}
               onClick={() => patchConfig({ enabled: !config.enabled })}
@@ -255,7 +272,7 @@ export function SourcingPanel({ initial }: Props) {
             <p className="text-muted-foreground">Pending crawls</p>
             <p className="text-2xl font-semibold">{initial.pendingCrawls}</p>
             <p className="text-xs text-muted-foreground">
-              Use Crawl now — cron alone often is not set up
+              Crawl now or Auto-crawl via cron
             </p>
           </div>
           <div>

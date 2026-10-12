@@ -325,6 +325,15 @@ enum IntegrationPlatform {
   EMAIL_SMTP
   LINKEDIN
   GOOGLE_PLACES
+  HUNTER
+}
+
+enum CompanyEnrichmentStatus {
+  PENDING
+  ENRICHED
+  NO_CONTACT
+  SKIPPED
+  FAILED
 }
 
 enum SearchQueryStatus {
@@ -457,6 +466,8 @@ enum OpportunityStatus {
 }
 
 enum OpportunityStage {
+  /// Pre-pipeline: enriched company, not yet enrolled in outreach
+  SOURCED
   NEW
   QUALIFIED
   CONTACTED
@@ -607,10 +618,33 @@ model Organization {
   searchQueries     SearchQuery[]
   companyEmails     CompanyEmail[]
   apiUsageLogs      ApiUsageLog[]
+  cronTickLogs      CronTickLog[]
 
   @@index([status])
   @@index([deletedAt])
   @@map("organizations")
+}
+
+/// Global + optional per-org cron observability (Phase 2)
+model CronTickLog {
+  id             String   @id @default(uuid())
+  /// null = system-wide tick summary
+  organizationId String?  @map("organization_id")
+  startedAt      DateTime @default(now()) @map("started_at")
+  finishedAt     DateTime? @map("finished_at")
+  ok             Boolean  @default(true)
+  skipped        Boolean  @default(false)
+  skipReason     String?  @map("skip_reason")
+  jobs           Json?
+  counts         Json?
+  errors         Json?
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  organization Organization? @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([startedAt])
+  @@index([organizationId, startedAt])
+  @@map("cron_tick_logs")
 }
 
 model Role {
@@ -835,6 +869,11 @@ model Company {
   crawlStatus    CompanyCrawlStatus? @map("crawl_status")
   crawledAt      DateTime?     @map("crawled_at")
   crawlError     String?       @map("crawl_error")
+  /// Phase 2 Hunter / enrichment lifecycle
+  enrichmentStatus CompanyEnrichmentStatus? @map("enrichment_status")
+  enrichedAt     DateTime?     @map("enriched_at")
+  enrichmentError String?      @map("enrichment_error")
+  enrichmentAttempts Int       @default(0) @map("enrichment_attempts")
   technologies   String[]      @default([])
   fundingTotal   Decimal?      @map("funding_total") @db.Decimal(14, 2)
   lastFundingDate DateTime?    @map("last_funding_date") @db.Date
@@ -862,6 +901,7 @@ model Company {
   @@index([organizationId, normalizedDomain])
   @@index([organizationId, googlePlaceId])
   @@index([organizationId, crawlStatus])
+  @@index([organizationId, enrichmentStatus])
   @@index([name])
   @@index([industry])
   @@index([status])
@@ -964,8 +1004,9 @@ model Contact {
   @@index([organizationId])
   @@index([companyId])
   @@index([email])
-  @@index([organizationId, normalizedEmail])
   @@index([organizationId, companyId, normalizedEmail])
+  /// Dedupe: one contact per org email (NULL normalizedEmail allowed multiple times in Postgres)
+  @@unique([organizationId, normalizedEmail], map: "contacts_org_normalized_email_key")
   @@index([status])
   @@map("contacts")
 }

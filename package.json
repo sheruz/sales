@@ -25,6 +25,7 @@
     "db:backfill:sequence-snapshots": "node scripts/run-with-env.js node scripts/phase5-backfill-sequence-snapshots.js",
     "db:migrate:phase0-leads": "node scripts/run-with-env.js npx tsx scripts/phase0-migrate-active-leads.js",
     "db:migrate:google-sourcing": "node scripts/run-with-env.js node scripts/phase1-google-sourcing-migrate.js",
+    "db:migrate:hunter-enrichment": "node scripts/run-with-env.js node scripts/phase2-hunter-enrichment-migrate.js",
     "db:studio": "node scripts/prisma-cli.js studio",
     "db:reset": "node scripts/prisma-cli.js migrate reset",
     "docker:up": "docker compose up -d postgres",

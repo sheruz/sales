@@ -37,6 +37,7 @@ export async function GET() {
 
 const patchSchema = z.object({
   enabled: z.boolean().optional(),
+  autoCrawl: z.boolean().optional(),
   queriesPerDay: z.number().int().min(1).max(100).optional(),
   companiesPerDay: z.number().int().min(1).max(500).optional(),
   queriesPerTick: z.number().int().min(1).max(5).optional(),

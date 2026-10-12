@@ -3,11 +3,19 @@ import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth/session";
 import { hasAnyOrgPermission, hasOrgPermission } from "@/lib/tenant/scope";
 import { sourcingJobService } from "@/services/sourcing-job.service";
+import { enrichmentJobService } from "@/services/enrichment-job.service";
+import { cronTickService } from "@/services/cron-tick.service";
 import { SourcingPanel } from "@/components/autopilot/sourcing-panel";
+import { EnrichmentPanel } from "@/components/autopilot/enrichment-panel";
 import { EmptyState } from "@/components/crm/empty-state";
 import { Button } from "@/components/ui/button";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
-export default async function AutopilotPage() {
+export default async function AutopilotPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ tab?: string }>;
+}) {
   const user = await getCurrentUser();
   if (!user) redirect("/login");
   if (!user.organizationId) redirect("/dashboard");
@@ -30,68 +38,116 @@ export default async function AutopilotPage() {
     );
   }
 
-  const data = await sourcingJobService.dashboard(user.organizationId);
+  const params = await searchParams;
+  const tab = params.tab === "enrichment" ? "enrichment" : "sourcing";
+
+  const [data, enrichment, lastTick] = await Promise.all([
+    sourcingJobService.dashboard(user.organizationId),
+    enrichmentJobService.dashboard(user.organizationId),
+    cronTickService.lastTick(),
+  ]);
   const canIntegrations = hasOrgPermission(user, "integrations.manage");
+  const lastCronRun = lastTick
+    ? {
+        startedAt: lastTick.startedAt.toISOString(),
+        finishedAt: lastTick.finishedAt?.toISOString() ?? null,
+        ok: lastTick.ok,
+        skipped: lastTick.skipped,
+        skipReason: lastTick.skipReason,
+        stale: cronTickService.isStale(lastTick),
+      }
+    : null;
 
   return (
     <div className="space-y-6">
       <div>
         <h2 className="text-2xl font-bold tracking-tight">Autopilot</h2>
         <p className="text-muted-foreground">
-          Sourcing — Google Places finds real businesses from your ICP. Keep
-          Sourcing OFF until you finish a cheap Run now test.
+          Google Places sourcing + Hunter decision-maker enrichment. Keep
+          toggles OFF until you finish cheap manual tests.
         </p>
       </div>
+
+      {lastCronRun?.stale || !lastCronRun ? (
+        <div className="rounded-lg border border-amber-500/40 bg-amber-500/10 p-3 text-sm">
+          Cron warning: last run is missing or older than 15 minutes. Set up{" "}
+          <code className="text-xs">scripts/cron-tick.sh</code> on the server.
+        </div>
+      ) : (
+        <p className="text-xs text-muted-foreground">
+          Last cron run:{" "}
+          {new Date(
+            lastCronRun.finishedAt || lastCronRun.startedAt
+          ).toLocaleString()}
+        </p>
+      )}
 
       <div className="flex flex-wrap gap-2 rounded-lg border border-dashed p-4 text-sm">
         <span className="w-full font-medium">Test setup</span>
         <Link href="/dashboard/settings?tab=integrations">
           <Button variant="outline" size="sm">
-            1. Settings → Integrations → Google Places
+            1. Google Places + Hunter keys
           </Button>
         </Link>
         <Link href="/dashboard/icp">
           <Button variant="outline" size="sm">
-            2. Configure ICP
-          </Button>
-        </Link>
-        <Link href="/dashboard/business-brain">
-          <Button variant="outline" size="sm">
-            3. Business Brain
+            2. ICP
           </Button>
         </Link>
         <Link href="/dashboard/companies">
           <Button variant="outline" size="sm">
-            4. View Companies
+            3. Companies
+          </Button>
+        </Link>
+        <Link href="/dashboard/opportunities?filter=sourced">
+          <Button variant="outline" size="sm">
+            4. Sourced opportunities
           </Button>
         </Link>
         {!canIntegrations ? (
           <p className="w-full text-xs text-muted-foreground">
-            Connecting the Google Places key requires integrations.manage.
+            Connecting API keys requires integrations.manage.
           </p>
         ) : null}
       </div>
 
-      <SourcingPanel
-        initial={{
-          config: data.config,
-          companiesToday: data.companiesToday,
-          pendingCrawls: data.pendingCrawls,
-          costs: data.costs,
-          recentErrors: data.recentErrors,
-          queries: data.queries.map((q) => ({
-            id: q.id,
-            query: q.query,
-            country: q.country,
-            city: q.city,
-            status: q.status,
-            lastRunAt: q.lastRunAt?.toISOString() ?? null,
-            resultsCount: q.resultsCount,
-            pageToken: q.pageToken,
-            lastError: q.lastError,
-          })),
-        }}
-      />
+      <Tabs defaultValue={tab}>
+        <TabsList>
+          <TabsTrigger value="sourcing">Sourcing</TabsTrigger>
+          <TabsTrigger value="enrichment">Enrichment</TabsTrigger>
+        </TabsList>
+        <TabsContent value="sourcing" className="mt-4">
+          <SourcingPanel
+            initial={{
+              config: data.config,
+              companiesToday: data.companiesToday,
+              pendingCrawls: data.pendingCrawls,
+              costs: data.costs,
+              recentErrors: data.recentErrors,
+              lastCronRun,
+              queries: data.queries.map((q) => ({
+                id: q.id,
+                query: q.query,
+                country: q.country,
+                city: q.city,
+                status: q.status,
+                lastRunAt: q.lastRunAt?.toISOString() ?? null,
+                resultsCount: q.resultsCount,
+                pageToken: q.pageToken,
+                lastError: q.lastError,
+              })),
+            }}
+          />
+        </TabsContent>
+        <TabsContent value="enrichment" className="mt-4">
+          <EnrichmentPanel
+            initial={{
+              ...enrichment,
+              lastCronRun,
+            }}
+          />
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }

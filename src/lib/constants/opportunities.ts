@@ -6,6 +6,7 @@ export const OPPORTUNITY_FILTERS: {
   label: string;
 }[] = [
   { value: "all", label: "All" },
+  { value: "sourced", label: "Sourced" },
   { value: "hot", label: "Hot" },
   { value: "warm", label: "Warm" },
   { value: "new", label: "New" },
@@ -19,6 +20,7 @@ export const OPPORTUNITY_FILTERS: {
 ];
 
 export const OPPORTUNITY_STAGE_LABELS: Record<OpportunityStage, string> = {
+  SOURCED: "Sourced",
   NEW: "New",
   QUALIFIED: "Qualified",
   CONTACTED: "Contacted",

@@ -1,6 +1,7 @@
 import prisma from "@/lib/db/prisma";
 import type { Prisma } from "@prisma/client";
 import { estimateTextSearchCostUsd } from "@/lib/sourcing/cost-estimate";
+import { estimateHunterCostUsd } from "@/lib/enrichment/cost-estimate";
 
 export class ApiUsageLogService {
   async logGoogleTextSearch(
@@ -13,6 +14,25 @@ export class ApiUsageLogService {
         organizationId,
         provider: "google_places",
         operation: "text_search",
+        estimatedCostUsd,
+        units: 1,
+        metadata: (meta ?? {}) as Prisma.InputJsonValue,
+      },
+    });
+    return estimatedCostUsd;
+  }
+
+  async logHunter(
+    organizationId: string,
+    operation: "domain_search" | "email_verifier" | "account",
+    meta?: Record<string, unknown>
+  ) {
+    const estimatedCostUsd = estimateHunterCostUsd(operation);
+    await prisma.apiUsageLog.create({
+      data: {
+        organizationId,
+        provider: "hunter",
+        operation,
         estimatedCostUsd,
         units: 1,
         metadata: (meta ?? {}) as Prisma.InputJsonValue,

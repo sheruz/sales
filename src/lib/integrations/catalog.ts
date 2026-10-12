@@ -77,6 +77,23 @@ export const INTEGRATION_CATALOG: IntegrationCatalogItem[] = [
       },
     ],
   },
+  {
+    platform: "HUNTER",
+    name: "Hunter.io",
+    description:
+      "Find and verify decision-maker emails by company domain. Billed by Hunter.",
+    monthlyPriceCents: 0,
+    sortOrder: 6,
+    fields: [
+      {
+        key: "apiKey",
+        label: "API Key",
+        type: "password",
+        placeholder: "Hunter API key",
+        required: true,
+      },
+    ],
+  },
 ];
 
 export function formatPrice(cents: number): string {

@@ -130,6 +130,9 @@ export class AnalyticsService {
     };
 
     for (const opp of opportunities) {
+      // SOURCED is pre-pipeline — exclude from value, forecast, conversion funnel
+      if (opp.stage === OpportunityStage.SOURCED) continue;
+
       funnel.Opportunities += 1;
       const value = num(opp.estimatedValue ?? opp.deals[0]?.estimatedValue);
       if (
@@ -153,7 +156,9 @@ export class AnalyticsService {
         weightedPipeline += value * prob;
       }
 
-      if (opp.stage !== OpportunityStage.NEW) qualified += 1;
+      if (opp.stage !== OpportunityStage.NEW) {
+        qualified += 1;
+      }
 
       switch (opp.stage) {
         case OpportunityStage.QUALIFIED:
@@ -196,21 +201,26 @@ export class AnalyticsService {
       OpportunityStage.WON,
     ];
     const stageRank = (s: OpportunityStage) => {
+      if (s === OpportunityStage.SOURCED) return -1;
       const i = stageOrder.indexOf(s);
       if (s === OpportunityStage.DISCOVERY) return stageOrder.indexOf(OpportunityStage.QUALIFIED);
       if (s === OpportunityStage.LOST) return -1;
       return i;
     };
 
+    const pipelineOpps = opportunities.filter(
+      (o) => o.stage !== OpportunityStage.SOURCED
+    );
+
     const cumulative = {
-      Opportunities: opportunities.length,
-      Qualified: opportunities.filter((o) => stageRank(o.stage) >= 1).length,
-      Contacted: opportunities.filter((o) => stageRank(o.stage) >= 2).length,
-      Replied: opportunities.filter((o) => stageRank(o.stage) >= 3).length,
-      Meeting: opportunities.filter((o) => stageRank(o.stage) >= 4).length,
-      Proposal: opportunities.filter((o) => stageRank(o.stage) >= 5).length,
-      Negotiation: opportunities.filter((o) => stageRank(o.stage) >= 6).length,
-      Won: opportunities.filter((o) => o.stage === OpportunityStage.WON).length,
+      Opportunities: pipelineOpps.length,
+      Qualified: pipelineOpps.filter((o) => stageRank(o.stage) >= 1).length,
+      Contacted: pipelineOpps.filter((o) => stageRank(o.stage) >= 2).length,
+      Replied: pipelineOpps.filter((o) => stageRank(o.stage) >= 3).length,
+      Meeting: pipelineOpps.filter((o) => stageRank(o.stage) >= 4).length,
+      Proposal: pipelineOpps.filter((o) => stageRank(o.stage) >= 5).length,
+      Negotiation: pipelineOpps.filter((o) => stageRank(o.stage) >= 6).length,
+      Won: pipelineOpps.filter((o) => o.stage === OpportunityStage.WON).length,
     };
 
     const dealsWon = wonDeals.length;

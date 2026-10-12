@@ -37,12 +37,13 @@ Hide legacy Leads / Autopilot / Prospect Finder / Sources scrapers behind flags.
 
 ---
 
-## Phase 2: Decision-maker enrichment
+## Phase 2: Decision-maker enrichment — DONE (code)
 
-1. `EnrichmentProvider` interface with one adapter first (Hunter or Apollo).
-2. For each Company domain, find founder/CEO/CTO/owner: name, title, email, LinkedIn URL.
-3. **Verify email** through the provider. Only verified emails can be enrolled. Fall back to generic website email (`info@`) marked `generic`.
-4. Create Contact linked to Company; create Opportunity at stage `Sourced`.
+1. `EnrichmentProvider` + `HunterAdapter` (Apollo later). BYOK in Settings.
+2. Domain Search → title-priority decision-maker → Email Verifier.
+3. Only `valid` enrollable by default; `accept_all` stored as risky. Fall back to crawled `info@` as GENERIC.
+4. Contact + Opportunity at stage `SOURCED` (excluded from pipeline board/value/forecast until Phase 4 enrollment → NEW).
+5. Domain blocklist, credit limits, Enrich now batch, cron Auto-crawl + Last cron UI.
 
 **Done when:** sourced companies get real decision-maker contacts with verified emails.
 

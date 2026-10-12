@@ -65,6 +65,7 @@ export function IntegrationsPanel({ initialData }: IntegrationsPanelProps) {
   const [openAiKey, setOpenAiKey] = useState("");
   const [anthropicKey, setAnthropicKey] = useState("");
   const [googlePlacesKey, setGooglePlacesKey] = useState("");
+  const [hunterKey, setHunterKey] = useState("");
   const [emailForm, setEmailForm] = useState({
     smtpHost: "smtp.gmail.com",
     smtpPort: "587",
@@ -185,6 +186,26 @@ export function IntegrationsPanel({ initialData }: IntegrationsPanelProps) {
       if (!json.success) throw new Error(json.error?.message);
       toast.success("Google Places connected");
       setGooglePlacesKey("");
+      router.refresh();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed");
+    } finally {
+      setSaving(null);
+    }
+  }
+
+  async function connectHunter() {
+    setSaving("HUNTER");
+    try {
+      const res = await fetch("/api/integrations/hunter", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ apiKey: hunterKey }),
+      });
+      const json = await res.json();
+      if (!json.success) throw new Error(json.error?.message);
+      toast.success("Hunter.io connected");
+      setHunterKey("");
       router.refresh();
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Failed");
@@ -455,6 +476,45 @@ export function IntegrationsPanel({ initialData }: IntegrationsPanelProps) {
               onClick={connectGooglePlaces}
               disabled={saving === "GOOGLE_PLACES"}
             >
+              Connect
+            </Button>
+          </div>
+        )}
+      </IntegrationCard>
+
+      <IntegrationCard
+        icon={<Shield className="h-5 w-5" />}
+        title="Hunter.io"
+        description={
+          getIntegration("HUNTER")?.description ??
+          "Find and verify decision-maker emails by domain."
+        }
+        price="Bring your own key"
+        connected={getIntegration("HUNTER")?.isConnected ?? false}
+        preview={getIntegration("HUNTER")?.maskedPreview}
+      >
+        {getIntegration("HUNTER")?.isConnected ? (
+          <div className="flex gap-2 items-center">
+            <CheckCircle2 className="h-4 w-4 text-green-600" />
+            <span className="text-sm">Connected</span>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => disconnect("HUNTER")}
+              disabled={!!saving}
+            >
+              Disconnect
+            </Button>
+          </div>
+        ) : (
+          <div className="flex gap-2">
+            <Input
+              type="password"
+              placeholder="Hunter API key"
+              value={hunterKey}
+              onChange={(e) => setHunterKey(e.target.value)}
+            />
+            <Button onClick={connectHunter} disabled={saving === "HUNTER"}>
               Connect
             </Button>
           </div>

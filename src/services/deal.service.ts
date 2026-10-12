@@ -299,12 +299,13 @@ export class DealService {
     });
   }
 
-  /** Opportunity Kanban board grouped by journey stage */
+  /** Opportunity Kanban board grouped by journey stage (excludes SOURCED). */
   async pipelineBoard(organizationId: string) {
     const opportunities = await prisma.opportunity.findMany({
       where: {
         organizationId,
         status: { in: [OpportunityStatus.OPEN, OpportunityStatus.WON, OpportunityStatus.LOST] },
+        stage: { not: OpportunityStage.SOURCED },
       },
       include: {
         company: { select: { id: true, name: true } },
@@ -325,7 +326,7 @@ export class DealService {
       items: opportunities.filter((o) => o.stage === stage),
     }));
 
-    // Include NEW in a pre-pipeline column
+    // Include NEW in a pre-pipeline column (SOURCED is list/filter only)
     const newItems = opportunities.filter(
       (o) => o.stage === OpportunityStage.NEW
     );
@@ -337,6 +338,7 @@ export class DealService {
         ...columns.filter((c) => c.stage === OpportunityStage.WON || c.stage === OpportunityStage.LOST),
       ],
       totalValue: opportunities.reduce((sum, o) => {
+        if (o.stage === OpportunityStage.SOURCED) return sum;
         const v = o.estimatedValue ? Number(o.estimatedValue) : 0;
         return sum + (Number.isFinite(v) ? v : 0);
       }, 0),

@@ -154,6 +154,17 @@ export class UserIntegrationService {
     );
   }
 
+  async saveHunter(organizationId: string, userId: string, apiKey: string) {
+    await this.verifyHunterKey(apiKey);
+    return this.saveCredentials(
+      organizationId,
+      userId,
+      IntegrationPlatform.HUNTER,
+      { apiKey },
+      "Hunter.io connected"
+    );
+  }
+
   async saveEmailSmtp(
     organizationId: string,
     userId: string,
@@ -413,6 +424,20 @@ export class UserIntegrationService {
       const body = await res.text().catch(() => "");
       throw new ValidationError(
         `Invalid Google Places API key: ${res.status} ${body.slice(0, 200)}`
+      );
+    }
+  }
+
+  private async verifyHunterKey(apiKey: string) {
+    const url = new URL("https://api.hunter.io/v2/account");
+    url.searchParams.set("api_key", apiKey);
+    const res = await fetch(url.toString(), {
+      headers: { Accept: "application/json" },
+    });
+    if (!res.ok) {
+      const body = await res.text().catch(() => "");
+      throw new ValidationError(
+        `Invalid Hunter API key: ${res.status} ${body.slice(0, 200)}`
       );
     }
   }

@@ -17,6 +17,8 @@ import type { GooglePlaceResult } from "@/lib/sourcing/adapters/google-places.ad
 
 export type SourcingConfig = {
   enabled: boolean;
+  /** Drain PENDING website crawls even when Places sourcing is OFF (default ON). */
+  autoCrawl: boolean;
   queriesPerDay: number;
   companiesPerDay: number;
   queriesPerTick: number;
@@ -25,6 +27,7 @@ export type SourcingConfig = {
 
 const DEFAULT_SOURCING: SourcingConfig = {
   enabled: false,
+  autoCrawl: true,
   queriesPerDay: 10,
   companiesPerDay: 50,
   queriesPerTick: 2,
@@ -42,6 +45,7 @@ function asConfig(raw: unknown): SourcingConfig {
       : {};
   return {
     enabled: o.enabled === true,
+    autoCrawl: o.autoCrawl !== false,
     queriesPerDay: Number(o.queriesPerDay ?? DEFAULT_SOURCING.queriesPerDay),
     companiesPerDay: Number(
       o.companiesPerDay ?? DEFAULT_SOURCING.companiesPerDay
@@ -76,6 +80,10 @@ export class SourcingJobService {
       ...patch,
       enabled:
         patch.enabled === undefined ? current.enabled : Boolean(patch.enabled),
+      autoCrawl:
+        patch.autoCrawl === undefined
+          ? current.autoCrawl
+          : Boolean(patch.autoCrawl),
       queriesPerDay: Math.min(
         100,
         Math.max(1, patch.queriesPerDay ?? current.queriesPerDay)
@@ -333,12 +341,10 @@ export class SourcingJobService {
   async processTickForOrg(organizationId: string) {
     const config = await this.getConfig(organizationId);
 
-    // Always drain website crawls (even when Sourcing OFF).
-    // OFF only stops automatic Places search — Run now still creates PENDING crawls.
-    const crawlResults = await this.processCrawlBatch(
-      organizationId,
-      config.crawlsPerTick
-    );
+    // Auto-crawl (default ON) drains PENDING websites even when Places sourcing is OFF.
+    const crawlResults = config.autoCrawl
+      ? await this.processCrawlBatch(organizationId, config.crawlsPerTick)
+      : [];
 
     if (!config.enabled) {
       return {
@@ -485,8 +491,7 @@ export class SourcingJobService {
   }
 
   /**
-   * Cron: process orgs with Sourcing ON, or with pending website crawls
-   * (so Run now + Sourcing OFF still drains email crawls).
+   * Cron: process orgs with Places sourcing ON, or autoCrawl + pending crawls.
    */
   async processAllEnabled() {
     const settings = await prisma.organizationSettings.findMany({
@@ -496,6 +501,7 @@ export class SourcingJobService {
     for (const row of settings) {
       const cfg = asConfig(row.settings);
       if (!cfg.enabled) {
+        if (!cfg.autoCrawl) continue;
         const pending = await prisma.company.count({
           where: {
             organizationId: row.organizationId,

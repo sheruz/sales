@@ -77,6 +77,8 @@ const envSchema = z.object({
   LINKEDIN_DISCOVERY_UI_ENABLED: z.coerce.boolean().default(false),
   /** Optional org-wide fallback for Autopilot Google Places sourcing */
   GOOGLE_PLACES_API_KEY: z.string().optional(),
+  /** Optional org-wide fallback for Hunter.io enrichment */
+  HUNTER_API_KEY: z.string().optional(),
 });
 
 let cachedEnv: z.infer<typeof envSchema> | null = null;

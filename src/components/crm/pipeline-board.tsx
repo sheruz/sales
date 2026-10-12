@@ -120,7 +120,9 @@ export function PipelineBoard() {
                         moveStage(item.id, e.target.value as OpportunityStage)
                       }
                     >
-                      {Object.values(OpportunityStage).map((s) => (
+                      {Object.values(OpportunityStage)
+                        .filter((s) => s !== OpportunityStage.SOURCED)
+                        .map((s) => (
                         <option key={s} value={s}>
                           {OPPORTUNITY_STAGE_LABELS[s]}
                         </option>

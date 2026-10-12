@@ -5,10 +5,30 @@ import {
 } from "@prisma/client";
 
 /** Map opportunity journey stage → deal commercial stage */
+/** Stages included in pipeline board / value / forecast (excludes SOURCED). */
+export const PIPELINE_VALUE_STAGES: OpportunityStage[] = [
+  OpportunityStage.NEW,
+  OpportunityStage.QUALIFIED,
+  OpportunityStage.CONTACTED,
+  OpportunityStage.REPLIED,
+  OpportunityStage.DISCOVERY,
+  OpportunityStage.MEETING,
+  OpportunityStage.PROPOSAL,
+  OpportunityStage.NEGOTIATION,
+  OpportunityStage.WON,
+  OpportunityStage.LOST,
+];
+
+export function isPipelineValueStage(stage: OpportunityStage): boolean {
+  return stage !== OpportunityStage.SOURCED;
+}
+
 export function opportunityStageToDealStage(
   stage: OppStage | OpportunityStage
 ): DealStage {
   switch (stage) {
+    case OpportunityStage.SOURCED:
+      return DealStage.LEAD;
     case OpportunityStage.NEW:
     case OpportunityStage.QUALIFIED:
       return DealStage.QUALIFIED;

@@ -16,6 +16,7 @@ import { FEATURE_KEYS } from "@/lib/billing/features";
 
 export type OpportunityListFilter =
   | "all"
+  | "sourced"
   | "hot"
   | "warm"
   | "new"
@@ -73,13 +74,19 @@ export class OpportunityService {
     };
 
     switch (filter) {
+      case "sourced":
+        where.stage = OpportunityStage.SOURCED;
+        where.status = OpportunityStatus.OPEN;
+        break;
       case "hot":
         where.status = OpportunityStatus.OPEN;
         where.score = { gte: 75 };
+        where.stage = { not: OpportunityStage.SOURCED };
         break;
       case "warm":
         where.status = OpportunityStatus.OPEN;
         where.score = { gte: 50, lt: 75 };
+        where.stage = { not: OpportunityStage.SOURCED };
         break;
       case "new":
         where.stage = OpportunityStage.NEW;
@@ -111,6 +118,8 @@ export class OpportunityService {
         where.status = OpportunityStatus.LOST;
         break;
       default:
+        // "all" and unknown — SOURCED only under dedicated filter
+        where.stage = { not: OpportunityStage.SOURCED };
         break;
     }
 
