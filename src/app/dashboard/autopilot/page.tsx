@@ -5,11 +5,14 @@ import { hasAnyOrgPermission, hasOrgPermission } from "@/lib/tenant/scope";
 import { sourcingJobService } from "@/services/sourcing-job.service";
 import { enrichmentJobService } from "@/services/enrichment-job.service";
 import { websiteAuditService } from "@/services/website-audit.service";
+import { outboundJobService } from "@/services/outbound-job.service";
+import { mailboxPoolService } from "@/services/mailbox-pool.service";
 import { cronTickService } from "@/services/cron-tick.service";
 import { SourcingPanel } from "@/components/autopilot/sourcing-panel";
 import { EnrichmentPanel } from "@/components/autopilot/enrichment-panel";
 import { AuditPanel } from "@/components/autopilot/audit-panel";
 import { PitchReviewPanel } from "@/components/autopilot/pitch-review-panel";
+import { OutboundPanel } from "@/components/autopilot/outbound-panel";
 import { OverviewPanel } from "@/components/autopilot/overview-panel";
 import { autopilotOverviewService } from "@/services/autopilot-overview.service";
 import { EmptyState } from "@/components/crm/empty-state";
@@ -53,21 +56,27 @@ export default async function AutopilotPage({
           ? "audit"
           : params.tab === "pitches"
             ? "pitches"
-            : "overview";
+            : params.tab === "outbound"
+              ? "outbound"
+              : "overview";
 
   let data;
   let enrichment;
   let audit;
+  let outbound;
+  let availableAccounts;
   let draftPitches;
   let lastTick;
   let overview;
   let schemaError: string | null = null;
   try {
-    [data, enrichment, audit, draftPitches, lastTick, overview] =
+    [data, enrichment, audit, outbound, availableAccounts, draftPitches, lastTick, overview] =
       await Promise.all([
         sourcingJobService.dashboard(user.organizationId),
         enrichmentJobService.dashboard(user.organizationId),
         websiteAuditService.dashboard(user.organizationId),
+        outboundJobService.dashboard(user.organizationId),
+        mailboxPoolService.listAvailableAccounts(user.organizationId),
         websiteAuditService.listDraftPitches(user.organizationId),
         cronTickService.lastTick(),
         autopilotOverviewService.get(user.organizationId, user.id),
@@ -78,19 +87,19 @@ export default async function AutopilotPage({
     schemaError = msg;
   }
 
-  if (schemaError || !data || !enrichment || !audit || !overview) {
+  if (schemaError || !data || !enrichment || !audit || !outbound || !overview) {
     return (
       <div className="space-y-6">
         <h2 className="text-2xl font-bold tracking-tight">Autopilot</h2>
         <div className="rounded-lg border border-destructive/40 bg-destructive/10 p-4 text-sm space-y-2">
           <p className="font-medium">Database schema is behind this deploy.</p>
           <p className="text-muted-foreground">
-            Phase 3 tables/columns may be missing. On the server (after pg_dump):
+            Phase 4 outbound tables may be missing. On the server (after pg_dump):
           </p>
           <pre className="overflow-x-auto rounded bg-muted p-3 text-xs">
             {`cd /var/www/html/sales
-DRY_RUN=1 npm run db:migrate:phase3-website-audit
-npm run db:migrate:phase3-website-audit
+DRY_RUN=1 npm run db:migrate:phase4-outbound
+npm run db:migrate:phase4-outbound
 pm2 restart all`}
           </pre>
           <p className="text-xs text-muted-foreground break-all">{schemaError}</p>
@@ -116,8 +125,8 @@ pm2 restart all`}
       <div>
         <h2 className="text-2xl font-bold tracking-tight">Autopilot</h2>
         <p className="text-muted-foreground">
-          Sourcing → Enrichment → Audit + pitch review. Keep toggles OFF until
-          you finish cheap manual tests.
+          Sourcing → Enrichment → Audit → Outbound. Keep Outbound OFF + Shadow
+          ON until test-to-self succeeds.
         </p>
       </div>
 
@@ -171,6 +180,7 @@ pm2 restart all`}
           <TabsTrigger value="enrichment">Enrichment</TabsTrigger>
           <TabsTrigger value="audit">Audit</TabsTrigger>
           <TabsTrigger value="pitches">Pitch review</TabsTrigger>
+          <TabsTrigger value="outbound">Outbound</TabsTrigger>
         </TabsList>
         <TabsContent value="overview" className="mt-4">
           <OverviewPanel data={overview} />
@@ -229,6 +239,15 @@ pm2 restart all`}
                 findings: p.websiteAudit.findings,
                 pageSpeedMobile: p.websiteAudit.pageSpeedMobile,
               })),
+            }}
+          />
+        </TabsContent>
+        <TabsContent value="outbound" className="mt-4">
+          <OutboundPanel
+            initial={{
+              ...outbound,
+              availableAccounts,
+              lastCronRun,
             }}
           />
         </TabsContent>

@@ -366,10 +366,24 @@ export class AutomationService {
       select: { id: true },
     });
 
+    const { outboundConfigService } = await import(
+      "@/services/outbound-config.service"
+    );
+
     const pipelineResults = [];
     const followUpResults = [];
 
     for (const org of orgs) {
+      // Phase 4: skip legacy Lead pipeline + FollowUpJob for Revenue OS orgs
+      if (await outboundConfigService.isLegacyDisabled(org.id)) {
+        pipelineResults.push({
+          organizationId: org.id,
+          status: "skipped",
+          reason: "revenue_os_legacy_disabled",
+        });
+        continue;
+      }
+
       const dueLeads = await prisma.lead.findMany({
         where: {
           organizationId: org.id,

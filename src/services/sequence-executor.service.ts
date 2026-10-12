@@ -5,6 +5,7 @@ import {
   ConversationChannel,
   OpportunityStatus,
   OutreachSequenceStatus,
+  SequenceEnrollmentSource,
   SequenceEnrollmentStatus,
   SequenceEnrollmentStopReason,
   SequenceExecutionStatus,
@@ -124,6 +125,8 @@ export class SequenceExecutorService {
       where: {
         status: SequenceEnrollmentStatus.ACTIVE,
         nextRunAt: { lte: now },
+        // Autopilot cold outreach uses EmailOutbox (Phase 4)
+        source: { not: SequenceEnrollmentSource.AUTOPILOT },
       },
       orderBy: { nextRunAt: "asc" },
       take: limit,
@@ -197,6 +200,26 @@ export class SequenceExecutorService {
     }
 
     const orgId = enrollment.organizationId;
+
+    // Phase 4 autopilot enrollments are sent via EmailOutbox — never double-send here
+    if (enrollment.source === SequenceEnrollmentSource.AUTOPILOT) {
+      await prisma.sequenceEnrollment.updateMany({
+        where: { id: enrollment.id, claimToken, organizationId: orgId },
+        data: {
+          status: SequenceEnrollmentStatus.ACTIVE,
+          claimToken: null,
+          claimedAt: null,
+          // Push nextRunAt out so we don't tight-loop; outbox owns scheduling
+          nextRunAt: new Date(Date.now() + 24 * 60 * 60_000),
+        },
+      });
+      return {
+        enrollmentId: enrollment.id,
+        organizationId: orgId,
+        status: "skipped",
+        reason: "autopilot_outbox",
+      };
+    }
 
     // Phase 4: PAUSED sequence/campaign → defer, do not permanently stop
     if (

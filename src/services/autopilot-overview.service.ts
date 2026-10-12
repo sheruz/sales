@@ -11,6 +11,7 @@ import {
 import { sourcingJobService } from "@/services/sourcing-job.service";
 import { enrichmentJobService } from "@/services/enrichment-job.service";
 import { websiteAuditService } from "@/services/website-audit.service";
+import { outboundJobService } from "@/services/outbound-job.service";
 import { cronTickService } from "@/services/cron-tick.service";
 import { apiUsageLogService } from "@/services/api-usage-log.service";
 import { FUNNEL_STAGES } from "@/lib/crm/funnel-stage";
@@ -24,6 +25,7 @@ export class AutopilotOverviewService {
       sourcing,
       enrichment,
       auditCfg,
+      outboundCfg,
       lastTick,
       googleCosts,
       totalCompanies,
@@ -38,11 +40,13 @@ export class AutopilotOverviewService {
       icps,
       servicesCount,
       caseStudiesCount,
+      outboundMailboxCount,
       errors24h,
     ] = await Promise.all([
       sourcingJobService.getConfig(organizationId),
       enrichmentJobService.dashboard(organizationId),
       websiteAuditService.getConfig(organizationId),
+      outboundJobService.getConfig(organizationId),
       cronTickService.lastTick(),
       apiUsageLogService.totals(organizationId),
       prisma.company.count({
@@ -130,6 +134,7 @@ export class AutopilotOverviewService {
         },
       }),
       prisma.serviceCaseStudy.count({ where: { organizationId } }),
+      prisma.outboundMailbox.count({ where: { organizationId } }),
       prisma.company.count({
         where: {
           organizationId,
@@ -232,11 +237,17 @@ export class AutopilotOverviewService {
           done: Boolean(lastCronRun && !lastCronRun.stale),
         },
         {
+          key: "outbound_compliance",
+          label: "Outbound address + business name",
+          done: Boolean(
+            outboundCfg.physicalAddress.trim() &&
+              outboundCfg.businessName.trim()
+          ),
+        },
+        {
           key: "inboxes",
-          label: "Sending inboxes",
-          done: false,
-          comingSoon: true,
-          phase: 4,
+          label: "Outbound mailbox in pool",
+          done: outboundMailboxCount > 0,
         },
         {
           key: "calendar",
@@ -272,6 +283,8 @@ export class AutopilotOverviewService {
         autoCrawl: sourcing.autoCrawl,
         enrichment: enrichment.config.enabled,
         audit: auditCfg.enabled,
+        outbound: outboundCfg.enabled,
+        shadowMode: outboundCfg.shadowMode,
       },
     };
   }

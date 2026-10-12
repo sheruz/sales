@@ -34,6 +34,8 @@ export type EnrollInput = {
   source?: SequenceEnrollmentSource;
   enrolledById?: string | null;
   startImmediately?: boolean;
+  /** Sticky mailbox for Phase 4 autopilot */
+  emailAccountId?: string | null;
 };
 
 export type EnrollmentListQuery = {
@@ -305,6 +307,7 @@ export class SequenceEnrollmentService {
           nextRunAt,
           startedAt: now,
           enrolledById: input.enrolledById ?? null,
+          emailAccountId: input.emailAccountId ?? null,
           idempotencyKey: `enroll:${organizationId}:${sequence.id}:${contact.id}:${randomUUID()}`,
         },
         include: {

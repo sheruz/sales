@@ -239,8 +239,18 @@ export class SourcingJobService {
         lng: place.lng,
       },
     };
+    const { deriveCompanyTimezone } = await import("@/lib/outbound/timezone");
+    const tz = deriveCompanyTimezone({
+      lat: place.lat,
+      lng: place.lng,
+      country: geo.country,
+    });
 
     if (match.kind !== "none") {
+      const existingTz = await prisma.company.findUnique({
+        where: { id: match.companyId },
+        select: { timezone: true },
+      });
       const updated = await prisma.company.update({
         where: { id: match.companyId },
         data: {
@@ -252,6 +262,12 @@ export class SourcingJobService {
           normalizedDomain: domain ?? undefined,
           country: geo.country ?? undefined,
           city: geo.city ?? undefined,
+          // Only set timezone if missing — never overwrite manual edits
+          ...(existingTz?.timezone
+            ? {}
+            : tz.timezone
+              ? { timezone: tz.timezone }
+              : {}),
           source: "google_places",
           metadata: metadata as Prisma.InputJsonValue,
         },
@@ -277,6 +293,7 @@ export class SourcingJobService {
         normalizedDomain: domain,
         country: geo.country ?? null,
         city: geo.city ?? null,
+        timezone: tz.timezone,
         source: "google_places",
         metadata: metadata as Prisma.InputJsonValue,
         crawlStatus: place.website

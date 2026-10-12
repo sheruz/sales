@@ -262,8 +262,21 @@ export class AutopilotService {
       byOrg.set(config.organizationId, list);
     }
 
+    const { outboundConfigService } = await import(
+      "@/services/outbound-config.service"
+    );
+
     const results = [];
     for (const [organizationId, orgConfigs] of byOrg) {
+      // Phase 4: never run legacy job-post autopilot for Revenue OS orgs
+      if (await outboundConfigService.isLegacyDisabled(organizationId)) {
+        results.push({
+          organizationId,
+          status: "skipped",
+          reason: "revenue_os_legacy_disabled",
+        });
+        continue;
+      }
       for (const config of orgConfigs) {
         try {
           const usage = await getAutopilotUsage(config.userId);

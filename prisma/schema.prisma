@@ -69,6 +69,22 @@ enum EmailAccountStatus {
   DISCONNECTED
   ERROR
   DISABLED
+  PAUSED
+}
+
+enum EmailOutboxStatus {
+  QUEUED
+  SENDING
+  SENT
+  FAILED
+  CANCELLED
+  HELD
+}
+
+enum OutboundMailboxStatus {
+  ACTIVE
+  PAUSED
+  ERROR
 }
 
 enum MessageDirection {
@@ -162,6 +178,7 @@ enum SequenceEnrollmentSource {
   MANUAL
   CAMPAIGN
   CAMPAIGN_LEAD_BRIDGE
+  AUTOPILOT
 }
 
 enum ReplyClassification {
@@ -679,6 +696,8 @@ model Organization {
   companyTimelineEvents CompanyTimelineEvent[]
   websiteAudits     WebsiteAudit[]
   pitches           Pitch[]
+  outboundMailboxes OutboundMailbox[]
+  emailOutbox       EmailOutbox[]
 
   @@index([status])
   @@index([deletedAt])
@@ -915,6 +934,8 @@ model Company {
   country        String?
   state          String?
   city           String?
+  /// IANA timezone (e.g. America/Chicago) — required for outbound send window
+  timezone       String?
   employeeCount  Int?          @map("employee_count")
   /// Legacy company_size / employee_range
   size           String?       @map("company_size")
@@ -965,6 +986,7 @@ model Company {
   timelineEvents CompanyTimelineEvent[]
   websiteAudits WebsiteAudit[]
   pitches       Pitch[]
+  emailOutbox   EmailOutbox[]
 
   @@unique([organizationId, domain])
   @@index([organizationId])
@@ -1169,6 +1191,7 @@ model Contact {
   sequenceEnrollments SequenceEnrollment[]
   timelineEvents CompanyTimelineEvent[]
   pitches        Pitch[]
+  emailOutbox    EmailOutbox[]
 
   @@index([organizationId])
   @@index([companyId])
@@ -1352,6 +1375,7 @@ model Opportunity {
   sequenceEnrollments SequenceEnrollment[]
   timelineEvents     CompanyTimelineEvent[]
   pitches            Pitch[]
+  emailOutbox        EmailOutbox[]
 
   @@index([organizationId])
   @@index([companyId])
@@ -1793,6 +1817,9 @@ model EmailAccount {
   conversations InboxConversation[]
   messages      Message[]
   events        EmailEvent[]
+  outboundMailbox OutboundMailbox?
+  outboxItems   EmailOutbox[]
+  stickyEnrollments SequenceEnrollment[] @relation("EnrollmentStickyMailbox")
 
   @@unique([organizationId, email])
   @@index([organizationId])
@@ -1800,6 +1827,82 @@ model EmailAccount {
   @@index([provider])
   @@index([status])
   @@map("email_accounts")
+}
+
+/// Org outbound pool member — EmailAccount is NOT auto-added; must opt in explicitly.
+model OutboundMailbox {
+  id               String                @id @default(uuid())
+  organizationId   String                @map("organization_id")
+  emailAccountId   String                @unique @map("email_account_id")
+  status           OutboundMailboxStatus @default(ACTIVE)
+  dailyCap         Int                   @default(30) @map("daily_cap")
+  rampStart        Int                   @default(5) @map("ramp_start")
+  rampIncrement    Int                   @default(3) @map("ramp_increment")
+  /// Days since rampStartedAt (warmup day index)
+  rampDay          Int                   @default(0) @map("ramp_day")
+  rampStartedAt    DateTime?             @map("ramp_started_at")
+  sentToday        Int                   @default(0) @map("sent_today")
+  sentTodayResetAt DateTime?             @map("sent_today_reset_at")
+  /// Lifetime sends/bounces for bounce-rate circuit breaker
+  sentTotal        Int                   @default(0) @map("sent_total")
+  bounceTotal      Int                   @default(0) @map("bounce_total")
+  dnsCheck         Json?                 @map("dns_check")
+  lastError        String?               @map("last_error")
+  createdAt        DateTime              @default(now()) @map("created_at")
+  updatedAt        DateTime              @updatedAt @map("updated_at")
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  emailAccount EmailAccount @relation(fields: [emailAccountId], references: [id], onDelete: Cascade)
+  outboxItems  EmailOutbox[]
+
+  @@index([organizationId, status])
+  @@map("outbound_mailboxes")
+}
+
+/// Autopilot send queue — unique per enrollment step (never double-send).
+model EmailOutbox {
+  id               String           @id @default(uuid())
+  organizationId   String           @map("organization_id")
+  enrollmentId     String           @map("enrollment_id")
+  stepOrder        Int              @map("step_order")
+  contactId        String           @map("contact_id")
+  companyId        String?          @map("company_id")
+  opportunityId    String?          @map("opportunity_id")
+  emailAccountId   String           @map("email_account_id")
+  outboundMailboxId String?         @map("outbound_mailbox_id")
+  status           EmailOutboxStatus @default(QUEUED)
+  toEmail          String           @map("to_email")
+  subject          String
+  bodyText         String           @map("body_text") @db.Text
+  /// Earliest UTC time this may send (prospect local Mon–Fri 8–11)
+  scheduledFor     DateTime?        @map("scheduled_for")
+  heldReason       String?          @map("held_reason")
+  attemptCount     Int              @default(0) @map("attempt_count")
+  lastError        String?          @map("last_error")
+  messageId        String?          @map("message_id")
+  providerMessageId String?         @map("provider_message_id")
+  sentAt           DateTime?        @map("sent_at")
+  /// enrollmentId:stepOrder
+  idempotencyKey   String           @unique @map("idempotency_key")
+  shadowMode       Boolean          @default(false) @map("shadow_mode")
+  metadata         Json?
+  createdAt        DateTime         @default(now()) @map("created_at")
+  updatedAt        DateTime         @updatedAt @map("updated_at")
+
+  organization    Organization     @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  enrollment      SequenceEnrollment @relation(fields: [enrollmentId], references: [id], onDelete: Cascade)
+  contact         Contact          @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  company         Company?         @relation(fields: [companyId], references: [id], onDelete: SetNull)
+  opportunity     Opportunity?     @relation(fields: [opportunityId], references: [id], onDelete: SetNull)
+  emailAccount    EmailAccount     @relation(fields: [emailAccountId], references: [id], onDelete: Cascade)
+  outboundMailbox OutboundMailbox? @relation(fields: [outboundMailboxId], references: [id], onDelete: SetNull)
+  message         Message?         @relation(fields: [messageId], references: [id], onDelete: SetNull)
+
+  @@unique([enrollmentId, stepOrder])
+  @@index([organizationId, status, scheduledFor])
+  @@index([emailAccountId, status])
+  @@index([status, scheduledFor])
+  @@map("email_outbox")
 }
 
 /// Unified inbox conversation (Phase 6 conversations entity)
@@ -1874,6 +1977,7 @@ model Message {
   events       EmailEvent[]
   attachments  MessageAttachment[]
   sequenceEnrollmentExecutions SequenceEnrollmentExecution[]
+  emailOutbox  EmailOutbox[]
 
   @@unique([organizationId, idempotencyKey])
   @@unique([organizationId, providerMessageId])
@@ -1951,6 +2055,8 @@ model OutreachSequence {
   stopOnReply       Boolean                @default(true) @map("stop_on_reply")
   stopOnMeeting     Boolean                @default(true) @map("stop_on_meeting")
   stopOnUnsubscribe Boolean                @default(true) @map("stop_on_unsubscribe")
+  /// Phase 4 — default Cold outreach sequence for autopilot enroll
+  isAutopilotDefault Boolean               @default(false) @map("is_autopilot_default")
   createdAt         DateTime               @default(now()) @map("created_at")
   updatedAt         DateTime               @updatedAt @map("updated_at")
 
@@ -1961,6 +2067,7 @@ model OutreachSequence {
 
   @@index([organizationId])
   @@index([status])
+  @@index([organizationId, isAutopilotDefault])
   @@map("outreach_sequences")
 }
 
@@ -2015,6 +2122,8 @@ model SequenceEnrollment {
   claimedAt       DateTime?                  @map("claimed_at")
   claimToken      String?                    @map("claim_token")
   enrolledById    String?                    @map("enrolled_by_id")
+  /// Sticky mailbox for entire sequence (Phase 4 autopilot)
+  emailAccountId  String?                    @map("email_account_id")
   idempotencyKey  String?                    @unique @map("idempotency_key")
   metadata        Json?
   createdAt       DateTime                   @default(now()) @map("created_at")
@@ -2028,7 +2137,9 @@ model SequenceEnrollment {
   lead         Lead?        @relation(fields: [leadId], references: [id], onDelete: SetNull)
   campaignLead CampaignLead? @relation(fields: [campaignLeadId], references: [id], onDelete: SetNull)
   enrolledBy   User?        @relation("SequenceEnrollmentEnrolledBy", fields: [enrolledById], references: [id], onDelete: SetNull)
+  emailAccount EmailAccount? @relation("EnrollmentStickyMailbox", fields: [emailAccountId], references: [id], onDelete: SetNull)
   executions   SequenceEnrollmentExecution[]
+  outboxItems  EmailOutbox[]
 
   @@index([organizationId])
   @@index([sequenceId])
@@ -2037,6 +2148,7 @@ model SequenceEnrollment {
   @@index([contactId])
   @@index([leadId])
   @@index([source])
+  @@index([emailAccountId])
   @@index([status, nextRunAt])
   @@index([organizationId, status, nextRunAt])
   @@map("sequence_enrollments")

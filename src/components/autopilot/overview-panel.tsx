@@ -46,6 +46,8 @@ type Props = {
       autoCrawl: boolean;
       enrichment: boolean;
       audit: boolean;
+      outbound: boolean;
+      shadowMode?: boolean;
     };
   };
 };
@@ -176,6 +178,15 @@ export function OverviewPanel({ data }: Props) {
             label={`Audit ${data.toggles.audit ? "ON" : "OFF"}`}
             tone={data.toggles.audit ? "success" : "muted"}
           />
+          <StatusBadge
+            label={`Outbound ${data.toggles.outbound ? "ON" : "OFF"}`}
+            tone={data.toggles.outbound ? "success" : "muted"}
+          />
+          {data.toggles.shadowMode !== false ? (
+            <StatusBadge label="Shadow mode" tone="warning" />
+          ) : (
+            <StatusBadge label="Live send" tone="danger" />
+          )}
         </CardContent>
       </Card>
     </div>

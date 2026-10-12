@@ -25,7 +25,7 @@ export const FUNNEL_STAGES: Array<{
   { key: "crawled", label: "Crawled", phase: 1 },
   { key: "enriched", label: "Enriched", phase: 2 },
   { key: "audited", label: "Audited", phase: 3 },
-  { key: "contacted", label: "Contacted", phase: 4, comingSoon: true },
+  { key: "contacted", label: "Contacted", phase: 4 },
   { key: "replied", label: "Replied", phase: 5, comingSoon: true },
   { key: "meeting", label: "Meeting booked", phase: 5, comingSoon: true },
   { key: "won", label: "Won", phase: 5, comingSoon: true },

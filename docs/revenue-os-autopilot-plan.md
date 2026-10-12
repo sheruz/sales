@@ -84,15 +84,17 @@ A phase is **not done** unless it ships:
 
 ---
 
-## Phase 4: Autopilot outbound email
+## Phase 4: Autopilot outbound email — DONE (code)
 
-1. Mailbox pool (SMTP/Gmail/Outlook), daily limits, warmup flag, rotation.
-2. Timezone-aware sending (prospect local 8:00–11:00).
-3. Auto-enroll verified + audited opportunities into default sequence (stop on reply).
-4. Compliance: unsubscribe + address, suppression list.
-5. Bounce handling; pause inbox if bounce rate > 3%.
+1. Explicit org mailbox pool (`OutboundMailbox`) — not auto-added; DNS SPF/DKIM gate; ramp 5/+3→cap; test-to-self.
+2. `EmailOutbox` queue (QUEUED/SENDING/SENT/FAILED/CANCELLED/HELD) unique per enrollment+step.
+3. Auto-enroll APPROVED pitches into seeded editable **Cold outreach** (day 0/3/7); SOURCED→NEW; CONTACTED after first send.
+4. Country allow-list (default US) at enroll + send; Company.timezone (IANA) required — hold if missing.
+5. Shadow mode default ON; hard-refuse missing pitch vars on autopilot; catch-all send setting separate (default OFF).
+6. Compliance footer + List-Unsubscribe one-click public `/unsubscribe`; bounce >3% pauses mailbox; 2+ paused on domain pauses domain.
+7. Legacy job-post autopilot + FollowUpJob disabled for Revenue OS orgs.
 
-**Done when:** emails go out daily within limits; follow-ups stop on reply.
+**Done when:** shadow/test-to-self verified, then live sends within caps; stop on reply/unsub/bounce.
 
 ---
 
