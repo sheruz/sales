@@ -18,16 +18,15 @@ APP_URL=https://your-domain.com
 ```bash
 cd /var/www/html/sales
 chmod 700 scripts/cron-tick.sh
-sudo touch /var/log/sales-cron.log
-sudo chown "$(whoami)" /var/log/sales-cron.log
-sudo mkdir -p /var/lock
+mkdir -p logs
+# Log defaults to /var/www/html/sales/logs/sales-cron.log (writable by ubuntu)
 ```
 
 Manual test:
 
 ```bash
 /var/www/html/sales/scripts/cron-tick.sh
-tail -n 20 /var/log/sales-cron.log
+tail -n 20 /var/www/html/sales/logs/sales-cron.log
 ```
 
 You should see `HTTP 200`. Autopilot page **Last cron run** should update.
@@ -50,7 +49,7 @@ Do **not** put `CRON_SECRET` in crontab — the script reads it from `.env`.
 
 ```bash
 sudo tee /etc/logrotate.d/sales-cron >/dev/null <<'EOF'
-/var/log/sales-cron.log {
+/var/www/html/sales/logs/sales-cron.log {
   weekly
   rotate 8
   compress

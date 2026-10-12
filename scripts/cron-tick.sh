@@ -7,8 +7,11 @@ set -euo pipefail
 
 APP_DIR="${APP_DIR:-/var/www/html/sales}"
 ENV_FILE="${ENV_FILE:-$APP_DIR/.env}"
-LOG_FILE="${LOG_FILE:-/var/log/sales-cron.log}"
-LOCK_FILE="${LOCK_FILE:-/var/lock/sales-cron.lock}"
+# Prefer app-owned log dir (ubuntu can write). Override with LOG_FILE=... if needed.
+LOG_DIR="${LOG_DIR:-$APP_DIR/logs}"
+mkdir -p "$LOG_DIR" 2>/dev/null || true
+LOG_FILE="${LOG_FILE:-$LOG_DIR/sales-cron.log}"
+LOCK_FILE="${LOCK_FILE:-$LOG_DIR/sales-cron.lock}"
 
 if [[ ! -f "$ENV_FILE" ]]; then
   echo "$(date -u +%Y-%m-%dT%H:%M:%SZ) ERROR missing env $ENV_FILE" >>"$LOG_FILE"
