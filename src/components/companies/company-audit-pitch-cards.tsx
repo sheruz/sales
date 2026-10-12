@@ -272,14 +272,23 @@ export function CompanyAuditPitchCards({
                   rows={4}
                 />
               </div>
+              {activePitch.status === "APPROVED" ? (
+                <p className="text-xs text-muted-foreground rounded-md border border-dashed p-2">
+                  Approved for the contact below. No email is sent yet — Phase 4
+                  outbound will use this pitch. You can still edit + Save, or
+                  Regenerate if the audit changed.
+                </p>
+              ) : null}
               <div className="flex flex-wrap gap-2">
-                <Button
-                  size="sm"
-                  disabled={Boolean(busy) || activePitch.status === "APPROVED"}
-                  onClick={() => pitchAction("approve")}
-                >
-                  Approve
-                </Button>
+                {activePitch.status !== "APPROVED" ? (
+                  <Button
+                    size="sm"
+                    disabled={Boolean(busy)}
+                    onClick={() => pitchAction("approve")}
+                  >
+                    Approve
+                  </Button>
+                ) : null}
                 <Button
                   size="sm"
                   variant="outline"

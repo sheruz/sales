@@ -33,6 +33,7 @@ function nextStepCopy(input: {
   funnelStage: FunnelStageKey;
   crawlStatus: string | null;
   enrichmentStatus: string | null;
+  pitchStatus?: string | null;
 }): { title: string; body: string } {
   if (input.enrichmentStatus === "SKIPPED") {
     return {
@@ -40,10 +41,16 @@ function nextStepCopy(input: {
       body: "Enrichment was skipped. Use Unskip on the companies list to re-queue.",
     };
   }
+  if (input.pitchStatus === "APPROVED") {
+    return {
+      title: "Pitch approved — waiting for Phase 4",
+      body: "Nothing is emailed yet. Phase 4 (outbound) will send this APPROVED pitch to the contact. Email preview below is what that first message will look like.",
+    };
+  }
   if (input.funnelStage === "audited") {
     return {
-      title: "Ready for outreach (Phase 4)",
-      body: "Audit and pitch are ready. Approve the pitch, then Phase 4 will send APPROVED pitches only.",
+      title: "Pitch ready to review",
+      body: "Approve the pitch on this page (or Autopilot → Pitch review). Phase 4 will only send APPROVED pitches — nothing sends until then.",
     };
   }
   if (input.funnelStage === "enriched") {
@@ -98,6 +105,7 @@ export default async function CompanyDetailPage({ params }: PageProps) {
     funnelStage: company.funnelStage,
     crawlStatus: company.crawlStatus,
     enrichmentStatus: company.enrichmentStatus,
+    pitchStatus: company.activePitch?.status ?? null,
   });
 
   return (
