@@ -332,8 +332,20 @@ export class SourcingJobService {
 
   async processTickForOrg(organizationId: string) {
     const config = await this.getConfig(organizationId);
+
+    // Always drain website crawls (even when Sourcing OFF).
+    // OFF only stops automatic Places search — Run now still creates PENDING crawls.
+    const crawlResults = await this.processCrawlBatch(
+      organizationId,
+      config.crawlsPerTick
+    );
+
     if (!config.enabled) {
-      return { skipped: true, reason: "sourcing_off" as const };
+      return {
+        skipped: true,
+        reason: "sourcing_off" as const,
+        crawlResults,
+      };
     }
 
     const [queriesToday, companiesToday] = await Promise.all([
@@ -380,11 +392,6 @@ export class SourcingJobService {
         }
       }
     }
-
-    const crawlResults = await this.processCrawlBatch(
-      organizationId,
-      config.crawlsPerTick
-    );
 
     return {
       skipped: false,
@@ -477,7 +484,10 @@ export class SourcingJobService {
     return results;
   }
 
-  /** Cron: process all orgs with sourcing enabled (small batches). */
+  /**
+   * Cron: process orgs with Sourcing ON, or with pending website crawls
+   * (so Run now + Sourcing OFF still drains email crawls).
+   */
   async processAllEnabled() {
     const settings = await prisma.organizationSettings.findMany({
       select: { organizationId: true, settings: true },
@@ -485,7 +495,17 @@ export class SourcingJobService {
     const results = [];
     for (const row of settings) {
       const cfg = asConfig(row.settings);
-      if (!cfg.enabled) continue;
+      if (!cfg.enabled) {
+        const pending = await prisma.company.count({
+          where: {
+            organizationId: row.organizationId,
+            source: "google_places",
+            crawlStatus: CompanyCrawlStatus.PENDING,
+            deletedAt: null,
+          },
+        });
+        if (pending === 0) continue;
+      }
       results.push({
         organizationId: row.organizationId,
         ...(await this.processTickForOrg(row.organizationId)),
