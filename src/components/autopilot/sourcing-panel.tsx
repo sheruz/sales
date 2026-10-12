@@ -192,6 +192,27 @@ export function SourcingPanel({ initial }: Props) {
     }
   }
 
+  async function crawlNow() {
+    setBusy("crawl");
+    try {
+      const res = await fetch("/api/autopilot/sourcing/crawl", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ limit: 15 }),
+      });
+      const json = await res.json();
+      if (!json.success) throw new Error(json.error?.message);
+      toast.success(
+        `Crawled ${json.data.processed} · done ${json.data.done} · failed ${json.data.failed} · emails ${json.data.emailsFound}`
+      );
+      await refresh();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Crawl failed");
+    } finally {
+      setBusy(null);
+    }
+  }
+
   return (
     <div className="space-y-6">
       <Card>
@@ -203,14 +224,27 @@ export function SourcingPanel({ initial }: Props) {
               queries before enabling cron.
             </CardDescription>
           </div>
-          <Button
-            size="sm"
-            variant={config.enabled ? "default" : "outline"}
-            disabled={busy === "config"}
-            onClick={() => patchConfig({ enabled: !config.enabled })}
-          >
-            {config.enabled ? "Sourcing ON" : "Sourcing OFF"}
-          </Button>
+          <div className="flex flex-wrap gap-2">
+            <Button
+              size="sm"
+              variant="outline"
+              disabled={busy === "crawl" || initial.pendingCrawls === 0}
+              onClick={crawlNow}
+            >
+              {busy === "crawl" ? (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              ) : null}
+              Crawl now ({Math.min(15, initial.pendingCrawls)})
+            </Button>
+            <Button
+              size="sm"
+              variant={config.enabled ? "default" : "outline"}
+              disabled={busy === "config"}
+              onClick={() => patchConfig({ enabled: !config.enabled })}
+            >
+              {config.enabled ? "Sourcing ON" : "Sourcing OFF"}
+            </Button>
+          </div>
         </CardHeader>
         <CardContent className="grid gap-4 sm:grid-cols-4 text-sm">
           <div>
@@ -220,6 +254,9 @@ export function SourcingPanel({ initial }: Props) {
           <div>
             <p className="text-muted-foreground">Pending crawls</p>
             <p className="text-2xl font-semibold">{initial.pendingCrawls}</p>
+            <p className="text-xs text-muted-foreground">
+              Use Crawl now — cron alone often is not set up
+            </p>
           </div>
           <div>
             <p className="text-muted-foreground">Google spend today</p>
