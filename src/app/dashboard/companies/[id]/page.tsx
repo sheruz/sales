@@ -1,7 +1,7 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import { format } from "date-fns";
-import { Building2, ExternalLink, Globe } from "lucide-react";
+import { ExternalLink, Link2 } from "lucide-react";
 import { companyService } from "@/services/company.service";
 import { getCurrentUser } from "@/lib/auth/session";
 import { hasAnyOrgPermission } from "@/lib/tenant/scope";
@@ -11,12 +11,59 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import { EntityRelatedLinks } from "@/components/crm/entity-related-links";
 import { EmptyState } from "@/components/crm/empty-state";
+import {
+  CrawlStatusBadge,
+  EnrichmentStatusBadge,
+  FunnelStageBadge,
+  SourceBadge,
+  StatusBadge,
+  VerificationBadge,
+} from "@/components/status/status-badge";
+import { displayContactName } from "@/lib/crm/display-name";
+import type { FunnelStageKey } from "@/lib/crm/funnel-stage";
 
 interface PageProps {
   params: Promise<{ id: string }>;
+}
+
+function nextStepCopy(input: {
+  funnelStage: FunnelStageKey;
+  crawlStatus: string | null;
+  enrichmentStatus: string | null;
+}): { title: string; body: string } {
+  if (input.enrichmentStatus === "SKIPPED") {
+    return {
+      title: "Skipped",
+      body: "Enrichment was skipped. Use Unskip on the companies list to re-queue.",
+    };
+  }
+  if (input.funnelStage === "enriched") {
+    return {
+      title: "Ready for outreach (Phase 4)",
+      body: "Contact is enriched. Website audit (Phase 3) and outbound email (Phase 4) come next.",
+    };
+  }
+  if (
+    input.crawlStatus === "PENDING" ||
+    (!input.crawlStatus && input.funnelStage === "found")
+  ) {
+    return {
+      title: "Waiting for crawl",
+      body: "Auto-crawl or Crawl now will fetch website emails, then enrichment can run.",
+    };
+  }
+  if (input.funnelStage === "crawled") {
+    return {
+      title: "Waiting for enrichment",
+      body: "Use Autopilot → Enrichment → Enrich now (or turn Enrichment ON after testing).",
+    };
+  }
+  return {
+    title: "In progress",
+    body: "This company is moving through the Autopilot funnel.",
+  };
 }
 
 export default async function CompanyDetailPage({ params }: PageProps) {
@@ -34,17 +81,48 @@ export default async function CompanyDetailPage({ params }: PageProps) {
     notFound();
   }
 
+  const meta =
+    company.metadata && typeof company.metadata === "object"
+      ? (company.metadata as { google?: { rating?: number } })
+      : {};
+  const rating = meta.google?.rating;
+  const website = company.website || (company.domain ? `https://${company.domain}` : null);
+  const next = nextStepCopy({
+    funnelStage: company.funnelStage,
+    crawlStatus: company.crawlStatus,
+    enrichmentStatus: company.enrichmentStatus,
+  });
+
   return (
     <div className="space-y-6">
       <div className="space-y-3">
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-2">
           <h2 className="text-2xl font-bold tracking-tight">{company.name}</h2>
-          <Badge variant="secondary">{company.status}</Badge>
+          <SourceBadge source={company.source} />
+          <FunnelStageBadge stage={company.funnelStage} />
+          <CrawlStatusBadge status={company.crawlStatus} />
+          <EnrichmentStatusBadge status={company.enrichmentStatus} />
         </div>
-        <p className="text-muted-foreground">
-          {company.industry || "Company"}
-          {company.domain ? ` · ${company.domain}` : ""}
-        </p>
+        <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm text-muted-foreground">
+          {rating != null ? <span>★ {rating}</span> : null}
+          {company.phone ? <span>{company.phone}</span> : null}
+          {company.address ? <span>{company.address}</span> : null}
+          {(company.city || company.country) && (
+            <span>
+              {[company.city, company.country].filter(Boolean).join(", ")}
+            </span>
+          )}
+          {website ? (
+            <a
+              href={website}
+              target="_blank"
+              rel="noreferrer"
+              className="inline-flex items-center gap-1 hover:underline text-foreground"
+            >
+              Website <ExternalLink className="h-3 w-3" />
+            </a>
+          ) : null}
+        </div>
         <EntityRelatedLinks
           links={[
             {
@@ -52,207 +130,155 @@ export default async function CompanyDetailPage({ params }: PageProps) {
               label: `Contacts (${company._count.contacts})`,
             },
             {
-              href: `/dashboard/opportunities?companyId=${company.id}`,
+              href: `/dashboard/opportunities?filter=sourced`,
               label: `Opportunities (${company._count.opportunities})`,
             },
             {
               href: "/dashboard/conversations",
               label: `Inbox (${company.inboxConversations.length})`,
             },
-            {
-              href: "/dashboard/meetings",
-              label: "Meetings",
-            },
-            {
-              href: "/dashboard/pipeline",
-              label: `Deals (${company._count.deals})`,
-            },
           ]}
         />
       </div>
 
-      <div className="grid gap-6 lg:grid-cols-3">
-        <Card className="lg:col-span-1">
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">Next step</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <p className="font-medium">{next.title}</p>
+          <p className="text-sm text-muted-foreground mt-1">{next.body}</p>
+        </CardContent>
+      </Card>
+
+      <div className="grid gap-6 lg:grid-cols-2">
+        <Card>
           <CardHeader>
-            <CardTitle className="text-base">Company info</CardTitle>
+            <CardTitle className="text-base">Contacts</CardTitle>
           </CardHeader>
           <CardContent className="space-y-3 text-sm">
-            {company.domain && (
-              <div className="flex items-center gap-2">
-                <Globe className="h-4 w-4 text-muted-foreground" />
-                <span>{company.domain}</span>
-              </div>
-            )}
-            {company.website && (
-              <div className="flex items-center gap-2">
-                <ExternalLink className="h-4 w-4 text-muted-foreground" />
-                <a
-                  href={company.website}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="hover:underline"
-                >
-                  Website
-                </a>
-              </div>
-            )}
-            {(company.city || company.country) && (
-              <div className="flex items-center gap-2">
-                <Building2 className="h-4 w-4 text-muted-foreground" />
-                <span>
-                  {[company.city, company.country].filter(Boolean).join(", ")}
-                </span>
-              </div>
-            )}
-            {company.description && (
-              <p className="text-muted-foreground">{company.description}</p>
-            )}
-            <div className="grid grid-cols-2 gap-2 pt-2 text-xs text-muted-foreground">
-              <div>Contacts: {company._count.contacts}</div>
-              <div>Signals: {company._count.signals}</div>
-              <div>Opportunities: {company._count.opportunities}</div>
-              <div>Deals: {company._count.deals}</div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <div className="space-y-4 lg:col-span-2">
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-base">Contacts</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-2 text-sm">
-              {company.contacts.length === 0 ? (
-                <p className="text-muted-foreground">No contacts yet</p>
-              ) : (
-                company.contacts.map((c) => (
+            {company.contacts.length === 0 ? (
+              <EmptyState
+                title="No contacts yet"
+                description="Contacts appear after Hunter enrichment (or website email fallback). Use Autopilot → Enrichment."
+                actionHref="/dashboard/autopilot?tab=enrichment"
+                actionLabel="Open Enrichment"
+              />
+            ) : (
+              company.contacts.map((c) => {
+                const display = displayContactName(c.fullName, c.email);
+                return (
                   <Link
                     key={c.id}
                     href={`/dashboard/contacts/${c.id}`}
-                    className="flex justify-between hover:underline"
+                    className="flex flex-wrap items-center justify-between gap-2 rounded-md border p-2 hover:bg-muted/40"
                   >
-                    <span>{c.fullName}</span>
-                    <span className="text-muted-foreground">
-                      {c.title || c.email || ""}
-                    </span>
+                    <div>
+                      <div className="font-medium flex flex-wrap items-center gap-2">
+                        {display.label}
+                        {display.isGeneralInbox ? (
+                          <StatusBadge label="General inbox" tone="muted" />
+                        ) : null}
+                      </div>
+                      <div className="text-xs text-muted-foreground">
+                        {[c.title, c.email].filter(Boolean).join(" · ")}
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <VerificationBadge status={c.emailStatus} />
+                      {c.linkedInUrl ? (
+                        <span title="LinkedIn">
+                          <Link2 className="h-4 w-4 text-muted-foreground" />
+                        </span>
+                      ) : null}
+                    </div>
                   </Link>
-                ))
-              )}
-            </CardContent>
-          </Card>
+                );
+              })
+            )}
+          </CardContent>
+        </Card>
 
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-base">Signals</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-2 text-sm">
-              {company.signals.length === 0 ? (
-                <p className="text-muted-foreground">No signals yet</p>
-              ) : (
-                company.signals.map((s) => (
-                  <div key={s.id} className="flex justify-between gap-4">
-                    <span className="truncate">{s.title}</span>
-                    <span className="shrink-0 text-muted-foreground">
-                      {format(s.detectedAt, "MMM d, yyyy")}
-                    </span>
-                  </div>
-                ))
-              )}
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-base">Opportunities</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-2 text-sm">
-              {company.opportunities.length === 0 ? (
-                <p className="text-muted-foreground">No opportunities yet</p>
-              ) : (
-                company.opportunities.map((o) => (
-                  <Link
-                    key={o.id}
-                    href={`/dashboard/opportunities/${o.id}`}
-                    className="flex justify-between hover:underline"
-                  >
-                    <span>
-                      {o.stage}
-                      {o.primaryContact
-                        ? ` · ${o.primaryContact.fullName}`
-                        : ""}
-                    </span>
-                    <span className="text-muted-foreground">
-                      {format(o.updatedAt, "MMM d")}
-                    </span>
-                  </Link>
-                ))
-              )}
-            </CardContent>
-          </Card>
-
-          <div className="grid gap-4 md:grid-cols-2">
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-base">Conversations</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-2 text-sm">
-                {company.inboxConversations.length === 0 ? (
-                  <EmptyState
-                    title="No conversations yet"
-                    description="Outreach and replies for contacts at this company appear in Inbox."
-                    actionHref="/dashboard/conversations"
-                    actionLabel="Open inbox"
-                  />
-                ) : (
-                  company.inboxConversations.map((c) => (
-                    <Link
-                      key={c.id}
-                      href="/dashboard/conversations"
-                      className="flex justify-between hover:underline"
-                    >
-                      <span className="truncate">
-                        {c.subject || c.status || c.id.slice(0, 8)}
-                      </span>
-                      <span className="text-muted-foreground">
-                        {c.lastMessageAt
-                          ? format(c.lastMessageAt, "MMM d")
-                          : ""}
-                      </span>
-                    </Link>
-                  ))
-                )}
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-base">Deals</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-2 text-sm">
-                {company.deals.length === 0 ? (
-                  <EmptyState
-                    title="No deals yet"
-                    description="Deals are created from opportunities. Open pipeline to manage stages."
-                    actionHref="/dashboard/pipeline"
-                    actionLabel="Open pipeline"
-                  />
-                ) : (
-                  company.deals.map((d) => (
-                    <Link
-                      key={d.id}
-                      href="/dashboard/pipeline"
-                      className="flex justify-between hover:underline"
-                    >
-                      <span>{d.name || d.stage}</span>
-                      <span className="text-muted-foreground">{d.stage}</span>
-                    </Link>
-                  ))
-                )}
-              </CardContent>
-            </Card>
-          </div>
-        </div>
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">Website emails</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-2 text-sm">
+            {company.emails.length === 0 ? (
+              <p className="text-muted-foreground">
+                No crawled emails yet. Crawl runs after Places sourcing when
+                Auto-crawl is ON.
+              </p>
+            ) : (
+              company.emails.map((e) => (
+                <div
+                  key={e.id}
+                  className="flex flex-wrap justify-between gap-2 border-b border-border py-1 last:border-0"
+                >
+                  <span>{e.email}</span>
+                  <span className="text-xs text-muted-foreground">
+                    {e.type}
+                    {e.sourcePage ? ` · ${e.sourcePage}` : ""}
+                  </span>
+                </div>
+              ))
+            )}
+          </CardContent>
+        </Card>
       </div>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">Activity timeline</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-3 text-sm">
+          {company.timelineEvents.length === 0 ? (
+            <p className="text-muted-foreground">
+              Timeline events appear as Autopilot sources, crawls, and enriches
+              this company. Run migrate backfill if this company predates Phase
+              2.5.
+            </p>
+          ) : (
+            company.timelineEvents.map((ev) => (
+              <div key={ev.id} className="border-l-2 border-border pl-3">
+                <p className="font-medium">{ev.title}</p>
+                <p className="text-xs text-muted-foreground">
+                  {ev.type} · {format(ev.createdAt, "MMM d, yyyy · HH:mm")}
+                </p>
+              </div>
+            ))
+          )}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">Opportunities</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-2 text-sm">
+          {company.opportunities.length === 0 ? (
+            <p className="text-muted-foreground">
+              Sourced opportunities are created when enrichment succeeds.
+            </p>
+          ) : (
+            company.opportunities.map((o) => (
+              <Link
+                key={o.id}
+                href={`/dashboard/opportunities/${o.id}`}
+                className="flex justify-between hover:underline"
+              >
+                <span>
+                  {o.stage}
+                  {o.primaryContact ? ` · ${o.primaryContact.fullName}` : ""}
+                </span>
+                <span className="text-muted-foreground">
+                  {format(o.updatedAt, "MMM d")}
+                </span>
+              </Link>
+            ))
+          )}
+        </CardContent>
+      </Card>
     </div>
   );
 }

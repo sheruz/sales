@@ -2,12 +2,15 @@ import prisma from "@/lib/db/prisma";
 import {
   CompanyCrawlStatus,
   CompanyEmailType,
+  CompanyTimelineEventType,
   SearchQueryStatus,
+  TimelineActor,
   type Prisma,
 } from "@prisma/client";
 import { NotFoundError, ValidationError } from "@/lib/api/response";
 import { googlePlacesService } from "@/services/google-places.service";
 import { apiUsageLogService } from "@/services/api-usage-log.service";
+import { timelineService } from "@/services/timeline.service";
 import {
   domainFromPlaceWebsite,
   resolveCompanyDedupe,
@@ -204,7 +207,8 @@ export class SourcingJobService {
   async upsertPlaceCompany(
     organizationId: string,
     place: GooglePlaceResult,
-    geo: { country?: string | null; city?: string | null }
+    geo: { country?: string | null; city?: string | null },
+    opts?: { queryLabel?: string | null }
   ): Promise<{ companyId: string; created: boolean }> {
     const domain = domainFromPlaceWebsite(place.website);
     const byPlaceId = await prisma.company.findFirst({
@@ -280,6 +284,20 @@ export class SourcingJobService {
           : CompanyCrawlStatus.DONE,
       },
     });
+    await timelineService.record({
+      organizationId,
+      companyId: created.id,
+      type: CompanyTimelineEventType.SOURCED,
+      title: opts?.queryLabel
+        ? `Found via Google query '${opts.queryLabel}'`
+        : "Found via Google Places",
+      details: {
+        googlePlaceId: place.googlePlaceId,
+        query: opts?.queryLabel ?? null,
+      },
+      actor: TimelineActor.SYSTEM,
+      dedupeKey: "sourced",
+    });
     return { companyId: created.id, created: true };
   }
 
@@ -307,10 +325,15 @@ export class SourcingJobService {
     let created = 0;
     let updated = 0;
     for (const place of result.places) {
-      const upsert = await this.upsertPlaceCompany(organizationId, place, {
-        country: query.country,
-        city: query.city,
-      });
+      const upsert = await this.upsertPlaceCompany(
+        organizationId,
+        place,
+        {
+          country: query.country,
+          city: query.city,
+        },
+        { queryLabel: query.query }
+      );
       if (upsert.created) created += 1;
       else updated += 1;
     }
@@ -406,14 +429,22 @@ export class SourcingJobService {
     };
   }
 
-  async processCrawlBatch(organizationId: string, limit: number) {
+  async processCrawlBatch(
+    organizationId: string,
+    limit: number,
+    companyIds?: string[]
+  ) {
     const pending = await prisma.company.findMany({
       where: {
         organizationId,
-        source: "google_places",
-        crawlStatus: CompanyCrawlStatus.PENDING,
         website: { not: null },
         deletedAt: null,
+        ...(companyIds?.length
+          ? { id: { in: companyIds } }
+          : {
+              source: "google_places",
+              crawlStatus: CompanyCrawlStatus.PENDING,
+            }),
       },
       orderBy: { createdAt: "asc" },
       take: Math.max(1, limit),
@@ -466,6 +497,38 @@ export class SourcingJobService {
           });
         }
 
+        const crawlType =
+          crawl.status === "BLOCKED"
+            ? CompanyTimelineEventType.CRAWL_BLOCKED
+            : crawl.status === "FAILED"
+              ? CompanyTimelineEventType.CRAWL_FAILED
+              : CompanyTimelineEventType.CRAWLED;
+        await timelineService.record({
+          organizationId,
+          companyId: company.id,
+          type: crawlType,
+          title:
+            crawl.status === "DONE"
+              ? "Website crawled"
+              : crawl.status === "BLOCKED"
+                ? "Crawl blocked"
+                : "Crawl finished",
+          details: { status: crawl.status, error: crawl.error },
+          actor: TimelineActor.SYSTEM,
+          dedupeKey: `crawl_${crawl.status.toLowerCase()}`,
+        });
+        if (crawl.emails.length > 0) {
+          await timelineService.record({
+            organizationId,
+            companyId: company.id,
+            type: CompanyTimelineEventType.EMAILS_FOUND,
+            title: `${crawl.emails.length} website email(s) found`,
+            details: { count: crawl.emails.length },
+            actor: TimelineActor.SYSTEM,
+            dedupeKey: "emails_found",
+          });
+        }
+
         results.push({
           companyId: company.id,
           status: crawl.status,
@@ -479,6 +542,17 @@ export class SourcingJobService {
             crawledAt: new Date(),
             crawlError: err instanceof Error ? err.message : "crawl failed",
           },
+        });
+        await timelineService.record({
+          organizationId,
+          companyId: company.id,
+          type: CompanyTimelineEventType.CRAWL_FAILED,
+          title: "Crawl failed",
+          details: {
+            error: err instanceof Error ? err.message : "crawl failed",
+          },
+          actor: TimelineActor.SYSTEM,
+          dedupeKey: "crawl_failed",
         });
         results.push({
           companyId: company.id,

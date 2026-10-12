@@ -75,7 +75,18 @@ export class ContactService {
         take: limit,
         include: {
           company: {
-            select: { id: true, name: true, domain: true },
+            select: {
+              id: true,
+              name: true,
+              domain: true,
+              crawlStatus: true,
+              enrichmentStatus: true,
+            },
+          },
+          primaryOpportunities: {
+            orderBy: { updatedAt: "desc" },
+            take: 1,
+            select: { stage: true },
           },
           _count: {
             select: {

@@ -354,6 +354,33 @@ enum CompanyEmailType {
   PERSONAL
 }
 
+enum CompanyTimelineEventType {
+  SOURCED
+  CRAWLED
+  CRAWL_BLOCKED
+  CRAWL_FAILED
+  EMAILS_FOUND
+  ENRICHED
+  NO_CONTACT
+  VERIFIED
+  SKIPPED
+  UNSKIPPED
+  NOTE
+  AUDITED
+  CONTACTED
+  REPLIED
+  MEETING_BOOKED
+  PROPOSAL_SENT
+  WON
+  LOST
+}
+
+enum TimelineActor {
+  SYSTEM
+  AI
+  USER
+}
+
 enum LinkedInConnectionType {
   OAUTH
   SESSION
@@ -619,6 +646,7 @@ model Organization {
   companyEmails     CompanyEmail[]
   apiUsageLogs      ApiUsageLog[]
   cronTickLogs      CronTickLog[]
+  companyTimelineEvents CompanyTimelineEvent[]
 
   @@index([status])
   @@index([deletedAt])
@@ -795,6 +823,7 @@ model User {
   emailAccounts          EmailAccount[]
   assignedInboxConversations InboxConversation[] @relation("InboxAssignee")
   sequenceEnrollmentsEnrolled SequenceEnrollment[] @relation("SequenceEnrollmentEnrolledBy")
+  companyTimelineEvents  CompanyTimelineEvent[]
 
   @@index([email])
   @@index([role])
@@ -895,6 +924,7 @@ model Company {
   meetings      Meeting[]
   proposals     Proposal[]
   emails        CompanyEmail[]
+  timelineEvents CompanyTimelineEvent[]
 
   @@unique([organizationId, domain])
   @@index([organizationId])
@@ -906,6 +936,35 @@ model Company {
   @@index([industry])
   @@index([status])
   @@map("companies")
+}
+
+/// Autopilot / CRM company activity timeline (Phase 2.5)
+model CompanyTimelineEvent {
+  id             String                   @id @default(uuid())
+  organizationId String                   @map("organization_id")
+  companyId      String                   @map("company_id")
+  contactId      String?                  @map("contact_id")
+  opportunityId  String?                  @map("opportunity_id")
+  type           CompanyTimelineEventType
+  title          String
+  details        Json?
+  actor          TimelineActor            @default(SYSTEM)
+  userId         String?                  @map("user_id")
+  /// Idempotency key for backfill / retries (unique per company when set)
+  dedupeKey      String?                  @map("dedupe_key")
+  createdAt      DateTime                 @default(now()) @map("created_at")
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  company      Company      @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  contact      Contact?     @relation(fields: [contactId], references: [id], onDelete: SetNull)
+  opportunity  Opportunity? @relation(fields: [opportunityId], references: [id], onDelete: SetNull)
+  user         User?        @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@unique([companyId, dedupeKey])
+  @@index([companyId, createdAt])
+  @@index([organizationId, createdAt])
+  @@index([type])
+  @@map("company_timeline_events")
 }
 
 model CompanyEmail {
@@ -1000,6 +1059,7 @@ model Contact {
   meetings     Meeting[]
   proposals    Proposal[]
   sequenceEnrollments SequenceEnrollment[]
+  timelineEvents CompanyTimelineEvent[]
 
   @@index([organizationId])
   @@index([companyId])
@@ -1181,6 +1241,7 @@ model Opportunity {
   deals              Deal[]
   learningEvents     LearningEvent[]
   sequenceEnrollments SequenceEnrollment[]
+  timelineEvents     CompanyTimelineEvent[]
 
   @@index([organizationId])
   @@index([companyId])

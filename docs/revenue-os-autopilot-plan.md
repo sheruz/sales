@@ -49,6 +49,28 @@ Hide legacy Leads / Autopilot / Prospect Finder / Sources scrapers behind flags.
 
 ---
 
+## Phase 2.5: Product UI alignment — DONE (code)
+
+Autopilot Overview (funnel + checklist + health), company/contact list & detail redesign, shared status badges, `CompanyTimelineEvent` + `timelineService.record()`, bulk crawl/enrich/skip/unskip.
+
+### Terminology
+| Term | Meaning |
+|------|---------|
+| **Company** | Prospect organization (from Places or other sources) |
+| **Contact** | Person or general inbox at a company |
+| **Opportunity** | Sales journey for a company (starts at **SOURCED**) |
+| **Stage / Funnel** | Found → Crawled → Enriched → Audited → Contacted → … → Won |
+
+### Product UI standards (every future phase)
+A phase is **not done** unless it ships:
+1. Its Autopilot tab (toggle, stats, errors)
+2. Funnel stage counts on Overview (or grey “Coming in Phase X”)
+3. Timeline events via **`timelineService.record()`** on every automatic action
+4. Setup checklist item(s) when a new integration is required
+5. Clear empty states explaining what fills the UI and how
+
+---
+
 ## Phase 3: Website audit + personalized pitch
 
 1. `WebsiteAuditService`: PageSpeed Insights + homepage checks (mobile, booking form, SSL, etc.).

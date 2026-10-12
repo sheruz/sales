@@ -7,7 +7,16 @@ import { getCurrentUser } from "@/lib/auth/session";
 import { hasAnyOrgPermission } from "@/lib/tenant/scope";
 
 interface PageProps {
-  searchParams: Promise<{ search?: string; page?: string }>;
+  searchParams: Promise<{
+    search?: string;
+    page?: string;
+    source?: string;
+    city?: string;
+    crawlStatus?: string;
+    enrichmentStatus?: string;
+    funnel?: string;
+    sort?: string;
+  }>;
 }
 
 export default async function CompaniesPage({ searchParams }: PageProps) {
@@ -27,31 +36,22 @@ export default async function CompaniesPage({ searchParams }: PageProps) {
       page,
       limit: 25,
       search,
+      source: params.source?.trim() || undefined,
+      city: params.city?.trim() || undefined,
+      crawlStatus: params.crawlStatus?.trim() || undefined,
+      enrichmentStatus: params.enrichmentStatus?.trim() || undefined,
+      funnel: params.funnel?.trim() || undefined,
+      sort: params.sort === "createdAt" || params.sort === "city" ? params.sort : "name",
     });
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     console.error("[companies] list failed", msg);
-    const needsMigrate =
-      /enrichment_|cron_tick|CompanyEnrichment|SOURCED|does not exist/i.test(
-        msg
-      );
     return (
       <div className="space-y-6">
         <h2 className="text-2xl font-bold tracking-tight">Companies</h2>
-        <div className="rounded-lg border border-destructive/40 bg-destructive/10 p-4 text-sm space-y-2">
-          <p className="font-medium">
-            {needsMigrate
-              ? "Database schema is behind this deploy (Phase 2 migrate not run)."
-              : "Failed to load companies."}
-          </p>
-          {needsMigrate ? (
-            <pre className="overflow-x-auto rounded bg-muted p-3 text-xs">
-              {`cd /var/www/html/sales
-npm run db:migrate:hunter-enrichment
-pm2 restart all`}
-            </pre>
-          ) : null}
-          <p className="text-xs text-muted-foreground break-all">{msg}</p>
+        <div className="rounded-lg border border-destructive/40 bg-destructive/10 p-4 text-sm">
+          <p className="font-medium">Failed to load companies.</p>
+          <p className="text-xs text-muted-foreground break-all mt-2">{msg}</p>
         </div>
       </div>
     );
@@ -62,22 +62,35 @@ pm2 restart all`}
       id: item.id,
       name: item.name,
       domain: item.domain,
-      status: item.status,
-      industry: item.industry,
+      city: item.city,
+      country: item.country,
+      source: item.source,
+      crawlStatus: item.crawlStatus,
+      enrichmentStatus: item.enrichmentStatus,
+      createdAt: item.createdAt.toISOString(),
+      funnelStage: item.funnelStage,
       _count: item._count,
-      signals: item.signals.map((s) => ({
-        id: s.id,
-        title: s.title,
-        detectedAt: s.detectedAt.toISOString(),
-      })),
-      opportunities: item.opportunities.map((o) => ({
-        id: o.id,
-        stage: o.stage,
-        updatedAt: o.updatedAt.toISOString(),
-      })),
+      bestContact: item.bestContact
+        ? {
+            id: item.bestContact.id,
+            fullName: item.bestContact.fullName,
+            email: item.bestContact.email,
+            emailStatus: item.bestContact.emailStatus,
+            title: item.bestContact.title,
+          }
+        : null,
     })),
     pagination: result.pagination,
-    filters: { search: params.search ?? "", page },
+    filters: {
+      search: params.search ?? "",
+      page,
+      source: params.source,
+      city: params.city,
+      crawlStatus: params.crawlStatus,
+      enrichmentStatus: params.enrichmentStatus,
+      funnel: params.funnel,
+      sort: params.sort,
+    },
   };
 
   return (
@@ -85,7 +98,7 @@ pm2 restart all`}
       <div>
         <h2 className="text-2xl font-bold tracking-tight">Companies</h2>
         <p className="text-muted-foreground">
-          Canonical prospect and customer organizations
+          Prospects moving through Found → Crawled → Enriched
           {user.organizationName ? ` · ${user.organizationName}` : ""}.
         </p>
       </div>

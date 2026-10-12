@@ -7,6 +7,8 @@ import { enrichmentJobService } from "@/services/enrichment-job.service";
 import { cronTickService } from "@/services/cron-tick.service";
 import { SourcingPanel } from "@/components/autopilot/sourcing-panel";
 import { EnrichmentPanel } from "@/components/autopilot/enrichment-panel";
+import { OverviewPanel } from "@/components/autopilot/overview-panel";
+import { autopilotOverviewService } from "@/services/autopilot-overview.service";
 import { EmptyState } from "@/components/crm/empty-state";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -39,17 +41,24 @@ export default async function AutopilotPage({
   }
 
   const params = await searchParams;
-  const tab = params.tab === "enrichment" ? "enrichment" : "sourcing";
+  const tab =
+    params.tab === "enrichment"
+      ? "enrichment"
+      : params.tab === "sourcing"
+        ? "sourcing"
+        : "overview";
 
   let data;
   let enrichment;
   let lastTick;
+  let overview;
   let schemaError: string | null = null;
   try {
-    [data, enrichment, lastTick] = await Promise.all([
+    [data, enrichment, lastTick, overview] = await Promise.all([
       sourcingJobService.dashboard(user.organizationId),
       enrichmentJobService.dashboard(user.organizationId),
       cronTickService.lastTick(),
+      autopilotOverviewService.get(user.organizationId, user.id),
     ]);
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
@@ -57,7 +66,7 @@ export default async function AutopilotPage({
     schemaError = msg;
   }
 
-  if (schemaError || !data || !enrichment) {
+  if (schemaError || !data || !enrichment || !overview) {
     return (
       <div className="space-y-6">
         <h2 className="text-2xl font-bold tracking-tight">Autopilot</h2>
@@ -144,9 +153,13 @@ pm2 restart all`}
 
       <Tabs defaultValue={tab}>
         <TabsList>
+          <TabsTrigger value="overview">Overview</TabsTrigger>
           <TabsTrigger value="sourcing">Sourcing</TabsTrigger>
           <TabsTrigger value="enrichment">Enrichment</TabsTrigger>
         </TabsList>
+        <TabsContent value="overview" className="mt-4">
+          <OverviewPanel data={overview} />
+        </TabsContent>
         <TabsContent value="sourcing" className="mt-4">
           <SourcingPanel
             initial={{

@@ -1,6 +1,17 @@
 import prisma from "@/lib/db/prisma";
-import { CompanyStatus, type Prisma } from "@prisma/client";
+import {
+  CompanyCrawlStatus,
+  CompanyEnrichmentStatus,
+  CompanyStatus,
+  CompanyTimelineEventType,
+  TimelineActor,
+  type Prisma,
+} from "@prisma/client";
 import { NotFoundError, ValidationError } from "@/lib/api/response";
+import { deriveCompanyFunnelStage } from "@/lib/crm/funnel-stage";
+import { sourcingJobService } from "@/services/sourcing-job.service";
+import { enrichmentJobService } from "@/services/enrichment-job.service";
+import { timelineService } from "@/services/timeline.service";
 
 /** Normalize a website or bare host to lowercase domain without www. */
 export function extractDomain(website?: string | null): string | null {
@@ -58,6 +69,13 @@ export type CompanyListQuery = {
   limit?: number;
   search?: string;
   domain?: string;
+  source?: string;
+  city?: string;
+  crawlStatus?: string;
+  enrichmentStatus?: string;
+  funnel?: string;
+  sort?: "name" | "createdAt" | "city";
+  sortDir?: "asc" | "desc";
 };
 
 export class CompanyService {
@@ -78,6 +96,34 @@ export class CompanyService {
             ],
           }
         : {}),
+      ...(query.source ? { source: query.source } : {}),
+      ...(query.city
+        ? { city: { contains: query.city, mode: "insensitive" } }
+        : {}),
+      ...(query.crawlStatus
+        ? { crawlStatus: query.crawlStatus as CompanyCrawlStatus }
+        : {}),
+      ...(query.enrichmentStatus
+        ? {
+            enrichmentStatus:
+              query.enrichmentStatus as CompanyEnrichmentStatus,
+          }
+        : {}),
+      ...(query.funnel === "crawled"
+        ? {
+            crawlStatus: {
+              in: [
+                CompanyCrawlStatus.DONE,
+                CompanyCrawlStatus.BLOCKED,
+                CompanyCrawlStatus.FAILED,
+              ],
+            },
+          }
+        : {}),
+      ...(query.funnel === "enriched"
+        ? { enrichmentStatus: CompanyEnrichmentStatus.ENRICHED }
+        : {}),
+      ...(query.funnel === "found" ? {} : {}),
       ...(query.search
         ? {
             AND: [
@@ -98,10 +144,13 @@ export class CompanyService {
         : {}),
     };
 
+    const sortField = query.sort ?? "name";
+    const sortDir = query.sortDir ?? "asc";
+
     const [items, total] = await Promise.all([
       prisma.company.findMany({
         where,
-        orderBy: { name: "asc" },
+        orderBy: { [sortField]: sortDir },
         skip,
         take: limit,
         include: {
@@ -109,13 +158,20 @@ export class CompanyService {
             select: {
               contacts: true,
               opportunities: true,
-              signals: true,
+              emails: true,
             },
           },
-          signals: {
-            orderBy: { detectedAt: "desc" },
+          contacts: {
+            orderBy: { createdAt: "asc" },
             take: 1,
-            select: { id: true, title: true, detectedAt: true },
+            select: {
+              id: true,
+              fullName: true,
+              email: true,
+              emailStatus: true,
+              title: true,
+              source: true,
+            },
           },
           opportunities: {
             orderBy: { updatedAt: "desc" },
@@ -128,7 +184,15 @@ export class CompanyService {
     ]);
 
     return {
-      items,
+      items: items.map((item) => ({
+        ...item,
+        funnelStage: deriveCompanyFunnelStage({
+          crawlStatus: item.crawlStatus,
+          enrichmentStatus: item.enrichmentStatus,
+          opportunityStage: item.opportunities[0]?.stage ?? null,
+        }),
+        bestContact: item.contacts[0] ?? null,
+      })),
       pagination: {
         page,
         limit,
@@ -143,7 +207,11 @@ export class CompanyService {
       where: { id, organizationId, deletedAt: null },
       include: {
         contacts: { orderBy: { createdAt: "desc" }, take: 50 },
-        signals: { orderBy: { detectedAt: "desc" }, take: 30 },
+        emails: { orderBy: { createdAt: "desc" }, take: 50 },
+        timelineEvents: {
+          orderBy: { createdAt: "desc" },
+          take: 40,
+        },
         opportunities: {
           orderBy: { updatedAt: "desc" },
           take: 30,
@@ -166,15 +234,127 @@ export class CompanyService {
         _count: {
           select: {
             contacts: true,
-            signals: true,
             opportunities: true,
             deals: true,
+            emails: true,
           },
         },
       },
     });
     if (!company) throw new NotFoundError("Company not found");
-    return company;
+    return {
+      ...company,
+      funnelStage: deriveCompanyFunnelStage({
+        crawlStatus: company.crawlStatus,
+        enrichmentStatus: company.enrichmentStatus,
+        opportunityStage: company.opportunities[0]?.stage ?? null,
+      }),
+    };
+  }
+
+  async bulkAction(
+    organizationId: string,
+    action: "crawl" | "enrich" | "skip" | "unskip",
+    companyIds: string[],
+    userId?: string
+  ) {
+    const ids = [...new Set(companyIds)].slice(0, 25);
+    if (!ids.length) throw new ValidationError("No companies selected");
+
+    const companies = await prisma.company.findMany({
+      where: { organizationId, id: { in: ids }, deletedAt: null },
+      select: { id: true },
+    });
+    const found = new Set(companies.map((c) => c.id));
+    const results: Array<{ id: string; ok: boolean; error?: string }> = [];
+
+    if (action === "crawl") {
+      const batch = await sourcingJobService.processCrawlBatch(
+        organizationId,
+        Math.min(25, ids.length),
+        ids
+      );
+      for (const id of ids) {
+        const hit = batch.find((b) => b.companyId === id);
+        results.push({
+          id,
+          ok: Boolean(hit),
+          error: hit ? undefined : "no website or crawl skipped",
+        });
+      }
+      return { action, results };
+    }
+
+    if (action === "enrich") {
+      for (const id of ids) {
+        if (!found.has(id)) {
+          results.push({ id, ok: false, error: "not found" });
+          continue;
+        }
+        try {
+          await enrichmentJobService.enrichOneCompany(
+            organizationId,
+            id,
+            userId
+          );
+          results.push({ id, ok: true });
+        } catch (err) {
+          results.push({
+            id,
+            ok: false,
+            error: err instanceof Error ? err.message : "failed",
+          });
+        }
+      }
+      return { action, results };
+    }
+
+    if (action === "skip") {
+      await prisma.company.updateMany({
+        where: { organizationId, id: { in: ids } },
+        data: {
+          enrichmentStatus: CompanyEnrichmentStatus.SKIPPED,
+          enrichmentError: "Skipped by user",
+          enrichedAt: new Date(),
+        },
+      });
+      for (const id of ids) {
+        await timelineService.record({
+          organizationId,
+          companyId: id,
+          type: CompanyTimelineEventType.SKIPPED,
+          title: "Skipped enrichment (bulk)",
+          actor: TimelineActor.USER,
+          userId: userId ?? null,
+          dedupeKey: `skipped_user_${Date.now()}`,
+        });
+        results.push({ id, ok: true });
+      }
+      return { action, results };
+    }
+
+    // unskip
+    await prisma.company.updateMany({
+      where: { organizationId, id: { in: ids } },
+      data: {
+        enrichmentStatus: CompanyEnrichmentStatus.PENDING,
+        enrichmentError: null,
+        enrichmentAttempts: 0,
+      },
+    });
+    for (const id of ids) {
+      await timelineService.record({
+        organizationId,
+        companyId: id,
+        type: CompanyTimelineEventType.UNSKIPPED,
+        title: "Unskipped — back to enrichment queue",
+        actor: TimelineActor.USER,
+        userId: userId ?? null,
+        dedupeKey: `unskipped_${Date.now()}_${id.slice(0, 8)}`,
+      });
+      results.push({ id, ok: true });
+    }
+    return { action, results };
   }
 
   async create(organizationId: string, input: CompanyWriteInput) {

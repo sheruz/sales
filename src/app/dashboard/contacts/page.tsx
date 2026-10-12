@@ -7,7 +7,7 @@ import { getCurrentUser } from "@/lib/auth/session";
 import { hasAnyOrgPermission } from "@/lib/tenant/scope";
 
 interface PageProps {
-  searchParams: Promise<{ search?: string; page?: string }>;
+  searchParams: Promise<{ search?: string; page?: string; companyId?: string }>;
 }
 
 export default async function ContactsPage({ searchParams }: PageProps) {
@@ -25,6 +25,7 @@ export default async function ContactsPage({ searchParams }: PageProps) {
     page,
     limit: 25,
     search,
+    companyId: params.companyId,
   });
 
   const serialized = {
@@ -33,9 +34,10 @@ export default async function ContactsPage({ searchParams }: PageProps) {
       fullName: item.fullName,
       title: item.title,
       email: item.email,
-      phone: item.phone,
+      emailStatus: item.emailStatus,
+      source: item.source,
       company: item.company,
-      _count: item._count,
+      opportunityStage: item.primaryOpportunities[0]?.stage ?? null,
     })),
     pagination: result.pagination,
     filters: { search: params.search ?? "", page },
@@ -46,7 +48,7 @@ export default async function ContactsPage({ searchParams }: PageProps) {
       <div>
         <h2 className="text-2xl font-bold tracking-tight">Contacts</h2>
         <p className="text-muted-foreground">
-          People at prospect and customer companies
+          Decision-makers and inboxes found by Autopilot
           {user.organizationName ? ` · ${user.organizationName}` : ""}.
         </p>
       </div>

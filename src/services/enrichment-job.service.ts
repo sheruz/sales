@@ -2,14 +2,17 @@ import prisma from "@/lib/db/prisma";
 import {
   CompanyCrawlStatus,
   CompanyEnrichmentStatus,
+  CompanyTimelineEventType,
   OpportunityEventType,
   OpportunityStage,
   OpportunityStatus,
+  TimelineActor,
   type Prisma,
 } from "@prisma/client";
 import { ValidationError } from "@/lib/api/response";
 import { hunterService } from "@/services/hunter.service";
 import { apiUsageLogService } from "@/services/api-usage-log.service";
+import { timelineService } from "@/services/timeline.service";
 import {
   DEFAULT_DOMAIN_BLOCKLIST,
   isDomainBlocked,
@@ -450,6 +453,15 @@ export class EnrichmentJobService {
           enrichedAt: new Date(),
         },
       });
+      await timelineService.record({
+        organizationId,
+        companyId: company.id,
+        type: CompanyTimelineEventType.SKIPPED,
+        title: "Skipped enrichment — domain blocklist",
+        details: { domain },
+        actor: TimelineActor.SYSTEM,
+        dedupeKey: "skipped",
+      });
       return { status: "SKIPPED" as const, reason: "blocklist" };
     }
 
@@ -543,6 +555,15 @@ export class EnrichmentJobService {
               enrichmentAttempts: { increment: 1 },
             },
           });
+          await timelineService.record({
+            organizationId,
+            companyId: company.id,
+            type: CompanyTimelineEventType.NO_CONTACT,
+            title: "No contact found",
+            details: { note: domainSearchNote },
+            actor: TimelineActor.SYSTEM,
+            dedupeKey: "no_contact",
+          });
           return { status: "NO_CONTACT" as const };
         }
 
@@ -595,7 +616,7 @@ export class EnrichmentJobService {
         },
       });
 
-      await this.ensureSourcedOpportunity(
+      const opp = await this.ensureSourcedOpportunity(
         organizationId,
         company.id,
         contact.id
@@ -610,6 +631,32 @@ export class EnrichmentJobService {
           enrichmentAttempts: { increment: 1 },
         },
       });
+
+      await timelineService.record({
+        organizationId,
+        companyId: company.id,
+        contactId: contact.id,
+        opportunityId: opp.id,
+        type: CompanyTimelineEventType.ENRICHED,
+        title: isGenericFallback
+          ? `Enriched via website email (${emailStatus})`
+          : `Enriched via Hunter — 1 contact, ${emailStatus}`,
+        details: { emailStatus, source, email: person.email },
+        actor: TimelineActor.SYSTEM,
+        dedupeKey: "enriched",
+      });
+      if (emailStatus === "valid") {
+        await timelineService.record({
+          organizationId,
+          companyId: company.id,
+          contactId: contact.id,
+          type: CompanyTimelineEventType.VERIFIED,
+          title: "Email verified (valid)",
+          details: { email: person.email },
+          actor: TimelineActor.SYSTEM,
+          dedupeKey: "verified",
+        });
+      }
 
       return {
         status: "ENRICHED" as const,

@@ -14,19 +14,30 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import {
+  FunnelStageBadge,
+  SourceBadge,
+  StatusBadge,
+  VerificationBadge,
+} from "@/components/status/status-badge";
+import { displayContactName } from "@/lib/crm/display-name";
+import { deriveCompanyFunnelStage } from "@/lib/crm/funnel-stage";
 
 interface ContactRow {
   id: string;
   fullName: string;
   title: string | null;
   email: string | null;
-  phone: string | null;
-  company: { id: string; name: string; domain: string | null };
-  _count: {
-    primaryOpportunities: number;
-    meetings: number;
-    inboxConversations: number;
+  emailStatus: string | null;
+  source: string | null;
+  company: {
+    id: string;
+    name: string;
+    domain: string | null;
+    crawlStatus: string | null;
+    enrichmentStatus: string | null;
   };
+  opportunityStage: string | null;
 }
 
 interface ContactsListProps {
@@ -76,7 +87,7 @@ export function ContactsList({ initialData }: ContactsListProps) {
         <Button onClick={applyFilters}>Search</Button>
       </div>
 
-      <div className="rounded-md border">
+      <div className="rounded-md border overflow-x-auto">
         <Table>
           <TableHeader>
             <TableRow>
@@ -84,82 +95,96 @@ export function ContactsList({ initialData }: ContactsListProps) {
               <TableHead>Title</TableHead>
               <TableHead>Company</TableHead>
               <TableHead>Email</TableHead>
-              <TableHead>Phone</TableHead>
-              <TableHead>Opportunities</TableHead>
+              <TableHead>Verification</TableHead>
+              <TableHead>Source</TableHead>
+              <TableHead>Stage</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {items.length === 0 ? (
               <TableRow>
                 <TableCell
-                  colSpan={6}
+                  colSpan={7}
                   className="h-24 text-center text-muted-foreground"
                 >
-                  No contacts found
+                  No contacts yet. They appear after Autopilot enrichment finds
+                  a decision-maker or website inbox.
                 </TableCell>
               </TableRow>
             ) : (
-              items.map((contact) => (
-                <TableRow key={contact.id}>
-                  <TableCell>
-                    <Link
-                      href={`/dashboard/contacts/${contact.id}`}
-                      className="font-medium hover:underline"
-                    >
-                      {contact.fullName}
-                    </Link>
-                  </TableCell>
-                  <TableCell className="text-muted-foreground">
-                    {contact.title || "—"}
-                  </TableCell>
-                  <TableCell>
-                    <Link
-                      href={`/dashboard/companies/${contact.company.id}`}
-                      className="hover:underline"
-                    >
-                      {contact.company.name}
-                    </Link>
-                  </TableCell>
-                  <TableCell className="text-muted-foreground">
-                    {contact.email || "—"}
-                  </TableCell>
-                  <TableCell className="text-muted-foreground">
-                    {contact.phone || "—"}
-                  </TableCell>
-                  <TableCell>{contact._count.primaryOpportunities}</TableCell>
-                </TableRow>
-              ))
+              items.map((c) => {
+                const display = displayContactName(c.fullName, c.email);
+                const stage = deriveCompanyFunnelStage({
+                  crawlStatus: c.company.crawlStatus as never,
+                  enrichmentStatus: c.company.enrichmentStatus as never,
+                  opportunityStage: c.opportunityStage as never,
+                });
+                return (
+                  <TableRow key={c.id}>
+                    <TableCell>
+                      <Link
+                        href={`/dashboard/contacts/${c.id}`}
+                        className="font-medium hover:underline inline-flex flex-wrap items-center gap-2"
+                      >
+                        {display.label}
+                        {display.isGeneralInbox ? (
+                          <StatusBadge label="General inbox" tone="muted" />
+                        ) : null}
+                      </Link>
+                    </TableCell>
+                    <TableCell className="text-muted-foreground">
+                      {c.title || "—"}
+                    </TableCell>
+                    <TableCell>
+                      <Link
+                        href={`/dashboard/companies/${c.company.id}`}
+                        className="hover:underline"
+                      >
+                        {c.company.name}
+                      </Link>
+                    </TableCell>
+                    <TableCell className="text-sm">{c.email || "—"}</TableCell>
+                    <TableCell>
+                      <VerificationBadge status={c.emailStatus} />
+                    </TableCell>
+                    <TableCell>
+                      <SourceBadge source={c.source} />
+                    </TableCell>
+                    <TableCell>
+                      <FunnelStageBadge stage={stage} />
+                    </TableCell>
+                  </TableRow>
+                );
+              })
             )}
           </TableBody>
         </Table>
       </div>
 
-      {pagination.totalPages > 1 && (
-        <div className="flex items-center justify-between text-sm">
-          <span className="text-muted-foreground">
-            Page {pagination.page} of {pagination.totalPages} ·{" "}
-            {pagination.total} contacts
-          </span>
-          <div className="flex gap-2">
-            <Button
-              variant="outline"
-              size="sm"
-              disabled={pagination.page <= 1}
-              onClick={() => goToPage(pagination.page - 1)}
-            >
-              Previous
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              disabled={pagination.page >= pagination.totalPages}
-              onClick={() => goToPage(pagination.page + 1)}
-            >
-              Next
-            </Button>
-          </div>
+      <div className="flex items-center justify-between text-sm">
+        <span className="text-muted-foreground">
+          Page {pagination.page} of {pagination.totalPages} · {pagination.total}{" "}
+          contacts
+        </span>
+        <div className="flex gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            disabled={pagination.page <= 1}
+            onClick={() => goToPage(pagination.page - 1)}
+          >
+            Previous
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            disabled={pagination.page >= pagination.totalPages}
+            onClick={() => goToPage(pagination.page + 1)}
+          >
+            Next
+          </Button>
         </div>
-      )}
+      </div>
     </div>
   );
 }
