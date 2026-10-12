@@ -45,6 +45,7 @@ type Props = {
       sourcing: boolean;
       autoCrawl: boolean;
       enrichment: boolean;
+      audit: boolean;
     };
   };
 };
@@ -170,6 +171,10 @@ export function OverviewPanel({ data }: Props) {
           <StatusBadge
             label={`Enrichment ${data.toggles.enrichment ? "ON" : "OFF"}`}
             tone={data.toggles.enrichment ? "success" : "muted"}
+          />
+          <StatusBadge
+            label={`Audit ${data.toggles.audit ? "ON" : "OFF"}`}
+            tone={data.toggles.audit ? "success" : "muted"}
           />
         </CardContent>
       </Card>

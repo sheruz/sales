@@ -4,6 +4,7 @@ import { autopilotService } from "@/services/autopilot.service";
 import { sequenceExecutorService } from "@/services/sequence-executor.service";
 import { sourcingJobService } from "@/services/sourcing-job.service";
 import { enrichmentJobService } from "@/services/enrichment-job.service";
+import { websiteAuditService } from "@/services/website-audit.service";
 import { cronTickService } from "@/services/cron-tick.service";
 import { apiSuccess } from "@/lib/api/response";
 import { handleApiError } from "@/lib/api/error-handler";
@@ -37,7 +38,7 @@ export async function POST(request: NextRequest) {
     const errors: string[] = [];
 
     try {
-      const [automation, autopilot, sequences, sourcing, enrichment] =
+      const [automation, autopilot, sequences, sourcing, enrichment, audit] =
         await Promise.all([
           automationService.processPendingJobs().catch((e: unknown) => {
             errors.push(
@@ -78,6 +79,10 @@ export async function POST(request: NextRequest) {
             );
             return { orgs: 0, results: [] };
           }),
+          websiteAuditService.processAllEnabled().catch((e: unknown) => {
+            errors.push(`audit: ${e instanceof Error ? e.message : "failed"}`);
+            return { orgs: 0, results: [] };
+          }),
         ]);
 
       console.info("[cron/automation] tick", {
@@ -89,6 +94,7 @@ export async function POST(request: NextRequest) {
         },
         sourcingOrgs: sourcing.orgs,
         enrichmentOrgs: enrichment.orgs,
+        auditOrgs: audit.orgs,
         errors: errors.length ? errors : undefined,
       });
 
@@ -100,6 +106,7 @@ export async function POST(request: NextRequest) {
           sequences: true,
           sourcing: true,
           enrichment: true,
+          audit: true,
         },
         counts: {
           sequencesClaimed: sequences.claimed,
@@ -107,6 +114,7 @@ export async function POST(request: NextRequest) {
           sequencesFailed: sequences.failed,
           sourcingOrgs: sourcing.orgs,
           enrichmentOrgs: enrichment.orgs,
+          auditOrgs: audit.orgs,
         },
         errors: errors.length ? errors : null,
       });
@@ -118,6 +126,7 @@ export async function POST(request: NextRequest) {
           autopilot,
           sourcing: { orgs: sourcing.orgs },
           enrichment: { orgs: enrichment.orgs },
+          audit: { orgs: audit.orgs },
           sequences: {
             claimed: sequences.claimed,
             success: sequences.success,

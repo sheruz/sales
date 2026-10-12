@@ -4,9 +4,12 @@ import { getCurrentUser } from "@/lib/auth/session";
 import { hasAnyOrgPermission, hasOrgPermission } from "@/lib/tenant/scope";
 import { sourcingJobService } from "@/services/sourcing-job.service";
 import { enrichmentJobService } from "@/services/enrichment-job.service";
+import { websiteAuditService } from "@/services/website-audit.service";
 import { cronTickService } from "@/services/cron-tick.service";
 import { SourcingPanel } from "@/components/autopilot/sourcing-panel";
 import { EnrichmentPanel } from "@/components/autopilot/enrichment-panel";
+import { AuditPanel } from "@/components/autopilot/audit-panel";
+import { PitchReviewPanel } from "@/components/autopilot/pitch-review-panel";
 import { OverviewPanel } from "@/components/autopilot/overview-panel";
 import { autopilotOverviewService } from "@/services/autopilot-overview.service";
 import { EmptyState } from "@/components/crm/empty-state";
@@ -46,38 +49,48 @@ export default async function AutopilotPage({
       ? "enrichment"
       : params.tab === "sourcing"
         ? "sourcing"
-        : "overview";
+        : params.tab === "audit"
+          ? "audit"
+          : params.tab === "pitches"
+            ? "pitches"
+            : "overview";
 
   let data;
   let enrichment;
+  let audit;
+  let draftPitches;
   let lastTick;
   let overview;
   let schemaError: string | null = null;
   try {
-    [data, enrichment, lastTick, overview] = await Promise.all([
-      sourcingJobService.dashboard(user.organizationId),
-      enrichmentJobService.dashboard(user.organizationId),
-      cronTickService.lastTick(),
-      autopilotOverviewService.get(user.organizationId, user.id),
-    ]);
+    [data, enrichment, audit, draftPitches, lastTick, overview] =
+      await Promise.all([
+        sourcingJobService.dashboard(user.organizationId),
+        enrichmentJobService.dashboard(user.organizationId),
+        websiteAuditService.dashboard(user.organizationId),
+        websiteAuditService.listDraftPitches(user.organizationId),
+        cronTickService.lastTick(),
+        autopilotOverviewService.get(user.organizationId, user.id),
+      ]);
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     console.error("[autopilot] dashboard load failed", msg);
     schemaError = msg;
   }
 
-  if (schemaError || !data || !enrichment || !overview) {
+  if (schemaError || !data || !enrichment || !audit || !overview) {
     return (
       <div className="space-y-6">
         <h2 className="text-2xl font-bold tracking-tight">Autopilot</h2>
         <div className="rounded-lg border border-destructive/40 bg-destructive/10 p-4 text-sm space-y-2">
           <p className="font-medium">Database schema is behind this deploy.</p>
           <p className="text-muted-foreground">
-            Phase 2 columns/tables are missing. On the server run:
+            Phase 3 tables/columns may be missing. On the server (after pg_dump):
           </p>
           <pre className="overflow-x-auto rounded bg-muted p-3 text-xs">
             {`cd /var/www/html/sales
-npm run db:migrate:hunter-enrichment
+DRY_RUN=1 npm run db:migrate:phase3-website-audit
+npm run db:migrate:phase3-website-audit
 pm2 restart all`}
           </pre>
           <p className="text-xs text-muted-foreground break-all">{schemaError}</p>
@@ -103,8 +116,8 @@ pm2 restart all`}
       <div>
         <h2 className="text-2xl font-bold tracking-tight">Autopilot</h2>
         <p className="text-muted-foreground">
-          Google Places sourcing + Hunter decision-maker enrichment. Keep
-          toggles OFF until you finish cheap manual tests.
+          Sourcing → Enrichment → Audit + pitch review. Keep toggles OFF until
+          you finish cheap manual tests.
         </p>
       </div>
 
@@ -126,7 +139,7 @@ pm2 restart all`}
         <span className="w-full font-medium">Test setup</span>
         <Link href="/dashboard/settings?tab=integrations">
           <Button variant="outline" size="sm">
-            1. Google Places + Hunter keys
+            1. Google + Hunter keys
           </Button>
         </Link>
         <Link href="/dashboard/icp">
@@ -134,14 +147,14 @@ pm2 restart all`}
             2. ICP
           </Button>
         </Link>
-        <Link href="/dashboard/companies">
+        <Link href="/dashboard/services">
           <Button variant="outline" size="sm">
-            3. Companies
+            3. Services / case studies
           </Button>
         </Link>
-        <Link href="/dashboard/opportunities?filter=sourced">
+        <Link href="/dashboard/companies">
           <Button variant="outline" size="sm">
-            4. Sourced opportunities
+            4. Companies
           </Button>
         </Link>
         {!canIntegrations ? (
@@ -152,10 +165,12 @@ pm2 restart all`}
       </div>
 
       <Tabs defaultValue={tab}>
-        <TabsList>
+        <TabsList className="flex h-auto flex-wrap">
           <TabsTrigger value="overview">Overview</TabsTrigger>
           <TabsTrigger value="sourcing">Sourcing</TabsTrigger>
           <TabsTrigger value="enrichment">Enrichment</TabsTrigger>
+          <TabsTrigger value="audit">Audit</TabsTrigger>
+          <TabsTrigger value="pitches">Pitch review</TabsTrigger>
         </TabsList>
         <TabsContent value="overview" className="mt-4">
           <OverviewPanel data={overview} />
@@ -188,6 +203,32 @@ pm2 restart all`}
             initial={{
               ...enrichment,
               lastCronRun,
+            }}
+          />
+        </TabsContent>
+        <TabsContent value="audit" className="mt-4">
+          <AuditPanel
+            initial={{
+              ...audit,
+              lastCronRun,
+            }}
+          />
+        </TabsContent>
+        <TabsContent value="pitches" className="mt-4">
+          <PitchReviewPanel
+            initial={{
+              pitches: (draftPitches ?? []).map((p) => ({
+                id: p.id,
+                personalizedFirstLine: p.personalizedFirstLine,
+                shortPitch: p.shortPitch,
+                topIssue: p.topIssue,
+                recommendedService: p.recommendedService,
+                confidence: p.confidence,
+                company: p.company,
+                contact: p.contact,
+                findings: p.websiteAudit.findings,
+                pageSpeedMobile: p.websiteAudit.pageSpeedMobile,
+              })),
             }}
           />
         </TabsContent>

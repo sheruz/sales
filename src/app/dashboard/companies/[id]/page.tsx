@@ -23,6 +23,7 @@ import {
 } from "@/components/status/status-badge";
 import { displayContactName } from "@/lib/crm/display-name";
 import type { FunnelStageKey } from "@/lib/crm/funnel-stage";
+import { CompanyAuditPitchCards } from "@/components/companies/company-audit-pitch-cards";
 
 interface PageProps {
   params: Promise<{ id: string }>;
@@ -39,10 +40,16 @@ function nextStepCopy(input: {
       body: "Enrichment was skipped. Use Unskip on the companies list to re-queue.",
     };
   }
-  if (input.funnelStage === "enriched") {
+  if (input.funnelStage === "audited") {
     return {
       title: "Ready for outreach (Phase 4)",
-      body: "Contact is enriched. Website audit (Phase 3) and outbound email (Phase 4) come next.",
+      body: "Audit and pitch are ready. Approve the pitch, then Phase 4 will send APPROVED pitches only.",
+    };
+  }
+  if (input.funnelStage === "enriched") {
+    return {
+      title: "Ready for website audit",
+      body: "Contact is enriched. Use Autopilot → Audit → Audit now (or Audit now on this page).",
     };
   }
   if (
@@ -150,6 +157,40 @@ export default async function CompanyDetailPage({ params }: PageProps) {
           <p className="text-sm text-muted-foreground mt-1">{next.body}</p>
         </CardContent>
       </Card>
+
+      <CompanyAuditPitchCards
+        companyId={company.id}
+        latestAudit={
+          company.latestAudit
+            ? {
+                ...company.latestAudit,
+                checks: Array.isArray(company.latestAudit.checks)
+                  ? (company.latestAudit.checks as Array<{
+                      id: string;
+                      label: string;
+                      pass: boolean | null;
+                      evidence: string;
+                      severity: string;
+                    }>)
+                  : null,
+                findings:
+                  company.latestAudit.findings &&
+                  typeof company.latestAudit.findings === "object"
+                    ? (company.latestAudit.findings as {
+                        top_issues?: Array<{
+                          issue: string;
+                          evidence: string;
+                          business_impact: string;
+                        }>;
+                      })
+                    : null,
+              }
+            : null
+        }
+        activePitch={company.activePitch}
+        newerAuditAvailable={company.newerAuditAvailable}
+        emailPreview={company.emailPreview}
+      />
 
       <div className="grid gap-6 lg:grid-cols-2">
         <Card>

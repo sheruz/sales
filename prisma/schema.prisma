@@ -336,6 +336,32 @@ enum CompanyEnrichmentStatus {
   FAILED
 }
 
+enum CompanyAuditStatus {
+  PENDING
+  DONE
+  FAILED
+  SKIPPED
+}
+
+enum WebsiteAuditStatus {
+  PENDING
+  DONE
+  FAILED
+  SKIPPED
+}
+
+enum PitchStatus {
+  DRAFT
+  APPROVED
+  REJECTED
+  SUPERSEDED
+}
+
+enum PitchReviewMode {
+  AUTO_APPROVE
+  REVIEW_REQUIRED
+}
+
 enum SearchQueryStatus {
   ACTIVE
   PAUSED
@@ -367,6 +393,10 @@ enum CompanyTimelineEventType {
   UNSKIPPED
   NOTE
   AUDITED
+  AUDIT_FAILED
+  PITCH_APPROVED
+  PITCH_REJECTED
+  PITCH_EDITED
   CONTACTED
   REPLIED
   MEETING_BOOKED
@@ -647,6 +677,8 @@ model Organization {
   apiUsageLogs      ApiUsageLog[]
   cronTickLogs      CronTickLog[]
   companyTimelineEvents CompanyTimelineEvent[]
+  websiteAudits     WebsiteAudit[]
+  pitches           Pitch[]
 
   @@index([status])
   @@index([deletedAt])
@@ -824,6 +856,7 @@ model User {
   assignedInboxConversations InboxConversation[] @relation("InboxAssignee")
   sequenceEnrollmentsEnrolled SequenceEnrollment[] @relation("SequenceEnrollmentEnrolledBy")
   companyTimelineEvents  CompanyTimelineEvent[]
+  pitchesApproved        Pitch[] @relation("PitchApprovedBy")
 
   @@index([email])
   @@index([role])
@@ -903,6 +936,11 @@ model Company {
   enrichedAt     DateTime?     @map("enriched_at")
   enrichmentError String?      @map("enrichment_error")
   enrichmentAttempts Int       @default(0) @map("enrichment_attempts")
+  /// Phase 3 website audit lifecycle (latest row also in website_audits)
+  auditStatus    CompanyAuditStatus? @map("audit_status")
+  auditedAt      DateTime?     @map("audited_at")
+  auditError     String?       @map("audit_error")
+  auditAttempts  Int           @default(0) @map("audit_attempts")
   technologies   String[]      @default([])
   fundingTotal   Decimal?      @map("funding_total") @db.Decimal(14, 2)
   lastFundingDate DateTime?    @map("last_funding_date") @db.Date
@@ -925,6 +963,8 @@ model Company {
   proposals     Proposal[]
   emails        CompanyEmail[]
   timelineEvents CompanyTimelineEvent[]
+  websiteAudits WebsiteAudit[]
+  pitches       Pitch[]
 
   @@unique([organizationId, domain])
   @@index([organizationId])
@@ -932,6 +972,7 @@ model Company {
   @@index([organizationId, googlePlaceId])
   @@index([organizationId, crawlStatus])
   @@index([organizationId, enrichmentStatus])
+  @@index([organizationId, auditStatus])
   @@index([name])
   @@index([industry])
   @@index([status])
@@ -1023,6 +1064,73 @@ model ApiUsageLog {
   @@map("api_usage_logs")
 }
 
+/// Phase 3 — website audit history (re-audits create new rows; latest is shown)
+model WebsiteAudit {
+  id               String             @id @default(uuid())
+  organizationId   String             @map("organization_id")
+  companyId        String             @map("company_id")
+  status           WebsiteAuditStatus @default(PENDING)
+  pageSpeedMobile  Int?               @map("page_speed_mobile")
+  pageSpeedDesktop Int?               @map("page_speed_desktop")
+  /// LCP, CLS, TBT, FCP, SI, etc.
+  coreMetrics      Json?              @map("core_metrics")
+  /// Rule-based + niche check results
+  checks           Json?
+  findings         Json?
+  /// Raw Claude pitch JSON (also mirrored into Pitch rows)
+  pitch            Json?
+  modelUsed        String?            @map("model_used")
+  costUsd          Decimal?           @map("cost_usd") @db.Decimal(12, 6)
+  error            String?
+  createdAt        DateTime           @default(now()) @map("created_at")
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  company      Company      @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  pitches      Pitch[]
+
+  @@index([organizationId, createdAt])
+  @@index([companyId, createdAt])
+  @@index([organizationId, status])
+  @@map("website_audits")
+}
+
+/// Phase 3 — personalized pitch per contact (separate from audit history)
+model Pitch {
+  id                     String      @id @default(uuid())
+  organizationId         String      @map("organization_id")
+  companyId              String      @map("company_id")
+  contactId              String      @map("contact_id")
+  opportunityId          String?     @map("opportunity_id")
+  websiteAuditId         String      @map("website_audit_id")
+  status                 PitchStatus @default(DRAFT)
+  personalizedFirstLine  String      @map("personalized_first_line") @db.Text
+  shortPitch             String      @map("short_pitch") @db.Text
+  topIssue               String?     @map("top_issue") @db.Text
+  recommendedService     String?     @map("recommended_service")
+  confidence             Int?
+  /// True when a human edited first line / pitch text
+  editedByUser           Boolean     @default(false) @map("edited_by_user")
+  /// Required template vars that were missing at generate/render time
+  missingVars            String[]    @default([]) @map("missing_vars")
+  approvedAt             DateTime?   @map("approved_at")
+  approvedBy             String?     @map("approved_by")
+  createdAt              DateTime    @default(now()) @map("created_at")
+  updatedAt              DateTime    @updatedAt @map("updated_at")
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  company      Company      @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  contact      Contact      @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  opportunity  Opportunity? @relation(fields: [opportunityId], references: [id], onDelete: SetNull)
+  websiteAudit WebsiteAudit @relation(fields: [websiteAuditId], references: [id], onDelete: Cascade)
+  approver     User?        @relation("PitchApprovedBy", fields: [approvedBy], references: [id], onDelete: SetNull)
+
+  @@index([organizationId, status])
+  @@index([companyId, status])
+  @@index([contactId, status])
+  @@index([websiteAuditId])
+  @@map("pitches")
+}
+
 model Contact {
   id             String        @id @default(uuid())
   organizationId String        @map("organization_id")
@@ -1060,6 +1168,7 @@ model Contact {
   proposals    Proposal[]
   sequenceEnrollments SequenceEnrollment[]
   timelineEvents CompanyTimelineEvent[]
+  pitches        Pitch[]
 
   @@index([organizationId])
   @@index([companyId])
@@ -1242,6 +1351,7 @@ model Opportunity {
   learningEvents     LearningEvent[]
   sequenceEnrollments SequenceEnrollment[]
   timelineEvents     CompanyTimelineEvent[]
+  pitches            Pitch[]
 
   @@index([organizationId])
   @@index([companyId])

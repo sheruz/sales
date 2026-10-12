@@ -1,0 +1,36 @@
+import { NextRequest, NextResponse } from "next/server";
+import { z } from "zod";
+import { websiteAuditService } from "@/services/website-audit.service";
+import {
+  requireAnyOrgPermission,
+  requireOrganizationContext,
+} from "@/lib/auth/api-auth";
+import { apiSuccess } from "@/lib/api/response";
+import { handleApiError } from "@/lib/api/error-handler";
+
+const schema = z.object({
+  limit: z.number().int().min(1).max(3).optional(),
+  companyIds: z.array(z.string().uuid()).max(3).optional(),
+});
+
+/** Audit a small batch (default 3) — manual test, no toggle required. */
+export async function POST(request: NextRequest) {
+  try {
+    const user = await requireAnyOrgPermission([
+      "integrations.manage",
+      "campaigns.manage",
+      "business_brain.manage",
+    ]);
+    await requireOrganizationContext();
+    const body = schema.parse(await request.json().catch(() => ({})));
+    const result = await websiteAuditService.auditBatch(
+      user.organizationId,
+      body.limit ?? 3,
+      user.id,
+      body.companyIds
+    );
+    return NextResponse.json(apiSuccess(result));
+  } catch (error) {
+    return handleApiError(error);
+  }
+}

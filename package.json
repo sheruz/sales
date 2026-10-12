@@ -27,6 +27,7 @@
     "db:migrate:google-sourcing": "node scripts/run-with-env.js node scripts/phase1-google-sourcing-migrate.js",
     "db:migrate:hunter-enrichment": "node scripts/run-with-env.js node scripts/phase2-hunter-enrichment-migrate.js",
     "db:migrate:phase25-ui": "node scripts/run-with-env.js node scripts/phase25-timeline-ui-migrate.js",
+    "db:migrate:phase3-website-audit": "node scripts/run-with-env.js node scripts/phase3-website-audit-migrate.js",
     "db:studio": "node scripts/prisma-cli.js studio",
     "db:reset": "node scripts/prisma-cli.js migrate reset",
     "docker:up": "docker compose up -d postgres",

@@ -19,7 +19,7 @@ describe("display names", () => {
 });
 
 describe("funnel stage", () => {
-  it("derives found → crawled → enriched → contacted", () => {
+  it("derives found → crawled → enriched → audited → contacted", () => {
     expect(
       deriveCompanyFunnelStage({
         crawlStatus: null,
@@ -42,6 +42,14 @@ describe("funnel stage", () => {
       deriveCompanyFunnelStage({
         crawlStatus: "DONE",
         enrichmentStatus: "ENRICHED",
+        audited: true,
+      })
+    ).toBe("audited");
+    expect(
+      deriveCompanyFunnelStage({
+        crawlStatus: "DONE",
+        enrichmentStatus: "ENRICHED",
+        audited: true,
         opportunityStage: "CONTACTED",
       })
     ).toBe("contacted");

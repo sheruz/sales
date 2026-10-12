@@ -71,13 +71,16 @@ A phase is **not done** unless it ships:
 
 ---
 
-## Phase 3: Website audit + personalized pitch
+## Phase 3: Website audit + personalized pitch — DONE (code)
 
-1. `WebsiteAuditService`: PageSpeed Insights + homepage checks (mobile, booking form, SSL, etc.).
-2. Claude returns JSON: `{ top_issues, opportunity, personalized_first_line, recommended_service }`.
-3. Save audit on Opportunity; sequence templates use `{{personalized_first_line}}`, `{{top_issue}}`, `{{recommended_service}}`.
+1. `WebsiteAudit` history + separate `Pitch` table (per contact; DRAFT/APPROVED/REJECTED/SUPERSEDED).
+2. `WebsiteAuditService`: PageSpeed (mobile then desktop, ~45s timeout) + rule checks + ICP niche checks + Claude pitch JSON grounded in check evidence.
+3. Only ENRICHED companies with valid (or allowed risky) contacts. Audit OFF by default; daily limit; Audit now ×3; retry failed max 3; cron batch ≤2–3.
+4. Pitch review mode REVIEW_REQUIRED (default) or AUTO_APPROVE. Phase 4 will only send APPROVED.
+5. Template vars: flat aliases `{{first_name}}`, `{{company_name}}`, `{{personalized_first_line}}`, `{{top_issue}}`, `{{recommended_service}}`, `{{short_pitch}}`, `{{city}}` + nested backward-compatible; missing vars use fallbacks (never blank/`{{…}}`).
+6. Autopilot Audit + Pitch review tabs; company Audit/Pitch cards + email preview; funnel Audited live; timeline AUDITED / AUDIT_FAILED / PITCH_*.
 
-**Done when:** each opportunity has an audit and a unique first line.
+**Done when:** enriched companies get audits + unique first lines; drafts reviewed before Phase 4.
 
 ---
 

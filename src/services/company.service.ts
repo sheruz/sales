@@ -1,5 +1,6 @@
 import prisma from "@/lib/db/prisma";
 import {
+  CompanyAuditStatus,
   CompanyCrawlStatus,
   CompanyEnrichmentStatus,
   CompanyStatus,
@@ -11,6 +12,7 @@ import { NotFoundError, ValidationError } from "@/lib/api/response";
 import { deriveCompanyFunnelStage } from "@/lib/crm/funnel-stage";
 import { sourcingJobService } from "@/services/sourcing-job.service";
 import { enrichmentJobService } from "@/services/enrichment-job.service";
+import { websiteAuditService } from "@/services/website-audit.service";
 import { timelineService } from "@/services/timeline.service";
 
 /** Normalize a website or bare host to lowercase domain without www. */
@@ -123,6 +125,9 @@ export class CompanyService {
       ...(query.funnel === "enriched"
         ? { enrichmentStatus: CompanyEnrichmentStatus.ENRICHED }
         : {}),
+      ...(query.funnel === "audited"
+        ? { auditStatus: CompanyAuditStatus.DONE }
+        : {}),
       ...(query.funnel === "found" ? {} : {}),
       ...(query.search
         ? {
@@ -190,6 +195,7 @@ export class CompanyService {
           crawlStatus: item.crawlStatus,
           enrichmentStatus: item.enrichmentStatus,
           opportunityStage: item.opportunities[0]?.stage ?? null,
+          audited: item.auditStatus === "DONE",
         }),
         bestContact: item.contacts[0] ?? null,
       })),
@@ -242,13 +248,59 @@ export class CompanyService {
       },
     });
     if (!company) throw new NotFoundError("Company not found");
+
+    const [latestAudit, activePitch, emailPreview] = await Promise.all([
+      websiteAuditService.latestAudit(organizationId, id),
+      websiteAuditService.activePitchForCompany(organizationId, id),
+      websiteAuditService.emailPreviewForCompany(organizationId, id),
+    ]);
+
+    const newerAuditAvailable = Boolean(
+      latestAudit &&
+        activePitch &&
+        latestAudit.id !== activePitch.websiteAuditId &&
+        latestAudit.status === "DONE"
+    );
+
     return {
       ...company,
       funnelStage: deriveCompanyFunnelStage({
         crawlStatus: company.crawlStatus,
         enrichmentStatus: company.enrichmentStatus,
         opportunityStage: company.opportunities[0]?.stage ?? null,
+        audited: company.auditStatus === "DONE",
       }),
+      latestAudit: latestAudit
+        ? {
+            id: latestAudit.id,
+            status: latestAudit.status,
+            pageSpeedMobile: latestAudit.pageSpeedMobile,
+            pageSpeedDesktop: latestAudit.pageSpeedDesktop,
+            checks: latestAudit.checks,
+            findings: latestAudit.findings,
+            createdAt: latestAudit.createdAt.toISOString(),
+            modelUsed: latestAudit.modelUsed,
+            costUsd:
+              latestAudit.costUsd != null
+                ? Number(latestAudit.costUsd)
+                : null,
+          }
+        : null,
+      activePitch: activePitch
+        ? {
+            id: activePitch.id,
+            status: activePitch.status,
+            personalizedFirstLine: activePitch.personalizedFirstLine,
+            shortPitch: activePitch.shortPitch,
+            topIssue: activePitch.topIssue,
+            recommendedService: activePitch.recommendedService,
+            confidence: activePitch.confidence,
+            websiteAuditId: activePitch.websiteAuditId,
+            editedByUser: activePitch.editedByUser,
+          }
+        : null,
+      newerAuditAvailable,
+      emailPreview,
     };
   }
 

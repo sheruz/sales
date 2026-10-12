@@ -2,6 +2,7 @@ import prisma from "@/lib/db/prisma";
 import type { Prisma } from "@prisma/client";
 import { estimateTextSearchCostUsd } from "@/lib/sourcing/cost-estimate";
 import { estimateHunterCostUsd } from "@/lib/enrichment/cost-estimate";
+import { estimatePageSpeedCostUsd } from "@/lib/audit/cost-estimate";
 
 export class ApiUsageLogService {
   async logGoogleTextSearch(
@@ -14,6 +15,43 @@ export class ApiUsageLogService {
         organizationId,
         provider: "google_places",
         operation: "text_search",
+        estimatedCostUsd,
+        units: 1,
+        metadata: (meta ?? {}) as Prisma.InputJsonValue,
+      },
+    });
+    return estimatedCostUsd;
+  }
+
+  async logPageSpeed(
+    organizationId: string,
+    strategy: "mobile" | "desktop",
+    meta?: Record<string, unknown>
+  ) {
+    const estimatedCostUsd = estimatePageSpeedCostUsd();
+    await prisma.apiUsageLog.create({
+      data: {
+        organizationId,
+        provider: "google_pagespeed",
+        operation: `pagespeed_${strategy}`,
+        estimatedCostUsd,
+        units: 1,
+        metadata: (meta ?? { strategy }) as Prisma.InputJsonValue,
+      },
+    });
+    return estimatedCostUsd;
+  }
+
+  async logClaudeAudit(
+    organizationId: string,
+    estimatedCostUsd: number,
+    meta?: Record<string, unknown>
+  ) {
+    await prisma.apiUsageLog.create({
+      data: {
+        organizationId,
+        provider: "anthropic",
+        operation: "website_audit_pitch",
         estimatedCostUsd,
         units: 1,
         metadata: (meta ?? {}) as Prisma.InputJsonValue,
@@ -39,6 +77,26 @@ export class ApiUsageLogService {
       },
     });
     return estimatedCostUsd;
+  }
+
+  async providerTotals(
+    organizationId: string,
+    providers: string[],
+    since: Date
+  ) {
+    const agg = await prisma.apiUsageLog.aggregate({
+      where: {
+        organizationId,
+        provider: { in: providers },
+        createdAt: { gte: since },
+      },
+      _sum: { estimatedCostUsd: true },
+      _count: true,
+    });
+    return {
+      usd: Number(agg._sum.estimatedCostUsd ?? 0),
+      calls: agg._count,
+    };
   }
 
   async totals(organizationId: string) {

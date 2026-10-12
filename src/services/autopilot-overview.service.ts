@@ -1,5 +1,7 @@
 import prisma from "@/lib/db/prisma";
 import {
+  CatalogItemStatus,
+  CompanyAuditStatus,
   CompanyCrawlStatus,
   CompanyEnrichmentStatus,
   IntegrationPlatform,
@@ -8,6 +10,7 @@ import {
 } from "@prisma/client";
 import { sourcingJobService } from "@/services/sourcing-job.service";
 import { enrichmentJobService } from "@/services/enrichment-job.service";
+import { websiteAuditService } from "@/services/website-audit.service";
 import { cronTickService } from "@/services/cron-tick.service";
 import { apiUsageLogService } from "@/services/api-usage-log.service";
 import { FUNNEL_STAGES } from "@/lib/crm/funnel-stage";
@@ -20,21 +23,26 @@ export class AutopilotOverviewService {
     const [
       sourcing,
       enrichment,
+      auditCfg,
       lastTick,
       googleCosts,
       totalCompanies,
       crawled,
       enriched,
+      audited,
       contacted,
       replied,
       meeting,
       won,
       integrations,
       icps,
+      servicesCount,
+      caseStudiesCount,
       errors24h,
     ] = await Promise.all([
       sourcingJobService.getConfig(organizationId),
       enrichmentJobService.dashboard(organizationId),
+      websiteAuditService.getConfig(organizationId),
       cronTickService.lastTick(),
       apiUsageLogService.totals(organizationId),
       prisma.company.count({
@@ -58,6 +66,13 @@ export class AutopilotOverviewService {
           organizationId,
           deletedAt: null,
           enrichmentStatus: CompanyEnrichmentStatus.ENRICHED,
+        },
+      }),
+      prisma.company.count({
+        where: {
+          organizationId,
+          deletedAt: null,
+          auditStatus: CompanyAuditStatus.DONE,
         },
       }),
       prisma.opportunity.count({
@@ -108,6 +123,13 @@ export class AutopilotOverviewService {
         select: { platform: true },
       }),
       icpService.list(organizationId, false),
+      prisma.service.count({
+        where: {
+          organizationId,
+          OR: [{ isActive: true }, { status: CatalogItemStatus.ACTIVE }],
+        },
+      }),
+      prisma.serviceCaseStudy.count({ where: { organizationId } }),
       prisma.company.count({
         where: {
           organizationId,
@@ -116,6 +138,7 @@ export class AutopilotOverviewService {
           OR: [
             { crawlStatus: CompanyCrawlStatus.FAILED },
             { enrichmentStatus: CompanyEnrichmentStatus.FAILED },
+            { auditStatus: CompanyAuditStatus.FAILED },
           ],
         },
       }),
@@ -125,12 +148,14 @@ export class AutopilotOverviewService {
     const claudeOrOpenAi =
       platforms.has(IntegrationPlatform.ANTHROPIC) ||
       platforms.has(IntegrationPlatform.OPENAI);
+    const placesKey = platforms.has(IntegrationPlatform.GOOGLE_PLACES);
 
     const funnel = FUNNEL_STAGES.map((s) => {
       let count = 0;
       if (s.key === "found") count = totalCompanies;
       else if (s.key === "crawled") count = crawled;
       else if (s.key === "enriched") count = enriched;
+      else if (s.key === "audited") count = audited;
       else if (s.key === "contacted") count = contacted;
       else if (s.key === "replied") count = replied;
       else if (s.key === "meeting") count = meeting;
@@ -145,15 +170,17 @@ export class AutopilotOverviewService {
               ? "/dashboard/companies?funnel=crawled"
               : s.key === "enriched"
                 ? "/dashboard/companies?funnel=enriched"
-                : s.key === "contacted"
-                  ? "/dashboard/opportunities?filter=contacted"
-                  : s.key === "replied"
-                    ? "/dashboard/opportunities?filter=replied"
-                    : s.key === "meeting"
-                      ? "/dashboard/opportunities?filter=meeting"
-                      : s.key === "won"
-                        ? "/dashboard/opportunities?filter=won"
-                        : "/dashboard/companies",
+                : s.key === "audited"
+                  ? "/dashboard/companies?funnel=audited"
+                  : s.key === "contacted"
+                    ? "/dashboard/opportunities?filter=contacted"
+                    : s.key === "replied"
+                      ? "/dashboard/opportunities?filter=replied"
+                      : s.key === "meeting"
+                        ? "/dashboard/opportunities?filter=meeting"
+                        : s.key === "won"
+                          ? "/dashboard/opportunities?filter=won"
+                          : "/dashboard/companies",
       };
     });
 
@@ -177,7 +204,12 @@ export class AutopilotOverviewService {
         {
           key: "places",
           label: "Google Places key",
-          done: platforms.has(IntegrationPlatform.GOOGLE_PLACES),
+          done: placesKey,
+        },
+        {
+          key: "pagespeed",
+          label: "PageSpeed enabled (same Google key)",
+          done: placesKey,
         },
         {
           key: "hunter",
@@ -188,6 +220,11 @@ export class AutopilotOverviewService {
           key: "icp",
           label: "ICP set",
           done: icps.length > 0,
+        },
+        {
+          key: "services",
+          label: "Services / case studies filled",
+          done: servicesCount > 0 && caseStudiesCount > 0,
         },
         {
           key: "cron",
@@ -234,6 +271,7 @@ export class AutopilotOverviewService {
         sourcing: sourcing.enabled,
         autoCrawl: sourcing.autoCrawl,
         enrichment: enrichment.config.enabled,
+        audit: auditCfg.enabled,
       },
     };
   }
