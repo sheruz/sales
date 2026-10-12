@@ -21,11 +21,41 @@ export default async function CompaniesPage({ searchParams }: PageProps) {
   const page = Number(params.page) || 1;
   const search = params.search?.trim() || undefined;
 
-  const result = await companyService.list(user.organizationId, {
-    page,
-    limit: 25,
-    search,
-  });
+  let result;
+  try {
+    result = await companyService.list(user.organizationId, {
+      page,
+      limit: 25,
+      search,
+    });
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    console.error("[companies] list failed", msg);
+    const needsMigrate =
+      /enrichment_|cron_tick|CompanyEnrichment|SOURCED|does not exist/i.test(
+        msg
+      );
+    return (
+      <div className="space-y-6">
+        <h2 className="text-2xl font-bold tracking-tight">Companies</h2>
+        <div className="rounded-lg border border-destructive/40 bg-destructive/10 p-4 text-sm space-y-2">
+          <p className="font-medium">
+            {needsMigrate
+              ? "Database schema is behind this deploy (Phase 2 migrate not run)."
+              : "Failed to load companies."}
+          </p>
+          {needsMigrate ? (
+            <pre className="overflow-x-auto rounded bg-muted p-3 text-xs">
+              {`cd /var/www/html/sales
+npm run db:migrate:hunter-enrichment
+pm2 restart all`}
+            </pre>
+          ) : null}
+          <p className="text-xs text-muted-foreground break-all">{msg}</p>
+        </div>
+      </div>
+    );
+  }
 
   const serialized = {
     items: result.items.map((item) => ({

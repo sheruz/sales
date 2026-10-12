@@ -58,10 +58,19 @@ export class CronTickService {
   }
 
   async lastTick() {
-    return prisma.cronTickLog.findFirst({
-      where: { organizationId: null },
-      orderBy: { startedAt: "desc" },
-    });
+    try {
+      return await prisma.cronTickLog.findFirst({
+        where: { organizationId: null },
+        orderBy: { startedAt: "desc" },
+      });
+    } catch (err) {
+      // Table missing until Phase 2 migrate runs — don't crash Autopilot
+      console.warn(
+        "[cron-tick] lastTick failed (run db:migrate:hunter-enrichment?):",
+        err instanceof Error ? err.message : err
+      );
+      return null;
+    }
   }
 
   /** True if last finished tick is older than 15 minutes (or missing). */

@@ -41,11 +41,42 @@ export default async function AutopilotPage({
   const params = await searchParams;
   const tab = params.tab === "enrichment" ? "enrichment" : "sourcing";
 
-  const [data, enrichment, lastTick] = await Promise.all([
-    sourcingJobService.dashboard(user.organizationId),
-    enrichmentJobService.dashboard(user.organizationId),
-    cronTickService.lastTick(),
-  ]);
+  let data;
+  let enrichment;
+  let lastTick;
+  let schemaError: string | null = null;
+  try {
+    [data, enrichment, lastTick] = await Promise.all([
+      sourcingJobService.dashboard(user.organizationId),
+      enrichmentJobService.dashboard(user.organizationId),
+      cronTickService.lastTick(),
+    ]);
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    console.error("[autopilot] dashboard load failed", msg);
+    schemaError = msg;
+  }
+
+  if (schemaError || !data || !enrichment) {
+    return (
+      <div className="space-y-6">
+        <h2 className="text-2xl font-bold tracking-tight">Autopilot</h2>
+        <div className="rounded-lg border border-destructive/40 bg-destructive/10 p-4 text-sm space-y-2">
+          <p className="font-medium">Database schema is behind this deploy.</p>
+          <p className="text-muted-foreground">
+            Phase 2 columns/tables are missing. On the server run:
+          </p>
+          <pre className="overflow-x-auto rounded bg-muted p-3 text-xs">
+            {`cd /var/www/html/sales
+npm run db:migrate:hunter-enrichment
+pm2 restart all`}
+          </pre>
+          <p className="text-xs text-muted-foreground break-all">{schemaError}</p>
+        </div>
+      </div>
+    );
+  }
+
   const canIntegrations = hasOrgPermission(user, "integrations.manage");
   const lastCronRun = lastTick
     ? {
