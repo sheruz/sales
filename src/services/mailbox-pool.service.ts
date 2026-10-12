@@ -151,18 +151,23 @@ export class MailboxPoolService {
     });
     if (!row) throw new NotFoundError("Outbound mailbox not found");
     const dns = await checkSendingDomainDns(row.emailAccount.email);
+    const dnsPaused =
+      row.status === OutboundMailboxStatus.PAUSED &&
+      /spf|dkim|dns/i.test(row.lastError || "");
+    let nextStatus = row.status;
+    if (!dns.canSend) {
+      nextStatus = OutboundMailboxStatus.PAUSED;
+    } else if (dnsPaused || row.status === OutboundMailboxStatus.ERROR) {
+      nextStatus = OutboundMailboxStatus.ACTIVE;
+    }
     return prisma.outboundMailbox.update({
       where: { id: mailboxId },
       data: {
         dnsCheck: dns as unknown as Prisma.InputJsonValue,
-        status: dns.canSend
-          ? row.status === OutboundMailboxStatus.ERROR
-            ? OutboundMailboxStatus.ACTIVE
-            : row.status
-          : OutboundMailboxStatus.PAUSED,
+        status: nextStatus,
         lastError: dns.canSend
           ? null
-          : "Paused: missing SPF or DKIM",
+          : "Paused: missing SPF or DKIM on custom domain — fix DNS then re-check",
       },
     });
   }

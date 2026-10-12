@@ -14,6 +14,7 @@ import {
   verifyUnsubscribeToken,
 } from "@/services/unsubscribe.service";
 import { isValidIanaTimezone } from "@/lib/outbound/timezone";
+import { isProviderManagedDomain } from "@/lib/outbound/dns-health";
 import {
   renderSequenceTemplateDetailed,
   REQUIRED_PITCH_VARS,
@@ -91,6 +92,14 @@ describe("unsubscribe token", () => {
       organizationId: "org-1",
       email: "person@example.com",
     });
+  });
+});
+
+describe("provider-managed sending domains", () => {
+  it("treats gmail/outlook as provider-managed", () => {
+    expect(isProviderManagedDomain("gmail.com")).toBe(true);
+    expect(isProviderManagedDomain("outlook.com")).toBe(true);
+    expect(isProviderManagedDomain("acme.com")).toBe(false);
   });
 });
 
