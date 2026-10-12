@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { Loader2 } from "lucide-react";
@@ -143,24 +144,41 @@ export function AuditPanel({ initial }: Props) {
           </div>
         </CardHeader>
         <CardContent className="grid gap-4 sm:grid-cols-4 text-sm">
-          <div>
+          <Link
+            href="/dashboard/companies?funnel=audit_pending"
+            className="rounded-md p-1 -m-1 hover:bg-muted/50 transition-colors"
+          >
             <p className="text-muted-foreground">Eligible pending</p>
             <p className="text-2xl font-semibold">{initial.pending}</p>
-          </div>
-          <div>
+            <p className="text-xs text-muted-foreground">View companies →</p>
+          </Link>
+          <Link
+            href="/dashboard/companies?funnel=audited_today"
+            className="rounded-md p-1 -m-1 hover:bg-muted/50 transition-colors"
+          >
             <p className="text-muted-foreground">Audited today</p>
             <p className="text-2xl font-semibold">{initial.auditedToday}</p>
             <p className="text-xs text-muted-foreground">
-              Limit {config.dailyLimit}/day · {config.batchPerTick}/tick
+              Limit {config.dailyLimit}/day · {config.batchPerTick}/tick · View
+              →
             </p>
-          </div>
-          <div>
+          </Link>
+          <Link
+            href="/dashboard/companies?funnel=audited"
+            className="rounded-md p-1 -m-1 hover:bg-muted/50 transition-colors"
+          >
             <p className="text-muted-foreground">Avg mobile score</p>
             <p className="text-2xl font-semibold">
               {initial.avgMobileScore ?? "—"}
             </p>
-          </div>
-          <div>
+            <p className="text-xs text-muted-foreground">
+              All audited companies →
+            </p>
+          </Link>
+          <Link
+            href="/dashboard/autopilot?tab=pitches"
+            className="rounded-md p-1 -m-1 hover:bg-muted/50 transition-colors"
+          >
             <p className="text-muted-foreground">Pitches</p>
             <p className="text-2xl font-semibold">
               {initial.approvedPitches}
@@ -170,9 +188,9 @@ export function AuditPanel({ initial }: Props) {
               </span>
             </p>
             <p className="text-xs text-muted-foreground">
-              {initial.draftPitches} pending review
+              {initial.draftPitches} pending review →
             </p>
-          </div>
+          </Link>
         </CardContent>
       </Card>
 

@@ -183,6 +183,9 @@ export function CompaniesList({ initialData }: CompaniesListProps) {
             <SelectItem value="found">Found</SelectItem>
             <SelectItem value="crawled">Crawled</SelectItem>
             <SelectItem value="enriched">Enriched</SelectItem>
+            <SelectItem value="audited">Audited</SelectItem>
+            <SelectItem value="audited_today">Audited today</SelectItem>
+            <SelectItem value="audit_pending">Audit pending</SelectItem>
           </SelectContent>
         </Select>
         <Select

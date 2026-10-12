@@ -128,6 +128,26 @@ export class CompanyService {
       ...(query.funnel === "audited"
         ? { auditStatus: CompanyAuditStatus.DONE }
         : {}),
+      ...(query.funnel === "audited_today"
+        ? (() => {
+            const day = new Date();
+            day.setUTCHours(0, 0, 0, 0);
+            return {
+              auditStatus: CompanyAuditStatus.DONE,
+              auditedAt: { gte: day },
+            };
+          })()
+        : {}),
+      ...(query.funnel === "audit_pending"
+        ? {
+            enrichmentStatus: CompanyEnrichmentStatus.ENRICHED,
+            OR: [
+              { auditStatus: null },
+              { auditStatus: CompanyAuditStatus.PENDING },
+              { auditStatus: CompanyAuditStatus.FAILED },
+            ],
+          }
+        : {}),
       ...(query.funnel === "found" ? {} : {}),
       ...(query.search
         ? {
