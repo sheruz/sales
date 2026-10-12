@@ -2,13 +2,22 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { SearchQueryStatus } from "@prisma/client";
 import { searchQueryService } from "@/services/search-query.service";
-import { requireOrgPermission, requireOrganizationContext } from "@/lib/auth/api-auth";
+import {
+  requireAnyOrgPermission,
+  requireOrganizationContext,
+} from "@/lib/auth/api-auth";
 import { apiSuccess } from "@/lib/api/response";
 import { handleApiError } from "@/lib/api/error-handler";
 
 interface RouteParams {
   params: Promise<{ id: string }>;
 }
+
+const SOURCING_PERMS = [
+  "integrations.manage",
+  "campaigns.manage",
+  "business_brain.manage",
+] as const;
 
 const patchSchema = z.object({
   query: z.string().min(3).max(300).optional(),
@@ -19,7 +28,7 @@ const patchSchema = z.object({
 
 export async function PATCH(request: NextRequest, { params }: RouteParams) {
   try {
-    await requireOrgPermission("integrations.manage");
+    await requireAnyOrgPermission([...SOURCING_PERMS]);
     const user = await requireOrganizationContext();
     const { id } = await params;
     const body = patchSchema.parse(await request.json());
@@ -35,7 +44,7 @@ export async function DELETE(
   { params }: RouteParams
 ) {
   try {
-    await requireOrgPermission("integrations.manage");
+    await requireAnyOrgPermission([...SOURCING_PERMS]);
     const user = await requireOrganizationContext();
     const { id } = await params;
     await searchQueryService.remove(user.organizationId, id);

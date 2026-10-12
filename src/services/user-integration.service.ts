@@ -47,21 +47,38 @@ export class UserIntegrationService {
     ]);
 
     const integrationMap = new Map(integrations.map((i) => [i.platform, i]));
+    const productMap = new Map(products.map((p) => [p.platform, p]));
+
+    // Merge DB products with static catalog so new platforms (e.g. GOOGLE_PLACES)
+    // appear in Settings even before migrate seeds integration_products.
+    const platforms = new Set<IntegrationPlatform>([
+      ...products.map((p) => p.platform),
+      ...INTEGRATION_CATALOG.map((c) => c.platform as IntegrationPlatform),
+    ]);
+
+    const ordered = [...platforms].sort((a, b) => {
+      const ca = INTEGRATION_CATALOG.find((c) => c.platform === a);
+      const cb = INTEGRATION_CATALOG.find((c) => c.platform === b);
+      return (ca?.sortOrder ?? 99) - (cb?.sortOrder ?? 99);
+    });
 
     return {
       outreachSettings,
-      integrations: products.map((product) => {
-        const userInt = integrationMap.get(product.platform);
-        const catalog = INTEGRATION_CATALOG.find((c) => c.platform === product.platform);
+      integrations: ordered.map((platform) => {
+        const product = productMap.get(platform);
+        const catalog = INTEGRATION_CATALOG.find((c) => c.platform === platform);
+        const userInt = integrationMap.get(platform);
+        const monthlyPriceCents =
+          product?.monthlyPriceCents ?? catalog?.monthlyPriceCents ?? 0;
         return {
-          platform: product.platform,
-          name: product.name,
-          description: product.description,
-          monthlyPriceCents: product.monthlyPriceCents,
+          platform,
+          name: product?.name ?? catalog?.name ?? platform,
+          description: product?.description ?? catalog?.description ?? "",
+          monthlyPriceCents,
           monthlyPriceLabel:
-            product.monthlyPriceCents === 0
+            monthlyPriceCents === 0
               ? "Bring your own key"
-              : `$${(product.monthlyPriceCents / 100).toFixed(0)}/mo`,
+              : `$${(monthlyPriceCents / 100).toFixed(0)}/mo`,
           fields: catalog?.fields ?? [],
           isConnected: userInt?.isConnected ?? false,
           isEnabled: userInt?.isEnabled ?? false,

@@ -1,13 +1,22 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { searchQueryService } from "@/services/search-query.service";
-import { requireOrgPermission, requireOrganizationContext } from "@/lib/auth/api-auth";
+import {
+  requireAnyOrgPermission,
+  requireOrganizationContext,
+} from "@/lib/auth/api-auth";
 import { apiSuccess } from "@/lib/api/response";
 import { handleApiError } from "@/lib/api/error-handler";
 
+const SOURCING_PERMS = [
+  "integrations.manage",
+  "campaigns.manage",
+  "business_brain.manage",
+] as const;
+
 export async function GET() {
   try {
-    await requireOrgPermission("integrations.manage");
+    await requireAnyOrgPermission([...SOURCING_PERMS]);
     const user = await requireOrganizationContext();
     const queries = await searchQueryService.list(user.organizationId);
     return NextResponse.json(apiSuccess({ queries }));
@@ -26,7 +35,7 @@ const createSchema = z.object({
 
 export async function POST(request: NextRequest) {
   try {
-    const user = await requireOrgPermission("integrations.manage");
+    const user = await requireAnyOrgPermission([...SOURCING_PERMS]);
     const body = createSchema.parse(await request.json());
 
     if (body.generate) {

@@ -1,22 +1,131 @@
-# Revenue OS → Client Autopilot Plan
+# Revenue OS → Client Autopilot: Build Plan
 
-Canonical product plan for Autopilot phases. Phase 0 (cleanup) and Phase 1 (Google sourcing) are implemented in code; later phases follow this document.
+## Goal
+Turn Revenue OS into an autopilot that finds businesses worldwide, emails them, replies with AI, and books Zoom meetings, running 24/7 without me.
 
-## Sources
-- **Google Places** — fully automatic (Phase 1)
-- **Meta Lead Ads** — inbound automatic (Phase 7)
-- **LinkedIn** — AI drafts, manual send (Phase 8)
+Sources: **Google (fully automatic)**, **Meta Lead Ads (inbound, automatic)**, **LinkedIn (AI drafts, I send manually)**.
 
-## Phases
-0. Cleanup / feature flags / nav — **done**
-1. Google business sourcing — **done (this iteration)**
-2. Decision-maker enrichment
-3. Website audit + personalized pitch
-4. Autopilot outbound email
-5. AI reply agent
-6. Zoom meeting booking
-7. Meta Lead Ads
-8. LinkedIn assist
-9. Autopilot control panel + dashboard KPIs
+## Rules for Cursor
+- Work **one phase at a time**. Do not start the next phase until I confirm the current one works.
+- Before each phase, read the existing code and tell me which files you will change.
+- **Never delete database tables or data.** Hide or disable old features behind a feature flag, and migrate data first if needed.
+- Every external API must go through an adapter/service file so providers can be swapped.
+- Every automatic action must be logged and visible in the UI.
+- No scraping LinkedIn. No automated LinkedIn or Meta cold messages (both violate platform rules).
 
-See conversation / Cursor plan for full acceptance criteria per phase.
+---
+
+## Phase 0: Cleanup (remove the extra stuff) — DONE
+
+Hide legacy Leads / Autopilot / Prospect Finder / Sources scrapers behind flags. Simplify nav. Keep CRM + Campaigns + Sequences + Inbox + Pipeline + Brain/ICP/Goals.
+
+---
+
+## Phase 1: Google business sourcing — DONE (code)
+
+1. `GooglePlacesService` using **Google Places API (New) Text Search**. Settings field for the API key (BYOK encrypted + env fallback).
+2. Claude + ICP generate search queries. Review, edit, add, pause in UI before they run.
+3. `SearchQuery` table: query text, country, city, status (active/paused/done), last run, results count, pagination token.
+4. Create/update **Company**: dedupe by `googlePlaceId` AND normalized website domain. `source = google_places`. Store phone, address, website, city, country. Rating/types in metadata.
+5. `CompanyEmail` table for crawled emails (email, source page, type generic/personal).
+6. `WebsiteContactCrawler`: homepage + contact/about, max 5 pages, 10s timeout, robots.txt, rate limited. Filter junk emails.
+7. Background job: small batches per cron tick (1–2 queries, up to 10 crawls). Daily limits. Skip already-sourced. Sourcing OFF by default.
+8. Autopilot → Sourcing UI: ON/OFF, queries, companies today, crawl status, errors, Google spend today/month.
+9. Log every API call with cost estimate.
+
+**Done when:** ICP set, turn on (or Run now), real companies with websites and emails appear.
+
+---
+
+## Phase 2: Decision-maker enrichment
+
+1. `EnrichmentProvider` interface with one adapter first (Hunter or Apollo).
+2. For each Company domain, find founder/CEO/CTO/owner: name, title, email, LinkedIn URL.
+3. **Verify email** through the provider. Only verified emails can be enrolled. Fall back to generic website email (`info@`) marked `generic`.
+4. Create Contact linked to Company; create Opportunity at stage `Sourced`.
+
+**Done when:** sourced companies get real decision-maker contacts with verified emails.
+
+---
+
+## Phase 3: Website audit + personalized pitch
+
+1. `WebsiteAuditService`: PageSpeed Insights + homepage checks (mobile, booking form, SSL, etc.).
+2. Claude returns JSON: `{ top_issues, opportunity, personalized_first_line, recommended_service }`.
+3. Save audit on Opportunity; sequence templates use `{{personalized_first_line}}`, `{{top_issue}}`, `{{recommended_service}}`.
+
+**Done when:** each opportunity has an audit and a unique first line.
+
+---
+
+## Phase 4: Autopilot outbound email
+
+1. Mailbox pool (SMTP/Gmail/Outlook), daily limits, warmup flag, rotation.
+2. Timezone-aware sending (prospect local 8:00–11:00).
+3. Auto-enroll verified + audited opportunities into default sequence (stop on reply).
+4. Compliance: unsubscribe + address, suppression list.
+5. Bounce handling; pause inbox if bounce rate > 3%.
+
+**Done when:** emails go out daily within limits; follow-ups stop on reply.
+
+---
+
+## Phase 5: AI reply agent
+
+1. Classify inbound: interested, question, not_now, not_interested, wrong_person, unsubscribe, out_of_office.
+2. Act per class; book-call goal for interested/question.
+3. AI Agent Rules settings + guardrails (no invented prices, max 4 AI replies, kill switch).
+4. Label “Sent by AI” in Inbox.
+
+**Done when:** replies answered automatically; handoffs notify me.
+
+---
+
+## Phase 6: Zoom meeting booking
+
+1. Google Calendar OAuth + Zoom Server-to-Server.
+2. Offer 3 slots in prospect timezone; create Zoom + Calendar + .ics.
+3. Meeting record; stage Meeting Booked; reminders; notify me with audit prep.
+
+**Done when:** reply → booked Zoom without me.
+
+---
+
+## Phase 7: Meta Lead Ads (inbound)
+
+1. Meta `leads_retrieval` + Page `leadgen` webhook.
+2. Create Contact + Company + Opportunity (`meta_lead_ads`).
+3. Welcome email + inbound sequence; audit website if provided.
+4. Messenger/IG only inside allowed window (never cold).
+
+**Done when:** ad form submit → email within 5 minutes + booking offer.
+
+---
+
+## Phase 8: LinkedIn assist (manual send)
+
+1. Daily LinkedIn Tasks (15–20) with drafted notes from audit.
+2. Open profile / Copy / Mark sent / Mark replied.
+
+**Done when:** ~5 minutes/day of prepared LinkedIn sends.
+
+---
+
+## Phase 9: Autopilot control panel + dashboard
+
+1. Master ON/OFF, per-source toggles, limits, status, errors.
+2. KPIs vs $20,000/month target.
+3. Daily summary email.
+
+**Done when:** turn on, walk away, check one page.
+
+---
+
+## API keys / accounts needed
+- Google Cloud: Places API (New) + PageSpeed Insights
+- Enrichment (Hunter or Apollo)
+- 3–5 sending inboxes (SPF/DKIM/DMARC, warmed)
+- Anthropic (connected)
+- Google Calendar OAuth
+- Zoom Server-to-Server OAuth
+- Meta Business + Lead Ads form + leads permission

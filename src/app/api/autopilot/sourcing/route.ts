@@ -1,13 +1,22 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { sourcingJobService } from "@/services/sourcing-job.service";
-import { requireOrgPermission, requireOrganizationContext } from "@/lib/auth/api-auth";
+import {
+  requireAnyOrgPermission,
+  requireOrganizationContext,
+} from "@/lib/auth/api-auth";
 import { apiSuccess } from "@/lib/api/response";
 import { handleApiError } from "@/lib/api/error-handler";
 
+const SOURCING_PERMS = [
+  "integrations.manage",
+  "campaigns.manage",
+  "business_brain.manage",
+] as const;
+
 export async function GET() {
   try {
-    await requireOrgPermission("integrations.manage");
+    await requireAnyOrgPermission([...SOURCING_PERMS]);
     const user = await requireOrganizationContext();
     const data = await sourcingJobService.dashboard(user.organizationId);
     return NextResponse.json(
@@ -36,7 +45,7 @@ const patchSchema = z.object({
 
 export async function PATCH(request: NextRequest) {
   try {
-    await requireOrgPermission("integrations.manage");
+    await requireAnyOrgPermission([...SOURCING_PERMS]);
     const user = await requireOrganizationContext();
     const body = patchSchema.parse(await request.json());
     const config = await sourcingJobService.setConfig(

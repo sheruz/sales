@@ -85,6 +85,18 @@ export default async function SettingsPage({
               Revenue Goals
             </Button>
           </Link>
+          {canManageIntegrations ? (
+            <Link href="/dashboard/settings?tab=integrations">
+              <Button size="sm">
+                Integrations (Google Places)
+              </Button>
+            </Link>
+          ) : null}
+          <Link href="/dashboard/autopilot">
+            <Button variant="outline" size="sm">
+              Autopilot sourcing
+            </Button>
+          </Link>
         </div>
       </section>
 
