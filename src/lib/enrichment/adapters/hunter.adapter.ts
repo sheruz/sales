@@ -86,9 +86,10 @@ export class HunterAdapter implements EnrichmentProvider {
   constructor(private readonly apiKey: string) {}
 
   async domainSearch(domain: string): Promise<DomainSearchResult> {
+    // Free/Starter Hunter plans cap domain-search at 10 results — requesting more fails the call.
     const json = (await hunterFetch("/domain-search", this.apiKey, {
       domain,
-      limit: "20",
+      limit: "10",
     })) as {
       data?: {
         domain?: string;

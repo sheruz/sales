@@ -467,14 +467,45 @@ export class EnrichmentJobService {
 
     const provider = await hunterService.getProvider(organizationId, userId);
 
-    try {
-      const search = await provider.domainSearch(domain);
-      await apiUsageLogService.logHunter(organizationId, "domain_search", {
-        domain,
-        companyId: company.id,
-      });
+    const isHunterPlanLimit = (message: string) =>
+      /limited to \d+ email|current plan|upgrade your plan/i.test(message);
 
-      let person = pickDecisionMaker(search.people, config.titlePriority);
+    try {
+      let people: Awaited<
+        ReturnType<typeof provider.domainSearch>
+      >["people"] = [];
+      let domainSearchNote: string | null = null;
+
+      try {
+        const search = await provider.domainSearch(domain);
+        await apiUsageLogService.logHunter(organizationId, "domain_search", {
+          domain,
+          companyId: company.id,
+        });
+        people = search.people;
+      } catch (searchErr) {
+        const searchMsg =
+          searchErr instanceof Error ? searchErr.message : "domain search failed";
+        await apiUsageLogService.logHunter(organizationId, "domain_search", {
+          domain,
+          companyId: company.id,
+          error: searchMsg,
+        });
+        // Free-plan limit (or empty search) → fall through to crawled emails
+        if (isHunterPlanLimit(searchMsg)) {
+          domainSearchNote = searchMsg;
+          people = [];
+        } else if (
+          searchErr instanceof EnrichmentRateLimitError ||
+          searchErr instanceof EnrichmentApiError
+        ) {
+          throw searchErr;
+        } else {
+          throw searchErr;
+        }
+      }
+
+      let person = pickDecisionMaker(people, config.titlePriority);
       let emailStatus: string = "unknown";
       let source = "hunter";
       let isGenericFallback = false;
@@ -505,7 +536,9 @@ export class EnrichmentJobService {
             where: { id: company.id },
             data: {
               enrichmentStatus: CompanyEnrichmentStatus.NO_CONTACT,
-              enrichmentError: "No Hunter person or crawled email",
+              enrichmentError:
+                domainSearchNote ||
+                "No Hunter person or crawled email",
               enrichedAt: new Date(),
               enrichmentAttempts: { increment: 1 },
             },
@@ -589,8 +622,12 @@ export class EnrichmentJobService {
         err instanceof EnrichmentApiError ||
         err instanceof Error
       ) {
-        const attempts = company.enrichmentAttempts + 1;
         const message = err instanceof Error ? err.message : "enrichment failed";
+        // Plan-limit is not a transient API failure — don't burn retries
+        const planLimit = isHunterPlanLimit(message);
+        const attempts = planLimit
+          ? config.maxAttempts
+          : company.enrichmentAttempts + 1;
         await prisma.company.update({
           where: { id: company.id },
           data: {
@@ -603,7 +640,7 @@ export class EnrichmentJobService {
           status: "FAILED" as const,
           error: message,
           attempts,
-          retryable: attempts < config.maxAttempts,
+          retryable: !planLimit && attempts < config.maxAttempts,
         };
       }
       throw err;
