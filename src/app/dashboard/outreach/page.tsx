@@ -55,7 +55,8 @@ type AvailableAccounts = Awaited<
 type TabData =
   | { tab: "pitch"; drafts: PitchDrafts }
   | { tab: "sequences"; sequences: Sequences }
-  | { tab: "scheduled" | "sent"; rows: OutboxRows }
+  | { tab: "scheduled"; rows: OutboxRows }
+  | { tab: "sent"; rows: OutboxRows }
   | {
       tab: "mailboxes";
       outbound: OutboundDash;
@@ -84,12 +85,16 @@ async function fetchTabData(
       const sequences = await outreachSequenceService.list(organizationId);
       return { data: { tab: "sequences", sequences }, error: null };
     }
-    if (activeTab === "scheduled" || activeTab === "sent") {
+    if (activeTab === "scheduled") {
       const rows = await outboundJobService.listOutbox(
         organizationId,
-        activeTab
+        "scheduled"
       );
-      return { data: { tab: activeTab, rows }, error: null };
+      return { data: { tab: "scheduled", rows }, error: null };
+    }
+    if (activeTab === "sent") {
+      const rows = await outboundJobService.listOutbox(organizationId, "sent");
+      return { data: { tab: "sent", rows }, error: null };
     }
     const [outbound, availableAccounts, lastTick] = await Promise.all([
       outboundJobService.dashboard(organizationId),
@@ -220,6 +225,7 @@ function renderTab(
 
   if (data.tab === "scheduled" || data.tab === "sent") {
     const isSent = data.tab === "sent";
+    const rows = data.rows;
     return (
       <div className="card table-wrap">
         <table>
@@ -233,7 +239,7 @@ function renderTab(
             </tr>
           </thead>
           <tbody>
-            {data.rows.length === 0 ? (
+            {rows.length === 0 ? (
               <tr>
                 <td
                   colSpan={5}
@@ -246,7 +252,7 @@ function renderTab(
                 </td>
               </tr>
             ) : (
-              data.rows.map((r) => {
+              rows.map((r) => {
                 const tone =
                   r.status === "SENT"
                     ? "ok"
@@ -304,6 +310,8 @@ function renderTab(
     );
   }
 
+  // Exhaustive: mailboxes
+  const { outbound, availableAccounts, lastCronRun } = data;
   return (
     <div className="stack">
       <div className="card table-wrap">
@@ -317,7 +325,7 @@ function renderTab(
             </tr>
           </thead>
           <tbody>
-            {data.outbound.mailboxes.length === 0 ? (
+            {outbound.mailboxes.length === 0 ? (
               <tr>
                 <td
                   colSpan={4}
@@ -336,7 +344,7 @@ function renderTab(
                 </td>
               </tr>
             ) : (
-              data.outbound.mailboxes.map((m) => (
+              outbound.mailboxes.map((m) => (
                 <tr key={m.id}>
                   <td>
                     <div className="cell-main">{m.emailAccount.email}</div>
@@ -369,9 +377,9 @@ function renderTab(
       </div>
       <OutboundPanel
         initial={{
-          ...data.outbound,
-          availableAccounts: data.availableAccounts,
-          lastCronRun: data.lastCronRun,
+          ...outbound,
+          availableAccounts,
+          lastCronRun,
         }}
       />
     </div>
