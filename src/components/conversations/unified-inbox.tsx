@@ -12,6 +12,7 @@ interface InboxMessage {
   direction: string;
   subject: string | null;
   body: string | null;
+  bodyHtml?: string | null;
   fromEmail: string | null;
   toEmail: string | null;
   status?: string | null;
@@ -415,9 +416,20 @@ export function UnifiedInbox({ initialConversations }: UnifiedInboxProps) {
                                   : ""}
                               </p>
                             ) : null}
-                            <div className="msg-body">
-                              {m.body || "(no body)"}
-                            </div>
+                            {m.bodyHtml &&
+                            (m.bodyHtml.includes("<") ||
+                              m.direction === "OUTBOUND") ? (
+                              <div
+                                className="msg-body msg-html"
+                                dangerouslySetInnerHTML={{
+                                  __html: m.bodyHtml,
+                                }}
+                              />
+                            ) : (
+                              <div className="msg-body">
+                                {m.body || "(no body)"}
+                              </div>
+                            )}
                           </div>
                         );
                       })

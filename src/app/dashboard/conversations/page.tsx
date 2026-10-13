@@ -28,6 +28,7 @@ export default async function ConversationsPage() {
       direction: m.direction,
       subject: m.subject,
       body: m.body,
+      bodyHtml: m.bodyHtml,
       fromEmail: m.fromEmail,
       toEmail: m.toEmail,
       status: m.status,

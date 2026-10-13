@@ -391,26 +391,55 @@ export class OutboundJobService {
         continue;
       }
 
-      // Already enrolled anywhere open?
-      const open = await prisma.sequenceEnrollment.findFirst({
+      // Never re-enroll a contact that already went through Autopilot outreach
+      // (including completed) — that was causing duplicate sends of the same pitch.
+      const priorEnrollment = await prisma.sequenceEnrollment.findFirst({
         where: {
           organizationId,
           contactId: pitch.contactId,
-          status: {
-            in: [
-              SequenceEnrollmentStatus.PENDING,
-              SequenceEnrollmentStatus.ACTIVE,
-              SequenceEnrollmentStatus.PROCESSING,
-              SequenceEnrollmentStatus.PAUSED,
-            ],
-          },
+          source: SequenceEnrollmentSource.AUTOPILOT,
         },
+        select: { id: true, status: true },
       });
-      if (open) {
+      if (priorEnrollment) {
         results.push({
           pitchId: pitch.id,
           status: "skipped",
-          reason: "already_enrolled",
+          reason: `already_enrolled:${priorEnrollment.status.toLowerCase()}`,
+        });
+        // Pitch already used — stop it showing up in Enroll now forever
+        await prisma.pitch.updateMany({
+          where: {
+            id: pitch.id,
+            organizationId,
+            status: PitchStatus.APPROVED,
+          },
+          data: { status: PitchStatus.SUPERSEDED },
+        });
+        continue;
+      }
+
+      const alreadySent = await prisma.emailOutbox.findFirst({
+        where: {
+          organizationId,
+          contactId: pitch.contactId,
+          status: EmailOutboxStatus.SENT,
+        },
+        select: { id: true },
+      });
+      if (alreadySent) {
+        results.push({
+          pitchId: pitch.id,
+          status: "skipped",
+          reason: "already_sent",
+        });
+        await prisma.pitch.updateMany({
+          where: {
+            id: pitch.id,
+            organizationId,
+            status: PitchStatus.APPROVED,
+          },
+          data: { status: PitchStatus.SUPERSEDED },
         });
         continue;
       }
@@ -450,6 +479,16 @@ export class OutboundJobService {
         }
 
         await this.queueStep(organizationId, enrollment.id, config);
+
+        // Consume the pitch so Enroll now cannot pick it again
+        await prisma.pitch.updateMany({
+          where: {
+            id: pitch.id,
+            organizationId,
+            status: PitchStatus.APPROVED,
+          },
+          data: { status: PitchStatus.SUPERSEDED },
+        });
 
         await timelineService.record({
           organizationId,
@@ -1014,6 +1053,49 @@ export class OutboundJobService {
       return { id: outboxId, status: "cancelled", reason: "suppressed" };
     }
 
+    // If step 1 was queued as plain text before the BRANDED fix, rebuild HTML now.
+    let bodyText = item.bodyText;
+    let bodyHtml = item.bodyHtml;
+    const metaEarly =
+      item.metadata && typeof item.metadata === "object"
+        ? (item.metadata as { emailStyle?: string })
+        : {};
+    const wantsBranded =
+      item.stepOrder <= 1 || metaEarly.emailStyle === "BRANDED";
+    const htmlLooksBranded =
+      typeof bodyHtml === "string" &&
+      (bodyHtml.includes("WHAT WE NOTICED") ||
+        bodyHtml.includes("SOFTWARE STUDIO"));
+    if (wantsBranded && !htmlLooksBranded) {
+      try {
+        const rebuilt = await this.reRenderBrandedOutbox(organizationId, item);
+        if (rebuilt) {
+          bodyText = rebuilt.text;
+          bodyHtml = rebuilt.html;
+          await prisma.emailOutbox.update({
+            where: { id: outboxId },
+            data: {
+              bodyText,
+              bodyHtml,
+              subject: rebuilt.subject,
+              metadata: {
+                ...(typeof item.metadata === "object" && item.metadata
+                  ? (item.metadata as object)
+                  : {}),
+                emailStyle: "BRANDED",
+                reRenderedAt: new Date().toISOString(),
+              } as Prisma.InputJsonValue,
+            },
+          });
+        }
+      } catch (err) {
+        console.error(
+          "[outbound] branded re-render failed",
+          err instanceof Error ? err.message : err
+        );
+      }
+    }
+
     if (cfg.shadowMode || item.shadowMode) {
       await prisma.emailOutbox.update({
         where: { id: outboxId },
@@ -1051,8 +1133,8 @@ export class OutboundJobService {
         emailAccountId: item.emailAccountId,
         toEmail: item.toEmail,
         subject: item.subject,
-        body: item.bodyText,
-        bodyHtml: item.bodyHtml ?? item.bodyText,
+        body: bodyText,
+        bodyHtml: bodyHtml ?? bodyText,
         companyId: item.companyId,
         contactId: item.contactId,
         opportunityId: item.opportunityId,
@@ -1110,6 +1192,64 @@ export class OutboundJobService {
       });
       return { id: outboxId, status: "failed", reason: message };
     }
+  }
+
+  /** Rebuild BRANDED HTML for a queued outbox row that was stored as plain text. */
+  private async reRenderBrandedOutbox(
+    organizationId: string,
+    item: {
+      contactId: string;
+      companyId: string | null;
+      outboundMailboxId: string | null;
+      toEmail: string;
+      subject: string;
+      contact: {
+        firstName: string | null;
+        email: string | null;
+      } | null;
+      company: { name: string; domain: string | null } | null;
+    }
+  ) {
+    const pitch = await prisma.pitch.findFirst({
+      where: {
+        organizationId,
+        contactId: item.contactId,
+        status: { in: [PitchStatus.APPROVED, PitchStatus.SUPERSEDED] },
+      },
+      orderBy: { updatedAt: "desc" },
+    });
+    if (!pitch) return null;
+
+    const unsub = unsubscribeUrl(organizationId, item.toEmail);
+    const sender = await emailBrandingService.resolveForSend(
+      organizationId,
+      item.outboundMailboxId
+    );
+    return renderOutboundEmail({
+      style: "BRANDED",
+      subject: item.subject,
+      pitch: {
+        greeting: pitch.greeting,
+        introHtml: pitch.introHtml,
+        findingTitle: pitch.findingTitle,
+        findingText: pitch.findingText,
+        bodyHtml: pitch.bodyHtml,
+        preheader: pitch.preheader,
+        personalizedFirstLine: pitch.personalizedFirstLine,
+        shortPitch: pitch.shortPitch,
+        topIssue: pitch.topIssue,
+      },
+      contact: {
+        firstName: item.contact?.firstName,
+        email: item.contact?.email ?? item.toEmail,
+      },
+      company: {
+        name: item.company?.name,
+        domain: item.company?.domain,
+      },
+      sender,
+      unsubscribeUrl: unsub,
+    });
   }
 
   private async afterSuccessfulSend(

@@ -12,8 +12,13 @@ export function appendComplianceFooter(
   body: string,
   input: ComplianceFooterInput
 ): string {
+  const trimmed = body.trimEnd();
+  // Avoid double-append when the renderer already included an unsubscribe line
+  if (/unsubscribe/i.test(trimmed) && trimmed.includes(input.unsubscribeUrl)) {
+    return trimmed;
+  }
   const lines = [
-    body.trimEnd(),
+    trimmed,
     "",
     "---",
     `To unsubscribe: ${input.unsubscribeUrl}`,
