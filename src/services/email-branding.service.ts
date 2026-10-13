@@ -136,11 +136,23 @@ export class EmailBrandingService {
     organizationId: string,
     mailboxId?: string | null
   ) {
-    const branding = await this.get(organizationId);
-    const org = await prisma.organization.findUnique({
-      where: { id: organizationId },
-      select: { name: true },
-    });
+    const [branding, org, outbound] = await Promise.all([
+      this.get(organizationId),
+      prisma.organization.findUnique({
+        where: { id: organizationId },
+        select: { name: true },
+      }),
+      outboundConfigService.getConfig(organizationId).catch(() => null),
+    ]);
+
+    // Prefer real brand names over placeholder org names like "Default Workspace".
+    const orgName = org?.name?.trim() || "";
+    const outboundBiz = outbound?.businessName?.trim() || "";
+    const fallbackName =
+      (orgName && !/^default\s+workspace$/i.test(orgName) ? orgName : "") ||
+      outboundBiz ||
+      "Delvix Studio";
+
     let mailbox = null;
     if (mailboxId) {
       mailbox = await prisma.outboundMailbox.findFirst({
@@ -152,17 +164,31 @@ export class EmailBrandingService {
         },
       });
     }
+
+    const legal =
+      branding.legalCompanyName.trim() ||
+      outboundBiz ||
+      (orgName && !/^default\s+workspace$/i.test(orgName) ? orgName : "") ||
+      "Delvix Studio";
+
+    const senderName =
+      branding.senderName.trim() ||
+      outboundBiz ||
+      fallbackName;
+
     return resolveSenderBranding({
       organizationId,
-      branding: branding.legalCompanyName
-        ? branding
-        : {
-            ...branding,
-            legalCompanyName:
-              branding.legalCompanyName || org?.name || DEFAULT_EMAIL_BRANDING.legalCompanyName,
-          },
+      branding: {
+        ...branding,
+        legalCompanyName: legal,
+        senderName,
+        businessAddress:
+          branding.businessAddress.trim() ||
+          outbound?.physicalAddress?.trim() ||
+          "",
+      },
       mailbox,
-      orgFallbackName: org?.name ?? undefined,
+      orgFallbackName: fallbackName,
     });
   }
 }

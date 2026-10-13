@@ -597,15 +597,14 @@ export class OutboundJobService {
       orderBy: { updatedAt: "desc" },
     });
 
+    // Step 1 is always BRANDED (our designed HTML template). Never trust a
+    // stale PLAIN flag on step 1 from older sequence rows.
     const emailStyle: "BRANDED" | "PLAIN" =
+      step.stepOrder === 1 ||
       step.emailStyle === "BRANDED" ||
       enrollment.sequence?.name === INBOUND_OUTREACH_NAME
         ? "BRANDED"
-        : step.emailStyle === "PLAIN"
-          ? "PLAIN"
-          : step.stepOrder === 1
-            ? "BRANDED"
-            : "PLAIN";
+        : "PLAIN";
 
     const vars = buildSequenceTemplateVars({
       contact: enrollment.contact,

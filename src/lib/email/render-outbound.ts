@@ -242,10 +242,12 @@ function renderBranded(input: RenderOutboundInput): RenderOutboundResult {
     s.whatsappDigits ? `WhatsApp: https://wa.me/${s.whatsappDigits}` : "",
     "",
     s.senderName,
-    `${s.senderTitle} · Delvix Studio`,
+    s.senderTitle
+      ? `${s.senderTitle} · ${s.companyLegalName || "Delvix Studio"}`
+      : s.companyLegalName || "Delvix Studio",
     s.websiteUrl,
     "",
-    `${s.companyLegalName} · ${s.businessAddress}`,
+    [s.companyLegalName, s.businessAddress].filter(Boolean).join(" · "),
     `Unsubscribe: ${input.unsubscribeUrl}`,
   ].filter((x) => x !== "");
 
