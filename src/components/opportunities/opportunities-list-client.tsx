@@ -33,6 +33,7 @@ export interface OpportunityListRow {
   whyNow: string | null;
   updatedAt: string;
   company: { id: string; name: string };
+  sourceKey?: string | null;
   primarySignal: { id: string; title: string } | null;
   owner: { id: string; firstName: string; lastName: string } | null;
 }
@@ -150,12 +151,18 @@ export function OpportunitiesListClient({
                 {items.map((item) => (
                   <TableRow key={item.id} className="cursor-pointer">
                     <TableCell>
-                      <Link
-                        href={`/dashboard/opportunities/${item.id}`}
-                        className="font-medium hover:underline"
-                      >
-                        {item.company.name}
-                      </Link>
+                      <div className="flex flex-wrap items-center gap-2">
+                        <Link
+                          href={`/dashboard/opportunities/${item.id}`}
+                          className="font-medium hover:underline"
+                        >
+                          {item.company.name}
+                        </Link>
+                        {(item.sourceKey === "website" ||
+                          item.sourceKey === "autopilot_waitlist") && (
+                          <Badge variant="secondary">Inbound</Badge>
+                        )}
+                      </div>
                     </TableCell>
                     <TableCell>
                       <Badge variant={scoreBadgeVariant(item.score)}>

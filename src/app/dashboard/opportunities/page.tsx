@@ -52,6 +52,7 @@ export default async function OpportunitiesPage({ searchParams }: PageProps) {
       whyNow: item.whyNow,
       updatedAt: item.updatedAt.toISOString(),
       company: { id: item.company.id, name: item.company.name },
+      sourceKey: item.source?.key ?? null,
       primarySignal: item.primarySignal
         ? { id: item.primarySignal.id, title: item.primarySignal.title }
         : null,

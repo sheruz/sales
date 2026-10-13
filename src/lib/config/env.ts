@@ -79,6 +79,12 @@ const envSchema = z.object({
   GOOGLE_PLACES_API_KEY: z.string().optional(),
   /** Optional org-wide fallback for Hunter.io enrichment */
   HUNTER_API_KEY: z.string().optional(),
+  /** Shared secret for delvixstudio.com → POST /api/inbound/website */
+  REVENUE_OS_SECRET: z.string().optional(),
+  /** Organization that receives website / Autopilot waitlist inbound leads */
+  WEBSITE_INBOUND_ORG_ID: z.string().uuid().optional(),
+  /** Email for inbound lead notifications (falls back to org owners) */
+  NOTIFY_EMAIL: z.union([z.string().email(), z.undefined()]).optional(),
 });
 
 let cachedEnv: z.infer<typeof envSchema> | null = null;

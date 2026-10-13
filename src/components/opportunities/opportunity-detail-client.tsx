@@ -29,6 +29,7 @@ interface OpportunityDetailClientProps {
   stage: OpportunityStage;
   status: OpportunityStatus;
   hasIntelligence: boolean;
+  isInbound?: boolean;
 }
 
 export function OpportunityDetailClient({
@@ -38,6 +39,7 @@ export function OpportunityDetailClient({
   stage: initialStage,
   status,
   hasIntelligence,
+  isInbound = false,
 }: OpportunityDetailClientProps) {
   const router = useRouter();
   const [stage, setStage] = useState(initialStage);
@@ -96,6 +98,7 @@ export function OpportunityDetailClient({
       <div className="space-y-2">
         <div className="flex flex-wrap items-center gap-2">
           <h2 className="text-2xl font-bold tracking-tight">{companyName}</h2>
+          {isInbound ? <Badge variant="secondary">Inbound</Badge> : null}
           <Badge variant={scoreBadgeVariant(score)}>
             {score} · {scoreLabel(score)}
           </Badge>

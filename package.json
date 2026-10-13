@@ -29,6 +29,7 @@
     "db:migrate:phase25-ui": "node scripts/run-with-env.js node scripts/phase25-timeline-ui-migrate.js",
     "db:migrate:phase3-website-audit": "node scripts/run-with-env.js node scripts/phase3-website-audit-migrate.js",
     "db:migrate:phase4-outbound": "node scripts/run-with-env.js node scripts/phase4-outbound-autopilot-migrate.js",
+    "db:migrate:website-inbound": "node scripts/run-with-env.js node scripts/website-inbound-migrate.js",
     "db:studio": "node scripts/prisma-cli.js studio",
     "db:reset": "node scripts/prisma-cli.js migrate reset",
     "docker:up": "docker compose up -d postgres",

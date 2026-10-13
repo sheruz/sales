@@ -28,6 +28,7 @@ import { timelineService } from "@/services/timeline.service";
 import { isEnrollableVerification } from "@/lib/enrichment/verification";
 import type { EmailVerificationStatus } from "@/lib/enrichment/types";
 import { isCountryAllowed } from "@/lib/outbound/country-allowlist";
+import { isInboundSourceKey } from "@/lib/inbound/constants";
 import {
   appendComplianceFooter,
   buildListUnsubscribeHeaders,
@@ -210,7 +211,7 @@ export class OutboundJobService {
       include: {
         contact: true,
         company: true,
-        opportunity: true,
+        opportunity: { include: { source: true } },
       },
     });
 
@@ -330,10 +331,20 @@ export class OutboundJobService {
         enrichmentStatus: string | null;
         auditStatus: string | null;
         timezone: string | null;
+        source?: string | null;
       };
+      opportunity?: {
+        source?: { key: string } | null;
+      } | null;
     },
     config: OutboundConfig
   ): Promise<{ ok: true } | { ok: false; reason: string }> {
+    if (
+      isInboundSourceKey(pitch.opportunity?.source?.key) ||
+      isInboundSourceKey(pitch.company.source)
+    ) {
+      return { ok: false, reason: "inbound_lead" };
+    }
     if (pitch.company.enrichmentStatus === "SKIPPED") {
       return { ok: false, reason: "company_skipped" };
     }

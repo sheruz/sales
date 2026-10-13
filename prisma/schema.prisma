@@ -420,6 +420,8 @@ enum CompanyTimelineEventType {
   PROPOSAL_SENT
   WON
   LOST
+  /// Website / Autopilot waitlist form (inbound — never cold-outreach enroll)
+  INBOUND_FORM
 }
 
 enum TimelineActor {

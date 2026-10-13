@@ -203,6 +203,10 @@ export default async function OpportunityDetailPage({ params }: PageProps) {
         stage={opportunity.stage}
         status={opportunity.status}
         hasIntelligence={Boolean(opportunity.intelligence)}
+        isInbound={
+          opportunity.source?.key === "website" ||
+          opportunity.source?.key === "autopilot_waitlist"
+        }
       />
 
       <div className="grid gap-4 md:grid-cols-2">
