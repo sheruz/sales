@@ -1,35 +1,9 @@
-import {
-  Bricolage_Grotesque,
-  Figtree,
-  IBM_Plex_Mono,
-} from "next/font/google";
-import { DelvixLanding } from "@/components/landing/delvix-landing";
+import { redirect } from "next/navigation";
 
-const bricolage = Bricolage_Grotesque({
-  subsets: ["latin"],
-  variable: "--font-bricolage",
-  display: "swap",
-});
-
-const figtree = Figtree({
-  subsets: ["latin"],
-  variable: "--font-figtree",
-  display: "swap",
-});
-
-const ibmPlexMono = IBM_Plex_Mono({
-  subsets: ["latin"],
-  weight: ["400", "500"],
-  variable: "--font-ibm-plex-mono",
-  display: "swap",
-});
-
+/**
+ * Fallback only. Production `/` is rewritten to `/landing.html` in next.config
+ * (static HTML — no React layout). This stub keeps the App Router + tsc happy.
+ */
 export default function HomePage() {
-  return (
-    <div
-      className={`${bricolage.variable} ${figtree.variable} ${ibmPlexMono.variable}`}
-    >
-      <DelvixLanding />
-    </div>
-  );
+  redirect("/landing.html");
 }

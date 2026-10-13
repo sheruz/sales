@@ -39,6 +39,8 @@
   "dependencies": {
     "@base-ui/react": "^1.7.0",
     "@prisma/client": "^6.19.3",
+    "@upstash/ratelimit": "^2.2.0",
+    "@upstash/redis": "^1.39.0",
     "bcryptjs": "^3.0.3",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
@@ -51,6 +53,7 @@
     "nodemailer": "^9.1.0",
     "react": "19.2.8",
     "react-dom": "19.2.8",
+    "resend": "^6.32.1",
     "shadcn": "^4.19.1",
     "sonner": "^2.0.8",
     "stripe": "^22.6.1",

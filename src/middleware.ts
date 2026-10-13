@@ -3,6 +3,7 @@ import { SESSION_COOKIE } from "@/lib/auth/permissions";
 
 const publicPages = [
   "/",
+  "/landing.html",
   "/login",
   "/invite",
   "/forgot-password",
@@ -48,6 +49,6 @@ export function middleware(request: NextRequest) {
 
 export const config = {
   matcher: [
-    "/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)",
+    "/((?!_next/static|_next/image|favicon.ico|vendor/|.*\\.(?:svg|png|jpg|jpeg|gif|webp|js|html)$).*)",
   ],
 };

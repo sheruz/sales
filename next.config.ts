@@ -17,9 +17,9 @@ const securityHeaders = [
     value: [
       "default-src 'self'",
       "script-src 'self' 'unsafe-inline' 'unsafe-eval'",
-      "style-src 'self' 'unsafe-inline'",
+      "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
       "img-src 'self' data: https: blob:",
-      "font-src 'self' data:",
+      "font-src 'self' data: https://fonts.gstatic.com",
       "connect-src 'self' https:",
       "frame-ancestors 'none'",
       "base-uri 'self'",
@@ -33,6 +33,14 @@ const nextConfig: NextConfig = {
     serverActions: {
       bodySizeLimit: "2mb",
     },
+  },
+  async rewrites() {
+    return {
+      beforeFiles: [
+        // Static Delvix Studio marketing HTML (not React) — bypasses app layout
+        { source: "/", destination: "/landing.html" },
+      ],
+    };
   },
   async headers() {
     return [
