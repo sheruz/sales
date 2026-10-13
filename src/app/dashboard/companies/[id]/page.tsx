@@ -43,14 +43,14 @@ function nextStepCopy(input: {
   }
   if (input.pitchStatus === "APPROVED") {
     return {
-      title: "Pitch approved — waiting for Phase 4",
-      body: "Nothing is emailed yet. Phase 4 (outbound) will send this APPROVED pitch to the contact. Email preview below is what that first message will look like.",
+      title: "Pitch approved — in outbound queue",
+      body: "Autopilot → Outbound enrolls this pitch and queues email. Cron sends Mon–Fri 8–11 prospect local time; Process outbox sends queued mail immediately. Preview below is the first message.",
     };
   }
   if (input.funnelStage === "audited") {
     return {
       title: "Pitch ready to review",
-      body: "Approve the pitch on this page (or Autopilot → Pitch review). Phase 4 will only send APPROVED pitches — nothing sends until then.",
+      body: "Approve the pitch on this page (or Autopilot → Pitch review). Outbound only sends APPROVED pitches — nothing sends until then.",
     };
   }
   if (input.funnelStage === "enriched") {

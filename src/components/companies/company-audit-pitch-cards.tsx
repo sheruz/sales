@@ -274,9 +274,10 @@ export function CompanyAuditPitchCards({
               </div>
               {activePitch.status === "APPROVED" ? (
                 <p className="text-xs text-muted-foreground rounded-md border border-dashed p-2">
-                  Approved for the contact below. No email is sent yet — Phase 4
-                  outbound will use this pitch. You can still edit + Save, or
-                  Regenerate if the audit changed.
+                  Approved for the contact below. Outbound uses this pitch —
+                  enroll/queue on Autopilot → Outbound, then Process outbox (or
+                  wait for the Mon–Fri 8–11 prospect window). You can still edit
+                  + Save, or Regenerate if the audit changed.
                 </p>
               ) : null}
               <div className="flex flex-wrap gap-2">

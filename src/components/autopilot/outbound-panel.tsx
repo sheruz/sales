@@ -46,6 +46,9 @@ type Props = {
     sentToday: number;
     failed: number;
     enrolledToday: number;
+    dueNow?: number;
+    waitingForWindow?: number;
+    nextScheduledFor?: string | null;
     mailboxes: Mailbox[];
     suppressCount: number;
     availableAccounts?: Array<{ id: string; email: string; provider: string }>;
@@ -57,6 +60,32 @@ type Props = {
     } | null;
   };
 };
+
+function formatSendResult(data: {
+  processed?: number;
+  reason?: string;
+  waitingForWindow?: number;
+  nextScheduledFor?: string | null;
+  results?: Array<{ status?: string; reason?: string }>;
+}): string {
+  const processed = data.processed ?? 0;
+  if (processed > 0) {
+    const sent = (data.results ?? []).filter((r) =>
+      String(r.status ?? "").startsWith("sent")
+    ).length;
+    return `Sent ${sent}/${processed} from outbox`;
+  }
+  if (data.reason === "global_cap") {
+    return "Daily send cap reached — nothing sent";
+  }
+  if (data.reason === "waiting_for_window") {
+    const when = data.nextScheduledFor
+      ? new Date(data.nextScheduledFor).toLocaleString()
+      : "later";
+    return `0 due now — ${data.waitingForWindow ?? 0} waiting for Mon–Fri 8–11 window (next ${when}). Process outbox sends immediately.`;
+  }
+  return "Nothing due in outbox";
+}
 
 export function OutboundPanel({ initial }: Props) {
   const router = useRouter();
@@ -96,13 +125,21 @@ export function OutboundPanel({ initial }: Props) {
       });
       const json = await res.json();
       if (!json.success) throw new Error(json.error?.message);
-      toast.success(
-        action === "enroll"
-          ? `Enrolled batch done`
-          : action === "send"
-            ? `Outbox processed`
-            : `Tick done (shadow=${config.shadowMode})`
-      );
+      if (action === "enroll") {
+        toast.success(
+          `Enrolled ${json.data?.processed ?? json.data?.results?.length ?? 0}`
+        );
+      } else if (action === "send") {
+        const msg = formatSendResult(json.data ?? {});
+        if ((json.data?.processed ?? 0) > 0) toast.success(msg);
+        else toast.message(msg);
+      } else {
+        const send = json.data?.send ?? {};
+        const msg = formatSendResult(send);
+        toast.success(
+          `Tick done (shadow=${config.shadowMode}). ${msg}`
+        );
+      }
       router.refresh();
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Failed");
@@ -191,8 +228,9 @@ export function OutboundPanel({ initial }: Props) {
           <div>
             <CardTitle className="text-base">Outbound email</CardTitle>
             <CardDescription>
-              OFF by default. Only APPROVED pitches, US allow-list, Mon–Fri
-              8–11 prospect TZ. Sticky mailbox + compliance footer.
+              OFF by default. Only APPROVED pitches, US allow-list. Cron
+              respects Mon–Fri 8–11 prospect TZ; Process outbox sends queued
+              mail immediately. Sticky mailbox + compliance footer.
             </CardDescription>
           </div>
           <div className="flex flex-wrap gap-2">
@@ -228,28 +266,42 @@ export function OutboundPanel({ initial }: Props) {
             </Button>
           </div>
         </CardHeader>
-        <CardContent className="grid gap-4 sm:grid-cols-4 text-sm">
-          <div>
-            <p className="text-muted-foreground">Queued</p>
-            <p className="text-2xl font-semibold">{initial.queued}</p>
-          </div>
-          <div>
-            <p className="text-muted-foreground">Held</p>
-            <p className="text-2xl font-semibold">{initial.held}</p>
-            <p className="text-xs text-muted-foreground">
-              {initial.heldTimezone} need timezone
-            </p>
-          </div>
-          <div>
-            <p className="text-muted-foreground">Sent today</p>
-            <p className="text-2xl font-semibold">{initial.sentToday}</p>
-            <p className="text-xs text-muted-foreground">
-              Cap {config.dailyGlobalCap}
-            </p>
-          </div>
-          <div>
-            <p className="text-muted-foreground">Enrolled today</p>
-            <p className="text-2xl font-semibold">{initial.enrolledToday}</p>
+        <CardContent className="space-y-3 text-sm">
+          <div className="grid gap-4 sm:grid-cols-4">
+            <div>
+              <p className="text-muted-foreground">Queued</p>
+              <p className="text-2xl font-semibold">{initial.queued}</p>
+              {(initial.waitingForWindow ?? 0) > 0 ? (
+                <p className="text-xs text-muted-foreground">
+                  {initial.waitingForWindow} waiting for send window
+                  {initial.nextScheduledFor
+                    ? ` (next ${new Date(initial.nextScheduledFor).toLocaleString()})`
+                    : ""}
+                </p>
+              ) : (initial.dueNow ?? 0) > 0 ? (
+                <p className="text-xs text-muted-foreground">
+                  {initial.dueNow} due now
+                </p>
+              ) : null}
+            </div>
+            <div>
+              <p className="text-muted-foreground">Held</p>
+              <p className="text-2xl font-semibold">{initial.held}</p>
+              <p className="text-xs text-muted-foreground">
+                {initial.heldTimezone} need timezone
+              </p>
+            </div>
+            <div>
+              <p className="text-muted-foreground">Sent today</p>
+              <p className="text-2xl font-semibold">{initial.sentToday}</p>
+              <p className="text-xs text-muted-foreground">
+                Cap {config.dailyGlobalCap}
+              </p>
+            </div>
+            <div>
+              <p className="text-muted-foreground">Enrolled today</p>
+              <p className="text-2xl font-semibold">{initial.enrolledToday}</p>
+            </div>
           </div>
         </CardContent>
       </Card>

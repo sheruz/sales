@@ -127,6 +127,7 @@ export class OutboundJobService {
   async dashboard(organizationId: string) {
     const day = startOfUtcDay();
     const config = await this.getConfig(organizationId);
+    const now = new Date();
     const [
       queued,
       held,
@@ -135,6 +136,8 @@ export class OutboundJobService {
       enrolledToday,
       mailboxes,
       suppressCount,
+      dueNow,
+      waitingForWindow,
     ] = await Promise.all([
       prisma.emailOutbox.count({
         where: { organizationId, status: EmailOutboxStatus.QUEUED },
@@ -161,6 +164,20 @@ export class OutboundJobService {
       }),
       mailboxPoolService.list(organizationId),
       prisma.emailSuppression.count({ where: { organizationId } }),
+      prisma.emailOutbox.count({
+        where: {
+          organizationId,
+          status: EmailOutboxStatus.QUEUED,
+          OR: [{ scheduledFor: null }, { scheduledFor: { lte: now } }],
+        },
+      }),
+      prisma.emailOutbox.count({
+        where: {
+          organizationId,
+          status: EmailOutboxStatus.QUEUED,
+          scheduledFor: { gt: now },
+        },
+      }),
     ]);
 
     const heldTimezone = await prisma.emailOutbox.count({
@@ -169,6 +186,16 @@ export class OutboundJobService {
         status: EmailOutboxStatus.HELD,
         heldReason: "timezone_needed",
       },
+    });
+
+    const nextQueued = await prisma.emailOutbox.findFirst({
+      where: {
+        organizationId,
+        status: EmailOutboxStatus.QUEUED,
+        scheduledFor: { not: null },
+      },
+      orderBy: { scheduledFor: "asc" },
+      select: { scheduledFor: true },
     });
 
     return {
@@ -182,6 +209,9 @@ export class OutboundJobService {
       mailboxes,
       suppressCount,
       globalCap: config.dailyGlobalCap,
+      dueNow,
+      waitingForWindow,
+      nextScheduledFor: nextQueued?.scheduledFor?.toISOString() ?? null,
     };
   }
 
@@ -596,9 +626,14 @@ export class OutboundJobService {
     });
   }
 
-  async processOutboxBatch(organizationId: string, limit = 5) {
+  async processOutboxBatch(
+    organizationId: string,
+    limit = 5,
+    opts?: { bypassSchedule?: boolean }
+  ) {
     const config = await this.getConfig(organizationId);
     const day = startOfUtcDay();
+    const now = new Date();
     const sentToday = await prisma.emailOutbox.count({
       where: {
         organizationId,
@@ -607,18 +642,32 @@ export class OutboundJobService {
       },
     });
     if (sentToday >= config.dailyGlobalCap) {
-      return { processed: 0, results: [], reason: "global_cap" as const };
+      return {
+        processed: 0,
+        results: [],
+        reason: "global_cap" as const,
+        waitingForWindow: 0,
+        nextScheduledFor: null as string | null,
+      };
     }
 
     const remaining = config.dailyGlobalCap - sentToday;
     const take = Math.min(limit, remaining, config.maxSendPerTick);
-    const now = new Date();
+
+    const scheduleFilter = opts?.bypassSchedule
+      ? {}
+      : {
+          OR: [
+            { scheduledFor: null },
+            { scheduledFor: { lte: now } },
+          ],
+        };
 
     const due = await prisma.emailOutbox.findMany({
       where: {
         organizationId,
         status: EmailOutboxStatus.QUEUED,
-        OR: [{ scheduledFor: null }, { scheduledFor: { lte: now } }],
+        ...scheduleFilter,
       },
       orderBy: { scheduledFor: "asc" },
       take,
@@ -630,12 +679,52 @@ export class OutboundJobService {
       },
     });
 
+    const waitingForWindow = opts?.bypassSchedule
+      ? 0
+      : await prisma.emailOutbox.count({
+          where: {
+            organizationId,
+            status: EmailOutboxStatus.QUEUED,
+            scheduledFor: { gt: now },
+          },
+        });
+
+    const nextWaiting = opts?.bypassSchedule
+      ? null
+      : await prisma.emailOutbox.findFirst({
+          where: {
+            organizationId,
+            status: EmailOutboxStatus.QUEUED,
+            scheduledFor: { gt: now },
+          },
+          orderBy: { scheduledFor: "asc" },
+          select: { scheduledFor: true },
+        });
+
+    if (due.length === 0) {
+      return {
+        processed: 0,
+        results: [],
+        reason:
+          waitingForWindow > 0
+            ? ("waiting_for_window" as const)
+            : ("nothing_due" as const),
+        waitingForWindow,
+        nextScheduledFor: nextWaiting?.scheduledFor?.toISOString() ?? null,
+      };
+    }
+
     const results = [];
     for (const item of due) {
       results.push(await this.sendOutboxItem(organizationId, item.id, config));
       // 2–6 min gap is encoded in scheduledFor for next picks; small pause between in-tick sends
     }
-    return { processed: results.length, results };
+    return {
+      processed: results.length,
+      results,
+      waitingForWindow,
+      nextScheduledFor: nextWaiting?.scheduledFor?.toISOString() ?? null,
+    };
   }
 
   async sendOutboxItem(
