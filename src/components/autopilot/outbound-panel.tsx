@@ -148,14 +148,24 @@ function MailboxLimitsEditor({
         size="sm"
         variant="secondary"
         disabled={busy}
-        title="Set sent today back to 0 so you can send again today"
+        title="Zero sent today and set ramp start = daily cap so you can send again immediately"
         onClick={() => {
           const parsed = parse();
-          if (parsed) onSave({ ...parsed, resetSentToday: true });
+          if (!parsed) return;
+          // Unblock: full cap available today
+          onSave({
+            ...parsed,
+            rampStart: parsed.dailyCap,
+            resetSentToday: true,
+          });
         }}
       >
         Reset sent today
       </Button>
+      <span className="text-muted-foreground">
+        Effective limit = min(cap, ramp start + days×increment). Raising only
+        Daily cap leaves Ramp start at 5.
+      </span>
     </div>
   );
 }

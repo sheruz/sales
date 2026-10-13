@@ -345,11 +345,16 @@ export class OutboundJobService {
     const coldSequence = await this.ensureColdOutreachSequence(organizationId);
     const inboundSequence =
       await this.ensureInboundOutreachSequence(organizationId);
-    const mailbox = await mailboxPoolService.pickMailbox(organizationId);
+    const picked = await mailboxPoolService.pickMailboxWithReasons(
+      organizationId
+    );
+    const mailbox = picked.mailbox;
     if (!mailbox) {
-      throw new ValidationError(
-        "No active outbound mailbox with remaining daily capacity / valid DNS"
-      );
+      const detail =
+        picked.reasons.length > 0
+          ? picked.reasons.join(" · ")
+          : "No active outbound mailbox with remaining daily capacity / valid DNS";
+      throw new ValidationError(detail);
     }
 
     const pitches = await prisma.pitch.findMany({

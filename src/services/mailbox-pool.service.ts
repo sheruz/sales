@@ -160,11 +160,17 @@ export class MailboxPoolService {
       throw new ValidationError("rampIncrement must be 0–50");
     }
 
+    // Resetting the day counter also lifts ramp to the full daily cap so
+    // "Reset sent today" actually unblocks sending (warmup start of 5 no longer traps you).
+    const nextRampStart = patch.resetSentToday
+      ? Math.max(rampStart, dailyCap)
+      : rampStart;
+
     const updated = await prisma.outboundMailbox.update({
       where: { id: mailboxId },
       data: {
         dailyCap,
-        rampStart,
+        rampStart: nextRampStart,
         rampIncrement,
         ...(patch.resetSentToday
           ? {
@@ -249,21 +255,41 @@ export class MailboxPoolService {
     return { to, messageId: result.message.id };
   }
 
+  /** Pick an ACTIVE mailbox that can send now (or null). */
   async pickMailbox(organizationId: string) {
+    const result = await this.pickMailboxWithReasons(organizationId);
+    return result.mailbox;
+  }
+
+  async pickMailboxWithReasons(organizationId: string) {
     const cfg = await outboundConfigService.getConfig(organizationId);
     const day = startOfUtcDay();
     const mailboxes = await prisma.outboundMailbox.findMany({
-      where: {
-        organizationId,
-        status: OutboundMailboxStatus.ACTIVE,
-      },
+      where: { organizationId },
       include: { emailAccount: true },
       orderBy: { sentToday: "asc" },
     });
 
+    const reasons: string[] = [];
+    if (mailboxes.length === 0) {
+      return {
+        mailbox: null as null,
+        reasons: ["No mailboxes in the outbound pool"],
+      };
+    }
+
     for (const m of mailboxes) {
-      const domain = domainOf(m.emailAccount.email);
-      if (cfg.pausedDomains.includes(domain)) continue;
+      const email = m.emailAccount.email;
+      if (m.status !== OutboundMailboxStatus.ACTIVE) {
+        reasons.push(`${email}: status is ${m.status}`);
+        continue;
+      }
+
+      const domain = domainOf(email);
+      if (cfg.pausedDomains.includes(domain)) {
+        reasons.push(`${email}: domain ${domain} is paused`);
+        continue;
+      }
 
       // Reset daily counters
       let sentToday = m.sentToday;
@@ -285,25 +311,45 @@ export class MailboxPoolService {
         m.rampDay = Math.max(0, rampDay);
       }
 
-      const dns = m.dnsCheck as { canSend?: boolean } | null;
-      if (dns && dns.canSend === false) continue;
+      const dns = m.dnsCheck as {
+        canSend?: boolean;
+        providerManaged?: boolean;
+      } | null;
+      // Stale DNS JSON can block Gmail even though provider-managed domains are OK.
+      if (dns && dns.canSend === false && dns.providerManaged !== true) {
+        reasons.push(`${email}: DNS canSend=false (Check DNS / fix SPF+DKIM)`);
+        continue;
+      }
 
       const limit = effectiveDailyLimit(m);
-      if (sentToday >= limit) continue;
-      if (m.emailAccount.status !== "ACTIVE") continue;
+      if (sentToday >= limit) {
+        reasons.push(
+          `${email}: daily limit reached (${sentToday}/${limit}; rampStart=${m.rampStart}, dailyCap=${m.dailyCap}) — raise Ramp start or Reset sent today`
+        );
+        continue;
+      }
+      if (m.emailAccount.status !== "ACTIVE") {
+        reasons.push(`${email}: email account status is ${m.emailAccount.status}`);
+        continue;
+      }
 
       const { assertOutboundFromAllowed } = await import(
         "@/lib/email/free-mail"
       );
       const free = assertOutboundFromAllowed({
-        fromEmail: m.emailAccount.email,
+        fromEmail: email,
         allowFreeMailProvider: m.allowFreeMailProvider === true,
       });
-      if (!free.ok) continue;
+      if (!free.ok) {
+        reasons.push(
+          `${email}: free-mail blocked — click “Allow free-mail” / Free-mail OK on this mailbox`
+        );
+        continue;
+      }
 
-      return m;
+      return { mailbox: m, reasons };
     }
-    return null;
+    return { mailbox: null as null, reasons };
   }
 
   async recordSend(mailboxId: string) {
