@@ -85,7 +85,7 @@ export default function SignupPage() {
           <div className="mx-auto mb-2 flex h-10 w-10 items-center justify-center rounded-lg bg-primary text-primary-foreground">
             <Zap className="h-5 w-5" />
           </div>
-          <CardTitle>Create your workspace</CardTitle>
+          <CardTitle>Create your Delvix workspace</CardTitle>
           <CardDescription>
             Signup → select plan → pay → get entitlements
           </CardDescription>

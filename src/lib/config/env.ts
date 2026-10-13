@@ -38,7 +38,7 @@ const envSchema = z.object({
   SMTP_SECURE: z.coerce.boolean().default(false),
   SMTP_USER: z.string().optional(),
   SMTP_PASSWORD: z.string().optional(),
-  SMTP_FROM_NAME: z.string().default("Sales Platform"),
+  SMTP_FROM_NAME: z.string().default("Delvix"),
   SMTP_FROM_EMAIL: z.union([z.string().email(), z.undefined()]).optional(),
   GOOGLE_CLIENT_ID: z.string().optional(),
   GOOGLE_CLIENT_SECRET: z.string().optional(),

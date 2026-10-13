@@ -268,7 +268,7 @@ export class AutopilotService {
 
     const results = [];
     for (const [organizationId, orgConfigs] of byOrg) {
-      // Phase 4: never run legacy job-post autopilot for Revenue OS orgs
+      // Phase 4: never run legacy job-post autopilot for Delvix orgs
       if (await outboundConfigService.isLegacyDisabled(organizationId)) {
         results.push({
           organizationId,

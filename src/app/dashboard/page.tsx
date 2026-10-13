@@ -214,7 +214,7 @@ export default async function DashboardPage() {
           <p className="text-muted-foreground">
             {summaryParts.length
               ? summaryParts.join(" · ")
-              : "Your Revenue OS overview — configure intelligence, then run the pipeline."}
+              : "Your Delvix overview — configure intelligence, then run the pipeline."}
             <Badge variant="secondary" className="ml-2">
               {user.organizationRoleKey
                 ? user.organizationRoleKey.replace(/_/g, " ")

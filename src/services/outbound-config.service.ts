@@ -63,7 +63,7 @@ export function asOutboundConfig(raw: unknown): OutboundConfig {
   };
 }
 
-/** Orgs that use Revenue OS Autopilot (sourcing/enrichment/audit/outbound). */
+/** Orgs that use Delvix Autopilot (sourcing/enrichment/audit/outbound). */
 export function isRevenueOsOrgSettings(raw: unknown): boolean {
   if (!raw || typeof raw !== "object" || Array.isArray(raw)) return false;
   const s = raw as Record<string, unknown>;

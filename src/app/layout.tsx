@@ -16,9 +16,9 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Sales Platform | Client Acquisition & Sales Automation",
+  title: "Delvix Studio | Web apps, mobile, ERP/CRM & AI",
   description:
-    "AI-powered internal SaaS for lead discovery, research, outreach, and conversion.",
+    "Delvix Studio builds web apps, mobile apps, custom ERP/CRM systems and AI integrations. Makers of Delvix Autopilot.",
 };
 
 export default function RootLayout({

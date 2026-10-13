@@ -163,7 +163,7 @@ export function AppSidebar({ user, flags }: AppSidebarProps) {
                 <Zap className="size-4" />
               </div>
               <div className="grid flex-1 text-left text-sm leading-tight">
-                <span className="truncate font-semibold">Revenue OS</span>
+                <span className="truncate font-semibold">Delvix</span>
                 <span className="truncate text-xs text-muted-foreground">
                   {user.organizationName || "Company workspace"}
                 </span>

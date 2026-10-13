@@ -225,7 +225,7 @@ export class OpportunityIntelligenceService {
       messages: [
         {
           role: "system",
-          content: `You are a B2B sales intelligence assistant for a Revenue OS.
+          content: `You are a B2B sales intelligence assistant for Delvix.
 Return ONLY valid JSON with this shape:
 {
   "whyNow": string,

@@ -62,7 +62,7 @@ export default async function SettingsPage({
       <section className="space-y-2">
         <h3 className="text-sm font-medium">Configuration</h3>
         <p className="text-xs text-muted-foreground">
-          Revenue OS setup — Business Brain, ICP, Services, and Revenue Goals.
+          Delvix setup — Business Brain, ICP, Services, and Revenue Goals.
         </p>
         <div className="flex flex-wrap gap-2">
           <Link href="/dashboard/business-brain">
@@ -147,7 +147,7 @@ export default async function SettingsPage({
           {canManageServices ? (
             <>
               <p className="text-sm text-muted-foreground">
-                Quick edit shortcut. For the full Revenue OS catalog use{" "}
+                Quick edit shortcut. For the full Delvix catalog use{" "}
                 <Link
                   href="/dashboard/services"
                   className="underline underline-offset-2"

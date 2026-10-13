@@ -10,7 +10,7 @@ export default function PrivacyPolicyPage() {
       <div className="prose prose-sm dark:prose-invert space-y-4 text-sm leading-relaxed">
         <p>
           We process account, organization, CRM, email, and usage data to operate
-          the Sales Platform for your company. Data is scoped to your
+          Delvix for your company. Data is scoped to your
           organization and is not shared across tenants.
         </p>
         <p>
