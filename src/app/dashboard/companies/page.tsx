@@ -2,6 +2,7 @@ import { Suspense } from "react";
 import { redirect } from "next/navigation";
 import { companyService } from "@/services/company.service";
 import { CompaniesList } from "@/components/companies/companies-list";
+import { LeadsHubHeader } from "@/components/leads/leads-hub-header";
 import { Skeleton } from "@/components/ui/skeleton";
 import { getCurrentUser } from "@/lib/auth/session";
 import { hasAnyOrgPermission } from "@/lib/tenant/scope";
@@ -47,11 +48,17 @@ export default async function CompaniesPage({ searchParams }: PageProps) {
     const msg = err instanceof Error ? err.message : String(err);
     console.error("[companies] list failed", msg);
     return (
-      <div className="space-y-6">
-        <h2 className="text-2xl font-bold tracking-tight">Companies</h2>
-        <div className="rounded-lg border border-destructive/40 bg-destructive/10 p-4 text-sm">
-          <p className="font-medium">Failed to load companies.</p>
-          <p className="text-xs text-muted-foreground break-all mt-2">{msg}</p>
+      <div className="dx">
+        <div className="page">
+          <LeadsHubHeader user={user} active="companies" />
+          <div className="banner">
+            <div className="t">
+              <div className="cell-main">Failed to load companies.</div>
+              <div className="cell-sub" style={{ wordBreak: "break-all" }}>
+                {msg}
+              </div>
+            </div>
+          </div>
         </div>
       </div>
     );
@@ -94,17 +101,13 @@ export default async function CompaniesPage({ searchParams }: PageProps) {
   };
 
   return (
-    <div className="space-y-6">
-      <div>
-        <h2 className="text-2xl font-bold tracking-tight">Companies</h2>
-        <p className="text-muted-foreground">
-          Prospects moving through Found → Crawled → Enriched
-          {user.organizationName ? ` · ${user.organizationName}` : ""}.
-        </p>
+    <div className="dx">
+      <div className="page">
+        <LeadsHubHeader user={user} active="companies" />
+        <Suspense fallback={<Skeleton className="h-96 w-full" />}>
+          <CompaniesList initialData={serialized} />
+        </Suspense>
       </div>
-      <Suspense fallback={<Skeleton className="h-96 w-full" />}>
-        <CompaniesList initialData={serialized} />
-      </Suspense>
     </div>
   );
 }

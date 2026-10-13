@@ -1,9 +1,9 @@
 import Link from "next/link";
+import { Plus } from "lucide-react";
 import { PipelineBoard } from "@/components/crm/pipeline-board";
 import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth/session";
 import { hasAnyOrgPermission, hasOrgPermission } from "@/lib/tenant/scope";
-import { Button } from "@/components/ui/button";
 
 export default async function PipelinePage() {
   const user = await getCurrentUser();
@@ -16,35 +16,42 @@ export default async function PipelinePage() {
 
   const canOpps = hasOrgPermission(user, "opportunities.view");
   const canProposals = hasOrgPermission(user, "deals.manage");
+  const newDealHref = canOpps
+    ? "/dashboard/opportunities"
+    : "/dashboard/proposals";
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <h2 className="text-2xl font-bold tracking-tight">Pipeline</h2>
-          <p className="text-muted-foreground">
-            Opportunity and deal progression — move work from qualified through
-            meeting, proposal, negotiation, and won into revenue.
-          </p>
-        </div>
-        <div className="flex flex-wrap gap-2">
-          {canOpps ? (
-            <Link href="/dashboard/opportunities">
-              <Button variant="outline" size="sm">
+    <div className="dx">
+      <div className="page">
+        <div className="page-head">
+          <div>
+            <h1 className="page-title">Deals</h1>
+            <p className="page-sub">
+              Only real conversations live here. Cold leads stay in Leads.
+            </p>
+          </div>
+          <div className="page-actions">
+            <Link href="/dashboard/pipeline" className="btn active">
+              Board
+            </Link>
+            {canOpps ? (
+              <Link href="/dashboard/opportunities" className="btn">
                 Opportunities
-              </Button>
-            </Link>
-          ) : null}
-          {canProposals ? (
-            <Link href="/dashboard/proposals">
-              <Button variant="outline" size="sm">
+              </Link>
+            ) : null}
+            {canProposals ? (
+              <Link href="/dashboard/proposals" className="btn">
                 Proposals
-              </Button>
+              </Link>
+            ) : null}
+            <Link href={newDealHref} className="btn primary">
+              <Plus />
+              New deal
             </Link>
-          ) : null}
+          </div>
         </div>
+        <PipelineBoard />
       </div>
-      <PipelineBoard />
     </div>
   );
 }

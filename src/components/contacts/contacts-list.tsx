@@ -4,24 +4,12 @@ import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Search } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import {
-  FunnelStageBadge,
-  SourceBadge,
-  StatusBadge,
-  VerificationBadge,
-} from "@/components/status/status-badge";
 import { displayContactName } from "@/lib/crm/display-name";
-import { deriveCompanyFunnelStage } from "@/lib/crm/funnel-stage";
+import {
+  deriveCompanyFunnelStage,
+  funnelStageLabel,
+  type FunnelStageKey,
+} from "@/lib/crm/funnel-stage";
 
 interface ContactRow {
   id: string;
@@ -53,6 +41,35 @@ interface ContactsListProps {
   };
 }
 
+function stageTone(stage: FunnelStageKey): string {
+  if (stage === "won" || stage === "meeting" || stage === "replied") return "ok";
+  if (stage === "contacted") return "brand";
+  if (stage === "audited") return "warn";
+  if (stage === "enriched") return "info";
+  return "";
+}
+
+function verification(status: string | null | undefined) {
+  switch (status?.toLowerCase()) {
+    case "valid":
+      return { label: "verified", color: "var(--dx-ok)" };
+    case "invalid":
+      return { label: "invalid", color: "var(--dx-bad)" };
+    case "accept_all":
+      return { label: "risky", color: "var(--dx-warn)" };
+    default:
+      return { label: "unverified", color: "var(--dx-text-3)" };
+  }
+}
+
+function sourceLabel(source: string | null): string {
+  if (!source) return "—";
+  if (source === "google_places") return "Google Maps";
+  if (source === "hunter") return "Hunter";
+  if (source === "website_crawl") return "Website";
+  return source;
+}
+
 export function ContactsList({ initialData }: ContactsListProps) {
   const router = useRouter();
   const [search, setSearch] = useState(initialData.filters.search);
@@ -61,7 +78,8 @@ export function ContactsList({ initialData }: ContactsListProps) {
   function applyFilters() {
     const params = new URLSearchParams();
     if (search) params.set("search", search);
-    router.push(`/dashboard/contacts?${params.toString()}`);
+    const qs = params.toString();
+    router.push(qs ? `/dashboard/contacts?${qs}` : "/dashboard/contacts");
   }
 
   function goToPage(page: number) {
@@ -71,46 +89,50 @@ export function ContactsList({ initialData }: ContactsListProps) {
     router.push(`/dashboard/contacts?${params.toString()}`);
   }
 
+  const from =
+    pagination.total === 0 ? 0 : (pagination.page - 1) * pagination.limit + 1;
+  const to = Math.min(pagination.page * pagination.limit, pagination.total);
+
   return (
-    <div className="space-y-4">
-      <div className="flex flex-wrap items-center gap-2">
-        <div className="relative min-w-[220px] flex-1">
-          <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-          <Input
-            className="pl-8"
-            placeholder="Search contacts, email, or company…"
+    <>
+      <div className="toolbar">
+        <label className="input" style={{ flex: 1, minWidth: 200 }}>
+          <Search width={15} height={15} />
+          <input
+            placeholder="Search contacts, email, or company"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             onKeyDown={(e) => e.key === "Enter" && applyFilters()}
           />
-        </div>
-        <Button onClick={applyFilters}>Search</Button>
+        </label>
+        <button type="button" className="btn" onClick={applyFilters}>
+          Search
+        </button>
       </div>
 
-      <div className="rounded-md border overflow-x-auto">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Name</TableHead>
-              <TableHead>Title</TableHead>
-              <TableHead>Company</TableHead>
-              <TableHead>Email</TableHead>
-              <TableHead>Verification</TableHead>
-              <TableHead>Source</TableHead>
-              <TableHead>Stage</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
+      <div className="card table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Contact</th>
+              <th>Company</th>
+              <th>Email</th>
+              <th>Stage</th>
+              <th className="hide-sm">Source</th>
+            </tr>
+          </thead>
+          <tbody>
             {items.length === 0 ? (
-              <TableRow>
-                <TableCell
-                  colSpan={7}
-                  className="h-24 text-center text-muted-foreground"
+              <tr>
+                <td
+                  colSpan={5}
+                  className="muted"
+                  style={{ textAlign: "center", padding: 32 }}
                 >
                   No contacts yet. They appear after Autopilot enrichment finds
                   a decision-maker or website inbox.
-                </TableCell>
-              </TableRow>
+                </td>
+              </tr>
             ) : (
               items.map((c) => {
                 const display = displayContactName(c.fullName, c.email);
@@ -119,72 +141,78 @@ export function ContactsList({ initialData }: ContactsListProps) {
                   enrichmentStatus: c.company.enrichmentStatus as never,
                   opportunityStage: c.opportunityStage as never,
                 });
+                const v = verification(c.emailStatus);
                 return (
-                  <TableRow key={c.id}>
-                    <TableCell>
+                  <tr key={c.id}>
+                    <td>
                       <Link
                         href={`/dashboard/contacts/${c.id}`}
-                        className="font-medium hover:underline inline-flex flex-wrap items-center gap-2"
+                        className="cell-main"
                       >
                         {display.label}
-                        {display.isGeneralInbox ? (
-                          <StatusBadge label="General inbox" tone="muted" />
-                        ) : null}
                       </Link>
-                    </TableCell>
-                    <TableCell className="text-muted-foreground">
-                      {c.title || "—"}
-                    </TableCell>
-                    <TableCell>
-                      <Link
-                        href={`/dashboard/companies/${c.company.id}`}
-                        className="hover:underline"
-                      >
+                      <div className="cell-sub">
+                        {display.isGeneralInbox
+                          ? "General inbox"
+                          : c.title || "—"}
+                      </div>
+                    </td>
+                    <td>
+                      <Link href={`/dashboard/companies/${c.company.id}`}>
                         {c.company.name}
                       </Link>
-                    </TableCell>
-                    <TableCell className="text-sm">{c.email || "—"}</TableCell>
-                    <TableCell>
-                      <VerificationBadge status={c.emailStatus} />
-                    </TableCell>
-                    <TableCell>
-                      <SourceBadge source={c.source} />
-                    </TableCell>
-                    <TableCell>
-                      <FunnelStageBadge stage={stage} />
-                    </TableCell>
-                  </TableRow>
+                      {c.company.domain ? (
+                        <div className="cell-sub">{c.company.domain}</div>
+                      ) : null}
+                    </td>
+                    <td>
+                      {c.email ? (
+                        <>
+                          <div>{c.email}</div>
+                          <div className="cell-sub">
+                            <span style={{ color: v.color }}>{v.label}</span>
+                          </div>
+                        </>
+                      ) : (
+                        <span className="muted">—</span>
+                      )}
+                    </td>
+                    <td>
+                      <span className={`badge ${stageTone(stage)}`.trim()}>
+                        {funnelStageLabel(stage)}
+                      </span>
+                    </td>
+                    <td className="hide-sm">{sourceLabel(c.source)}</td>
+                  </tr>
                 );
               })
             )}
-          </TableBody>
-        </Table>
+          </tbody>
+        </table>
       </div>
 
-      <div className="flex items-center justify-between text-sm">
-        <span className="text-muted-foreground">
-          Page {pagination.page} of {pagination.totalPages} · {pagination.total}{" "}
-          contacts
+      <div className="toolbar mt">
+        <span className="muted">
+          Showing {from}–{to} of {pagination.total}
         </span>
-        <div className="flex gap-2">
-          <Button
-            variant="outline"
-            size="sm"
-            disabled={pagination.page <= 1}
-            onClick={() => goToPage(pagination.page - 1)}
-          >
-            Previous
-          </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            disabled={pagination.page >= pagination.totalPages}
-            onClick={() => goToPage(pagination.page + 1)}
-          >
-            Next
-          </Button>
-        </div>
+        <span style={{ flex: 1 }} />
+        <button
+          type="button"
+          className="btn"
+          disabled={pagination.page <= 1}
+          onClick={() => goToPage(pagination.page - 1)}
+        >
+          Previous
+        </button>
+        <button
+          type="button"
+          className="btn"
+          disabled={pagination.page >= pagination.totalPages}
+          onClick={() => goToPage(pagination.page + 1)}
+        >
+          Next
+        </button>
       </div>
-    </div>
+    </>
   );
 }

@@ -5,9 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { OpportunityStage } from "@prisma/client";
 import { toast } from "sonner";
-import { Badge } from "@/components/ui/badge";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { OPPORTUNITY_STAGE_LABELS, scoreBadgeVariant } from "@/lib/constants/opportunities";
+import { OPPORTUNITY_STAGE_LABELS } from "@/lib/constants/opportunities";
 
 interface BoardItem {
   id: string;
@@ -23,6 +21,62 @@ interface BoardItem {
 interface Column {
   stage: OpportunityStage;
   items: BoardItem[];
+}
+
+/** Reference board columns, each grouping the existing pipeline stages. */
+const BOARD_COLUMNS: {
+  key: string;
+  label: string;
+  stages: OpportunityStage[];
+  emptyText?: string;
+}[] = [
+  {
+    key: "replied",
+    label: "Replied",
+    stages: [
+      OpportunityStage.NEW,
+      OpportunityStage.QUALIFIED,
+      OpportunityStage.CONTACTED,
+      OpportunityStage.REPLIED,
+      OpportunityStage.DISCOVERY,
+    ],
+  },
+  { key: "meeting", label: "Meeting", stages: [OpportunityStage.MEETING] },
+  {
+    key: "proposal",
+    label: "Proposal",
+    stages: [OpportunityStage.PROPOSAL, OpportunityStage.NEGOTIATION],
+  },
+  { key: "won", label: "Won", stages: [OpportunityStage.WON] },
+  {
+    key: "lost",
+    label: "Lost",
+    stages: [OpportunityStage.LOST],
+    emptyText: "Move a deal here when it's lost. The AI learns from the reason.",
+  },
+];
+
+function toNumber(value: unknown): number {
+  const n = value == null ? 0 : Number(value);
+  return Number.isFinite(n) ? n : 0;
+}
+
+function formatMoney(amount: number, currency = "USD"): string {
+  try {
+    return new Intl.NumberFormat("en-US", {
+      style: "currency",
+      currency: currency || "USD",
+      maximumFractionDigits: 0,
+    }).format(amount);
+  } catch {
+    return `$${amount.toLocaleString()}`;
+  }
+}
+
+function formatCompact(amount: number): string {
+  if (amount >= 1_000_000) return `$${(amount / 1_000_000).toFixed(1).replace(/\.0$/, "")}M`;
+  if (amount >= 1_000) return `$${(amount / 1_000).toFixed(1).replace(/\.0$/, "")}k`;
+  return `$${Math.round(amount)}`;
 }
 
 export function PipelineBoard() {
@@ -68,72 +122,91 @@ export function PipelineBoard() {
   }
 
   if (loading) {
-    return <p className="text-sm text-muted-foreground">Loading pipeline…</p>;
+    return <p className="muted">Loading pipeline…</p>;
+  }
+
+  const allItems = new Map<string, BoardItem>();
+  for (const col of columns) {
+    for (const item of col.items) allItems.set(item.id, item);
   }
 
   return (
-    <div className="space-y-4">
-      <p className="text-sm text-muted-foreground">
+    <div className="stack">
+      <p className="muted">
         Pipeline value (open + closed):{" "}
-        <span className="font-medium text-foreground">
+        <b style={{ color: "var(--dx-text)" }}>
           ${totalValue.toLocaleString()}
-        </span>
+        </b>
       </p>
-      <div className="flex gap-3 overflow-x-auto pb-4">
-        {columns.map((col) => (
-          <Card key={col.stage} className="min-w-[240px] max-w-[260px] shrink-0">
-            <CardHeader className="pb-2">
-              <CardTitle className="flex items-center justify-between text-sm">
-                <span>{OPPORTUNITY_STAGE_LABELS[col.stage] ?? col.stage}</span>
-                <Badge variant="secondary">{col.items.length}</Badge>
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-2 max-h-[70vh] overflow-y-auto">
-              {col.items.length === 0 ? (
-                <p className="text-xs text-muted-foreground">Empty</p>
+      <div className="board">
+        {BOARD_COLUMNS.map((col) => {
+          const items = Array.from(allItems.values()).filter((i) =>
+            col.stages.includes(i.stage)
+          );
+          const sum = items.reduce((s, i) => s + toNumber(i.estimatedValue), 0);
+          const multiStage = col.stages.length > 1;
+          return (
+            <div key={col.key} className="col">
+              <div className="col-head">
+                {col.label} <span className="n">{items.length}</span>
+                {sum > 0 ? <span className="sum">{formatCompact(sum)}</span> : null}
+              </div>
+              {items.length === 0 ? (
+                <div className="empty-col">
+                  {col.emptyText ?? "No deals in this stage yet."}
+                </div>
               ) : (
-                col.items.map((item) => (
-                  <div
-                    key={item.id}
-                    className="rounded-md border p-2 space-y-2 bg-background"
-                  >
-                    <Link
-                      href={`/dashboard/opportunities/${item.id}`}
-                      className="text-sm font-medium hover:underline"
-                    >
-                      {item.company.name}
-                    </Link>
-                    <div className="flex flex-wrap gap-1">
-                      <Badge variant={scoreBadgeVariant(item.score)} className="text-xs">
-                        {item.score}
-                      </Badge>
-                      {item.primaryContact && (
-                        <span className="text-xs text-muted-foreground truncate">
-                          {item.primaryContact.fullName}
+                items.map((item) => {
+                  const value = toNumber(item.estimatedValue);
+                  const contact = item.primaryContact?.fullName;
+                  return (
+                    <div key={item.id} className="deal">
+                      <div className="deal-name">
+                        <Link href={`/dashboard/opportunities/${item.id}`}>
+                          {item.company.name}
+                        </Link>
+                      </div>
+                      <div className="deal-meta">
+                        {contact ? `${contact} · ` : ""}
+                        score {item.score}
+                        {multiStage
+                          ? ` · ${OPPORTUNITY_STAGE_LABELS[item.stage] ?? item.stage}`
+                          : ""}
+                      </div>
+                      <div className="deal-foot">
+                        <span className="deal-val">
+                          {value > 0 ? formatMoney(value, item.currency) : "—"}
                         </span>
-                      )}
+                        {col.key === "won" ? (
+                          <span className="badge ok">Won</span>
+                        ) : (
+                          <span className="mini-av">
+                            {(contact ?? item.company.name).charAt(0).toUpperCase()}
+                          </span>
+                        )}
+                      </div>
+                      <select
+                        aria-label={`Move ${item.company.name} to stage`}
+                        value={item.stage}
+                        onChange={(e) =>
+                          moveStage(item.id, e.target.value as OpportunityStage)
+                        }
+                      >
+                        {Object.values(OpportunityStage)
+                          .filter((s) => s !== OpportunityStage.SOURCED)
+                          .map((s) => (
+                            <option key={s} value={s}>
+                              {OPPORTUNITY_STAGE_LABELS[s]}
+                            </option>
+                          ))}
+                      </select>
                     </div>
-                    <select
-                      className="w-full rounded border bg-background px-2 py-1 text-xs"
-                      value={item.stage}
-                      onChange={(e) =>
-                        moveStage(item.id, e.target.value as OpportunityStage)
-                      }
-                    >
-                      {Object.values(OpportunityStage)
-                        .filter((s) => s !== OpportunityStage.SOURCED)
-                        .map((s) => (
-                        <option key={s} value={s}>
-                          {OPPORTUNITY_STAGE_LABELS[s]}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                ))
+                  );
+                })
               )}
-            </CardContent>
-          </Card>
-        ))}
+            </div>
+          );
+        })}
       </div>
     </div>
   );

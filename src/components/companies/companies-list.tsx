@@ -4,34 +4,13 @@ import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { format } from "date-fns";
-import { Search } from "lucide-react";
+import { MapPin, Search } from "lucide-react";
 import { toast } from "sonner";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import {
-  CrawlStatusBadge,
-  EnrichmentStatusBadge,
-  FunnelStageBadge,
-  SourceBadge,
-  VerificationBadge,
-} from "@/components/status/status-badge";
 import { displayContactName } from "@/lib/crm/display-name";
-import type { FunnelStageKey } from "@/lib/crm/funnel-stage";
+import {
+  funnelStageLabel,
+  type FunnelStageKey,
+} from "@/lib/crm/funnel-stage";
 
 interface CompanyRow {
   id: string;
@@ -76,9 +55,67 @@ interface CompaniesListProps {
   };
 }
 
+type BadgeTone = "ok" | "warn" | "bad" | "info" | "brand" | "plain" | "";
+
+function stageBadge(c: CompanyRow): { tone: BadgeTone; label: string } {
+  const stage = c.funnelStage;
+  const emailStatus = c.bestContact?.emailStatus?.toLowerCase();
+
+  if (stage === "won" || stage === "meeting" || stage === "replied") {
+    return { tone: "ok", label: funnelStageLabel(stage) };
+  }
+  if (stage === "contacted") {
+    return { tone: "brand", label: funnelStageLabel(stage) };
+  }
+  if (c.enrichmentStatus === "SKIPPED") {
+    return { tone: "plain", label: "Skipped" };
+  }
+  if (emailStatus === "invalid") {
+    return { tone: "bad", label: "Bad email" };
+  }
+  if (c.enrichmentStatus === "NO_CONTACT" || c.enrichmentStatus === "FAILED") {
+    return { tone: "bad", label: "No contact" };
+  }
+  if (stage === "audited") {
+    return { tone: "warn", label: "Pitch ready" };
+  }
+  if (stage === "enriched") {
+    return { tone: "info", label: funnelStageLabel(stage) };
+  }
+  if (stage === "crawled") {
+    return { tone: "", label: "Finding contact" };
+  }
+  return { tone: "", label: funnelStageLabel(stage) };
+}
+
+function verification(status: string | null | undefined): {
+  label: string;
+  color: string;
+} {
+  switch (status?.toLowerCase()) {
+    case "valid":
+      return { label: "verified", color: "var(--dx-ok)" };
+    case "invalid":
+      return { label: "invalid", color: "var(--dx-bad)" };
+    case "accept_all":
+      return { label: "risky", color: "var(--dx-warn)" };
+    default:
+      return { label: "unverified", color: "var(--dx-text-3)" };
+  }
+}
+
+function sourceLabel(source: string | null): string {
+  if (!source) return "—";
+  if (source === "google_places") return "Google Maps";
+  if (source === "hunter") return "Hunter";
+  if (source === "website_crawl") return "Website";
+  return source;
+}
+
 export function CompaniesList({ initialData }: CompaniesListProps) {
   const router = useRouter();
   const [search, setSearch] = useState(initialData.filters.search);
+  const [city, setCity] = useState(initialData.filters.city || "");
   const [source, setSource] = useState(initialData.filters.source || "all");
   const [funnel, setFunnel] = useState(initialData.filters.funnel || "all");
   const [enrichmentStatus, setEnrichmentStatus] = useState(
@@ -94,17 +131,20 @@ export function CompaniesList({ initialData }: CompaniesListProps) {
     const f = overrides.funnel ?? funnel;
     const src = overrides.source ?? source;
     const enr = overrides.enrichmentStatus ?? enrichmentStatus;
+    const ct = overrides.city ?? city;
     const page = overrides.page ?? filters.page;
     if (s) params.set("search", String(s));
+    if (ct) params.set("city", String(ct));
     if (f && f !== "all") params.set("funnel", String(f));
     if (src && src !== "all") params.set("source", String(src));
     if (enr && enr !== "all") params.set("enrichmentStatus", String(enr));
     if (page && Number(page) > 1) params.set("page", String(page));
-    return `/dashboard/companies?${params.toString()}`;
+    const qs = params.toString();
+    return qs ? `/dashboard/companies?${qs}` : "/dashboard/companies";
   }
 
-  function applyFilters() {
-    router.push(buildUrl({ page: 1 }));
+  function applyFilters(overrides: Record<string, string | number | undefined> = {}) {
+    router.push(buildUrl({ page: 1, ...overrides }));
   }
 
   function toggleAll(checked: boolean) {
@@ -158,235 +198,232 @@ export function CompaniesList({ initialData }: CompaniesListProps) {
     }
   }
 
+  const from =
+    pagination.total === 0 ? 0 : (pagination.page - 1) * pagination.limit + 1;
+  const to = Math.min(pagination.page * pagination.limit, pagination.total);
+
   return (
-    <div className="space-y-4">
-      <div className="flex flex-wrap items-center gap-2">
-        <div className="relative min-w-[200px] flex-1">
-          <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-          <Input
-            className="pl-8"
-            placeholder="Search companies or domains…"
+    <>
+      <div className="toolbar">
+        <label className="input" style={{ flex: 1, minWidth: 200 }}>
+          <Search width={15} height={15} />
+          <input
+            placeholder="Search name or website"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             onKeyDown={(e) => e.key === "Enter" && applyFilters()}
           />
+        </label>
+        <label className="select">
+          Stage:
+          <select
+            value={funnel}
+            onChange={(e) => {
+              setFunnel(e.target.value);
+              applyFilters({ funnel: e.target.value });
+            }}
+          >
+            <option value="all">All</option>
+            <option value="found">Found</option>
+            <option value="crawled">Crawled</option>
+            <option value="enriched">Enriched</option>
+            <option value="audited">Audited</option>
+            <option value="audited_today">Audited today</option>
+            <option value="audit_pending">Audit pending</option>
+          </select>
+        </label>
+        <label className="input" style={{ width: 160 }}>
+          <MapPin width={15} height={15} />
+          <input
+            placeholder="City"
+            value={city}
+            onChange={(e) => setCity(e.target.value)}
+            onKeyDown={(e) => e.key === "Enter" && applyFilters()}
+          />
+        </label>
+        <label className="select hide-sm">
+          Source:
+          <select
+            value={source}
+            onChange={(e) => {
+              setSource(e.target.value);
+              applyFilters({ source: e.target.value });
+            }}
+          >
+            <option value="all">All</option>
+            <option value="google_places">Google Maps</option>
+          </select>
+        </label>
+        <label className="select hide-sm">
+          Enrichment:
+          <select
+            value={enrichmentStatus}
+            onChange={(e) => {
+              setEnrichmentStatus(e.target.value);
+              applyFilters({ enrichmentStatus: e.target.value });
+            }}
+          >
+            <option value="all">Any</option>
+            <option value="PENDING">Pending</option>
+            <option value="ENRICHED">Enriched</option>
+            <option value="SKIPPED">Skipped</option>
+            <option value="FAILED">Failed</option>
+            <option value="NO_CONTACT">No contact</option>
+          </select>
+        </label>
+        <button type="button" className="btn" onClick={() => applyFilters()}>
+          Apply
+        </button>
+      </div>
+
+      {selected.size > 0 ? (
+        <div className="toolbar">
+          <span className="muted">{selected.size} selected</span>
+          <button
+            type="button"
+            className="btn"
+            disabled={busy}
+            onClick={() => runBulk("crawl")}
+          >
+            Crawl now
+          </button>
+          <button
+            type="button"
+            className="btn"
+            disabled={busy}
+            onClick={() => runBulk("enrich")}
+          >
+            Enrich now
+          </button>
+          <button
+            type="button"
+            className="btn"
+            disabled={busy}
+            onClick={() => runBulk("skip")}
+          >
+            Skip
+          </button>
+          <button
+            type="button"
+            className="btn"
+            disabled={busy}
+            onClick={() => runBulk("unskip")}
+          >
+            Unskip
+          </button>
         </div>
-        <Select
-          value={funnel}
-          onValueChange={(v) => setFunnel(v || "all")}
-        >
-          <SelectTrigger className="w-[140px]">
-            <SelectValue placeholder="Funnel" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All stages</SelectItem>
-            <SelectItem value="found">Found</SelectItem>
-            <SelectItem value="crawled">Crawled</SelectItem>
-            <SelectItem value="enriched">Enriched</SelectItem>
-            <SelectItem value="audited">Audited</SelectItem>
-            <SelectItem value="audited_today">Audited today</SelectItem>
-            <SelectItem value="audit_pending">Audit pending</SelectItem>
-          </SelectContent>
-        </Select>
-        <Select
-          value={source}
-          onValueChange={(v) => setSource(v || "all")}
-        >
-          <SelectTrigger className="w-[150px]">
-            <SelectValue placeholder="Source" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All sources</SelectItem>
-            <SelectItem value="google_places">Google Places</SelectItem>
-          </SelectContent>
-        </Select>
-        <Select
-          value={enrichmentStatus}
-          onValueChange={(v) => setEnrichmentStatus(v || "all")}
-        >
-          <SelectTrigger className="w-[150px]">
-            <SelectValue placeholder="Enrichment" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">Any enrichment</SelectItem>
-            <SelectItem value="PENDING">Pending</SelectItem>
-            <SelectItem value="ENRICHED">Enriched</SelectItem>
-            <SelectItem value="SKIPPED">Skipped</SelectItem>
-            <SelectItem value="FAILED">Failed</SelectItem>
-            <SelectItem value="NO_CONTACT">No contact</SelectItem>
-          </SelectContent>
-        </Select>
-        <Button onClick={applyFilters}>Apply</Button>
-      </div>
+      ) : null}
 
-      <div className="flex flex-wrap gap-2">
-        <Button
-          size="sm"
-          variant="outline"
-          disabled={busy || !selected.size}
-          onClick={() => runBulk("crawl")}
-        >
-          Crawl now
-        </Button>
-        <Button
-          size="sm"
-          variant="outline"
-          disabled={busy || !selected.size}
-          onClick={() => runBulk("enrich")}
-        >
-          Enrich now
-        </Button>
-        <Button
-          size="sm"
-          variant="outline"
-          disabled={busy || !selected.size}
-          onClick={() => runBulk("skip")}
-        >
-          Skip
-        </Button>
-        <Button
-          size="sm"
-          variant="outline"
-          disabled={busy || !selected.size}
-          onClick={() => runBulk("unskip")}
-        >
-          Unskip
-        </Button>
-        <span className="text-xs text-muted-foreground self-center">
-          {selected.size} selected
-        </span>
-      </div>
-
-      <div className="rounded-md border overflow-x-auto">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead className="w-10">
+      <div className="card table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th style={{ width: 36 }}>
                 <input
                   type="checkbox"
+                  className="chk-input"
                   aria-label="Select all"
-                  checked={
-                    items.length > 0 && selected.size === items.length
-                  }
+                  checked={items.length > 0 && selected.size === items.length}
                   onChange={(e) => toggleAll(e.target.checked)}
                 />
-              </TableHead>
-              <TableHead>Name</TableHead>
-              <TableHead>City / Country</TableHead>
-              <TableHead>Stage</TableHead>
-              <TableHead>Crawl</TableHead>
-              <TableHead>Enrichment</TableHead>
-              <TableHead>Best contact</TableHead>
-              <TableHead>Verification</TableHead>
-              <TableHead>Emails</TableHead>
-              <TableHead>Source</TableHead>
-              <TableHead>Found</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
+              </th>
+              <th>Company</th>
+              <th>Stage</th>
+              <th>Best contact</th>
+              <th className="hide-sm">Location</th>
+              <th className="hide-sm">Source</th>
+              <th className="hide-sm">Found</th>
+            </tr>
+          </thead>
+          <tbody>
             {items.length === 0 ? (
-              <TableRow>
-                <TableCell
-                  colSpan={11}
-                  className="h-24 text-center text-muted-foreground"
-                >
+              <tr>
+                <td colSpan={7} className="muted" style={{ textAlign: "center", padding: 32 }}>
                   No companies yet. Run Autopilot → Sourcing → Run now after
                   connecting Google Places and setting an ICP.
-                </TableCell>
-              </TableRow>
+                </td>
+              </tr>
             ) : (
               items.map((c) => {
                 const best = c.bestContact
                   ? displayContactName(c.bestContact.fullName, c.bestContact.email)
                   : null;
+                const v = verification(c.bestContact?.emailStatus);
+                const stage = stageBadge(c);
+                const location = [c.city, c.country].filter(Boolean).join(", ");
                 return (
-                  <TableRow key={c.id}>
-                    <TableCell>
+                  <tr key={c.id}>
+                    <td>
                       <input
                         type="checkbox"
+                        className="chk-input"
                         checked={selected.has(c.id)}
                         onChange={(e) => toggleOne(c.id, e.target.checked)}
                         aria-label={`Select ${c.name}`}
                       />
-                    </TableCell>
-                    <TableCell>
+                    </td>
+                    <td>
                       <Link
                         href={`/dashboard/companies/${c.id}`}
-                        className="font-medium hover:underline"
+                        className="cell-main"
                       >
                         {c.name}
                       </Link>
-                      {c.domain ? (
-                        <div className="text-xs text-muted-foreground">
-                          {c.domain}
-                        </div>
-                      ) : null}
-                    </TableCell>
-                    <TableCell className="text-sm text-muted-foreground">
-                      {[c.city, c.country].filter(Boolean).join(", ") || "—"}
-                    </TableCell>
-                    <TableCell>
-                      <FunnelStageBadge stage={c.funnelStage} />
-                    </TableCell>
-                    <TableCell>
-                      <CrawlStatusBadge status={c.crawlStatus} />
-                    </TableCell>
-                    <TableCell>
-                      <EnrichmentStatusBadge status={c.enrichmentStatus} />
-                    </TableCell>
-                    <TableCell className="text-sm">
-                      {best ? best.label : "—"}
-                    </TableCell>
-                    <TableCell>
-                      {c.bestContact?.emailStatus ? (
-                        <VerificationBadge status={c.bestContact.emailStatus} />
+                      {c.domain ? <div className="cell-sub">{c.domain}</div> : null}
+                    </td>
+                    <td>
+                      <span className={`badge ${stage.tone}`.trim()}>
+                        {stage.label}
+                      </span>
+                    </td>
+                    <td>
+                      {best && c.bestContact ? (
+                        <>
+                          <div>{best.label}</div>
+                          <div className="cell-sub">
+                            {c.bestContact.email ? `${c.bestContact.email} · ` : ""}
+                            <span style={{ color: v.color }}>{v.label}</span>
+                          </div>
+                        </>
                       ) : (
-                        "—"
+                        <span className="muted">—</span>
                       )}
-                    </TableCell>
-                    <TableCell>{c._count.emails}</TableCell>
-                    <TableCell>
-                      <SourceBadge source={c.source} />
-                    </TableCell>
-                    <TableCell className="text-xs text-muted-foreground whitespace-nowrap">
-                      {format(new Date(c.createdAt), "MMM d, yyyy")}
-                    </TableCell>
-                  </TableRow>
+                    </td>
+                    <td className="hide-sm">{location || "—"}</td>
+                    <td className="hide-sm">{sourceLabel(c.source)}</td>
+                    <td className="hide-sm muted">
+                      {format(new Date(c.createdAt), "MMM d")}
+                    </td>
+                  </tr>
                 );
               })
             )}
-          </TableBody>
-        </Table>
+          </tbody>
+        </table>
       </div>
 
-      <div className="flex items-center justify-between text-sm">
-        <span className="text-muted-foreground">
-          Page {pagination.page} of {pagination.totalPages} · {pagination.total}{" "}
-          companies
+      <div className="toolbar mt">
+        <span className="muted">
+          Showing {from}–{to} of {pagination.total}
         </span>
-        <div className="flex gap-2">
-          <Button
-            variant="outline"
-            size="sm"
-            disabled={pagination.page <= 1}
-            onClick={() =>
-              router.push(buildUrl({ page: pagination.page - 1 }))
-            }
-          >
-            Previous
-          </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            disabled={pagination.page >= pagination.totalPages}
-            onClick={() =>
-              router.push(buildUrl({ page: pagination.page + 1 }))
-            }
-          >
-            Next
-          </Button>
-        </div>
+        <span style={{ flex: 1 }} />
+        <button
+          type="button"
+          className="btn"
+          disabled={pagination.page <= 1}
+          onClick={() => router.push(buildUrl({ page: pagination.page - 1 }))}
+        >
+          Previous
+        </button>
+        <button
+          type="button"
+          className="btn"
+          disabled={pagination.page >= pagination.totalPages}
+          onClick={() => router.push(buildUrl({ page: pagination.page + 1 }))}
+        >
+          Next
+        </button>
       </div>
-    </div>
+    </>
   );
 }

@@ -6,6 +6,7 @@ import {
   Briefcase,
   Building2,
   Calendar,
+  ChevronsUpDown,
   Home,
   Inbox,
   Rocket,
@@ -21,6 +22,7 @@ import {
   SidebarGroupContent,
   SidebarHeader,
   SidebarMenu,
+  SidebarMenuBadge,
   SidebarMenuButton,
   SidebarMenuItem,
   SidebarRail,
@@ -47,6 +49,8 @@ interface AppSidebarProps {
   user: AuthUser;
   flags: FeatureFlags;
   autopilotStatus: AutopilotShellStatus;
+  /** Real counts keyed by nav title (e.g. Inbox, Outreach). */
+  navCounts?: Record<string, number>;
 }
 
 function canSee(user: AuthUser, anyOf?: PermissionKey[]): boolean {
@@ -68,6 +72,7 @@ const NAV: NavItem[] = [
     match: ({ pathname, tab }) =>
       pathname.startsWith("/dashboard/autopilot") &&
       tab !== "pitch" &&
+      tab !== "pitches" &&
       tab !== "outbound",
   },
   {
@@ -77,11 +82,12 @@ const NAV: NavItem[] = [
     anyOf: ["opportunities.view", "leads.view"],
     match: ({ pathname }) =>
       pathname.startsWith("/dashboard/companies") ||
-      pathname.startsWith("/dashboard/contacts"),
+      pathname.startsWith("/dashboard/contacts") ||
+      pathname.startsWith("/dashboard/leads"),
   },
   {
     title: "Outreach",
-    href: "/dashboard/autopilot?tab=pitch",
+    href: "/dashboard/outreach",
     icon: Send,
     anyOf: [
       "campaigns.manage",
@@ -90,10 +96,11 @@ const NAV: NavItem[] = [
       "integrations.manage",
     ],
     match: ({ pathname, tab }) =>
+      pathname.startsWith("/dashboard/outreach") ||
       pathname.startsWith("/dashboard/sequences") ||
       pathname.startsWith("/dashboard/campaigns") ||
       (pathname.startsWith("/dashboard/autopilot") &&
-        (tab === "pitch" || tab === "outbound")),
+        (tab === "pitch" || tab === "pitches" || tab === "outbound")),
   },
   {
     title: "Inbox",
@@ -121,7 +128,13 @@ const NAV: NavItem[] = [
   },
 ];
 
-function SidebarNav({ user }: { user: AuthUser }) {
+function SidebarNav({
+  user,
+  navCounts,
+}: {
+  user: AuthUser;
+  navCounts?: Record<string, number>;
+}) {
   const pathname = usePathname();
   const search = useSearchParams();
   const tab = search.get("tab");
@@ -138,13 +151,22 @@ function SidebarNav({ user }: { user: AuthUser }) {
             <item.icon />
             <span>{item.title}</span>
           </SidebarMenuButton>
+          {(navCounts?.[item.title] ?? 0) > 0 ? (
+            <SidebarMenuBadge className="rounded-full bg-primary px-1.5 text-[11px] font-semibold text-primary-foreground">
+              {navCounts![item.title]}
+            </SidebarMenuBadge>
+          ) : null}
         </SidebarMenuItem>
       ))}
     </SidebarMenu>
   );
 }
 
-export function AppSidebar({ user, autopilotStatus }: AppSidebarProps) {
+export function AppSidebar({
+  user,
+  autopilotStatus,
+  navCounts,
+}: AppSidebarProps) {
   const pathname = usePathname();
   const workspace =
     user.organizationName?.trim() || "Set workspace name in Settings";
@@ -163,14 +185,21 @@ export function AppSidebar({ user, autopilotStatus }: AppSidebarProps) {
             </div>
           </div>
         </Link>
-        <p className="truncate px-1 text-xs text-muted-foreground">{workspace}</p>
+        <Link
+          href="/dashboard/settings"
+          title="Workspace settings"
+          className="flex items-center justify-between gap-2 rounded-lg border border-sidebar-border bg-sidebar-accent/40 px-3 py-2 text-[13px] font-semibold text-sidebar-foreground transition-colors hover:bg-sidebar-accent"
+        >
+          <span className="truncate">{workspace}</span>
+          <ChevronsUpDown className="size-3.5 shrink-0 text-muted-foreground" />
+        </Link>
       </SidebarHeader>
 
       <SidebarContent>
         <SidebarGroup className="px-2 py-3">
           <SidebarGroupContent>
             <Suspense fallback={<SidebarMenu />}>
-              <SidebarNav user={user} />
+              <SidebarNav user={user} navCounts={navCounts} />
             </Suspense>
           </SidebarGroupContent>
         </SidebarGroup>

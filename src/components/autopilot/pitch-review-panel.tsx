@@ -4,17 +4,7 @@ import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { toast } from "sonner";
-import { Loader2 } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Textarea } from "@/components/ui/textarea";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
-import { EmptyState } from "@/components/crm/empty-state";
+import { Check, Loader2 } from "lucide-react";
 import { EmailPreview } from "@/components/email/email-preview";
 
 type PitchRow = {
@@ -54,6 +44,7 @@ export function PitchReviewPanel({ initial }: Props) {
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [busy, setBusy] = useState<string | null>(null);
   const [editing, setEditing] = useState<string | null>(null);
+  const [previewing, setPreviewing] = useState<string | null>(null);
   const [editFirst, setEditFirst] = useState("");
   const [editPitch, setEditPitch] = useState("");
 
@@ -143,21 +134,27 @@ export function PitchReviewPanel({ initial }: Props) {
 
   if (pitches.length === 0) {
     return (
-      <EmptyState
-        title="No draft pitches"
-        description="Run Audit now on enriched companies. Draft pitches appear here for approve / edit / reject before Phase 4 sends."
-        actionHref="/dashboard/autopilot?tab=audit"
-        actionLabel="Open Audit"
-      />
+      <div className="card">
+        <div className="card-body" style={{ textAlign: "center" }}>
+          <div className="cell-main">No draft pitches</div>
+          <p className="muted" style={{ margin: "4px 0 14px" }}>
+            Draft pitches appear here for approve / edit / reject before
+            anything is sent. They are written after a company is audited.
+          </p>
+          <Link href="/dashboard/autopilot?tab=audit" className="btn">
+            Open Audit
+          </Link>
+        </div>
+      </div>
     );
   }
 
   return (
-    <div className="space-y-4">
-      <div className="flex flex-wrap items-center gap-2">
-        <Button
-          size="sm"
-          variant="outline"
+    <div className="stack">
+      <div className="toolbar" style={{ marginBottom: 0 }}>
+        <button
+          type="button"
+          className="btn"
           onClick={() =>
             setSelected(
               selected.size === allIds.length ? new Set() : new Set(allIds)
@@ -165,28 +162,41 @@ export function PitchReviewPanel({ initial }: Props) {
           }
         >
           {selected.size === allIds.length ? "Clear selection" : "Select all"}
-        </Button>
-        <Button
-          size="sm"
+        </button>
+        <button
+          type="button"
+          className="btn primary"
           disabled={!selected.size || busy === "bulk"}
           onClick={bulkApprove}
         >
           {busy === "bulk" ? (
-            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-          ) : null}
+            <Loader2 className="animate-spin" />
+          ) : (
+            <Check />
+          )}
           Bulk approve ({selected.size})
-        </Button>
+        </button>
       </div>
 
       {pitches.map((p) => {
         const issues = issuesFromFindings(p.findings);
         const isEdit = editing === p.id;
+        const isPreview = previewing === p.id;
+        const noticed = issues[0] || p.topIssue;
+        const evidence = [
+          ...issues.slice(1),
+          p.pageSpeedMobile != null
+            ? `mobile speed ${p.pageSpeedMobile}/100`
+            : null,
+        ].filter(Boolean);
+
         return (
-          <Card key={p.id}>
-            <CardHeader className="flex flex-row items-start gap-3 space-y-0">
+          <div className="card" key={p.id}>
+            <div className="card-head">
               <input
                 type="checkbox"
-                className="mt-1 h-4 w-4"
+                className="chk-input"
+                aria-label={`Select ${p.company.name}`}
                 checked={selected.has(p.id)}
                 onChange={(e) => {
                   setSelected((prev) => {
@@ -197,51 +207,60 @@ export function PitchReviewPanel({ initial }: Props) {
                   });
                 }}
               />
-              <div className="min-w-0 flex-1">
-                <CardTitle className="text-base">
-                  <Link
-                    href={`/dashboard/companies/${p.company.id}`}
-                    className="hover:underline"
-                  >
+              <div>
+                <div className="card-title">
+                  <Link href={`/dashboard/companies/${p.company.id}`}>
                     {p.company.name}
                   </Link>
-                </CardTitle>
-                <CardDescription>
-                  {p.contact.fullName}
-                  {p.contact.title ? ` · ${p.contact.title}` : ""}
+                </div>
+                <div className="card-sub">
+                  To {p.contact.fullName}
                   {p.contact.email ? ` · ${p.contact.email}` : ""}
-                  {p.pageSpeedMobile != null
-                    ? ` · Mobile ${p.pageSpeedMobile}`
-                    : ""}
-                </CardDescription>
+                  {p.contact.title ? ` · ${p.contact.title}` : ""}
+                  {p.company.city ? ` · ${p.company.city}` : ""}
+                </div>
               </div>
-            </CardHeader>
-            <CardContent className="space-y-3 text-sm">
-              {issues.length > 0 ? (
-                <ul className="list-disc pl-5 text-muted-foreground">
-                  {issues.map((i) => (
-                    <li key={i}>{i}</li>
-                  ))}
-                </ul>
-              ) : p.topIssue ? (
-                <p className="text-muted-foreground">{p.topIssue}</p>
+              <span className="badge warn" style={{ marginLeft: "auto" }}>
+                Waiting approval
+              </span>
+            </div>
+            <div className="card-body">
+              {noticed ? (
+                <>
+                  <div className="cell-sub" style={{ marginBottom: 6 }}>
+                    WHAT WE NOTICED
+                  </div>
+                  <div className="cell-main">{noticed}</div>
+                </>
               ) : null}
+              {evidence.length > 0 ? (
+                <p className="muted" style={{ margin: "6px 0 14px" }}>
+                  Evidence: {evidence.join(" · ")}
+                </p>
+              ) : (
+                <div style={{ height: 14 }} />
+              )}
 
               {isEdit ? (
-                <div className="space-y-2">
-                  <Textarea
-                    value={editFirst}
-                    onChange={(e) => setEditFirst(e.target.value)}
-                    rows={2}
-                  />
-                  <Textarea
-                    value={editPitch}
-                    onChange={(e) => setEditPitch(e.target.value)}
-                    rows={4}
-                  />
-                  <div className="flex gap-2">
-                    <Button
-                      size="sm"
+                <div className="stack" style={{ gap: 8 }}>
+                  <div className="field area">
+                    <textarea
+                      value={editFirst}
+                      onChange={(e) => setEditFirst(e.target.value)}
+                      rows={2}
+                    />
+                  </div>
+                  <div className="field area">
+                    <textarea
+                      value={editPitch}
+                      onChange={(e) => setEditPitch(e.target.value)}
+                      rows={4}
+                    />
+                  </div>
+                  <div className="toolbar" style={{ marginBottom: 0 }}>
+                    <button
+                      type="button"
+                      className="btn primary"
                       disabled={busy === `edit:${p.id}`}
                       onClick={() =>
                         act(p.id, "edit", {
@@ -251,45 +270,57 @@ export function PitchReviewPanel({ initial }: Props) {
                       }
                     >
                       Save
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="ghost"
+                    </button>
+                    <button
+                      type="button"
+                      className="btn"
                       onClick={() => setEditing(null)}
                     >
                       Cancel
-                    </Button>
+                    </button>
                   </div>
                 </div>
               ) : (
                 <>
-                  <p className="font-medium">{p.personalizedFirstLine}</p>
-                  <p className="text-muted-foreground whitespace-pre-wrap">
-                    {p.shortPitch}
-                  </p>
+                  <div className="field area" style={{ display: "block" }}>
+                    <div style={{ color: "var(--dx-text)", fontWeight: 600 }}>
+                      {p.personalizedFirstLine}
+                    </div>
+                    <div style={{ whiteSpace: "pre-wrap", marginTop: 6 }}>
+                      {p.shortPitch}
+                    </div>
+                  </div>
                   {p.recommendedService ? (
-                    <p className="text-xs">
+                    <p className="cell-sub" style={{ marginTop: 8 }}>
                       Recommended: {p.recommendedService}
-                      {p.confidence != null ? ` · confidence ${p.confidence}` : ""}
+                      {p.confidence != null
+                        ? ` · confidence ${p.confidence}`
+                        : ""}
                     </p>
                   ) : null}
                 </>
               )}
 
-              <EmailPreview pitchId={p.id} />
+              {isPreview ? (
+                <div style={{ marginTop: 14 }}>
+                  <EmailPreview pitchId={p.id} />
+                </div>
+              ) : null}
 
               {!isEdit ? (
-                <div className="flex flex-wrap gap-2 pt-1">
-                  <Button
-                    size="sm"
+                <div className="toolbar mt" style={{ marginBottom: 0 }}>
+                  <button
+                    type="button"
+                    className="btn primary"
                     disabled={Boolean(busy)}
                     onClick={() => act(p.id, "approve")}
                   >
+                    <Check />
                     Approve
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="outline"
+                  </button>
+                  <button
+                    type="button"
+                    className="btn"
                     disabled={Boolean(busy)}
                     onClick={() => {
                       setEditing(p.id);
@@ -298,27 +329,35 @@ export function PitchReviewPanel({ initial }: Props) {
                     }}
                   >
                     Edit
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    disabled={Boolean(busy)}
-                    onClick={() => act(p.id, "reject")}
+                  </button>
+                  <button
+                    type="button"
+                    className="btn"
+                    onClick={() => setPreviewing(isPreview ? null : p.id)}
                   >
-                    Reject
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="ghost"
+                    {isPreview ? "Hide preview" : "Preview email"}
+                  </button>
+                  <button
+                    type="button"
+                    className="btn"
                     disabled={Boolean(busy)}
                     onClick={() => act(p.id, "regenerate")}
                   >
                     Regenerate
-                  </Button>
+                  </button>
+                  <span style={{ flex: 1 }} />
+                  <button
+                    type="button"
+                    className="btn"
+                    disabled={Boolean(busy)}
+                    onClick={() => act(p.id, "reject")}
+                  >
+                    Reject
+                  </button>
                 </div>
               ) : null}
-            </CardContent>
-          </Card>
+            </div>
+          </div>
         );
       })}
     </div>

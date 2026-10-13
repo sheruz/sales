@@ -1,23 +1,46 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
+import { AlertTriangle } from "lucide-react";
 import { getCurrentUser } from "@/lib/auth/session";
-import { hasAnyOrgPermission, hasOrgPermission } from "@/lib/tenant/scope";
+import { hasAnyOrgPermission } from "@/lib/tenant/scope";
 import { sourcingJobService } from "@/services/sourcing-job.service";
 import { enrichmentJobService } from "@/services/enrichment-job.service";
 import { websiteAuditService } from "@/services/website-audit.service";
 import { outboundJobService } from "@/services/outbound-job.service";
-import { mailboxPoolService } from "@/services/mailbox-pool.service";
 import { cronTickService } from "@/services/cron-tick.service";
+import { autopilotOverviewService } from "@/services/autopilot-overview.service";
 import { SourcingPanel } from "@/components/autopilot/sourcing-panel";
 import { EnrichmentPanel } from "@/components/autopilot/enrichment-panel";
 import { AuditPanel } from "@/components/autopilot/audit-panel";
-import { PitchReviewPanel } from "@/components/autopilot/pitch-review-panel";
-import { OutboundPanel } from "@/components/autopilot/outbound-panel";
-import { OverviewPanel } from "@/components/autopilot/overview-panel";
-import { autopilotOverviewService } from "@/services/autopilot-overview.service";
-import { EmptyState } from "@/components/crm/empty-state";
-import { Button } from "@/components/ui/button";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import {
+  AutopilotMasterButtons,
+  StageToggle,
+} from "@/components/autopilot/autopilot-controls";
+
+const SETUP_HREFS: Record<string, string> = {
+  ai: "/dashboard/settings?tab=integrations",
+  places: "/dashboard/settings?tab=integrations",
+  pagespeed: "/dashboard/settings?tab=integrations",
+  hunter: "/dashboard/settings?tab=integrations",
+  icp: "/dashboard/icp",
+  services: "/dashboard/services",
+  cron: "/dashboard/autopilot",
+  outbound_compliance: "/dashboard/outreach?tab=outbound",
+  inboxes: "/dashboard/outreach?tab=outbound",
+};
+
+function formatAgo(date: Date): string {
+  const mins = Math.max(0, Math.floor((Date.now() - date.getTime()) / 60_000));
+  if (mins < 1) return "just now";
+  if (mins < 60) return `${mins} min ago`;
+  const hours = Math.floor(mins / 60);
+  if (hours < 48) return `${hours}h ago`;
+  return `${Math.floor(hours / 24)}d ago`;
+}
+
+function usd(n: number) {
+  return `$${n.toFixed(2)}`;
+}
 
 export default async function AutopilotPage({
   searchParams,
@@ -36,17 +59,32 @@ export default async function AutopilotPage({
 
   if (!canSourcing) {
     return (
-      <div className="space-y-6">
-        <h2 className="text-2xl font-bold tracking-tight">Autopilot</h2>
-        <EmptyState
-          title="No permission"
-          description="Ask an admin for integrations.manage, campaigns.manage, or business_brain.manage."
-        />
+      <div className="page">
+        <div className="page-head">
+          <div>
+            <h1 className="page-title">Autopilot</h1>
+            <p className="page-sub">
+              Ask an admin for integrations.manage, campaigns.manage, or
+              business_brain.manage.
+            </p>
+          </div>
+        </div>
+        <div className="card">
+          <div className="card-body muted">No permission.</div>
+        </div>
       </div>
     );
   }
 
   const params = await searchParams;
+
+  if (params.tab === "pitch" || params.tab === "pitches") {
+    redirect("/dashboard/outreach?tab=pitch");
+  }
+  if (params.tab === "outbound") {
+    redirect("/dashboard/outreach?tab=mailboxes");
+  }
+
   const tab =
     params.tab === "enrichment"
       ? "enrichment"
@@ -54,30 +92,22 @@ export default async function AutopilotPage({
         ? "sourcing"
         : params.tab === "audit"
           ? "audit"
-          : params.tab === "pitches"
-            ? "pitches"
-            : params.tab === "outbound"
-              ? "outbound"
-              : "overview";
+          : "overview";
 
   let data;
   let enrichment;
   let audit;
   let outbound;
-  let availableAccounts;
-  let draftPitches;
   let lastTick;
   let overview;
   let schemaError: string | null = null;
   try {
-    [data, enrichment, audit, outbound, availableAccounts, draftPitches, lastTick, overview] =
+    [data, enrichment, audit, outbound, lastTick, overview] =
       await Promise.all([
         sourcingJobService.dashboard(user.organizationId),
         enrichmentJobService.dashboard(user.organizationId),
         websiteAuditService.dashboard(user.organizationId),
         outboundJobService.dashboard(user.organizationId),
-        mailboxPoolService.listAvailableAccounts(user.organizationId),
-        websiteAuditService.listDraftPitches(user.organizationId),
         cronTickService.lastTick(),
         autopilotOverviewService.get(user.organizationId, user.id),
       ]);
@@ -89,26 +119,40 @@ export default async function AutopilotPage({
 
   if (schemaError || !data || !enrichment || !audit || !outbound || !overview) {
     return (
-      <div className="space-y-6">
-        <h2 className="text-2xl font-bold tracking-tight">Autopilot</h2>
-        <div className="rounded-lg border border-destructive/40 bg-destructive/10 p-4 text-sm space-y-2">
-          <p className="font-medium">Database schema is behind this deploy.</p>
-          <p className="text-muted-foreground">
-            Phase 4 outbound tables may be missing. On the server (after pg_dump):
-          </p>
-          <pre className="overflow-x-auto rounded bg-muted p-3 text-xs">
-            {`cd /var/www/html/sales
+      <div className="page">
+        <div className="page-head">
+          <div>
+            <h1 className="page-title">Autopilot</h1>
+            <p className="page-sub">Could not load Autopilot.</p>
+          </div>
+        </div>
+        <div className="banner">
+          <AlertTriangle />
+          <div className="t">
+            <b>Database schema is behind this deploy.</b>{" "}
+            <span className="muted">
+              Phase 4 outbound tables may be missing. On the server (after
+              pg_dump):
+            </span>
+          </div>
+        </div>
+        <div className="card">
+          <div className="card-body">
+            <pre className="muted" style={{ overflowX: "auto", fontSize: 12 }}>
+              {`cd /var/www/html/sales
 DRY_RUN=1 npm run db:migrate:phase4-outbound
 npm run db:migrate:phase4-outbound
 pm2 restart all`}
-          </pre>
-          <p className="text-xs text-muted-foreground break-all">{schemaError}</p>
+            </pre>
+            <p className="muted mt" style={{ wordBreak: "break-all" }}>
+              {schemaError}
+            </p>
+          </div>
         </div>
       </div>
     );
   }
 
-  const canIntegrations = hasOrgPermission(user, "integrations.manage");
   const lastCronRun = lastTick
     ? {
         startedAt: lastTick.startedAt.toISOString(),
@@ -120,138 +164,373 @@ pm2 restart all`}
       }
     : null;
 
+  const toggles = overview.toggles;
+  const anyRunning =
+    toggles.sourcing ||
+    toggles.enrichment ||
+    toggles.audit ||
+    toggles.outbound;
+  const testMode = outbound.config.shadowMode !== false;
+  const cronBad = !lastCronRun || lastCronRun.stale;
+
+  const activeSearches = data.queries.filter(
+    (q) => q.status === "ACTIVE"
+  ).length;
+  const activeMailboxes = outbound.mailboxes.length;
+
+  const setup = overview.checklist.filter((c) => !c.comingSoon);
+  const setupDone = setup.filter((c) => c.done).length;
+
+  const health = overview.health;
+  const healthBad = cronBad;
+  const healthWarn = health.errorsLast24h > 0;
+
+  const tabs: {
+    key: string;
+    label: string;
+    href: string;
+    count?: number;
+  }[] = [
+    { key: "overview", label: "Overview", href: "/dashboard/autopilot" },
+    {
+      key: "sourcing",
+      label: "Sourcing",
+      href: "/dashboard/autopilot?tab=sourcing",
+    },
+    {
+      key: "enrichment",
+      label: "Enrichment",
+      href: "/dashboard/autopilot?tab=enrichment",
+    },
+    { key: "audit", label: "Audit", href: "/dashboard/autopilot?tab=audit" },
+    {
+      key: "pitch",
+      label: "Pitch review",
+      href: "/dashboard/outreach?tab=pitch",
+      count: audit.draftPitches,
+    },
+    {
+      key: "outbound",
+      label: "Outbound",
+      href: "/dashboard/outreach?tab=outbound",
+    },
+  ];
+
   return (
-    <div className="space-y-6">
-      <div>
-        <h2 className="text-2xl font-bold tracking-tight">Autopilot</h2>
-        <p className="text-muted-foreground">
-          Sourcing → Enrichment → Audit → Outbound. Keep Outbound OFF + Shadow
-          ON until test-to-self succeeds.
-        </p>
-      </div>
-
-      {lastCronRun?.stale || !lastCronRun ? (
-        <div className="rounded-lg border border-amber-500/40 bg-amber-500/10 p-3 text-sm">
-          Cron warning: last run is missing or older than 15 minutes. Set up{" "}
-          <code className="text-xs">scripts/cron-tick.sh</code> on the server.
-        </div>
-      ) : (
-        <p className="text-xs text-muted-foreground">
-          Last cron run:{" "}
-          {new Date(
-            lastCronRun.finishedAt || lastCronRun.startedAt
-          ).toLocaleString()}
-        </p>
-      )}
-
-      <div className="flex flex-wrap gap-2 rounded-lg border border-dashed p-4 text-sm">
-        <span className="w-full font-medium">Test setup</span>
-        <Link href="/dashboard/settings?tab=integrations">
-          <Button variant="outline" size="sm">
-            1. Google + Hunter keys
-          </Button>
-        </Link>
-        <Link href="/dashboard/icp">
-          <Button variant="outline" size="sm">
-            2. ICP
-          </Button>
-        </Link>
-        <Link href="/dashboard/services">
-          <Button variant="outline" size="sm">
-            3. Services / case studies
-          </Button>
-        </Link>
-        <Link href="/dashboard/companies">
-          <Button variant="outline" size="sm">
-            4. Companies
-          </Button>
-        </Link>
-        {!canIntegrations ? (
-          <p className="w-full text-xs text-muted-foreground">
-            Connecting API keys requires integrations.manage.
+    <div className="page">
+      <div className="page-head">
+        <div>
+          <h1 className="page-title">Autopilot</h1>
+          <p className="page-sub">
+            Finds businesses, writes pitches and emails them while you&apos;re
+            away.
           </p>
-        ) : null}
+        </div>
+        <div className="page-actions">
+          <AutopilotMasterButtons
+            running={anyRunning}
+            settingsHref="/dashboard/autopilot"
+          />
+        </div>
       </div>
 
-      <Tabs defaultValue={tab}>
-        <TabsList className="flex h-auto flex-wrap">
-          <TabsTrigger value="overview">Overview</TabsTrigger>
-          <TabsTrigger value="sourcing">Sourcing</TabsTrigger>
-          <TabsTrigger value="enrichment">Enrichment</TabsTrigger>
-          <TabsTrigger value="audit">Audit</TabsTrigger>
-          <TabsTrigger value="pitches">Pitch review</TabsTrigger>
-          <TabsTrigger value="outbound">Outbound</TabsTrigger>
-        </TabsList>
-        <TabsContent value="overview" className="mt-4">
-          <OverviewPanel data={overview} />
-        </TabsContent>
-        <TabsContent value="sourcing" className="mt-4">
-          <SourcingPanel
-            initial={{
-              config: data.config,
-              companiesToday: data.companiesToday,
-              pendingCrawls: data.pendingCrawls,
-              costs: data.costs,
-              recentErrors: data.recentErrors,
-              lastCronRun,
-              queries: data.queries.map((q) => ({
-                id: q.id,
-                query: q.query,
-                country: q.country,
-                city: q.city,
-                status: q.status,
-                lastRunAt: q.lastRunAt?.toISOString() ?? null,
-                resultsCount: q.resultsCount,
-                pageToken: q.pageToken,
-                lastError: q.lastError,
-              })),
-            }}
-          />
-        </TabsContent>
-        <TabsContent value="enrichment" className="mt-4">
-          <EnrichmentPanel
-            initial={{
-              ...enrichment,
-              lastCronRun,
-            }}
-          />
-        </TabsContent>
-        <TabsContent value="audit" className="mt-4">
-          <AuditPanel
-            initial={{
-              ...audit,
-              lastCronRun,
-            }}
-          />
-        </TabsContent>
-        <TabsContent value="pitches" className="mt-4">
-          <PitchReviewPanel
-            initial={{
-              pitches: (draftPitches ?? []).map((p) => ({
-                id: p.id,
-                personalizedFirstLine: p.personalizedFirstLine,
-                shortPitch: p.shortPitch,
-                topIssue: p.topIssue,
-                recommendedService: p.recommendedService,
-                confidence: p.confidence,
-                company: p.company,
-                contact: p.contact,
-                findings: p.websiteAudit.findings,
-                pageSpeedMobile: p.websiteAudit.pageSpeedMobile,
-              })),
-            }}
-          />
-        </TabsContent>
-        <TabsContent value="outbound" className="mt-4">
-          <OutboundPanel
-            initial={{
-              ...outbound,
-              availableAccounts,
-              lastCronRun,
-            }}
-          />
-        </TabsContent>
-      </Tabs>
+      {testMode ? (
+        <div className="banner">
+          <AlertTriangle />
+          <div className="t">
+            <b>Sending is in test mode.</b>{" "}
+            <span className="muted">
+              Emails are queued but not delivered until you turn off shadow
+              mode.
+            </span>
+          </div>
+          <Link href="/dashboard/outreach?tab=outbound" className="btn">
+            Go live
+          </Link>
+        </div>
+      ) : null}
+
+      {cronBad ? (
+        <div className="banner">
+          <AlertTriangle />
+          <div className="t">
+            <b>Cron warning.</b>{" "}
+            <span className="muted">
+              Last run is missing or older than 15 minutes. Set up{" "}
+              <code>scripts/cron-tick.sh</code> on the server.
+            </span>
+          </div>
+        </div>
+      ) : null}
+
+      <div className="tabs">
+        {tabs.map((t) => (
+          <Link
+            key={t.key}
+            href={t.href}
+            className={`tab${t.key === tab ? " active" : ""}`}
+          >
+            {t.label}
+            {t.count ? <span className="n">{t.count}</span> : null}
+          </Link>
+        ))}
+      </div>
+
+      {tab === "overview" ? (
+        <>
+          <div className="card">
+            <div className="card-head">
+              <div>
+                <div className="card-title">Pipeline steps</div>
+                <div className="card-sub">
+                  Each step runs on its own every 5 minutes within your daily
+                  limits
+                </div>
+              </div>
+            </div>
+
+            <div className="stage-row">
+              <div className="stage-num">1</div>
+              <div className="stage-info">
+                <div className="stage-name">Find businesses</div>
+                <div className="cell-sub">
+                  Google Maps · {activeSearches} active{" "}
+                  {activeSearches === 1 ? "search" : "searches"} ·{" "}
+                  {data.pendingCrawls} awaiting crawl
+                </div>
+              </div>
+              <div className="stat-inline hide-sm">
+                <b>{data.companiesToday}</b> today / {data.config.companiesPerDay}
+              </div>
+              <StageToggle
+                stage="sourcing"
+                enabled={toggles.sourcing}
+                label="Find businesses"
+              />
+            </div>
+
+            <div className="stage-row">
+              <div className="stage-num">2</div>
+              <div className="stage-info">
+                <div className="stage-name">Find decision-maker</div>
+                <div className="cell-sub">
+                  Hunter ·{" "}
+                  {enrichment.creditsRemaining != null
+                    ? `${enrichment.creditsRemaining} credits left`
+                    : "credits unavailable"}{" "}
+                  · {enrichment.pending} waiting
+                </div>
+              </div>
+              <div className="stat-inline hide-sm">
+                <b>{enrichment.enrichedToday}</b> today /{" "}
+                {enrichment.dailyCreditLimit} credits
+              </div>
+              <StageToggle
+                stage="enrichment"
+                enabled={toggles.enrichment}
+                label="Find decision-maker"
+              />
+            </div>
+
+            <div className="stage-row">
+              <div className="stage-num">3</div>
+              <div className="stage-info">
+                <div className="stage-name">Audit website &amp; write pitch</div>
+                <div className="cell-sub">
+                  PageSpeed + AI · {audit.draftPitches}{" "}
+                  {audit.draftPitches === 1 ? "pitch needs" : "pitches need"}{" "}
+                  your approval
+                </div>
+              </div>
+              <div className="stat-inline hide-sm">
+                <b>{audit.auditedToday}</b> today / {audit.config.dailyLimit}
+              </div>
+              <StageToggle
+                stage="audit"
+                enabled={toggles.audit}
+                label="Audit website and write pitch"
+              />
+            </div>
+
+            <div className="stage-row">
+              <div className="stage-num">4</div>
+              <div className="stage-info">
+                <div className="stage-name">Send emails</div>
+                <div className="cell-sub">
+                  {activeMailboxes} {activeMailboxes === 1 ? "inbox" : "inboxes"}{" "}
+                  · {outbound.queued} queued · {outbound.held} held
+                  {testMode ? " · test mode" : ""}
+                </div>
+              </div>
+              <div className="stat-inline hide-sm">
+                <b>{outbound.sentToday}</b> today / {outbound.globalCap}
+              </div>
+              <StageToggle
+                stage="outbound"
+                enabled={toggles.outbound}
+                label="Send emails"
+              />
+            </div>
+
+            <div className="stage-row">
+              <div className="stage-num">5</div>
+              <div className="stage-info">
+                <div className="stage-name">Answer replies &amp; book calls</div>
+                <div className="cell-sub">
+                  Replies land in your inbox; pricing and contract questions
+                  are handed to you
+                </div>
+              </div>
+              <div className="stat-inline hide-sm">
+                <b>
+                  {overview.funnel.find((f) => f.key === "replied")?.count ?? 0}
+                </b>{" "}
+                replied
+              </div>
+              <Link href="/dashboard/conversations" className="btn">
+                Open inbox
+              </Link>
+            </div>
+          </div>
+
+          <div className="grid g2 mt">
+            <div className="card">
+              <div className="card-head">
+                <div className="card-title">Health</div>
+                <span
+                  className={`badge ${
+                    healthBad ? "bad" : healthWarn ? "warn" : "ok"
+                  }`}
+                  style={{ marginLeft: "auto" }}
+                >
+                  {healthBad
+                    ? "Cron not running"
+                    : healthWarn
+                      ? "Errors"
+                      : "All good"}
+                </span>
+              </div>
+              <table>
+                <tbody>
+                  <tr>
+                    <td className="muted">Last run</td>
+                    <td style={{ textAlign: "right" }}>
+                      {health.lastCronRun
+                        ? formatAgo(
+                            new Date(
+                              health.lastCronRun.finishedAt ||
+                                health.lastCronRun.startedAt
+                            )
+                          )
+                        : "Never"}
+                    </td>
+                  </tr>
+                  <tr>
+                    <td className="muted">Google spend today</td>
+                    <td style={{ textAlign: "right" }}>
+                      {usd(health.googleSpendTodayUsd)}
+                    </td>
+                  </tr>
+                  <tr>
+                    <td className="muted">AI spend today</td>
+                    <td style={{ textAlign: "right" }}>
+                      {usd(audit.costs.claudeTodayUsd)}
+                    </td>
+                  </tr>
+                  <tr>
+                    <td className="muted">Hunter credits left</td>
+                    <td style={{ textAlign: "right" }}>
+                      {health.hunterCreditsRemaining ?? "\u2014"}
+                    </td>
+                  </tr>
+                  <tr>
+                    <td className="muted">Errors (24h)</td>
+                    <td style={{ textAlign: "right" }}>
+                      {health.errorsLast24h}
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+
+            <div className="card">
+              <div className="card-head">
+                <div className="card-title">Setup</div>
+                <span className="card-sub" style={{ marginLeft: "auto" }}>
+                  {setupDone} of {setup.length} done
+                </span>
+              </div>
+              <table>
+                <tbody>
+                  {setup.map((item) => (
+                    <tr key={item.key}>
+                      <td>
+                        <span
+                          className={`badge ${item.done ? "ok" : "warn"} plain`}
+                        >
+                          {item.done ? "\u2713" : "!"}
+                        </span>
+                        &nbsp; {item.label}
+                        {!item.done ? (
+                          <Link
+                            href={SETUP_HREFS[item.key] ?? "/dashboard/settings"}
+                            className="muted"
+                            style={{ float: "right" }}
+                          >
+                            Fix &rarr;
+                          </Link>
+                        ) : null}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </>
+      ) : null}
+
+      {tab === "sourcing" ? (
+        <SourcingPanel
+          initial={{
+            config: data.config,
+            companiesToday: data.companiesToday,
+            pendingCrawls: data.pendingCrawls,
+            costs: data.costs,
+            recentErrors: data.recentErrors,
+            lastCronRun,
+            queries: data.queries.map((q) => ({
+              id: q.id,
+              query: q.query,
+              country: q.country,
+              city: q.city,
+              status: q.status,
+              lastRunAt: q.lastRunAt?.toISOString() ?? null,
+              resultsCount: q.resultsCount,
+              pageToken: q.pageToken,
+              lastError: q.lastError,
+            })),
+          }}
+        />
+      ) : null}
+
+      {tab === "enrichment" ? (
+        <EnrichmentPanel
+          initial={{
+            ...enrichment,
+            lastCronRun,
+          }}
+        />
+      ) : null}
+
+      {tab === "audit" ? (
+        <AuditPanel
+          initial={{
+            ...audit,
+            lastCronRun,
+          }}
+        />
+      ) : null}
     </div>
   );
 }

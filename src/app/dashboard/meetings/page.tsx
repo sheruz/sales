@@ -2,11 +2,39 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { format } from "date-fns";
 import { meetingService } from "@/services/meeting.service";
+import { emailBrandingService } from "@/services/email-branding.service";
 import { getCurrentUser } from "@/lib/auth/session";
 import { hasAnyOrgPermission } from "@/lib/tenant/scope";
-import { Badge } from "@/components/ui/badge";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { EmptyState } from "@/components/crm/empty-state";
+import {
+  CopyBookingLinkButton,
+  MeetingRow,
+} from "@/components/meetings/meeting-actions";
+
+function prepToText(value: unknown): string | null {
+  if (value == null) return null;
+  if (typeof value === "string") return value.trim() || null;
+  if (Array.isArray(value)) {
+    const parts = value
+      .map((v) => prepToText(v))
+      .filter((v): v is string => !!v);
+    return parts.length ? parts.map((p) => `• ${p}`).join("\n") : null;
+  }
+  if (typeof value === "object") {
+    const parts = Object.entries(value as Record<string, unknown>)
+      .map(([k, v]) => {
+        const text = prepToText(v);
+        return text ? `${k}: ${text}` : null;
+      })
+      .filter((v): v is string => !!v);
+    return parts.length ? parts.join("\n") : null;
+  }
+  return String(value);
+}
+
+function isHttpUrl(value: string | null | undefined): value is string {
+  return !!value && /^https?:\/\//i.test(value.trim());
+}
 
 export default async function MeetingsPage() {
   const user = await getCurrentUser();
@@ -17,75 +45,99 @@ export default async function MeetingsPage() {
     redirect("/dashboard");
   }
 
-  const meetings = await meetingService.list(user.organizationId);
+  const [meetings, branding] = await Promise.all([
+    meetingService.list(user.organizationId),
+    emailBrandingService.get(user.organizationId).catch(() => null),
+  ]);
+
+  const bookingUrl = branding?.bookingUrl?.trim() ?? "";
 
   return (
-    <div className="space-y-6">
-      <div>
-        <h2 className="text-2xl font-bold tracking-tight">Meetings</h2>
-        <p className="text-muted-foreground">
-          Scheduled and completed meetings linked to opportunities.
-        </p>
+    <div className="dx">
+      <div className="page">
+        <div className="page-head">
+          <div>
+            <h1 className="page-title">Meetings</h1>
+            <p className="page-sub">
+              Calls the AI booked for you, with prep notes.
+            </p>
+          </div>
+          {isHttpUrl(bookingUrl) ? (
+            <div className="page-actions">
+              <CopyBookingLinkButton url={bookingUrl} />
+            </div>
+          ) : null}
+        </div>
+
+        {meetings.length === 0 ? (
+          <EmptyState
+            title="No meetings yet"
+            description="Book a meeting from an opportunity detail page."
+            actionHref="/dashboard/opportunities"
+            actionLabel="View opportunities"
+          />
+        ) : (
+          <div className="card">
+            {meetings.map((m) => {
+              const prep =
+                prepToText(m.aiPrepNotes) ??
+                prepToText(m.notes) ??
+                prepToText(m.description);
+              const upcoming = m.outcome === "SCHEDULED";
+              const subtitleParts = [
+                format(new Date(m.date), "EEE MMM d · h:mm a"),
+                m.location,
+              ].filter(Boolean);
+              return (
+                <MeetingRow
+                  key={m.id}
+                  title={m.title}
+                  subtitle={subtitleParts.join(" · ")}
+                  prep={prep}
+                  joinUrl={
+                    upcoming && isHttpUrl(m.meetingLink) ? m.meetingLink : null
+                  }
+                  badge={
+                    <span
+                      className={`badge ${
+                        m.outcome === "COMPLETED"
+                          ? "ok"
+                          : m.outcome === "SCHEDULED"
+                            ? "info"
+                            : m.outcome === "NO_SHOW" || m.outcome === "CANCELLED"
+                              ? "bad"
+                              : "warn"
+                      }`}
+                    >
+                      {m.outcome.replace("_", " ").toLowerCase().replace(/^\w/, (c) => c.toUpperCase())}
+                    </span>
+                  }
+                  links={
+                    <>
+                      {m.company ? (
+                        <Link href={`/dashboard/companies/${m.company.id}`}>
+                          {m.company.name}
+                        </Link>
+                      ) : null}
+                      {m.contact ? (
+                        <Link href={`/dashboard/contacts/${m.contact.id}`}>
+                          {m.contact.fullName}
+                        </Link>
+                      ) : null}
+                      {m.opportunityId ? (
+                        <Link href={`/dashboard/opportunities/${m.opportunityId}`}>
+                          Opportunity
+                          {m.opportunity?.stage ? ` · ${m.opportunity.stage}` : ""}
+                        </Link>
+                      ) : null}
+                    </>
+                  }
+                />
+              );
+            })}
+          </div>
+        )}
       </div>
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">Upcoming & recent</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-3">
-          {meetings.length === 0 ? (
-            <EmptyState
-              title="No meetings yet"
-              description="Book a meeting from an opportunity detail page."
-              actionHref="/dashboard/opportunities"
-              actionLabel="View opportunities"
-            />
-          ) : (
-            meetings.map((m) => (
-              <div
-                key={m.id}
-                className="flex flex-wrap items-center justify-between gap-2 border-b border-border pb-3 last:border-0"
-              >
-                <div>
-                  <p className="text-sm font-medium">{m.title}</p>
-                  <p className="text-xs text-muted-foreground">
-                    {format(new Date(m.date), "MMM d, yyyy HH:mm")}
-                  </p>
-                  <div className="mt-1 flex flex-wrap gap-2 text-xs">
-                    {m.company ? (
-                      <Link
-                        href={`/dashboard/companies/${m.company.id}`}
-                        className="text-primary hover:underline"
-                      >
-                        {m.company.name}
-                      </Link>
-                    ) : null}
-                    {m.contact ? (
-                      <Link
-                        href={`/dashboard/contacts/${m.contact.id}`}
-                        className="text-primary hover:underline"
-                      >
-                        {m.contact.fullName}
-                      </Link>
-                    ) : null}
-                    {m.opportunityId ? (
-                      <Link
-                        href={`/dashboard/opportunities/${m.opportunityId}`}
-                        className="text-primary hover:underline"
-                      >
-                        Opportunity
-                        {m.opportunity?.stage
-                          ? ` · ${m.opportunity.stage}`
-                          : ""}
-                      </Link>
-                    ) : null}
-                  </div>
-                </div>
-                <Badge variant="outline">{m.outcome}</Badge>
-              </div>
-            ))
-          )}
-        </CardContent>
-      </Card>
     </div>
   );
 }

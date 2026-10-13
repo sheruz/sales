@@ -1,0 +1,112 @@
+/* Delvix R2 — page-level helpers used by app pages (complements dx-reference.css) */
+
+/* Sidebar active rail (reference: soft brand fill + left accent) */
+[data-slot="sidebar-menu-button"][data-active="true"] {
+  background: color-mix(in srgb, var(--primary) 14%, transparent) !important;
+  color: var(--sidebar-foreground) !important;
+  position: relative;
+}
+[data-slot="sidebar-menu-button"][data-active="true"]::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 6px;
+  bottom: 6px;
+  width: 3px;
+  border-radius: 0 3px 3px 0;
+  background: var(--primary);
+}
+[data-slot="sidebar-menu-button"][data-active="true"] svg {
+  color: var(--primary);
+}
+
+.dx .page { width: 100%; }
+.dx .page-head { display: flex; align-items: flex-start; gap: 16px; margin-bottom: 22px; }
+.dx .page-title { font-size: 22px; font-weight: 700; letter-spacing: -0.4px; }
+.dx .page-sub { color: var(--dx-text-2); margin-top: 2px; }
+.dx .page-actions { margin-left: auto; display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+
+.dx .avatar {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  flex: none;
+  font-weight: 700;
+  font-size: 13px;
+  background: var(--dx-surface-3);
+  color: var(--dx-text);
+}
+
+.dx button.btn { cursor: pointer; font-family: inherit; }
+.dx button.btn:disabled { opacity: 0.6; cursor: not-allowed; }
+.dx a.btn.active { border-color: var(--dx-border-strong); background: var(--dx-surface-2); }
+
+.dx .select select {
+  background: transparent;
+  border: 0;
+  outline: 0;
+  color: var(--dx-text);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+.dx .select select option { background: var(--dx-surface); color: var(--dx-text); }
+
+/* Inbox */
+.dx .inbox { overflow: hidden; }
+.dx .thread-list { max-height: 72vh; overflow-y: auto; }
+.dx button.thread { width: 100%; text-align: left; background: transparent; cursor: pointer; font: inherit; color: inherit; }
+.dx button.thread:hover { background: var(--dx-surface-2); }
+.dx button.thread.active { background: var(--dx-brand-soft); }
+.dx .thread-body { flex: 1; min-width: 0; }
+.dx .thread-gap { width: 8px; flex: none; }
+.dx .reader-body { max-height: 56vh; overflow-y: auto; padding-bottom: 6px; }
+.dx .msg-body { white-space: pre-wrap; }
+.dx .msg-ai { font-size: 12px; color: var(--dx-text-3); margin-bottom: 8px; }
+.dx .reader-empty { padding: 48px 22px; text-align: center; color: var(--dx-text-3); }
+.dx .reader-links { display: flex; flex-wrap: wrap; gap: 12px; padding: 12px 22px 0; font-size: 12.5px; }
+.dx .reader-links a { color: var(--dx-brand-hover); }
+.dx .reader-links a:hover { text-decoration: underline; }
+.dx .ai-box textarea[readonly] { cursor: default; }
+
+/* Deals */
+.dx .col-stack { display: flex; flex-direction: column; }
+.dx .deal-name a:hover { text-decoration: underline; }
+.dx .deal select {
+  width: 100%;
+  margin-top: 10px;
+  height: 28px;
+  border: 1px solid var(--dx-border);
+  border-radius: 6px;
+  background: var(--dx-surface-2);
+  color: var(--dx-text-2);
+  font-size: 12px;
+  padding: 0 6px;
+}
+.dx .deal-stage { font-size: 11.5px; color: var(--dx-text-3); }
+
+/* Meetings */
+.dx .meeting-prep { padding: 0 18px 14px 60px; font-size: 13px; color: var(--dx-text-2); white-space: pre-wrap; border-bottom: 1px solid var(--dx-border); }
+.dx .task-links { display: flex; flex-wrap: wrap; gap: 10px; font-size: 12.5px; margin-top: 2px; }
+.dx .task-links a { color: var(--dx-brand-hover); }
+.dx .task-links a:hover { text-decoration: underline; }
+
+/* Settings */
+.dx .settings-nav > div { display: flex; flex-direction: column; gap: 2px; }
+.dx .settings-nav a { display: block; }
+.dx .settings-nav a:hover { background: var(--dx-surface-2); color: var(--dx-text); }
+.dx .settings-panel { min-width: 0; }
+.dx .settings-panel > .stack > * { min-width: 0; }
+
+@media (max-width: 900px) {
+  .dx .inbox { grid-template-columns: 1fr; }
+  .dx .thread-list { border-right: 0; border-bottom: 1px solid var(--dx-border); max-height: 40vh; }
+  .dx .settings { grid-template-columns: 1fr; gap: 16px; }
+  .dx .settings-nav { flex-direction: row; flex-wrap: wrap; }
+  .dx .settings-nav > div { flex-direction: row; flex-wrap: wrap; align-items: center; }
+  .dx .settings-nav .grp { width: 100%; }
+  .dx .page-head { flex-wrap: wrap; }
+  .dx .page-actions { margin-left: 0; }
+}

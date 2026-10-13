@@ -14,8 +14,23 @@ import { ServicesPanel } from "@/components/settings/services-panel";
 import { AiUsageCard } from "@/components/settings/ai-usage-card";
 import { BillingPanel } from "@/components/settings/billing-panel";
 import { EmailBrandingPanel } from "@/components/settings/email-branding-panel";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Button } from "@/components/ui/button";
+
+type SettingsTab =
+  | "profile"
+  | "billing"
+  | "integrations"
+  | "services"
+  | "users"
+  | "email-branding";
+
+type NavLink = {
+  label: string;
+  href: string;
+  /** Settings panel this link opens on this page (drives the active state). */
+  tab?: SettingsTab;
+};
+
+type NavGroup = { title: string; links: NavLink[] };
 
 export default async function SettingsPage({
   searchParams,
@@ -26,23 +41,31 @@ export default async function SettingsPage({
   if (!user) redirect("/login");
 
   const params = await searchParams;
-  const defaultTab =
-    params.tab === "integrations"
-      ? "integrations"
-      : params.tab === "services"
-        ? "services"
-        : params.tab === "billing"
-          ? "billing"
-          : params.tab === "users"
-            ? "users"
-            : params.tab === "email-branding"
-              ? "email-branding"
-              : "profile";
 
   const canManageUsers = hasPermission(user.role, "users:manage");
   const canManageIntegrations = hasPermission(user.role, "integrations:manage");
   const canManageServices = hasPermission(user.role, "settings:write");
   const canManageBilling = hasOrgPermission(user, "billing.manage");
+  const canBrain = hasOrgPermission(user, "business_brain.manage");
+  const canRevenue =
+    hasOrgPermission(user, "revenue_goals.manage") ||
+    hasOrgPermission(user, "revenue.view");
+  const canBranding = canManageIntegrations || canManageServices;
+
+  const allowedTabs: Record<SettingsTab, boolean> = {
+    profile: true,
+    billing: canManageBilling,
+    integrations: canManageIntegrations,
+    services: canManageServices || canManageIntegrations,
+    users: canManageUsers,
+    "email-branding": canBranding,
+  };
+
+  const requested = params.tab as SettingsTab | undefined;
+  const activeTab: SettingsTab =
+    requested && requested in allowedTabs && allowedTabs[requested]
+      ? requested
+      : "profile";
 
   const [integrationData, services] = await Promise.all([
     canManageIntegrations && user.organizationId
@@ -53,153 +76,212 @@ export default async function SettingsPage({
       : [],
   ]);
 
+  const groups: NavGroup[] = [
+    {
+      title: "Your business",
+      links: [
+        ...(canBrain
+          ? [
+              {
+                label: "Business profile",
+                href: "/dashboard/business-brain",
+              },
+              {
+                label: "Services",
+                href: "/dashboard/services",
+                tab: "services" as const,
+              },
+              {
+                label: "Case studies",
+                href: "/dashboard/business-brain#documents",
+              },
+              { label: "Target customers", href: "/dashboard/icp" },
+            ]
+          : allowedTabs.services
+            ? [
+                {
+                  label: "Services",
+                  href: "/dashboard/settings?tab=services",
+                  tab: "services" as const,
+                },
+              ]
+            : []),
+        ...(canRevenue
+          ? [{ label: "Revenue goal", href: "/dashboard/revenue-goals" }]
+          : []),
+      ],
+    },
+    {
+      title: "Sending",
+      links: [
+        ...(canBranding
+          ? [
+              {
+                label: "Email & branding",
+                href: "/dashboard/settings?tab=email-branding",
+                tab: "email-branding" as const,
+              },
+            ]
+          : []),
+        ...(canManageIntegrations
+          ? [
+              {
+                label: "Mailboxes",
+                href: "/dashboard/outreach?tab=mailboxes",
+              },
+            ]
+          : []),
+      ],
+    },
+    {
+      title: "Workspace",
+      links: [
+        ...(canManageIntegrations
+          ? [
+              {
+                label: "Integrations",
+                href: "/dashboard/settings?tab=integrations",
+                tab: "integrations" as const,
+              },
+            ]
+          : []),
+        ...(canManageUsers
+          ? [
+              {
+                label: "Team",
+                href: "/dashboard/settings?tab=users",
+                tab: "users" as const,
+              },
+            ]
+          : []),
+        ...(canManageBilling
+          ? [
+              {
+                label: "Billing",
+                href: "/dashboard/settings?tab=billing",
+                tab: "billing" as const,
+              },
+            ]
+          : []),
+        {
+          label: "My account",
+          href: "/dashboard/settings?tab=profile",
+          tab: "profile" as const,
+        },
+      ],
+    },
+  ].filter((g) => g.links.length > 0);
+
   return (
-    <div className="space-y-6">
-      <div>
-        <h2 className="text-2xl font-bold tracking-tight">Settings</h2>
-        <p className="text-muted-foreground">
-          Manage your profile, billing, integrations, and company services.
-        </p>
-      </div>
-
-      <section className="space-y-2">
-        <h3 className="text-sm font-medium">Configuration</h3>
-        <p className="text-xs text-muted-foreground">
-          Delvix setup — Business Brain, ICP, Services, and Revenue Goals.
-        </p>
-        <div className="flex flex-wrap gap-2">
-          <Link href="/dashboard/business-brain">
-            <Button variant="outline" size="sm">
-              Business Brain
-            </Button>
-          </Link>
-          <Link href="/dashboard/icp">
-            <Button variant="outline" size="sm">
-              ICP
-            </Button>
-          </Link>
-          <Link href="/dashboard/services">
-            <Button variant="outline" size="sm">
-              Services
-            </Button>
-          </Link>
-          <Link href="/dashboard/revenue-goals">
-            <Button variant="outline" size="sm">
-              Revenue Goals
-            </Button>
-          </Link>
-          {canManageIntegrations ? (
-            <Link href="/dashboard/settings?tab=integrations">
-              <Button size="sm">
-                Integrations (Google Places)
-              </Button>
-            </Link>
-          ) : null}
-          <Link href="/dashboard/autopilot">
-            <Button variant="outline" size="sm">
-              Autopilot sourcing
-            </Button>
-          </Link>
-        </div>
-      </section>
-
-      <Tabs defaultValue={defaultTab}>
-        <TabsList>
-          <TabsTrigger value="profile">Profile</TabsTrigger>
-          {canManageBilling && (
-            <TabsTrigger value="billing">Billing</TabsTrigger>
-          )}
-          {canManageIntegrations && (
-            <TabsTrigger value="integrations">Integrations</TabsTrigger>
-          )}
-          {(canManageServices || canManageIntegrations) && (
-            <TabsTrigger value="services">Services</TabsTrigger>
-          )}
-          {canManageUsers && (
-            <TabsTrigger value="users">Team</TabsTrigger>
-          )}
-          {(canManageIntegrations || canManageServices) && (
-            <TabsTrigger value="email-branding">Email branding</TabsTrigger>
-          )}
-        </TabsList>
-
-        <TabsContent value="profile" className="mt-4">
-          <ProfileSettings
-            user={{
-              firstName: user.firstName,
-              lastName: user.lastName,
-              email: user.email,
-              role: user.role,
-            }}
-          />
-        </TabsContent>
-
-        {canManageBilling && (
-          <TabsContent value="billing" className="mt-4">
-            <BillingPanel />
-          </TabsContent>
-        )}
-
-        {canManageIntegrations && integrationData && (
-          <TabsContent value="integrations" className="mt-4 space-y-6">
-            <Suspense fallback={null}>
-              <IntegrationsPanel initialData={integrationData} />
-            </Suspense>
-            <AiUsageCard />
-          </TabsContent>
-        )}
-
-        <TabsContent value="services" className="mt-4 space-y-3">
-          {canManageServices ? (
-            <>
-              <p className="text-sm text-muted-foreground">
-                Quick edit shortcut. For the full Delvix catalog use{" "}
-                <Link
-                  href="/dashboard/services"
-                  className="underline underline-offset-2"
-                >
-                  Services
-                </Link>
-                .
-              </p>
-              <ServicesPanel
-                initialServices={services.map((s) => ({
-                  id: s.id,
-                  name: s.name,
-                  description: s.description,
-                  targetClientType: s.targetClientType,
-                  technologies: s.technologies,
-                  isActive: s.isActive,
-                }))}
-              />
-            </>
-          ) : (
-            <p className="text-sm text-muted-foreground">
-              Contact your admin to manage company services.
+    <div className="dx">
+      <div className="page">
+        <div className="page-head">
+          <div>
+            <h1 className="page-title">Settings</h1>
+            <p className="page-sub">
+              Set these once. Autopilot uses them for every lead and email.
             </p>
-          )}
-        </TabsContent>
+          </div>
+        </div>
 
-        {canManageUsers && (
-          <TabsContent value="users" className="mt-4">
-            {user.organizationId ? (
-              <OrgTeamPanel
-                organizationId={user.organizationId}
-                permissions={user.permissions}
-                currentUserId={user.id}
+        <div className="settings">
+          <nav className="settings-nav" aria-label="Settings sections">
+            {groups.map((group) => (
+              <div key={group.title}>
+                <div className="grp">{group.title}</div>
+                {group.links.map((link) => {
+                  const isActive = link.tab === activeTab;
+                  return (
+                    <Link
+                      key={link.label}
+                      href={link.href}
+                      className={isActive ? "active" : undefined}
+                      aria-current={isActive ? "page" : undefined}
+                    >
+                      {link.label}
+                    </Link>
+                  );
+                })}
+              </div>
+            ))}
+          </nav>
+
+          <div className="settings-panel">
+            {activeTab === "profile" && (
+              <ProfileSettings
+                user={{
+                  firstName: user.firstName,
+                  lastName: user.lastName,
+                  email: user.email,
+                  role: user.role,
+                }}
               />
-            ) : (
-              <UserManagementPanel actorRole={user.role} />
             )}
-          </TabsContent>
-        )}
 
-        {(canManageIntegrations || canManageServices) && (
-          <TabsContent value="email-branding" className="mt-4">
-            <EmailBrandingPanel />
-          </TabsContent>
-        )}
-      </Tabs>
+            {activeTab === "billing" && canManageBilling && <BillingPanel />}
+
+            {activeTab === "integrations" &&
+              canManageIntegrations &&
+              integrationData && (
+                <div className="stack">
+                  <Suspense fallback={null}>
+                    <IntegrationsPanel initialData={integrationData} />
+                  </Suspense>
+                  <AiUsageCard />
+                </div>
+              )}
+
+            {activeTab === "services" && (
+              <div className="stack">
+                {canManageServices ? (
+                  <>
+                    <p className="muted">
+                      Quick edit shortcut. For the full Delvix catalog use{" "}
+                      <Link
+                        href="/dashboard/services"
+                        className="underline underline-offset-2"
+                      >
+                        Services
+                      </Link>
+                      .
+                    </p>
+                    <ServicesPanel
+                      initialServices={services.map((s) => ({
+                        id: s.id,
+                        name: s.name,
+                        description: s.description,
+                        targetClientType: s.targetClientType,
+                        technologies: s.technologies,
+                        isActive: s.isActive,
+                      }))}
+                    />
+                  </>
+                ) : (
+                  <p className="muted">
+                    Contact your admin to manage company services.
+                  </p>
+                )}
+              </div>
+            )}
+
+            {activeTab === "users" &&
+              canManageUsers &&
+              (user.organizationId ? (
+                <OrgTeamPanel
+                  organizationId={user.organizationId}
+                  permissions={user.permissions}
+                  currentUserId={user.id}
+                />
+              ) : (
+                <UserManagementPanel actorRole={user.role} />
+              ))}
+
+            {activeTab === "email-branding" && canBranding && (
+              <EmailBrandingPanel />
+            )}
+          </div>
+        </div>
+      </div>
     </div>
   );
 }

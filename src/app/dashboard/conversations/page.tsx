@@ -30,6 +30,7 @@ export default async function ConversationsPage() {
       body: m.body,
       fromEmail: m.fromEmail,
       toEmail: m.toEmail,
+      status: m.status,
       aiClassification: m.aiClassification,
       aiSummary: m.aiSummary,
       suggestedNextAction: m.suggestedNextAction,
@@ -40,15 +41,10 @@ export default async function ConversationsPage() {
   }));
 
   return (
-    <div className="space-y-6">
-      <div>
-        <h2 className="text-2xl font-bold tracking-tight">Inbox</h2>
-        <p className="text-muted-foreground">
-          Unified inbox — replies link to company, contact, and opportunity when
-          those relationships exist.
-        </p>
+    <div className="dx">
+      <div className="page">
+        <UnifiedInbox initialConversations={serialized} />
       </div>
-      <UnifiedInbox initialConversations={serialized} />
     </div>
   );
 }

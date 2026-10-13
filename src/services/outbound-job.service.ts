@@ -295,6 +295,43 @@ export class OutboundJobService {
     };
   }
 
+  /** Outbox rows for the Outreach hub (Scheduled = queued/held, Sent = sent/failed). */
+  async listOutbox(
+    organizationId: string,
+    kind: "scheduled" | "sent",
+    take = 50
+  ) {
+    const statuses =
+      kind === "scheduled"
+        ? [EmailOutboxStatus.QUEUED, EmailOutboxStatus.HELD]
+        : [EmailOutboxStatus.SENT, EmailOutboxStatus.FAILED];
+    const rows = await prisma.emailOutbox.findMany({
+      where: { organizationId, status: { in: statuses } },
+      orderBy:
+        kind === "scheduled"
+          ? [{ scheduledFor: "asc" }, { createdAt: "asc" }]
+          : [{ sentAt: "desc" }, { createdAt: "desc" }],
+      take,
+      select: {
+        id: true,
+        status: true,
+        stepOrder: true,
+        toEmail: true,
+        subject: true,
+        scheduledFor: true,
+        sentAt: true,
+        heldReason: true,
+        lastError: true,
+        shadowMode: true,
+        createdAt: true,
+        company: { select: { id: true, name: true } },
+        contact: { select: { id: true, fullName: true } },
+        emailAccount: { select: { email: true } },
+      },
+    });
+    return rows;
+  }
+
   async autoEnrollBatch(organizationId: string, limit = 5, userId?: string) {
     const config = await this.getConfig(organizationId);
     if (!config.physicalAddress.trim() || !config.businessName.trim()) {

@@ -2,6 +2,7 @@ import { Suspense } from "react";
 import { redirect } from "next/navigation";
 import { contactService } from "@/services/contact.service";
 import { ContactsList } from "@/components/contacts/contacts-list";
+import { LeadsHubHeader } from "@/components/leads/leads-hub-header";
 import { Skeleton } from "@/components/ui/skeleton";
 import { getCurrentUser } from "@/lib/auth/session";
 import { hasAnyOrgPermission } from "@/lib/tenant/scope";
@@ -44,17 +45,13 @@ export default async function ContactsPage({ searchParams }: PageProps) {
   };
 
   return (
-    <div className="space-y-6">
-      <div>
-        <h2 className="text-2xl font-bold tracking-tight">Contacts</h2>
-        <p className="text-muted-foreground">
-          Decision-makers and inboxes found by Autopilot
-          {user.organizationName ? ` · ${user.organizationName}` : ""}.
-        </p>
+    <div className="dx">
+      <div className="page">
+        <LeadsHubHeader user={user} active="contacts" />
+        <Suspense fallback={<Skeleton className="h-96 w-full" />}>
+          <ContactsList initialData={serialized} />
+        </Suspense>
       </div>
-      <Suspense fallback={<Skeleton className="h-96 w-full" />}>
-        <ContactsList initialData={serialized} />
-      </Suspense>
     </div>
   );
 }

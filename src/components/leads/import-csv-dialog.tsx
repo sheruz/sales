@@ -15,7 +15,7 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 
-export function ImportCsvDialog() {
+export function ImportCsvDialog({ variant = "default" }: { variant?: "default" | "dx" }) {
   const router = useRouter();
   const fileRef = useRef<HTMLInputElement>(null);
   const [open, setOpen] = useState(false);
@@ -57,12 +57,19 @@ export function ImportCsvDialog() {
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger>
-        <Button variant="outline" size="sm">
-          <Upload className="mr-2 h-4 w-4" />
+      {variant === "dx" ? (
+        <DialogTrigger className="btn">
+          <Upload />
           Import CSV
-        </Button>
-      </DialogTrigger>
+        </DialogTrigger>
+      ) : (
+        <DialogTrigger>
+          <Button variant="outline" size="sm">
+            <Upload className="mr-2 h-4 w-4" />
+            Import CSV
+          </Button>
+        </DialogTrigger>
+      )}
       <DialogContent>
         <DialogHeader>
           <DialogTitle>Import Leads from CSV</DialogTitle>
