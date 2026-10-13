@@ -21,6 +21,7 @@ export type StepSnapshotItem = {
   subjectTemplate: string | null;
   bodyTemplate: string;
   isActive: boolean;
+  emailStyle?: "BRANDED" | "PLAIN";
 };
 
 export type EnrollInput = {
@@ -63,6 +64,7 @@ export function snapshotSteps(
     subjectTemplate: string | null;
     bodyTemplate: string;
     isActive: boolean;
+    emailStyle?: "BRANDED" | "PLAIN" | string;
   }[]
 ): StepSnapshotItem[] {
   return steps.map((s) => ({
@@ -72,6 +74,7 @@ export function snapshotSteps(
     subjectTemplate: s.subjectTemplate,
     bodyTemplate: s.bodyTemplate,
     isActive: s.isActive,
+    emailStyle: s.emailStyle === "BRANDED" ? "BRANDED" : "PLAIN",
   }));
 }
 
@@ -86,6 +89,7 @@ export function resolveEnrollmentSteps(enrollment: {
       subjectTemplate: string | null;
       bodyTemplate: string;
       isActive: boolean;
+      emailStyle?: "BRANDED" | "PLAIN" | string;
     }[];
   };
 }): StepSnapshotItem[] {

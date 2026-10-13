@@ -37,6 +37,8 @@ import {
 import {
   COLD_OUTREACH_NAME,
   COLD_OUTREACH_STEPS,
+  INBOUND_OUTREACH_NAME,
+  INBOUND_OUTREACH_STEPS,
 } from "@/lib/outbound/cold-sequence";
 import {
   isValidIanaTimezone,
@@ -50,6 +52,10 @@ import {
 } from "@/lib/sequences/runtime";
 import { unsubscribeUrl } from "@/services/unsubscribe.service";
 import { resolveEnrollmentSteps } from "@/services/sequence-enrollment.service";
+import { renderOutboundEmail } from "@/lib/email/render-outbound";
+import { emailBrandingService } from "@/services/email-branding.service";
+import { assertOutboundFromAllowed } from "@/lib/email/free-mail";
+import { EmailStyle } from "@prisma/client";
 
 function startOfUtcDay() {
   const d = new Date();
@@ -79,7 +85,21 @@ export class OutboundJobService {
           data: { status: OutreachSequenceStatus.ACTIVE },
         });
       }
-      return existing;
+      // Sync cold step styles (1 BRANDED, 2–3 PLAIN)
+      for (const s of existing.steps) {
+        const want =
+          s.stepOrder === 1 ? EmailStyle.BRANDED : EmailStyle.PLAIN;
+        if (s.emailStyle !== want) {
+          await prisma.outreachSequenceStep.update({
+            where: { id: s.id },
+            data: { emailStyle: want },
+          });
+        }
+      }
+      return prisma.outreachSequence.findFirstOrThrow({
+        where: { id: existing.id },
+        include: { steps: { orderBy: { stepOrder: "asc" } } },
+      });
     }
 
     const byName = await prisma.outreachSequence.findFirst({
@@ -87,6 +107,16 @@ export class OutboundJobService {
       include: { steps: true },
     });
     if (byName) {
+      for (const s of byName.steps) {
+        const want =
+          s.stepOrder === 1 ? EmailStyle.BRANDED : EmailStyle.PLAIN;
+        if (s.emailStyle !== want) {
+          await prisma.outreachSequenceStep.update({
+            where: { id: s.id },
+            data: { emailStyle: want },
+          });
+        }
+      }
       return prisma.outreachSequence.update({
         where: { id: byName.id },
         data: {
@@ -116,6 +146,56 @@ export class OutboundJobService {
             channel: ConversationChannel.EMAIL,
             subjectTemplate: s.subjectTemplate,
             bodyTemplate: s.bodyTemplate,
+            emailStyle:
+              s.emailStyle === "BRANDED"
+                ? EmailStyle.BRANDED
+                : EmailStyle.PLAIN,
+            isActive: true,
+          })),
+        },
+      },
+      include: { steps: { orderBy: { stepOrder: "asc" } } },
+    });
+  }
+
+  /** Inbound / Meta — BRANDED single-step (or multi) sequence. */
+  async ensureInboundOutreachSequence(organizationId: string) {
+    const existing = await prisma.outreachSequence.findFirst({
+      where: { organizationId, name: INBOUND_OUTREACH_NAME },
+      include: { steps: { orderBy: { stepOrder: "asc" } } },
+    });
+    if (existing) {
+      if (existing.status !== OutreachSequenceStatus.ACTIVE) {
+        await prisma.outreachSequence.update({
+          where: { id: existing.id },
+          data: { status: OutreachSequenceStatus.ACTIVE },
+        });
+      }
+      return prisma.outreachSequence.findFirstOrThrow({
+        where: { id: existing.id },
+        include: { steps: { orderBy: { stepOrder: "asc" } } },
+      });
+    }
+    return prisma.outreachSequence.create({
+      data: {
+        organizationId,
+        name: INBOUND_OUTREACH_NAME,
+        description:
+          "Inbound / Meta leads — branded HTML email using approved pitch.",
+        status: OutreachSequenceStatus.ACTIVE,
+        isAutopilotDefault: false,
+        stopOnReply: true,
+        stopOnMeeting: true,
+        stopOnUnsubscribe: true,
+        steps: {
+          create: INBOUND_OUTREACH_STEPS.map((s) => ({
+            id: randomUUID(),
+            stepOrder: s.stepOrder,
+            delayMinutes: s.delayMinutes,
+            channel: ConversationChannel.EMAIL,
+            subjectTemplate: s.subjectTemplate,
+            bodyTemplate: s.bodyTemplate,
+            emailStyle: EmailStyle.BRANDED,
             isActive: true,
           })),
         },
@@ -223,7 +303,11 @@ export class OutboundJobService {
       );
     }
 
-    const sequence = await this.ensureColdOutreachSequence(organizationId);
+    await this.ensureColdOutreachSequence(organizationId);
+    await this.ensureInboundOutreachSequence(organizationId);
+    const coldSequence = await this.ensureColdOutreachSequence(organizationId);
+    const inboundSequence =
+      await this.ensureInboundOutreachSequence(organizationId);
     const mailbox = await mailboxPoolService.pickMailbox(organizationId);
     if (!mailbox) {
       throw new ValidationError(
@@ -290,6 +374,14 @@ export class OutboundJobService {
       }
 
       try {
+        const inbound =
+          isInboundSourceKey(pitch.opportunity?.source?.key) ||
+          isInboundSourceKey(pitch.company.source) ||
+          String(pitch.company.source || "")
+            .toUpperCase()
+            .includes("META");
+        const sequence = inbound ? inboundSequence : coldSequence;
+
         const enrollment = await sequenceEnrollmentService.enroll(
           organizationId,
           {
@@ -323,8 +415,14 @@ export class OutboundJobService {
           contactId: pitch.contactId,
           opportunityId: pitch.opportunityId,
           type: CompanyTimelineEventType.CONTACTED,
-          title: "Enrolled in Cold outreach (autopilot)",
-          details: { enrollmentId: enrollment.id, shadowMode: config.shadowMode },
+          title: inbound
+            ? "Enrolled in Inbound outreach (autopilot)"
+            : "Enrolled in Cold outreach (autopilot)",
+          details: {
+            enrollmentId: enrollment.id,
+            shadowMode: config.shadowMode,
+            sequence: sequence.name,
+          },
           actor: TimelineActor.SYSTEM,
           userId: userId ?? null,
           dedupeKey: `enrolled:${enrollment.id}`,
@@ -457,6 +555,16 @@ export class OutboundJobService {
       orderBy: { updatedAt: "desc" },
     });
 
+    const emailStyle: "BRANDED" | "PLAIN" =
+      step.emailStyle === "BRANDED" ||
+      enrollment.sequence?.name === INBOUND_OUTREACH_NAME
+        ? "BRANDED"
+        : step.emailStyle === "PLAIN"
+          ? "PLAIN"
+          : step.stepOrder === 1
+            ? "BRANDED"
+            : "PLAIN";
+
     const vars = buildSequenceTemplateVars({
       contact: enrollment.contact,
       company,
@@ -467,8 +575,14 @@ export class OutboundJobService {
         ? {
             personalizedFirstLine: pitch.personalizedFirstLine,
             shortPitch: pitch.shortPitch,
-            topIssue: pitch.topIssue,
+            topIssue: pitch.findingTitle || pitch.topIssue,
             recommendedService: pitch.recommendedService,
+            greeting: pitch.greeting,
+            introHtml: pitch.introHtml,
+            findingTitle: pitch.findingTitle,
+            findingText: pitch.findingText,
+            bodyHtml: pitch.bodyHtml,
+            preheader: pitch.preheader,
           }
         : null,
     });
@@ -478,61 +592,41 @@ export class OutboundJobService {
       vars,
       REQUIRED_PITCH_VARS
     );
-    const bodyRendered = renderSequenceTemplateDetailed(
-      step.bodyTemplate,
-      vars,
-      REQUIRED_PITCH_VARS
-    );
 
-    // Hard-refuse missing required vars for autopilot
-    const missing = [
-      ...new Set([
-        ...subjectRendered.missingRequired,
-        ...bodyRendered.missingRequired,
-      ]),
-    ];
-    if (missing.length || !pitch) {
+    const heldBase = {
+      id: randomUUID(),
+      organizationId,
+      enrollmentId: enrollment.id,
+      stepOrder: step.stepOrder,
+      contactId: enrollment.contactId,
+      companyId: company?.id ?? null,
+      opportunityId: enrollment.opportunityId,
+      emailAccountId: enrollment.emailAccountId!,
+      status: EmailOutboxStatus.HELD,
+      toEmail: enrollment.contact.email!,
+      subject: subjectRendered.text,
+      bodyText: "",
+      idempotencyKey,
+      shadowMode: cfg.shadowMode,
+    };
+
+    if (!pitch) {
       return prisma.emailOutbox.create({
         data: {
-          id: randomUUID(),
-          organizationId,
-          enrollmentId: enrollment.id,
-          stepOrder: step.stepOrder,
-          contactId: enrollment.contactId,
-          companyId: company?.id ?? null,
-          opportunityId: enrollment.opportunityId,
-          emailAccountId: enrollment.emailAccountId!,
-          status: EmailOutboxStatus.HELD,
-          toEmail: enrollment.contact.email!,
-          subject: subjectRendered.text,
-          bodyText: bodyRendered.text,
-          heldReason: !pitch
-            ? "missing_approved_pitch"
-            : `missing_vars:${missing.join(",")}`,
-          idempotencyKey,
-          shadowMode: cfg.shadowMode,
+          ...heldBase,
+          bodyText: "(missing approved pitch)",
+          heldReason: "missing_approved_pitch",
         },
       });
     }
 
-    if (countHttpLinks(bodyRendered.text) > 1) {
+    const missingSubject = subjectRendered.missingRequired;
+    if (missingSubject.length) {
       return prisma.emailOutbox.create({
         data: {
-          id: randomUUID(),
-          organizationId,
-          enrollmentId: enrollment.id,
-          stepOrder: step.stepOrder,
-          contactId: enrollment.contactId,
-          companyId: company?.id ?? null,
-          opportunityId: enrollment.opportunityId,
-          emailAccountId: enrollment.emailAccountId!,
-          status: EmailOutboxStatus.HELD,
-          toEmail: enrollment.contact.email!,
-          subject: subjectRendered.text,
-          bodyText: bodyRendered.text,
-          heldReason: "too_many_links",
-          idempotencyKey,
-          shadowMode: cfg.shadowMode,
+          ...heldBase,
+          bodyText: "(missing template vars)",
+          heldReason: `missing_vars:${missingSubject.join(",")}`,
         },
       });
     }
@@ -541,21 +635,9 @@ export class OutboundJobService {
     if (!isValidIanaTimezone(tz)) {
       return prisma.emailOutbox.create({
         data: {
-          id: randomUUID(),
-          organizationId,
-          enrollmentId: enrollment.id,
-          stepOrder: step.stepOrder,
-          contactId: enrollment.contactId,
-          companyId: company?.id ?? null,
-          opportunityId: enrollment.opportunityId,
-          emailAccountId: enrollment.emailAccountId!,
-          status: EmailOutboxStatus.HELD,
-          toEmail: enrollment.contact.email!,
-          subject: subjectRendered.text,
-          bodyText: bodyRendered.text,
+          ...heldBase,
+          bodyText: "(timezone needed)",
           heldReason: "timezone_needed",
-          idempotencyKey,
-          shadowMode: cfg.shadowMode,
         },
       });
     }
@@ -563,32 +645,12 @@ export class OutboundJobService {
     if (!isCountryAllowed(company?.country, cfg.countryAllowList)) {
       return prisma.emailOutbox.create({
         data: {
-          id: randomUUID(),
-          organizationId,
-          enrollmentId: enrollment.id,
-          stepOrder: step.stepOrder,
-          contactId: enrollment.contactId,
-          companyId: company?.id ?? null,
-          opportunityId: enrollment.opportunityId,
-          emailAccountId: enrollment.emailAccountId!,
-          status: EmailOutboxStatus.HELD,
-          toEmail: enrollment.contact.email!,
-          subject: subjectRendered.text,
-          bodyText: bodyRendered.text,
+          ...heldBase,
+          bodyText: "(country blocked)",
           heldReason: "country_blocked",
-          idempotencyKey,
-          shadowMode: cfg.shadowMode,
         },
       });
     }
-
-    const scheduledFor = nextSendWindowUtc(tz!);
-    const unsub = unsubscribeUrl(organizationId, enrollment.contact.email!);
-    const bodyWithFooter = appendComplianceFooter(bodyRendered.text, {
-      businessName: cfg.businessName || enrollment.organization.name,
-      physicalAddress: cfg.physicalAddress,
-      unsubscribeUrl: unsub,
-    });
 
     const pool = await prisma.outboundMailbox.findFirst({
       where: {
@@ -596,6 +658,125 @@ export class OutboundJobService {
         emailAccountId: enrollment.emailAccountId!,
       },
     });
+
+    const fromCheck = assertOutboundFromAllowed({
+      fromEmail: enrollment.emailAccount?.email || "",
+      allowFreeMailProvider: pool?.allowFreeMailProvider === true,
+    });
+    if (!fromCheck.ok) {
+      return prisma.emailOutbox.create({
+        data: {
+          ...heldBase,
+          bodyText: fromCheck.reason,
+          heldReason: "free_mail_blocked",
+          outboundMailboxId: pool?.id ?? null,
+        },
+      });
+    }
+
+    const unsub = unsubscribeUrl(organizationId, enrollment.contact.email!);
+    const sender = await emailBrandingService.resolveForSend(
+      organizationId,
+      pool?.id
+    );
+
+    let rendered;
+    try {
+      rendered = renderOutboundEmail({
+        style: emailStyle,
+        subject: subjectRendered.text,
+        pitch: {
+          greeting: pitch.greeting,
+          introHtml: pitch.introHtml,
+          findingTitle: pitch.findingTitle,
+          findingText: pitch.findingText,
+          bodyHtml: pitch.bodyHtml,
+          preheader: pitch.preheader,
+          personalizedFirstLine: pitch.personalizedFirstLine,
+          shortPitch: pitch.shortPitch,
+          topIssue: pitch.topIssue,
+        },
+        contact: {
+          firstName: enrollment.contact.firstName,
+          email: enrollment.contact.email,
+        },
+        company: {
+          name: company?.name,
+          domain: company?.domain,
+        },
+        sender,
+        unsubscribeUrl: unsub,
+      });
+    } catch (err) {
+      return prisma.emailOutbox.create({
+        data: {
+          ...heldBase,
+          bodyText: err instanceof Error ? err.message : "render failed",
+          heldReason: "render_failed",
+          outboundMailboxId: pool?.id ?? null,
+        },
+      });
+    }
+
+    // PLAIN: keep link budget; BRANDED has CTAs by design
+    if (
+      emailStyle === "PLAIN" &&
+      countHttpLinks(rendered.text) > 3
+    ) {
+      return prisma.emailOutbox.create({
+        data: {
+          ...heldBase,
+          bodyText: rendered.text,
+          bodyHtml: rendered.html,
+          heldReason: "too_many_links",
+          outboundMailboxId: pool?.id ?? null,
+        },
+      });
+    }
+
+    const bodyText =
+      emailStyle === "PLAIN"
+        ? appendComplianceFooter(rendered.text, {
+            businessName:
+              sender.companyLegalName ||
+              cfg.businessName ||
+              enrollment.organization.name,
+            physicalAddress:
+              sender.businessAddress || cfg.physicalAddress,
+            unsubscribeUrl: unsub,
+          })
+        : rendered.text;
+
+    // Thread follow-ups (PLAIN) to prior sent message
+    let threadMeta: Record<string, unknown> = {};
+    if (step.stepOrder > 1) {
+      const prior = await prisma.emailOutbox.findFirst({
+        where: {
+          enrollmentId: enrollment.id,
+          organizationId,
+          status: EmailOutboxStatus.SENT,
+          stepOrder: { lt: step.stepOrder },
+        },
+        orderBy: { stepOrder: "desc" },
+        select: {
+          messageId: true,
+          providerMessageId: true,
+          subject: true,
+          metadata: true,
+        },
+      });
+      if (prior?.providerMessageId || prior?.messageId) {
+        const ref =
+          prior.providerMessageId || prior.messageId || undefined;
+        threadMeta = {
+          inReplyTo: ref,
+          references: ref,
+          threadSubject: prior.subject,
+        };
+      }
+    }
+
+    const scheduledFor = nextSendWindowUtc(tz!);
 
     return prisma.emailOutbox.create({
       data: {
@@ -610,17 +791,28 @@ export class OutboundJobService {
         outboundMailboxId: pool?.id ?? null,
         status: EmailOutboxStatus.QUEUED,
         toEmail: enrollment.contact.email!,
-        subject: subjectRendered.text,
-        bodyText: bodyWithFooter,
+        subject: rendered.subject,
+        bodyText,
+        bodyHtml: rendered.html,
         scheduledFor,
         idempotencyKey,
         shadowMode: cfg.shadowMode,
         metadata: {
           unsubscribeUrl: unsub,
-          headers: buildListUnsubscribeHeaders({
-            unsubscribeUrl: unsub,
-            mailtoEmail: enrollment.emailAccount?.email,
-          }),
+          emailStyle,
+          ...threadMeta,
+          headers: {
+            ...buildListUnsubscribeHeaders({
+              unsubscribeUrl: unsub,
+              mailtoEmail: enrollment.emailAccount?.email,
+            }),
+            ...(threadMeta.inReplyTo
+              ? {
+                  "In-Reply-To": `<${String(threadMeta.inReplyTo)}>`,
+                  References: `<${String(threadMeta.references)}>`,
+                }
+              : {}),
+          },
         } as Prisma.InputJsonValue,
       },
     });
@@ -805,7 +997,11 @@ export class OutboundJobService {
     try {
       const meta =
         item.metadata && typeof item.metadata === "object"
-          ? (item.metadata as { headers?: Record<string, string> })
+          ? (item.metadata as {
+              headers?: Record<string, string>;
+              inReplyTo?: string;
+              references?: string;
+            })
           : {};
 
       const sent = await inboxService.sendOutreach({
@@ -815,12 +1011,14 @@ export class OutboundJobService {
         toEmail: item.toEmail,
         subject: item.subject,
         body: item.bodyText,
-        // Plain text only — no HTML tracking
-        bodyHtml: undefined,
+        bodyHtml: item.bodyHtml ?? item.bodyText,
         companyId: item.companyId,
         contactId: item.contactId,
         opportunityId: item.opportunityId,
         idempotencyKey: item.idempotencyKey,
+        headers: meta.headers,
+        inReplyTo: meta.inReplyTo,
+        references: meta.references,
       });
 
       await prisma.emailOutbox.update({
@@ -833,6 +1031,7 @@ export class OutboundJobService {
           metadata: {
             ...meta,
             headers: meta.headers,
+            providerThreadId: sent.message.threadId ?? null,
           } as Prisma.InputJsonValue,
         },
       });

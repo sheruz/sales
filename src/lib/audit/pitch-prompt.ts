@@ -1,8 +1,9 @@
 /**
- * Claude pitch prompt + JSON parse/validation for Phase 3.
+ * Claude pitch prompt + JSON parse/validation for Phase 3 (+ email redesign fields).
  */
 
 import type { CheckResult } from "@/lib/audit/rule-checks";
+import { looksLikeRawAuditLabel } from "@/lib/email/render-outbound";
 
 export type PitchIssue = {
   issue: string;
@@ -16,14 +17,22 @@ export type PitchAiResult = {
   personalized_first_line: string;
   short_pitch: string;
   confidence: number;
+  greeting: string;
+  intro_html: string;
+  finding_title: string;
+  finding_text: string;
+  body_html: string;
+  preheader: string;
 };
 
 export type PitchPromptContext = {
   companyName: string;
   contactFirstName: string | null;
   contactTitle: string | null;
+  contactEmail: string | null;
   city: string | null;
   industry: string | null;
+  domain: string | null;
   checks: CheckResult[];
   services: Array<{ id: string; name: string; description: string }>;
   caseStudies: Array<{
@@ -34,7 +43,7 @@ export type PitchPromptContext = {
   }>;
 };
 
-export const PITCH_SYSTEM_PROMPT = `You write respectful, evidence-based sales openers from measured website checks.
+export const PITCH_SYSTEM_PROMPT = `You write respectful, evidence-based sales email copy from measured website checks.
 
 Return ONLY valid JSON:
 {
@@ -42,17 +51,29 @@ Return ONLY valid JSON:
   "recommended_service": "...",
   "personalized_first_line": "...",
   "short_pitch": "...",
-  "confidence": 0-100
+  "confidence": 0-100,
+  "greeting": "Hi {First}," or "Hi there,",
+  "intro_html": "<p>...</p> 1–2 sentences mentioning their domain",
+  "finding_title": "short headline max 10 words — business language, NOT audit labels",
+  "finding_text": "1–2 sentences on business impact",
+  "body_html": "<p>...</p> what we build + soft ask",
+  "preheader": "inbox preview max 90 characters"
 }
 
 Rules:
-- Every issue MUST cite evidence from the provided checks (quote or paraphrase the check evidence). Do NOT invent problems that are not in the checks.
-- Prefer failed/warn checks (pass=false). If few failures, use weaker opportunity signals carefully and still cite evidence.
+- Every issue MUST cite evidence from the provided checks. Do NOT invent problems.
+- Prefer failed/warn checks (pass=false).
 - Respectful tone — never insult their site, design, or team.
 - No prices, discounts, or guarantees.
-- personalized_first_line: under 40 words, natural, uses first name when available.
-- short_pitch: 2–4 sentences tying issues to ONE recommended_service from the provided services list (use the service name exactly when possible).
-- confidence: integer 0–100 reflecting how well evidence supports the pitch.
+- personalized_first_line: under 40 words (legacy plain opener).
+- short_pitch: 2–4 sentences tying issues to ONE recommended_service from the list.
+- greeting: use first name when it is a real person name. For generic inboxes (info@, office@, hello@) or missing first name use exactly "Hi there," — NEVER "Hi info," or "Hi office,".
+- intro_html: 1–2 sentences in simple HTML (<p> only). Mention their domain when provided.
+- finding_title: max 10 words. Business impact headline. NEVER copy raw audit check labels (e.g. "No tenant or owner portal detected", "Mobile PageSpeed"). Rewrite into natural language.
+- finding_text: 1–2 sentences on why it matters to the business.
+- body_html: what we build + ask, simple HTML (<p> only).
+- preheader: max 90 characters, curiosity without spam.
+- confidence: integer 0–100.
 - No markdown, no commentary outside JSON.`;
 
 export function buildPitchUserPayload(ctx: PitchPromptContext) {
@@ -70,10 +91,12 @@ export function buildPitchUserPayload(ctx: PitchPromptContext) {
       name: ctx.companyName,
       city: ctx.city,
       industry: ctx.industry,
+      domain: ctx.domain,
     },
     contact: {
       first_name: ctx.contactFirstName,
       title: ctx.contactTitle,
+      email: ctx.contactEmail,
     },
     checks: evidenceChecks,
     services: ctx.services.map((s) => ({
@@ -108,8 +131,18 @@ function asIssue(raw: unknown): PitchIssue | null {
   return { issue, evidence, business_impact: business_impact || issue };
 }
 
+function strField(
+  o: Record<string, unknown>,
+  snake: string,
+  camel: string
+): string {
+  if (typeof o[snake] === "string") return (o[snake] as string).trim();
+  if (typeof o[camel] === "string") return (o[camel] as string).trim();
+  return "";
+}
+
 /**
- * Validate AI JSON. Ensures issues cite check evidence (substring/overlap heuristic).
+ * Validate AI JSON. Ensures issues cite check evidence; blocks raw audit labels in finding_title.
  */
 export function validatePitchAiResult(
   raw: unknown,
@@ -158,12 +191,7 @@ export function validatePitchAiResult(
     }
   }
 
-  const firstLine =
-    typeof o.personalized_first_line === "string"
-      ? o.personalized_first_line.trim()
-      : typeof o.personalizedFirstLine === "string"
-        ? o.personalizedFirstLine.trim()
-        : "";
+  const firstLine = strField(o, "personalized_first_line", "personalizedFirstLine");
   if (!firstLine) {
     return { ok: false, error: "Missing personalized_first_line" };
   }
@@ -174,22 +202,16 @@ export function validatePitchAiResult(
     };
   }
 
-  const short_pitch =
-    typeof o.short_pitch === "string"
-      ? o.short_pitch.trim()
-      : typeof o.shortPitch === "string"
-        ? o.shortPitch.trim()
-        : "";
+  const short_pitch = strField(o, "short_pitch", "shortPitch");
   if (!short_pitch) {
     return { ok: false, error: "Missing short_pitch" };
   }
 
-  const recommended_service =
-    typeof o.recommended_service === "string"
-      ? o.recommended_service.trim()
-      : typeof o.recommendedService === "string"
-        ? o.recommendedService.trim()
-        : "";
+  const recommended_service = strField(
+    o,
+    "recommended_service",
+    "recommendedService"
+  );
   if (!recommended_service) {
     return { ok: false, error: "Missing recommended_service" };
   }
@@ -199,6 +221,45 @@ export function validatePitchAiResult(
     confidence = Math.max(0, Math.min(100, Math.round(o.confidence)));
   }
 
+  let greeting = strField(o, "greeting", "greeting") || "Hi there,";
+  if (/^hi\s+(info|office|hello|contact|admin)\b/i.test(greeting)) {
+    greeting = "Hi there,";
+  }
+
+  const intro_html =
+    strField(o, "intro_html", "introHtml") ||
+    `<p>${firstLine}</p>`;
+
+  let finding_title =
+    strField(o, "finding_title", "findingTitle") ||
+    top_issues[0]?.issue ||
+    "A site opportunity worth a look";
+  if (wordCount(finding_title) > 10) {
+    finding_title = finding_title.split(/\s+/).slice(0, 10).join(" ");
+  }
+  const labels = checks.map((c) => c.label);
+  if (looksLikeRawAuditLabel(finding_title, labels)) {
+    // Rewrite from business_impact / issue without using the raw label
+    const impact = top_issues[0]?.business_impact?.trim();
+    finding_title = impact
+      ? impact.split(/\s+/).slice(0, 10).join(" ")
+      : "A site opportunity worth a look";
+    if (looksLikeRawAuditLabel(finding_title, labels)) {
+      finding_title = "A site opportunity worth a look";
+    }
+  }
+
+  const finding_text =
+    strField(o, "finding_text", "findingText") ||
+    top_issues[0]?.business_impact ||
+    short_pitch.slice(0, 220);
+
+  const body_html =
+    strField(o, "body_html", "bodyHtml") || `<p>${short_pitch}</p>`;
+
+  let preheader = strField(o, "preheader", "preheader") || finding_title;
+  if (preheader.length > 90) preheader = preheader.slice(0, 90);
+
   return {
     ok: true,
     value: {
@@ -207,6 +268,12 @@ export function validatePitchAiResult(
       personalized_first_line: firstLine,
       short_pitch,
       confidence,
+      greeting,
+      intro_html,
+      finding_title,
+      finding_text,
+      body_html,
+      preheader,
     },
   };
 }

@@ -34,6 +34,9 @@ type Mailbox = {
   bounceRate: number;
   lastError: string | null;
   dnsCheck: unknown;
+  allowFreeMailProvider?: boolean;
+  senderName?: string | null;
+  senderTitle?: string | null;
   emailAccount: { id: string; email: string; provider: string };
 };
 
@@ -150,20 +153,29 @@ export function OutboundPanel({ initial }: Props) {
 
   async function mailboxAction(
     mailboxId: string,
-    action: "pause" | "activate" | "remove" | "refresh_dns" | "test"
+    action:
+      | "pause"
+      | "activate"
+      | "remove"
+      | "refresh_dns"
+      | "test"
+      | "update_branding",
+    extra?: Record<string, unknown>
   ) {
     setBusy(`mb:${action}:${mailboxId}`);
     try {
       const res = await fetch("/api/autopilot/outbound/mailboxes", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ mailboxId, action }),
+        body: JSON.stringify({ mailboxId, action, ...extra }),
       });
       const json = await res.json();
       if (!json.success) throw new Error(json.error?.message);
       toast.success(
         action === "test"
           ? `Test sent to ${json.data.to}`
+          : action === "update_branding"
+            ? "Mailbox branding updated"
           : action === "refresh_dns"
             ? "DNS refreshed"
             : "Updated"
@@ -458,6 +470,21 @@ export function OutboundPanel({ initial }: Props) {
                     }
                   >
                     {m.status === "PAUSED" ? "Activate" : "Pause"}
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant={m.allowFreeMailProvider ? "default" : "outline"}
+                    disabled={Boolean(busy)}
+                    title="Allow Gmail/Outlook/Yahoo as From domain"
+                    onClick={() =>
+                      mailboxAction(m.id, "update_branding", {
+                        allowFreeMailProvider: !m.allowFreeMailProvider,
+                      })
+                    }
+                  >
+                    {m.allowFreeMailProvider
+                      ? "Free-mail OK"
+                      : "Allow free-mail"}
                   </Button>
                 </div>
               </div>

@@ -417,8 +417,10 @@ export class WebsiteAuditService {
         companyName: company.name,
         contactFirstName: primary.firstName,
         contactTitle: primary.title,
+        contactEmail: primary.email,
         city: company.city,
         industry: company.industry,
+        domain: company.domain,
         checks,
         services: brain.services.map((s) => ({
           id: s.id,
@@ -434,7 +436,7 @@ export class WebsiteAuditService {
         feature: "website_audit_pitch",
         operation: "website_audit_pitch",
         temperature: 0.3,
-        maxTokens: 1200,
+        maxTokens: 1800,
         jsonMode: true,
         messages: [
           { role: "system", content: PITCH_SYSTEM_PROMPT },
@@ -630,7 +632,10 @@ export class WebsiteAuditService {
     const autoApprove =
       input.reviewMode === PitchReviewMode.AUTO_APPROVE;
     const pitchId = randomUUID();
-    const topIssue = input.pitch.top_issues[0]?.issue ?? null;
+    const topIssue =
+      input.pitch.finding_title?.trim() ||
+      input.pitch.top_issues[0]?.issue ||
+      null;
 
     const contact = await prisma.contact.findFirst({
       where: { id: input.contactId },
@@ -651,6 +656,8 @@ export class WebsiteAuditService {
       missingVars.push("recommended_service");
     }
     if (!input.pitch.short_pitch?.trim()) missingVars.push("short_pitch");
+    if (!input.pitch.finding_title?.trim()) missingVars.push("finding_title");
+    if (!input.pitch.body_html?.trim()) missingVars.push("body_html");
 
     const row = await prisma.pitch.create({
       data: {
@@ -666,6 +673,12 @@ export class WebsiteAuditService {
         topIssue,
         recommendedService: input.pitch.recommended_service,
         confidence: input.pitch.confidence,
+        greeting: input.pitch.greeting,
+        introHtml: input.pitch.intro_html,
+        findingTitle: input.pitch.finding_title,
+        findingText: input.pitch.finding_text,
+        bodyHtml: input.pitch.body_html,
+        preheader: input.pitch.preheader,
         editedByUser: false,
         missingVars,
         approvedAt: autoApprove ? new Date() : null,
@@ -899,7 +912,16 @@ export class WebsiteAuditService {
     organizationId: string,
     pitchId: string,
     userId: string,
-    patch: { personalizedFirstLine?: string; shortPitch?: string }
+    patch: {
+      personalizedFirstLine?: string;
+      shortPitch?: string;
+      greeting?: string;
+      introHtml?: string;
+      findingTitle?: string;
+      findingText?: string;
+      bodyHtml?: string;
+      preheader?: string;
+    }
   ) {
     const pitch = await prisma.pitch.findFirst({
       where: { id: pitchId, organizationId },
@@ -911,12 +933,21 @@ export class WebsiteAuditService {
     ) {
       throw new ValidationError("Cannot edit this pitch status");
     }
+    const findingTitle =
+      patch.findingTitle?.trim() || pitch.findingTitle || pitch.topIssue;
     const updated = await prisma.pitch.update({
       where: { id: pitchId },
       data: {
         personalizedFirstLine:
           patch.personalizedFirstLine?.trim() || pitch.personalizedFirstLine,
         shortPitch: patch.shortPitch?.trim() || pitch.shortPitch,
+        greeting: patch.greeting?.trim() || pitch.greeting,
+        introHtml: patch.introHtml?.trim() || pitch.introHtml,
+        findingTitle,
+        findingText: patch.findingText?.trim() || pitch.findingText,
+        bodyHtml: patch.bodyHtml?.trim() || pitch.bodyHtml,
+        preheader: patch.preheader?.trim() || pitch.preheader,
+        topIssue: findingTitle || pitch.topIssue,
         editedByUser: true,
       },
     });

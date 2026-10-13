@@ -239,6 +239,15 @@ export class MailboxPoolService {
       if (sentToday >= limit) continue;
       if (m.emailAccount.status !== "ACTIVE") continue;
 
+      const { assertOutboundFromAllowed } = await import(
+        "@/lib/email/free-mail"
+      );
+      const free = assertOutboundFromAllowed({
+        fromEmail: m.emailAccount.email,
+        allowFreeMailProvider: m.allowFreeMailProvider === true,
+      });
+      if (!free.ok) continue;
+
       return m;
     }
     return null;

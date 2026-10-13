@@ -15,6 +15,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { EmptyState } from "@/components/crm/empty-state";
+import { EmailPreview } from "@/components/email/email-preview";
 
 type PitchRow = {
   id: string;
@@ -274,6 +275,8 @@ export function PitchReviewPanel({ initial }: Props) {
                   ) : null}
                 </>
               )}
+
+              <EmailPreview pitchId={p.id} />
 
               {!isEdit ? (
                 <div className="flex flex-wrap gap-2 pt-1">

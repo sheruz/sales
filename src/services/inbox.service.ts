@@ -125,6 +125,9 @@ export class InboxService {
     conversationId?: string | null;
     emailAccountId?: string | null;
     idempotencyKey: string;
+    headers?: Record<string, string>;
+    inReplyTo?: string | null;
+    references?: string | null;
   }) {
     const account = input.emailAccountId
       ? await emailAccountService.getById(
@@ -275,6 +278,9 @@ export class InboxService {
         subject: input.subject,
         text: input.body,
         html: input.bodyHtml,
+        headers: input.headers,
+        inReplyTo: input.inReplyTo,
+        references: input.references,
       });
 
       const message = await prisma.message.update({

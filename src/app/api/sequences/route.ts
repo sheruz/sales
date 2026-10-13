@@ -1,6 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
-import { ConversationChannel, OutreachSequenceStatus } from "@prisma/client";
+import {
+  ConversationChannel,
+  EmailStyle,
+  OutreachSequenceStatus,
+} from "@prisma/client";
 import { outreachSequenceService } from "@/services/outreach-sequence.service";
 import {
   requireAnyOrgPermission,
@@ -15,6 +19,7 @@ const stepSchema = z.object({
   channel: z.nativeEnum(ConversationChannel).optional(),
   subjectTemplate: z.string().max(500).optional().nullable(),
   bodyTemplate: z.string().min(1).max(50000),
+  emailStyle: z.nativeEnum(EmailStyle).optional(),
   condition: z.any().optional().nullable(),
   isActive: z.boolean().optional(),
 });

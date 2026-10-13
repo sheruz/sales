@@ -6,7 +6,6 @@ import {
 } from "@/lib/audit/rule-checks";
 import {
   validatePitchAiResult,
-  type PitchAiResult,
 } from "@/lib/audit/pitch-prompt";
 import {
   buildSequenceTemplateVars,
@@ -70,7 +69,7 @@ describe("pitch prompt validation", () => {
   ];
 
   it("accepts grounded JSON", () => {
-    const raw: PitchAiResult = {
+    const raw = {
       top_issues: [
         {
           issue: "Slow mobile experience",
@@ -84,9 +83,21 @@ describe("pitch prompt validation", () => {
       short_pitch:
         "We help property managers fix speed and conversion gaps. Happy to share a short teardown.",
       confidence: 72,
+      greeting: "Hi Alex,",
+      intro_html:
+        "<p>I was reviewing acme.com and noticed the mobile experience may be costing leads.</p>",
+      finding_title: "Mobile visitors may bounce early",
+      finding_text:
+        "A low mobile score often means fewer inquiries from people browsing on the go.",
+      body_html:
+        "<p>We help property managers fix speed and conversion gaps. Happy to share a short teardown.</p>",
+      preheader: "A quick note on your mobile site speed",
     };
     const result = validatePitchAiResult(raw, checks);
     expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.value.finding_title).not.toMatch(/detected/i);
+    }
   });
 
   it("rejects invented evidence", () => {

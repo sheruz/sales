@@ -15,6 +15,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { EmptyState } from "@/components/crm/empty-state";
+import { EmailPreview } from "@/components/email/email-preview";
 
 type Check = {
   id: string;
@@ -306,6 +307,12 @@ export function CompanyAuditPitchCards({
                 >
                   Regenerate
                 </Button>
+              </div>
+              <div className="pt-2">
+                <p className="mb-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                  Rendered email
+                </p>
+                <EmailPreview pitchId={activePitch.id} />
               </div>
             </>
           )}

@@ -87,6 +87,12 @@ enum OutboundMailboxStatus {
   ERROR
 }
 
+/// BRANDED = Delvix HTML template; PLAIN = personal text in-thread reply
+enum EmailStyle {
+  BRANDED
+  PLAIN
+}
+
 enum MessageDirection {
   OUTBOUND
   INBOUND
@@ -1132,6 +1138,13 @@ model Pitch {
   topIssue               String?     @map("top_issue") @db.Text
   recommendedService     String?     @map("recommended_service")
   confidence             Int?
+  /// Email template fields (Phase email redesign)
+  greeting               String?     @db.Text
+  introHtml              String?     @map("intro_html") @db.Text
+  findingTitle           String?     @map("finding_title") @db.Text
+  findingText            String?     @map("finding_text") @db.Text
+  bodyHtml               String?     @map("body_html") @db.Text
+  preheader              String?     @db.Text
   /// True when a human edited first line / pitch text
   editedByUser           Boolean     @default(false) @map("edited_by_user")
   /// Required template vars that were missing at generate/render time
@@ -1850,6 +1863,12 @@ model OutboundMailbox {
   bounceTotal      Int                   @default(0) @map("bounce_total")
   dnsCheck         Json?                 @map("dns_check")
   lastError        String?               @map("last_error")
+  /// Per-mailbox branding overrides (null = use org email branding)
+  senderName       String?               @map("sender_name")
+  senderTitle      String?               @map("sender_title")
+  senderPhotoPath  String?               @map("sender_photo_path")
+  /// Allow gmail.com / outlook.com / yahoo.com as From domain (default blocked)
+  allowFreeMailProvider Boolean          @default(false) @map("allow_free_mail_provider")
   createdAt        DateTime              @default(now()) @map("created_at")
   updatedAt        DateTime              @updatedAt @map("updated_at")
 
@@ -1876,6 +1895,7 @@ model EmailOutbox {
   toEmail          String           @map("to_email")
   subject          String
   bodyText         String           @map("body_text") @db.Text
+  bodyHtml         String?          @map("body_html") @db.Text
   /// Earliest UTC time this may send (prospect local Mon–Fri 8–11)
   scheduledFor     DateTime?        @map("scheduled_for")
   heldReason       String?          @map("held_reason")
@@ -2081,6 +2101,7 @@ model OutreachSequenceStep {
   channel         ConversationChannel @default(EMAIL)
   subjectTemplate String?             @map("subject_template")
   bodyTemplate    String              @map("body_template")
+  emailStyle      EmailStyle          @default(PLAIN) @map("email_style")
   condition       Json?
   isActive        Boolean             @default(true) @map("is_active")
   createdAt       DateTime            @default(now()) @map("created_at")

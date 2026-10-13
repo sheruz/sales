@@ -13,6 +13,7 @@ import { ProfileSettings } from "@/components/settings/profile-settings";
 import { ServicesPanel } from "@/components/settings/services-panel";
 import { AiUsageCard } from "@/components/settings/ai-usage-card";
 import { BillingPanel } from "@/components/settings/billing-panel";
+import { EmailBrandingPanel } from "@/components/settings/email-branding-panel";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 
@@ -34,7 +35,9 @@ export default async function SettingsPage({
           ? "billing"
           : params.tab === "users"
             ? "users"
-            : "profile";
+            : params.tab === "email-branding"
+              ? "email-branding"
+              : "profile";
 
   const canManageUsers = hasPermission(user.role, "users:manage");
   const canManageIntegrations = hasPermission(user.role, "integrations:manage");
@@ -115,6 +118,9 @@ export default async function SettingsPage({
           {canManageUsers && (
             <TabsTrigger value="users">Team</TabsTrigger>
           )}
+          {(canManageIntegrations || canManageServices) && (
+            <TabsTrigger value="email-branding">Email branding</TabsTrigger>
+          )}
         </TabsList>
 
         <TabsContent value="profile" className="mt-4">
@@ -185,6 +191,12 @@ export default async function SettingsPage({
             ) : (
               <UserManagementPanel actorRole={user.role} />
             )}
+          </TabsContent>
+        )}
+
+        {(canManageIntegrations || canManageServices) && (
+          <TabsContent value="email-branding" className="mt-4">
+            <EmailBrandingPanel />
           </TabsContent>
         )}
       </Tabs>

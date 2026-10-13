@@ -100,6 +100,12 @@ export function buildSequenceTemplateVars(input: {
     shortPitch?: string | null;
     topIssue?: string | null;
     recommendedService?: string | null;
+    greeting?: string | null;
+    introHtml?: string | null;
+    findingTitle?: string | null;
+    findingText?: string | null;
+    bodyHtml?: string | null;
+    preheader?: string | null;
   } | null;
 }): Record<string, string> {
   const c = input.contact;
@@ -111,7 +117,7 @@ export function buildSequenceTemplateVars(input: {
   const companyName = co?.name?.trim() || "";
   const city = co?.city?.trim() || "";
   const firstLine = p?.personalizedFirstLine?.trim() || "";
-  const topIssue = p?.topIssue?.trim() || "";
+  const topIssue = p?.findingTitle?.trim() || p?.topIssue?.trim() || "";
   const recommendedService =
     p?.recommendedService?.trim() || input.service?.name?.trim() || "";
   const shortPitch = p?.shortPitch?.trim() || "";
@@ -133,7 +139,7 @@ export function buildSequenceTemplateVars(input: {
     "opportunity.score": o?.score != null ? String(o.score) : "",
     "organization.name": input.organization?.name ?? "",
     "service.name": input.service?.name ?? "",
-    // Flat aliases (Phase 3)
+    // Flat aliases (Phase 3 + email redesign)
     first_name: firstName,
     company_name: companyName,
     city,
@@ -141,6 +147,12 @@ export function buildSequenceTemplateVars(input: {
     top_issue: topIssue,
     recommended_service: recommendedService,
     short_pitch: shortPitch,
+    greeting: p?.greeting?.trim() || "",
+    intro_html: p?.introHtml?.trim() || "",
+    finding_title: p?.findingTitle?.trim() || topIssue,
+    finding_text: p?.findingText?.trim() || "",
+    body_html: p?.bodyHtml?.trim() || "",
+    preheader: p?.preheader?.trim() || "",
   };
 }
 

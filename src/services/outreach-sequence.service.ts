@@ -1,6 +1,7 @@
 import prisma from "@/lib/db/prisma";
 import {
   ConversationChannel,
+  EmailStyle,
   OutreachSequenceStatus,
   SequenceEnrollmentStatus,
   type Prisma,
@@ -15,6 +16,7 @@ export type SequenceStepInput = {
   channel?: ConversationChannel;
   subjectTemplate?: string | null;
   bodyTemplate: string;
+  emailStyle?: EmailStyle;
   condition?: Prisma.InputJsonValue | null;
   isActive?: boolean;
 };
@@ -254,6 +256,7 @@ export class OutreachSequenceService {
       channel: s.channel ?? ConversationChannel.EMAIL,
       subjectTemplate: s.subjectTemplate ?? null,
       bodyTemplate: s.bodyTemplate,
+      emailStyle: s.emailStyle ?? EmailStyle.PLAIN,
       condition: (s.condition ?? undefined) as Prisma.InputJsonValue | undefined,
       isActive: s.isActive ?? true,
     };

@@ -18,6 +18,12 @@ const patchSchema = z.object({
   action: z.enum(["approve", "reject", "edit", "regenerate"]),
   personalizedFirstLine: z.string().min(1).max(500).optional(),
   shortPitch: z.string().min(1).max(4000).optional(),
+  greeting: z.string().max(80).optional(),
+  introHtml: z.string().max(4000).optional(),
+  findingTitle: z.string().max(200).optional(),
+  findingText: z.string().max(2000).optional(),
+  bodyHtml: z.string().max(8000).optional(),
+  preheader: z.string().max(90).optional(),
 });
 
 export async function PATCH(
@@ -54,6 +60,12 @@ export async function PATCH(
         {
           personalizedFirstLine: body.personalizedFirstLine,
           shortPitch: body.shortPitch,
+          greeting: body.greeting,
+          introHtml: body.introHtml,
+          findingTitle: body.findingTitle,
+          findingText: body.findingText,
+          bodyHtml: body.bodyHtml,
+          preheader: body.preheader,
         }
       );
       return NextResponse.json(apiSuccess({ pitch }));

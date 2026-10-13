@@ -52,7 +52,17 @@ export async function POST(request: NextRequest) {
 
 const patchSchema = z.object({
   mailboxId: z.string().uuid(),
-  action: z.enum(["pause", "activate", "remove", "refresh_dns", "test"]),
+  action: z.enum([
+    "pause",
+    "activate",
+    "remove",
+    "refresh_dns",
+    "test",
+    "update_branding",
+  ]),
+  senderName: z.string().max(120).optional().nullable(),
+  senderTitle: z.string().max(120).optional().nullable(),
+  allowFreeMailProvider: z.boolean().optional(),
 });
 
 export async function PATCH(request: NextRequest) {
@@ -60,6 +70,25 @@ export async function PATCH(request: NextRequest) {
     const user = await requireAnyOrgPermission([...PERMS]);
     await requireOrganizationContext();
     const body = patchSchema.parse(await request.json());
+
+    if (body.action === "update_branding") {
+      const prisma = (await import("@/lib/db/prisma")).default;
+      const updated = await prisma.outboundMailbox.updateMany({
+        where: { id: body.mailboxId, organizationId: user.organizationId },
+        data: {
+          ...(body.senderName !== undefined
+            ? { senderName: body.senderName }
+            : {}),
+          ...(body.senderTitle !== undefined
+            ? { senderTitle: body.senderTitle }
+            : {}),
+          ...(body.allowFreeMailProvider !== undefined
+            ? { allowFreeMailProvider: body.allowFreeMailProvider }
+            : {}),
+        },
+      });
+      return NextResponse.json(apiSuccess({ updated: updated.count }));
+    }
 
     if (body.action === "remove") {
       return NextResponse.json(

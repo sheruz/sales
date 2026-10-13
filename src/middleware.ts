@@ -26,8 +26,14 @@ export function middleware(request: NextRequest) {
   const isPublicPage = publicPages.some(
     (route) => pathname === route || pathname.startsWith(`${route}/`)
   );
+  // Stable public branding assets (logo / sender photo) — no auth
+  const isBrandingAsset = pathname.startsWith("/branding/");
   const isDashboardRoute = pathname.startsWith("/dashboard");
   const isPlatformRoute = pathname.startsWith("/platform");
+
+  if (isBrandingAsset) {
+    return NextResponse.next();
+  }
 
   if ((isDashboardRoute || isPlatformRoute) && !sessionToken) {
     const loginUrl = new URL("/login", request.url);
@@ -40,7 +46,13 @@ export function middleware(request: NextRequest) {
   // bounce login ↔ dashboard forever (blank page). The login page redirects
   // only after getCurrentUser() succeeds.
 
-  if (!isPublicPage && !isDashboardRoute && !isPlatformRoute && !sessionToken) {
+  if (
+    !isPublicPage &&
+    !isBrandingAsset &&
+    !isDashboardRoute &&
+    !isPlatformRoute &&
+    !sessionToken
+  ) {
     return NextResponse.redirect(new URL("/login", request.url));
   }
 

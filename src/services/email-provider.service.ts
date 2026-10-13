@@ -19,6 +19,65 @@ function toBase64Url(raw: string): string {
     .replace(/=+$/, "");
 }
 
+/** Build RFC 2046 multipart/alternative (text + html). */
+export function buildMultipartAlternative(params: {
+  from: string;
+  to: string;
+  subject: string;
+  text: string;
+  html: string;
+  headers?: Record<string, string>;
+  inReplyTo?: string | null;
+  references?: string | null;
+}): string {
+  const boundary = `delvix_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 10)}`;
+  const extra: string[] = [];
+  if (params.headers) {
+    for (const [k, v] of Object.entries(params.headers)) {
+      if (v) extra.push(`${k}: ${v}`);
+    }
+  }
+  if (params.inReplyTo) {
+    const v = params.inReplyTo.startsWith("<")
+      ? params.inReplyTo
+      : `<${params.inReplyTo}>`;
+    if (!extra.some((h) => h.toLowerCase().startsWith("in-reply-to:"))) {
+      extra.push(`In-Reply-To: ${v}`);
+    }
+  }
+  if (params.references) {
+    const v = params.references.startsWith("<")
+      ? params.references
+      : `<${params.references}>`;
+    if (!extra.some((h) => h.toLowerCase().startsWith("references:"))) {
+      extra.push(`References: ${v}`);
+    }
+  }
+
+  return [
+    `From: ${params.from}`,
+    `To: ${params.to}`,
+    `Subject: ${params.subject}`,
+    "MIME-Version: 1.0",
+    ...extra,
+    `Content-Type: multipart/alternative; boundary="${boundary}"`,
+    "",
+    `--${boundary}`,
+    'Content-Type: text/plain; charset="UTF-8"',
+    "Content-Transfer-Encoding: 7bit",
+    "",
+    params.text,
+    "",
+    `--${boundary}`,
+    'Content-Type: text/html; charset="UTF-8"',
+    "Content-Transfer-Encoding: 7bit",
+    "",
+    params.html,
+    "",
+    `--${boundary}--`,
+  ].join("\r\n");
+}
+
 export class EmailProviderService {
   async ensureFreshAccessToken(account: EmailAccount): Promise<string> {
     const access = emailAccountService.getAccessToken(account);
@@ -63,12 +122,21 @@ export class EmailProviderService {
     throw new Error("SMTP accounts do not use OAuth access tokens");
   }
 
-  async send(account: EmailAccount, params: {
-    to: string;
-    subject: string;
-    text: string;
-    html?: string;
-  }): Promise<ProviderSendResult> {
+  async send(
+    account: EmailAccount,
+    params: {
+      to: string;
+      subject: string;
+      text: string;
+      html?: string;
+      headers?: Record<string, string>;
+      inReplyTo?: string | null;
+      references?: string | null;
+    }
+  ): Promise<ProviderSendResult> {
+    const html = params.html ?? params.text.replace(/\n/g, "<br>");
+    const text = params.text;
+
     if (account.provider === EmailProvider.SMTP) {
       const password = emailAccountService.getSmtpPassword(account);
       if (!account.smtpHost || !account.smtpUser || !password) {
@@ -84,22 +152,32 @@ export class EmailProviderService {
           fromName: account.displayName || account.email,
           fromEmail: account.email,
         },
-        params
+        {
+          to: params.to,
+          subject: params.subject,
+          text,
+          html,
+          headers: params.headers,
+          inReplyTo: params.inReplyTo,
+          references: params.references,
+        }
       );
       return { providerMessageId: result.messageId };
     }
 
     if (account.provider === EmailProvider.GMAIL) {
       const token = await this.ensureFreshAccessToken(account);
-      const raw = [
-        `From: ${account.displayName || account.email} <${account.email}>`,
-        `To: ${params.to}`,
-        `Subject: ${params.subject}`,
-        "MIME-Version: 1.0",
-        'Content-Type: text/html; charset="UTF-8"',
-        "",
-        params.html ?? params.text.replace(/\n/g, "<br>"),
-      ].join("\r\n");
+      const from = `${account.displayName || account.email} <${account.email}>`;
+      const raw = buildMultipartAlternative({
+        from,
+        to: params.to,
+        subject: params.subject,
+        text,
+        html,
+        headers: params.headers,
+        inReplyTo: params.inReplyTo,
+        references: params.references,
+      });
 
       const res = await fetch(
         "https://gmail.googleapis.com/gmail/v1/users/me/messages/send",
@@ -121,6 +199,29 @@ export class EmailProviderService {
 
     if (account.provider === EmailProvider.OUTLOOK) {
       const token = await this.ensureFreshAccessToken(account);
+      const internetHeaders: Array<{ name: string; value: string }> = [];
+      if (params.headers) {
+        for (const [name, value] of Object.entries(params.headers)) {
+          if (value) internetHeaders.push({ name, value });
+        }
+      }
+      if (params.inReplyTo) {
+        internetHeaders.push({
+          name: "In-Reply-To",
+          value: params.inReplyTo.startsWith("<")
+            ? params.inReplyTo
+            : `<${params.inReplyTo}>`,
+        });
+      }
+      if (params.references) {
+        internetHeaders.push({
+          name: "References",
+          value: params.references.startsWith("<")
+            ? params.references
+            : `<${params.references}>`,
+        });
+      }
+
       const res = await fetch("https://graph.microsoft.com/v1.0/me/sendMail", {
         method: "POST",
         headers: {
@@ -132,11 +233,12 @@ export class EmailProviderService {
             subject: params.subject,
             body: {
               contentType: "HTML",
-              content: params.html ?? params.text.replace(/\n/g, "<br>"),
+              content: html,
             },
-            toRecipients: [
-              { emailAddress: { address: params.to } },
-            ],
+            toRecipients: [{ emailAddress: { address: params.to } }],
+            internetMessageHeaders: internetHeaders.length
+              ? internetHeaders
+              : undefined,
           },
           saveToSentItems: true,
         }),

@@ -1,46 +1,65 @@
-/** Default Cold outreach sequence templates (plain text, pitch vars). */
+/** Default Cold outreach sequence templates (pitch vars + email styles). */
 
 export const COLD_OUTREACH_NAME = "Cold outreach";
+export const INBOUND_OUTREACH_NAME = "Inbound outreach";
 
 export const COLD_OUTREACH_STEPS = [
   {
     stepOrder: 1,
     delayMinutes: 0,
+    emailStyle: "BRANDED" as const,
     subjectTemplate: `{{company_name}} — quick idea`,
-    bodyTemplate: `Hi {{first_name}},
+    bodyTemplate: `{{greeting}}
 
-{{personalized_first_line}}
+{{intro_html}}
 
-{{short_pitch}}
+{{finding_title}}
 
-Worth a quick look?
+{{finding_text}}
 
-Best`,
+{{body_html}}`,
   },
   {
     stepOrder: 2,
     delayMinutes: 3 * 24 * 60,
+    emailStyle: "PLAIN" as const,
     subjectTemplate: `Re: {{company_name}} — quick idea`,
-    bodyTemplate: `Hi {{first_name}},
+    bodyTemplate: `{{greeting}}
 
-Circling back on {{top_issue}}.
+Circling back on {{finding_title}}.
 
-{{short_pitch}}
+{{body_html}}
 
-Happy to share a short example of {{recommended_service}} if useful.
-
-Best`,
+Happy to share a short example of {{recommended_service}} if useful.`,
   },
   {
     stepOrder: 3,
     delayMinutes: 7 * 24 * 60,
+    emailStyle: "PLAIN" as const,
     subjectTemplate: `Re: {{company_name}} — quick idea`,
-    bodyTemplate: `Hi {{first_name}},
+    bodyTemplate: `{{greeting}}
 
-Last note from me — if {{top_issue}} isn't a priority, no worries at all.
+Last note from me — if {{finding_title}} isn't a priority, no worries at all.
 
-If it is, I can outline how {{recommended_service}} usually helps teams like {{company_name}}.
+If it is, I can outline how {{recommended_service}} usually helps teams like {{company_name}}.`,
+  },
+] as const;
 
-Best`,
+/** Inbound / Meta — all BRANDED. */
+export const INBOUND_OUTREACH_STEPS = [
+  {
+    stepOrder: 1,
+    delayMinutes: 0,
+    emailStyle: "BRANDED" as const,
+    subjectTemplate: `{{company_name}} — next steps`,
+    bodyTemplate: `{{greeting}}
+
+{{intro_html}}
+
+{{finding_title}}
+
+{{finding_text}}
+
+{{body_html}}`,
   },
 ] as const;

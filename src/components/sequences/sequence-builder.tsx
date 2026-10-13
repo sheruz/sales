@@ -30,6 +30,7 @@ export type BuilderStep = {
   channel: "EMAIL" | "LINKEDIN" | "WHATSAPP";
   subjectTemplate: string;
   bodyTemplate: string;
+  emailStyle: "BRANDED" | "PLAIN";
   isActive: boolean;
 };
 
@@ -48,6 +49,7 @@ type SequenceBuilderProps = {
       channel: string;
       subjectTemplate: string | null;
       bodyTemplate: string;
+      emailStyle?: string;
       isActive: boolean;
     }[];
   };
@@ -62,6 +64,7 @@ function newStep(order: number, key?: string): BuilderStep {
     channel: "EMAIL",
     subjectTemplate: "",
     bodyTemplate: "",
+    emailStyle: order <= 1 ? "BRANDED" : "PLAIN",
     isActive: true,
   };
 }
@@ -96,6 +99,7 @@ export function SequenceBuilder({
               : "EMAIL",
           subjectTemplate: s.subjectTemplate ?? "",
           bodyTemplate: s.bodyTemplate,
+          emailStyle: s.emailStyle === "BRANDED" ? "BRANDED" : "PLAIN",
           isActive: s.isActive,
         }))
       : [newStep(0)]
@@ -208,6 +212,7 @@ export function SequenceBuilder({
           channel: s.channel,
           subjectTemplate: s.subjectTemplate || null,
           bodyTemplate: s.bodyTemplate,
+          emailStyle: s.emailStyle,
           isActive: s.isActive,
         })),
       };
@@ -454,6 +459,39 @@ export function SequenceBuilder({
                           Unsupported — will be skipped at runtime
                         </span>
                       ) : null}
+                    </div>
+                  </div>
+                </div>
+                <div className="flex flex-wrap gap-2 items-end">
+                  <div className="space-y-1">
+                    <Label>Email style</Label>
+                    <div className="flex gap-2">
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant={
+                          step.emailStyle === "BRANDED" ? "default" : "outline"
+                        }
+                        disabled={readOnly || saving}
+                        onClick={() =>
+                          updateStep(step.key, { emailStyle: "BRANDED" })
+                        }
+                      >
+                        BRANDED
+                      </Button>
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant={
+                          step.emailStyle === "PLAIN" ? "default" : "outline"
+                        }
+                        disabled={readOnly || saving}
+                        onClick={() =>
+                          updateStep(step.key, { emailStyle: "PLAIN" })
+                        }
+                      >
+                        PLAIN
+                      </Button>
                     </div>
                   </div>
                 </div>
