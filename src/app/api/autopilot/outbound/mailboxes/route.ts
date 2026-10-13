@@ -31,7 +31,9 @@ export async function GET() {
 
 const postSchema = z.object({
   emailAccountId: z.string().uuid(),
-  dailyCap: z.number().int().min(1).max(100).optional(),
+  dailyCap: z.number().int().min(1).max(200).optional(),
+  rampStart: z.number().int().min(1).max(200).optional(),
+  rampIncrement: z.number().int().min(0).max(50).optional(),
 });
 
 export async function POST(request: NextRequest) {
@@ -42,7 +44,11 @@ export async function POST(request: NextRequest) {
     const result = await mailboxPoolService.addToPool(
       user.organizationId,
       body.emailAccountId,
-      { dailyCap: body.dailyCap }
+      {
+        dailyCap: body.dailyCap,
+        rampStart: body.rampStart,
+        rampIncrement: body.rampIncrement,
+      }
     );
     return NextResponse.json(apiSuccess(result));
   } catch (error) {
@@ -59,10 +65,15 @@ const patchSchema = z.object({
     "refresh_dns",
     "test",
     "update_branding",
+    "update_limits",
   ]),
   senderName: z.string().max(120).optional().nullable(),
   senderTitle: z.string().max(120).optional().nullable(),
   allowFreeMailProvider: z.boolean().optional(),
+  dailyCap: z.number().int().min(1).max(200).optional(),
+  rampStart: z.number().int().min(1).max(200).optional(),
+  rampIncrement: z.number().int().min(0).max(50).optional(),
+  resetSentToday: z.boolean().optional(),
 });
 
 export async function PATCH(request: NextRequest) {
@@ -70,6 +81,23 @@ export async function PATCH(request: NextRequest) {
     const user = await requireAnyOrgPermission([...PERMS]);
     await requireOrganizationContext();
     const body = patchSchema.parse(await request.json());
+
+    if (body.action === "update_limits") {
+      return NextResponse.json(
+        apiSuccess(
+          await mailboxPoolService.updateLimits(
+            user.organizationId,
+            body.mailboxId,
+            {
+              dailyCap: body.dailyCap,
+              rampStart: body.rampStart,
+              rampIncrement: body.rampIncrement,
+              resetSentToday: body.resetSentToday,
+            }
+          )
+        )
+      );
+    }
 
     if (body.action === "update_branding") {
       const prisma = (await import("@/lib/db/prisma")).default;

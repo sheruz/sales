@@ -67,7 +67,7 @@ export class MailboxPoolService {
   async addToPool(
     organizationId: string,
     emailAccountId: string,
-    opts?: { dailyCap?: number }
+    opts?: { dailyCap?: number; rampStart?: number; rampIncrement?: number }
   ) {
     const account = await prisma.emailAccount.findFirst({
       where: { id: emailAccountId, organizationId },
@@ -107,7 +107,9 @@ export class MailboxPoolService {
         status: dns.canSend
           ? OutboundMailboxStatus.ACTIVE
           : OutboundMailboxStatus.PAUSED,
-        dailyCap: opts?.dailyCap ?? 30,
+        dailyCap: opts?.dailyCap ?? 40,
+        rampStart: opts?.rampStart ?? 20,
+        rampIncrement: opts?.rampIncrement ?? 5,
         rampStartedAt: new Date(),
         rampDay: 0,
         dnsCheck: dns as unknown as Prisma.InputJsonValue,
@@ -127,6 +129,55 @@ export class MailboxPoolService {
     if (!row) throw new NotFoundError("Outbound mailbox not found");
     await prisma.outboundMailbox.delete({ where: { id: mailboxId } });
     return { ok: true };
+  }
+
+  /** Update daily send limits / warmup, optionally reset the day counter. */
+  async updateLimits(
+    organizationId: string,
+    mailboxId: string,
+    patch: {
+      dailyCap?: number;
+      rampStart?: number;
+      rampIncrement?: number;
+      resetSentToday?: boolean;
+    }
+  ) {
+    const row = await prisma.outboundMailbox.findFirst({
+      where: { id: mailboxId, organizationId },
+    });
+    if (!row) throw new NotFoundError("Outbound mailbox not found");
+
+    const dailyCap = patch.dailyCap ?? row.dailyCap;
+    const rampStart = patch.rampStart ?? row.rampStart;
+    const rampIncrement = patch.rampIncrement ?? row.rampIncrement;
+    if (dailyCap < 1 || dailyCap > 200) {
+      throw new ValidationError("dailyCap must be 1–200");
+    }
+    if (rampStart < 1 || rampStart > dailyCap) {
+      throw new ValidationError("rampStart must be 1–dailyCap");
+    }
+    if (rampIncrement < 0 || rampIncrement > 50) {
+      throw new ValidationError("rampIncrement must be 0–50");
+    }
+
+    const updated = await prisma.outboundMailbox.update({
+      where: { id: mailboxId },
+      data: {
+        dailyCap,
+        rampStart,
+        rampIncrement,
+        ...(patch.resetSentToday
+          ? {
+              sentToday: 0,
+              sentTodayResetAt: startOfUtcDay(),
+            }
+          : {}),
+      },
+    });
+    return {
+      ...updated,
+      effectiveLimit: effectiveDailyLimit(updated),
+    };
   }
 
   async setStatus(

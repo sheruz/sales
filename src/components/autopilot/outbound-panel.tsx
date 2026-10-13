@@ -29,6 +29,8 @@ type Mailbox = {
   id: string;
   status: string;
   dailyCap: number;
+  rampStart: number;
+  rampIncrement: number;
   sentToday: number;
   effectiveLimit: number;
   bounceRate: number;
@@ -63,6 +65,100 @@ type Props = {
     } | null;
   };
 };
+
+function MailboxLimitsEditor({
+  mailbox,
+  busy,
+  onSave,
+}: {
+  mailbox: Mailbox;
+  busy: boolean;
+  onSave: (patch: {
+    dailyCap: number;
+    rampStart: number;
+    rampIncrement: number;
+    resetSentToday?: boolean;
+  }) => void;
+}) {
+  const [dailyCap, setDailyCap] = useState(String(mailbox.dailyCap));
+  const [rampStart, setRampStart] = useState(String(mailbox.rampStart));
+  const [rampIncrement, setRampIncrement] = useState(
+    String(mailbox.rampIncrement)
+  );
+
+  function parse() {
+    const cap = Number(dailyCap);
+    const start = Number(rampStart);
+    const inc = Number(rampIncrement);
+    if (!Number.isFinite(cap) || !Number.isFinite(start) || !Number.isFinite(inc)) {
+      toast.error("Enter valid numbers for limits");
+      return null;
+    }
+    return {
+      dailyCap: Math.round(cap),
+      rampStart: Math.round(start),
+      rampIncrement: Math.round(inc),
+    };
+  }
+
+  return (
+    <div className="flex flex-wrap items-end gap-2 rounded-md bg-muted/40 p-2 text-xs">
+      <label className="space-y-1">
+        <span className="text-muted-foreground">Daily cap</span>
+        <Input
+          className="h-8 w-20"
+          inputMode="numeric"
+          value={dailyCap}
+          onChange={(e) => setDailyCap(e.target.value)}
+          disabled={busy}
+        />
+      </label>
+      <label className="space-y-1">
+        <span className="text-muted-foreground">Ramp start</span>
+        <Input
+          className="h-8 w-20"
+          inputMode="numeric"
+          value={rampStart}
+          onChange={(e) => setRampStart(e.target.value)}
+          disabled={busy}
+        />
+      </label>
+      <label className="space-y-1">
+        <span className="text-muted-foreground">+ / day</span>
+        <Input
+          className="h-8 w-16"
+          inputMode="numeric"
+          value={rampIncrement}
+          onChange={(e) => setRampIncrement(e.target.value)}
+          disabled={busy}
+        />
+      </label>
+      <Button
+        size="sm"
+        variant="outline"
+        disabled={busy}
+        onClick={() => {
+          const parsed = parse();
+          if (parsed) onSave(parsed);
+        }}
+      >
+        Save limits
+      </Button>
+      <Button
+        size="sm"
+        variant="secondary"
+        disabled={busy}
+        title="Set sent today back to 0 so you can send again today"
+        onClick={() => {
+          const parsed = parse();
+          if (parsed) onSave({ ...parsed, resetSentToday: true });
+        }}
+      >
+        Reset sent today
+      </Button>
+    </div>
+  );
+}
 
 function formatSendResult(data: {
   processed?: number;
@@ -159,7 +255,8 @@ export function OutboundPanel({ initial }: Props) {
       | "remove"
       | "refresh_dns"
       | "test"
-      | "update_branding",
+      | "update_branding"
+      | "update_limits",
     extra?: Record<string, unknown>
   ) {
     setBusy(`mb:${action}:${mailboxId}`);
@@ -176,9 +273,11 @@ export function OutboundPanel({ initial }: Props) {
           ? `Test sent to ${json.data.to}`
           : action === "update_branding"
             ? "Mailbox branding updated"
-          : action === "refresh_dns"
-            ? "DNS refreshed"
-            : "Updated"
+            : action === "update_limits"
+              ? "Mailbox daily limit updated"
+              : action === "refresh_dns"
+                ? "DNS refreshed"
+                : "Updated"
       );
       router.refresh();
     } catch (err) {
@@ -422,71 +521,81 @@ export function OutboundPanel({ initial }: Props) {
               return (
               <div
                 key={m.id}
-                className="flex flex-wrap items-center justify-between gap-2 rounded-md border p-3"
+                className="space-y-2 rounded-md border p-3"
               >
-                <div>
-                  <p className="font-medium">{m.emailAccount.email}</p>
-                  <p className="text-xs text-muted-foreground">
-                    {m.emailAccount.provider} · sent {m.sentToday}/
-                    {m.effectiveLimit} · bounce{" "}
-                    {(m.bounceRate * 100).toFixed(1)}%
-                    {dns
-                      ? ` · SPF ${dns.spf?.ok ? "OK" : "FAIL"} · DKIM ${
-                          dns.dkim?.ok ? "OK" : "FAIL"
-                        }`
-                      : ""}
-                  </p>
-                  {m.lastError ? (
-                    <p className="text-xs text-destructive">{m.lastError}</p>
-                  ) : null}
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div>
+                    <p className="font-medium">{m.emailAccount.email}</p>
+                    <p className="text-xs text-muted-foreground">
+                      {m.emailAccount.provider} · sent {m.sentToday}/
+                      {m.effectiveLimit} (cap {m.dailyCap}, ramp{" "}
+                      {m.rampStart}+{m.rampIncrement}/day) · bounce{" "}
+                      {(m.bounceRate * 100).toFixed(1)}%
+                      {dns
+                        ? ` · SPF ${dns.spf?.ok ? "OK" : "FAIL"} · DKIM ${
+                            dns.dkim?.ok ? "OK" : "FAIL"
+                          }`
+                        : ""}
+                    </p>
+                    {m.lastError ? (
+                      <p className="text-xs text-destructive">{m.lastError}</p>
+                    ) : null}
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    <Badge variant="outline">{m.status}</Badge>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      disabled={Boolean(busy)}
+                      onClick={() => mailboxAction(m.id, "test")}
+                    >
+                      Test to self
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      disabled={Boolean(busy)}
+                      onClick={() => mailboxAction(m.id, "refresh_dns")}
+                    >
+                      Check DNS
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      disabled={Boolean(busy)}
+                      onClick={() =>
+                        mailboxAction(
+                          m.id,
+                          m.status === "PAUSED" ? "activate" : "pause"
+                        )
+                      }
+                    >
+                      {m.status === "PAUSED" ? "Activate" : "Pause"}
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant={m.allowFreeMailProvider ? "default" : "outline"}
+                      disabled={Boolean(busy)}
+                      title="Allow Gmail/Outlook/Yahoo as From domain"
+                      onClick={() =>
+                        mailboxAction(m.id, "update_branding", {
+                          allowFreeMailProvider: !m.allowFreeMailProvider,
+                        })
+                      }
+                    >
+                      {m.allowFreeMailProvider
+                        ? "Free-mail OK"
+                        : "Allow free-mail"}
+                    </Button>
+                  </div>
                 </div>
-                <div className="flex flex-wrap gap-2">
-                  <Badge variant="outline">{m.status}</Badge>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    disabled={Boolean(busy)}
-                    onClick={() => mailboxAction(m.id, "test")}
-                  >
-                    Test to self
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    disabled={Boolean(busy)}
-                    onClick={() => mailboxAction(m.id, "refresh_dns")}
-                  >
-                    Check DNS
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    disabled={Boolean(busy)}
-                    onClick={() =>
-                      mailboxAction(
-                        m.id,
-                        m.status === "PAUSED" ? "activate" : "pause"
-                      )
-                    }
-                  >
-                    {m.status === "PAUSED" ? "Activate" : "Pause"}
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant={m.allowFreeMailProvider ? "default" : "outline"}
-                    disabled={Boolean(busy)}
-                    title="Allow Gmail/Outlook/Yahoo as From domain"
-                    onClick={() =>
-                      mailboxAction(m.id, "update_branding", {
-                        allowFreeMailProvider: !m.allowFreeMailProvider,
-                      })
-                    }
-                  >
-                    {m.allowFreeMailProvider
-                      ? "Free-mail OK"
-                      : "Allow free-mail"}
-                  </Button>
-                </div>
+                <MailboxLimitsEditor
+                  mailbox={m}
+                  busy={Boolean(busy)}
+                  onSave={(patch) =>
+                    mailboxAction(m.id, "update_limits", patch)
+                  }
+                />
               </div>
             );
             })
