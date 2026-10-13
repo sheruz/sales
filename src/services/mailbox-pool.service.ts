@@ -151,6 +151,8 @@ export class MailboxPoolService {
     });
     if (!row) throw new NotFoundError("Outbound mailbox not found");
     const dns = await checkSendingDomainDns(row.emailAccount.email);
+    // Auto-unpause only when DNS previously blocked send (or ERROR). Manual pause
+    // (null / non-DNS lastError) stays PAUSED until the user clicks Activate.
     const dnsPaused =
       row.status === OutboundMailboxStatus.PAUSED &&
       /spf|dkim|dns/i.test(row.lastError || "");

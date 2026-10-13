@@ -132,12 +132,21 @@ export async function PATCH(request: NextRequest) {
         )
       );
     }
-    // activate: re-check DNS first (clears stale Gmail/Outlook DKIM pause)
+    // activate: refresh DNS, then force ACTIVE when canSend (manual pause has null lastError)
+    const refreshed = await mailboxPoolService.refreshDns(
+      user.organizationId,
+      body.mailboxId
+    );
+    const dns = refreshed.dnsCheck as { canSend?: boolean } | null;
+    if (dns && dns.canSend === false) {
+      return NextResponse.json(apiSuccess(refreshed));
+    }
     return NextResponse.json(
       apiSuccess(
-        await mailboxPoolService.refreshDns(
+        await mailboxPoolService.setStatus(
           user.organizationId,
-          body.mailboxId
+          body.mailboxId,
+          OutboundMailboxStatus.ACTIVE
         )
       )
     );
