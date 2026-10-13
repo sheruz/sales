@@ -1,0 +1,544 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Delvix App Reference</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+/* ============ DESIGN TOKENS (copy these into the app's globals.css) ============ */
+:root{
+  --bg:#0a0b12; --surface:#11131c; --surface-2:#171a25; --surface-3:#1e2230;
+  --border:#232737; --border-strong:#2e3346;
+  --text:#eceef6; --text-2:#a3a8bf; --text-3:#6e738c;
+  --brand:#5b63f5; --brand-hover:#6e75ff; --brand-soft:rgba(91,99,245,.14);
+  --accent:#ff6b3d;
+  --ok:#3ddc97; --ok-soft:rgba(61,220,151,.12);
+  --warn:#f5b84b; --warn-soft:rgba(245,184,75,.12);
+  --bad:#ff5d6c; --bad-soft:rgba(255,93,108,.12);
+  --info:#5ab4ff; --info-soft:rgba(90,180,255,.12);
+  --neutral-soft:rgba(163,168,191,.12);
+  --radius:12px; --radius-sm:8px;
+  --font:'Inter',system-ui,-apple-system,sans-serif; --mono:'JetBrains Mono',ui-monospace,monospace;
+  --sidebar:248px; --logo-bg:#ffffff; --logo-fg:#0b0d18;
+}
+@media (prefers-color-scheme: light){ :root:not([data-theme="dark"]){
+  --bg:#f6f7fb; --surface:#ffffff; --surface-2:#f8f9fc; --surface-3:#eff1f7;
+  --border:#e6e8f0; --border-strong:#d7dae6;
+  --text:#14172a; --text-2:#545a73; --text-3:#8a8fa8;
+  --brand-soft:rgba(91,99,245,.10); --neutral-soft:rgba(84,90,115,.08);
+  --ok:#0f9d63; --warn:#b7791f; --bad:#d93545; --info:#1f7fd1; --brand-hover:#4a52e8; --logo-bg:#0b0d18; --logo-fg:#ffffff;
+}}
+:root[data-theme="light"]{
+  --bg:#f6f7fb; --surface:#ffffff; --surface-2:#f8f9fc; --surface-3:#eff1f7;
+  --border:#e6e8f0; --border-strong:#d7dae6;
+  --text:#14172a; --text-2:#545a73; --text-3:#8a8fa8;
+  --brand-soft:rgba(91,99,245,.10); --neutral-soft:rgba(84,90,115,.08);
+  --ok:#0f9d63; --warn:#b7791f; --bad:#d93545; --info:#1f7fd1; --brand-hover:#4a52e8; --logo-bg:#0b0d18; --logo-fg:#ffffff;
+}
+:root[data-theme="dark"]{ /* defaults above */ }
+
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%}
+body{background:var(--bg);color:var(--text);font-family:var(--font);font-size:14px;line-height:1.5;-webkit-font-smoothing:antialiased}
+a{color:inherit;text-decoration:none}
+button{font:inherit;color:inherit;cursor:pointer;border:0;background:none}
+
+/* ============ APP SHELL ============ */
+.app{display:flex;min-height:100vh;background:linear-gradient(to right,var(--surface) var(--sidebar),var(--bg) var(--sidebar))}
+.sidebar{width:var(--sidebar);flex:none;position:sticky;top:0;height:100vh;background:var(--surface);border-right:1px solid var(--border);display:flex;flex-direction:column;padding:16px 12px}
+.brand{display:flex;align-items:center;gap:10px;padding:6px 8px 18px}
+.brand-mark{width:30px;height:30px;border-radius:8px;background:var(--logo-bg);position:relative;flex:none}
+.brand-mark::before{content:"";position:absolute;left:9px;top:7px;width:9px;height:16px;background:var(--logo-fg);border-radius:0 8px 8px 0}
+.brand-mark::after{content:"";position:absolute;left:5px;bottom:5px;width:7px;height:7px;border-radius:50%;background:var(--accent)}
+.brand-name{font-weight:800;font-size:16px;letter-spacing:-.3px}
+.brand-sub{font-family:var(--mono);font-size:9.5px;letter-spacing:1.8px;color:var(--text-3)}
+.ws{margin:0 0 14px;padding:8px 10px;border:1px solid var(--border);border-radius:var(--radius-sm);display:flex;align-items:center;gap:8px;font-size:13px;color:var(--text-2)}
+.ws b{color:var(--text);font-weight:600}
+.ws .chev{margin-left:auto;color:var(--text-3)}
+.nav{display:flex;flex-direction:column;gap:2px}
+.nav-item{display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:var(--radius-sm);color:var(--text-2);font-weight:500}
+.nav-item:hover{background:var(--surface-2);color:var(--text)}
+.nav-item.active{background:var(--brand-soft);color:var(--text)}
+.nav-item.active svg{color:var(--brand)}
+.nav-item svg{width:17px;height:17px;flex:none}
+.nav-item .count{margin-left:auto;font-size:11px;font-weight:600;background:var(--brand);color:#fff;border-radius:999px;padding:1px 7px}
+.nav-label{font-size:11px;font-weight:600;color:var(--text-3);text-transform:uppercase;letter-spacing:.6px;padding:14px 10px 6px}
+.sidebar-foot{margin-top:auto;border-top:1px solid var(--border);padding-top:12px}
+.autopilot-pill{display:flex;align-items:center;gap:8px;padding:10px;border-radius:var(--radius-sm);background:var(--surface-2);border:1px solid var(--border);font-size:12.5px;margin-bottom:10px}
+.dot{width:8px;height:8px;border-radius:50%;background:var(--ok);box-shadow:0 0 0 3px var(--ok-soft);flex:none}
+.dot.warn{background:var(--warn);box-shadow:0 0 0 3px var(--warn-soft)}
+.user{display:flex;align-items:center;gap:10px;padding:6px 8px}
+.avatar{width:32px;height:32px;border-radius:50%;background:var(--brand);color:#fff;display:grid;place-items:center;font-weight:700;font-size:12px;flex:none}
+.user-name{font-weight:600;font-size:13px}.user-role{font-size:12px;color:var(--text-3)}
+
+.main{flex:1;min-width:0;display:flex;flex-direction:column}
+.topbar{height:56px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:12px;padding:0 28px;position:sticky;top:0;background:color-mix(in srgb,var(--bg) 88%,transparent);backdrop-filter:blur(8px);z-index:5}
+.search{flex:1;max-width:440px;display:flex;align-items:center;gap:8px;height:34px;padding:0 12px;border:1px solid var(--border);border-radius:var(--radius-sm);background:var(--surface);color:var(--text-3);font-size:13px;white-space:nowrap;overflow:hidden;min-width:0}
+.search svg{flex:none}
+.kbd{margin-left:auto;font-family:var(--mono);font-size:11px;border:1px solid var(--border);border-radius:5px;padding:0 5px}
+.topbar .spacer{flex:1}
+.icon-btn{width:34px;height:34px;border-radius:var(--radius-sm);border:1px solid var(--border);display:grid;place-items:center;color:var(--text-2);background:var(--surface);position:relative}
+.icon-btn svg{width:16px;height:16px}
+.icon-btn .badge-dot{position:absolute;top:6px;right:6px;width:7px;height:7px;border-radius:50%;background:var(--accent)}
+.menu-btn{display:none}
+
+.page{padding:28px;max-width:1280px;width:100%;margin:0 auto}
+.page-head{display:flex;align-items:flex-start;gap:16px;margin-bottom:22px}
+.page-title{font-size:22px;font-weight:700;letter-spacing:-.4px}
+.page-sub{color:var(--text-2);margin-top:2px}
+.page-actions{margin-left:auto;display:flex;gap:8px;flex-wrap:wrap}
+
+/* ============ COMPONENTS ============ */
+.btn{height:34px;padding:0 14px;border-radius:var(--radius-sm);font-weight:600;font-size:13px;display:inline-flex;align-items:center;gap:7px;border:1px solid var(--border);background:var(--surface);color:var(--text);white-space:nowrap}
+.btn:hover{border-color:var(--border-strong)}
+.btn.primary{background:var(--brand);border-color:var(--brand);color:#fff}
+.btn.primary:hover{background:var(--brand-hover)}
+.btn svg{width:15px;height:15px}
+.card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius)}
+.card-head{display:flex;align-items:center;gap:10px;padding:16px 18px;border-bottom:1px solid var(--border)}
+.card-title{font-weight:600;font-size:14px}
+.card-sub{color:var(--text-3);font-size:12.5px}
+.card-body{padding:18px}
+.grid{display:grid;gap:16px}
+.g4{grid-template-columns:repeat(4,1fr)}.g3{grid-template-columns:repeat(3,1fr)}.g2{grid-template-columns:repeat(2,1fr)}.g21{grid-template-columns:2fr 1fr}
+.stack{display:flex;flex-direction:column;gap:16px}
+
+.kpi{padding:16px 18px}
+.kpi-label{font-size:12.5px;color:var(--text-2);display:flex;align-items:center;gap:6px}
+.kpi-value{font-size:26px;font-weight:700;letter-spacing:-.6px;margin-top:6px}
+.kpi-delta{font-size:12px;color:var(--ok);margin-top:2px}
+.kpi-delta.muted{color:var(--text-3)}
+.progress{height:6px;border-radius:99px;background:var(--surface-3);overflow:hidden;margin-top:10px}
+.progress>span{display:block;height:100%;background:linear-gradient(90deg,var(--brand),var(--accent));border-radius:99px}
+
+.badge{display:inline-flex;align-items:center;gap:5px;height:22px;padding:0 8px;border-radius:999px;font-size:11.5px;font-weight:600;white-space:nowrap;background:var(--neutral-soft);color:var(--text-2)}
+.badge::before{content:"";width:6px;height:6px;border-radius:50%;background:currentColor;opacity:.9}
+.badge.ok{background:var(--ok-soft);color:var(--ok)}
+.badge.warn{background:var(--warn-soft);color:var(--warn)}
+.badge.bad{background:var(--bad-soft);color:var(--bad)}
+.badge.info{background:var(--info-soft);color:var(--info)}
+.badge.brand{background:var(--brand-soft);color:var(--brand-hover)}
+.badge.plain::before{display:none}
+
+.table-wrap{overflow-x:auto}
+table{width:100%;border-collapse:collapse;font-size:13.5px}
+th{text-align:left;font-size:12px;font-weight:600;color:var(--text-3);padding:10px 14px;border-bottom:1px solid var(--border);white-space:nowrap;background:var(--surface-2)}
+td{padding:12px 14px;border-bottom:1px solid var(--border);vertical-align:middle}
+tr:last-child td{border-bottom:0}
+tbody tr:hover td{background:var(--surface-2)}
+.cell-main{font-weight:600}
+.cell-sub{font-size:12.5px;color:var(--text-3)}
+.chk{width:16px;height:16px;border:1.5px solid var(--border-strong);border-radius:4px;display:inline-block;vertical-align:middle}
+
+.tabs{display:flex;gap:4px;border-bottom:1px solid var(--border);margin-bottom:20px;overflow-x:auto}
+.tab{padding:10px 12px;font-weight:600;color:var(--text-3);border-bottom:2px solid transparent;margin-bottom:-1px;white-space:nowrap;display:flex;gap:6px;align-items:center}
+.tab.active{color:var(--text);border-color:var(--brand)}
+.tab .n{font-size:11px;background:var(--surface-3);color:var(--text-2);border-radius:99px;padding:0 6px}
+
+.toolbar{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:14px}
+.input{height:34px;border:1px solid var(--border);border-radius:var(--radius-sm);background:var(--surface);padding:0 12px;color:var(--text-3);display:flex;align-items:center;gap:8px;font-size:13px}
+.select{height:34px;border:1px solid var(--border);border-radius:var(--radius-sm);background:var(--surface);padding:0 10px;display:flex;align-items:center;gap:6px;font-size:13px;color:var(--text-2)}
+.select b{color:var(--text);font-weight:600}
+
+.funnel{display:grid;grid-template-columns:repeat(8,1fr);gap:0;border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;background:var(--surface)}
+.f-step{padding:14px 14px 16px;border-right:1px solid var(--border);position:relative}
+.f-step:last-child{border-right:0}
+.f-step .l{font-size:12px;color:var(--text-2)}
+.f-step .v{font-size:22px;font-weight:700;margin-top:4px;letter-spacing:-.4px}
+.f-step .r{font-size:11.5px;color:var(--text-3)}
+.f-step .bar{position:absolute;left:0;bottom:0;height:3px;background:var(--brand)}
+
+.feed-item{display:flex;gap:12px;padding:12px 18px;border-bottom:1px solid var(--border)}
+.feed-item:last-child{border-bottom:0}
+.feed-icon{width:30px;height:30px;border-radius:8px;display:grid;place-items:center;flex:none;background:var(--surface-3);color:var(--text-2)}
+.feed-icon svg{width:15px;height:15px}
+.feed-icon.ok{background:var(--ok-soft);color:var(--ok)}.feed-icon.brand{background:var(--brand-soft);color:var(--brand-hover)}.feed-icon.warn{background:var(--warn-soft);color:var(--warn)}
+.feed-text{flex:1;min-width:0}
+.feed-time{font-size:12px;color:var(--text-3);white-space:nowrap}
+.live{display:inline-flex;align-items:center;gap:6px;font-size:12px;color:var(--ok);font-weight:600}
+.live .dot{width:7px;height:7px}
+
+.task{display:flex;gap:12px;align-items:center;padding:12px 18px;border-bottom:1px solid var(--border)}
+.task:last-child{border-bottom:0}
+.task-text{flex:1;min-width:0}
+.task-title{font-weight:600}
+
+.stage-row{display:flex;align-items:center;gap:14px;padding:14px 18px;border-bottom:1px solid var(--border)}
+.stage-row:last-child{border-bottom:0}
+.stage-num{width:26px;height:26px;border-radius:50%;display:grid;place-items:center;font-size:12px;font-weight:700;background:var(--surface-3);color:var(--text-2);flex:none}
+.stage-info{flex:1;min-width:0}
+.stage-name{font-weight:600}
+.toggle{width:36px;height:20px;border-radius:99px;background:var(--surface-3);position:relative;flex:none;border:1px solid var(--border-strong)}
+.toggle::after{content:"";position:absolute;top:2px;left:2px;width:14px;height:14px;border-radius:50%;background:var(--text-3);transition:.2s}
+.toggle.on{background:var(--brand);border-color:var(--brand)}
+.toggle.on::after{left:18px;background:#fff}
+.stat-inline{font-size:12.5px;color:var(--text-2);text-align:right;white-space:nowrap}
+.stat-inline b{color:var(--text);font-size:15px}
+
+.board{display:grid;grid-template-columns:repeat(5,minmax(200px,1fr));gap:14px;overflow-x:auto;padding-bottom:6px}
+.col{background:var(--surface-2);border:1px solid var(--border);border-radius:var(--radius);padding:10px;min-height:340px}
+.col-head{display:flex;align-items:center;gap:8px;padding:4px 4px 10px;font-weight:600}
+.col-head .n{font-size:11.5px;color:var(--text-3);font-weight:500}
+.col-head .sum{margin-left:auto;font-size:12px;color:var(--text-3);font-weight:500}
+.deal{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:12px;margin-bottom:8px}
+.deal-name{font-weight:600}
+.deal-meta{font-size:12px;color:var(--text-3);margin-top:2px}
+.deal-foot{display:flex;align-items:center;justify-content:space-between;margin-top:10px}
+.deal-val{font-weight:700}
+.mini-av{width:22px;height:22px;border-radius:50%;background:var(--surface-3);display:grid;place-items:center;font-size:10px;font-weight:700;color:var(--text-2)}
+.empty-col{border:1px dashed var(--border-strong);border-radius:10px;padding:18px 10px;text-align:center;color:var(--text-3);font-size:12.5px}
+
+.inbox{display:grid;grid-template-columns:360px 1fr;min-height:560px}
+.thread-list{border-right:1px solid var(--border)}
+.thread{padding:14px 16px;border-bottom:1px solid var(--border);display:flex;gap:10px}
+.thread.active{background:var(--brand-soft)}
+.thread-top{display:flex;align-items:center;gap:8px}
+.thread-name{font-weight:600;flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.thread-time{font-size:12px;color:var(--text-3)}
+.thread-snip{font-size:12.5px;color:var(--text-2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:2px}
+.unread{width:8px;height:8px;border-radius:50%;background:var(--brand);margin-top:6px;flex:none}
+.reader{display:flex;flex-direction:column}
+.reader-head{padding:16px 22px;border-bottom:1px solid var(--border);display:flex;gap:12px;align-items:center}
+.msg{margin:16px 22px 0;padding:16px;border:1px solid var(--border);border-radius:var(--radius);background:var(--surface-2)}
+.msg.in{background:var(--surface)}
+.msg-meta{font-size:12px;color:var(--text-3);margin-bottom:8px;display:flex;gap:8px;align-items:center}
+.ai-box{margin:16px 22px 22px;padding:16px;border:1px solid var(--brand);border-radius:var(--radius);background:var(--brand-soft)}
+.ai-box textarea{width:100%;min-height:90px;margin-top:10px;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-sm);color:var(--text);font:inherit;padding:10px;resize:vertical}
+
+.settings{display:grid;grid-template-columns:220px 1fr;gap:28px}
+.settings-nav{display:flex;flex-direction:column;gap:2px}
+.settings-nav a{padding:8px 10px;border-radius:var(--radius-sm);color:var(--text-2);font-weight:500}
+.settings-nav a.active{background:var(--surface-2);color:var(--text)}
+.settings-nav .grp{font-size:11px;font-weight:600;color:var(--text-3);text-transform:uppercase;letter-spacing:.6px;padding:14px 10px 6px}
+.form-row{display:grid;grid-template-columns:240px 1fr;gap:24px;padding:18px 0;border-bottom:1px solid var(--border)}
+.form-row:last-child{border-bottom:0}
+.form-label{font-weight:600}
+.form-help{font-size:12.5px;color:var(--text-3);margin-top:2px}
+.field{height:36px;border:1px solid var(--border);border-radius:var(--radius-sm);background:var(--surface-2);padding:0 12px;display:flex;align-items:center;color:var(--text)}
+.field.area{height:auto;min-height:76px;align-items:flex-start;padding:10px 12px;color:var(--text-2)}
+.chips{display:flex;gap:6px;flex-wrap:wrap}
+.chip{height:26px;padding:0 10px;border-radius:99px;border:1px solid var(--border);display:inline-flex;align-items:center;font-size:12.5px;color:var(--text-2);background:var(--surface-2)}
+.integ{display:flex;align-items:center;gap:12px;padding:14px 18px;border-bottom:1px solid var(--border)}
+.integ:last-child{border-bottom:0}
+.integ-logo{width:34px;height:34px;border-radius:8px;display:grid;place-items:center;font-weight:800;font-size:13px;background:var(--surface-3);flex:none}
+
+.banner{display:flex;gap:12px;align-items:center;padding:12px 16px;border-radius:var(--radius);border:1px solid rgba(245,184,75,.35);background:var(--warn-soft);margin-bottom:18px}
+.banner svg{width:18px;height:18px;color:var(--warn);flex:none}
+.banner .t{flex:1}
+.muted{color:var(--text-3)}
+.mt{margin-top:16px}
+.view{display:none}.view.active{display:block}
+.ref-note{position:fixed;right:16px;bottom:16px;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:10px 14px;font-size:12px;color:var(--text-2);box-shadow:0 8px 30px rgba(0,0,0,.25);z-index:20;max-width:300px}
+.ref-note b{color:var(--text)}
+
+/* ============ RESPONSIVE ============ */
+@media (max-width:1100px){.g4{grid-template-columns:repeat(2,1fr)}.funnel{grid-template-columns:repeat(4,1fr)}.f-step:nth-child(4){border-right:0}.f-step:nth-child(-n+4){border-bottom:1px solid var(--border)}.g21{grid-template-columns:1fr}}
+@media (max-width:860px){
+  .app{background:var(--bg)}
+  .sidebar{position:fixed;left:0;top:0;z-index:30;transform:translateX(-100%);transition:transform .2s}
+  .sidebar.open{transform:none;box-shadow:0 0 0 100vmax rgba(0,0,0,.5)}
+  .menu-btn{display:grid}
+  .page{padding:20px 16px}.topbar{padding:0 16px}
+  .search .kbd{display:none}
+  .g3,.g2{grid-template-columns:1fr}
+  .inbox{grid-template-columns:1fr}.reader{display:none}
+  .settings{grid-template-columns:1fr}.settings-nav{flex-direction:row;overflow-x:auto}.settings-nav .grp{display:none}
+  .form-row{grid-template-columns:1fr;gap:8px}
+  .page-head{flex-wrap:wrap}.page-actions{margin-left:0}
+  .ref-note{display:none}
+}
+@media (max-width:520px){.g4{grid-template-columns:1fr 1fr}.funnel{grid-template-columns:repeat(2,1fr)}.f-step{border-right:1px solid var(--border)!important;border-bottom:1px solid var(--border)}.f-step:nth-child(2n){border-right:0!important}.kpi-value{font-size:22px}.hide-sm{display:none}}
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute">
+  <symbol id="i-home" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10.5 12 3l9 7.5V20a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"/></symbol>
+  <symbol id="i-bolt" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2 4 14h7l-1 8 9-12h-7z"/></symbol>
+  <symbol id="i-users" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="4"/><path d="M2 21v-1a6 6 0 0 1 12 0v1"/><path d="M16 4a4 4 0 0 1 0 8M22 21v-1a6 6 0 0 0-4-5.6"/></symbol>
+  <symbol id="i-send" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 2 11 13M22 2l-7 20-4-9-9-4z"/></symbol>
+  <symbol id="i-inbox" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 12h-6l-2 3h-4l-2-3H2"/><path d="M5.5 5h13l3.5 7v7a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1v-7z"/></symbol>
+  <symbol id="i-deals" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="5" height="16" rx="1"/><rect x="10" y="4" width="5" height="11" rx="1"/><rect x="17" y="4" width="4" height="7" rx="1"/></symbol>
+  <symbol id="i-cal" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M16 3v4M8 3v4M3 10h18"/></symbol>
+  <symbol id="i-gear" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></symbol>
+  <symbol id="i-search" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></symbol>
+  <symbol id="i-bell" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 8a6 6 0 1 1 12 0c0 7 3 9 3 9H3s3-2 3-9M10.3 21a1.9 1.9 0 0 0 3.4 0"/></symbol>
+  <symbol id="i-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></symbol>
+  <symbol id="i-menu" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 6h16M4 12h16M4 18h16"/></symbol>
+  <symbol id="i-plus" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></symbol>
+  <symbol id="i-alert" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0zM12 9v4M12 17h.01"/></symbol>
+  <symbol id="i-check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></symbol>
+  <symbol id="i-mail" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="m22 7-10 6L2 7"/></symbol>
+  <symbol id="i-reply" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 17 4 12l5-5"/><path d="M20 18v-2a4 4 0 0 0-4-4H4"/></symbol>
+  <symbol id="i-sparkle" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9zM19 17l.8 2.2L22 20l-2.2.8L19 23l-.8-2.2L16 20l2.2-.8z"/></symbol>
+  <symbol id="i-filter" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 5h18l-7 8v6l-4 2v-8z"/></symbol>
+</svg>
+
+<div class="app">
+  <!-- ======== SIDEBAR: 6 items, no sub-menus, no duplicates ======== -->
+  <aside class="sidebar" id="sidebar">
+    <div class="brand">
+      <div class="brand-mark"></div>
+      <div><div class="brand-name">Delvix</div><div class="brand-sub">REVENUE OS</div></div>
+    </div>
+    <div class="ws"><b>Delvix Studio</b><span class="chev">▾</span></div>
+    <nav class="nav">
+      <a class="nav-item active" data-view="home"><svg><use href="#i-home"/></svg>Home</a>
+      <a class="nav-item" data-view="autopilot"><svg><use href="#i-bolt"/></svg>Autopilot</a>
+      <a class="nav-item" data-view="leads"><svg><use href="#i-users"/></svg>Leads</a>
+      <a class="nav-item" data-view="outreach"><svg><use href="#i-send"/></svg>Outreach<span class="count">4</span></a>
+      <a class="nav-item" data-view="inbox"><svg><use href="#i-inbox"/></svg>Inbox<span class="count">2</span></a>
+      <a class="nav-item" data-view="deals"><svg><use href="#i-deals"/></svg>Deals</a>
+      <a class="nav-item" data-view="meetings"><svg><use href="#i-cal"/></svg>Meetings</a>
+    </nav>
+    <div class="sidebar-foot">
+      <div class="autopilot-pill"><span class="dot"></span><div><b>Autopilot running</b><div class="muted" style="font-size:11.5px">Last run 2 min ago</div></div></div>
+      <a class="nav-item" data-view="settings"><svg><use href="#i-gear"/></svg>Settings</a>
+      <div class="user"><div class="avatar">SM</div><div><div class="user-name">Shahroz Malik</div><div class="user-role">Owner</div></div></div>
+    </div>
+  </aside>
+
+  <div class="main">
+    <header class="topbar">
+      <button class="icon-btn menu-btn" onclick="document.getElementById('sidebar').classList.toggle('open')" aria-label="Menu"><svg><use href="#i-menu"/></svg></button>
+      <div class="search"><svg width="15" height="15"><use href="#i-search"/></svg>Search companies, contacts, deals<span class="kbd">⌘K</span></div>
+      <div class="spacer"></div>
+      <button class="icon-btn" aria-label="Notifications"><svg><use href="#i-bell"/></svg><span class="badge-dot"></span></button>
+      <button class="icon-btn" aria-label="Theme" onclick="toggleTheme()"><svg><use href="#i-moon"/></svg></button>
+    </header>
+
+    <!-- ================= HOME ================= -->
+    <section class="view active" id="view-home"><div class="page">
+      <div class="page-head">
+        <div><h1 class="page-title">Good afternoon, Shahroz</h1><p class="page-sub">2 replies need you · 1 meeting today · Autopilot found 18 new companies</p></div>
+        <div class="page-actions"><button class="btn">Last 30 days ▾</button></div>
+      </div>
+
+      <div class="grid g4">
+        <div class="card kpi"><div class="kpi-label">Revenue this month</div><div class="kpi-value">$4,500</div><div class="progress"><span style="width:22.5%"></span></div><div class="kpi-delta muted">22% of $20,000 goal</div></div>
+        <div class="card kpi"><div class="kpi-label">Open pipeline</div><div class="kpi-value">$38,200</div><div class="kpi-delta">+$6,000 this week</div></div>
+        <div class="card kpi"><div class="kpi-label">Meetings booked</div><div class="kpi-value">5</div><div class="kpi-delta">+2 this week</div></div>
+        <div class="card kpi"><div class="kpi-label">Reply rate</div><div class="kpi-value">4.8%</div><div class="kpi-delta muted">312 emails sent</div></div>
+      </div>
+
+      <div class="mt"><div class="funnel">
+        <div class="f-step"><div class="l">Found</div><div class="v">58</div><div class="r">companies</div><span class="bar" style="width:100%"></span></div>
+        <div class="f-step"><div class="l">Enriched</div><div class="v">24</div><div class="r">41%</div><span class="bar" style="width:41%"></span></div>
+        <div class="f-step"><div class="l">Audited</div><div class="v">6</div><div class="r">25%</div><span class="bar" style="width:25%"></span></div>
+        <div class="f-step"><div class="l">Contacted</div><div class="v">3</div><div class="r">50%</div><span class="bar" style="width:50%"></span></div>
+        <div class="f-step"><div class="l">Replied</div><div class="v">2</div><div class="r">67%</div><span class="bar" style="width:67%"></span></div>
+        <div class="f-step"><div class="l">Meeting</div><div class="v">1</div><div class="r">50%</div><span class="bar" style="width:50%"></span></div>
+        <div class="f-step"><div class="l">Proposal</div><div class="v">1</div><div class="r">100%</div><span class="bar" style="width:100%"></span></div>
+        <div class="f-step"><div class="l">Won</div><div class="v">0</div><div class="r">—</div><span class="bar" style="width:0"></span></div>
+      </div></div>
+
+      <div class="grid g21 mt">
+        <div class="card">
+          <div class="card-head"><div><div class="card-title">Needs you</div><div class="card-sub">Things the AI handed over</div></div></div>
+          <div class="task"><div class="feed-icon brand"><svg><use href="#i-reply"/></svg></div><div class="task-text"><div class="task-title">Bettina at 24 Doors asked about pricing</div><div class="cell-sub">AI drafted a reply · hand-off: payment question</div></div><button class="btn primary">Review</button></div>
+          <div class="task"><div class="feed-icon brand"><svg><use href="#i-reply"/></svg></div><div class="task-title task-text">Ascend Group wants a demo next week<div class="cell-sub" style="font-weight:400">3 time slots offered · waiting for pick</div></div><button class="btn">Open</button></div>
+          <div class="task"><div class="feed-icon warn"><svg><use href="#i-sparkle"/></svg></div><div class="task-text"><div class="task-title">4 pitches waiting for approval</div><div class="cell-sub">Approve to start sending tomorrow 8 AM their time</div></div><button class="btn">Review</button></div>
+          <div class="task"><div class="feed-icon"><svg><use href="#i-cal"/></svg></div><div class="task-text"><div class="task-title">Call with Realty Texas · Today 7:00 PM</div><div class="cell-sub">Zoom · prep notes ready</div></div><button class="btn">Prep</button></div>
+        </div>
+        <div class="card">
+          <div class="card-head"><div class="card-title">Live activity</div><span class="live" style="margin-left:auto"><span class="dot"></span>Live</span></div>
+          <div class="feed-item"><div class="feed-icon ok"><svg><use href="#i-check"/></svg></div><div class="feed-text">Meeting booked with <b>Ascend Group</b></div><div class="feed-time">2m</div></div>
+          <div class="feed-item"><div class="feed-icon brand"><svg><use href="#i-mail"/></svg></div><div class="feed-text">Email sent to <b>Cole Group PM</b></div><div class="feed-time">9m</div></div>
+          <div class="feed-item"><div class="feed-icon"><svg><use href="#i-search"/></svg></div><div class="feed-text">Found <b>18 companies</b> in Fort Worth</div><div class="feed-time">24m</div></div>
+          <div class="feed-item"><div class="feed-icon"><svg><use href="#i-sparkle"/></svg></div><div class="feed-text">Audited <b>McCaw Property Mgmt</b></div><div class="feed-time">31m</div></div>
+          <div class="feed-item"><div class="feed-icon"><svg><use href="#i-users"/></svg></div><div class="feed-text">Enriched <b>LOCKE PM</b> · 1 contact</div><div class="feed-time">40m</div></div>
+        </div>
+      </div>
+    </div></section>
+
+    <!-- ================= AUTOPILOT ================= -->
+    <section class="view" id="view-autopilot"><div class="page">
+      <div class="page-head">
+        <div><h1 class="page-title">Autopilot</h1><p class="page-sub">Finds businesses, writes pitches and emails them while you're away.</p></div>
+        <div class="page-actions"><button class="btn">Pause all</button><button class="btn primary"><svg><use href="#i-bolt"/></svg>Running</button></div>
+      </div>
+      <div class="banner"><svg><use href="#i-alert"/></svg><div class="t"><b>Sending is in test mode.</b> <span class="muted">Emails are queued but not sent until your inboxes finish warmup.</span></div><button class="btn">Go live</button></div>
+
+      <div class="card">
+        <div class="card-head"><div><div class="card-title">Pipeline steps</div><div class="card-sub">Each step runs on its own every 5 minutes within your daily limits</div></div></div>
+        <div class="stage-row"><div class="stage-num">1</div><div class="stage-info"><div class="stage-name">Find businesses</div><div class="cell-sub">Google Maps · 3 active searches · Texas real estate</div></div><div class="stat-inline hide-sm"><b>18</b> today / 40</div><div class="toggle on"></div></div>
+        <div class="stage-row"><div class="stage-num">2</div><div class="stage-info"><div class="stage-name">Find decision-maker</div><div class="cell-sub">Hunter · 41 credits left this month</div></div><div class="stat-inline hide-sm"><b>9</b> today / 15</div><div class="toggle on"></div></div>
+        <div class="stage-row"><div class="stage-num">3</div><div class="stage-info"><div class="stage-name">Audit website & write pitch</div><div class="cell-sub">PageSpeed + AI · 4 pitches need your approval</div></div><div class="stat-inline hide-sm"><b>6</b> today / 10</div><div class="toggle on"></div></div>
+        <div class="stage-row"><div class="stage-num">4</div><div class="stage-info"><div class="stage-name">Send emails</div><div class="cell-sub">2 inboxes · Mon–Fri 8–11 AM prospect time · test mode</div></div><div class="stat-inline hide-sm"><b>0</b> today / 30</div><div class="toggle on"></div></div>
+        <div class="stage-row"><div class="stage-num">5</div><div class="stage-info"><div class="stage-name">Answer replies & book calls</div><div class="cell-sub">AI replies within 10 minutes · hands off pricing and contracts</div></div><div class="stat-inline hide-sm"><b>2</b> today</div><div class="toggle on"></div></div>
+      </div>
+
+      <div class="grid g2 mt">
+        <div class="card">
+          <div class="card-head"><div class="card-title">Health</div><span class="badge ok" style="margin-left:auto">All good</span></div>
+          <table><tbody>
+            <tr><td class="muted">Last run</td><td style="text-align:right">2 min ago</td></tr>
+            <tr><td class="muted">Google spend today</td><td style="text-align:right">$0.13</td></tr>
+            <tr><td class="muted">AI spend today</td><td style="text-align:right">$0.42</td></tr>
+            <tr><td class="muted">Bounce rate (7d)</td><td style="text-align:right">0.8%</td></tr>
+            <tr><td class="muted">Errors (24h)</td><td style="text-align:right">0</td></tr>
+          </tbody></table>
+        </div>
+        <div class="card">
+          <div class="card-head"><div class="card-title">Setup</div><span class="card-sub" style="margin-left:auto">7 of 9 done</span></div>
+          <table><tbody>
+            <tr><td><span class="badge ok plain">✓</span>&nbsp; AI provider connected</td></tr>
+            <tr><td><span class="badge ok plain">✓</span>&nbsp; Google + Hunter keys</td></tr>
+            <tr><td><span class="badge ok plain">✓</span>&nbsp; Target customers set</td></tr>
+            <tr><td><span class="badge warn plain">!</span>&nbsp; Add 2 case studies <a class="muted" style="float:right">Fix →</a></td></tr>
+            <tr><td><span class="badge warn plain">!</span>&nbsp; Connect Google Calendar & Zoom <a class="muted" style="float:right">Fix →</a></td></tr>
+          </tbody></table>
+        </div>
+      </div>
+    </div></section>
+
+    <!-- ================= LEADS ================= -->
+    <section class="view" id="view-leads"><div class="page">
+      <div class="page-head">
+        <div><h1 class="page-title">Leads</h1><p class="page-sub">Every business Autopilot found, and the people behind them.</p></div>
+        <div class="page-actions"><button class="btn">Import CSV</button><button class="btn primary"><svg><use href="#i-plus"/></svg>Add lead</button></div>
+      </div>
+      <div class="tabs"><a class="tab active">Companies <span class="n">58</span></a><a class="tab">Contacts <span class="n">25</span></a></div>
+      <div class="toolbar">
+        <div class="input" style="flex:1;min-width:200px"><svg width="15" height="15"><use href="#i-search"/></svg>Search name or website</div>
+        <div class="select">Stage: <b>All</b> ▾</div>
+        <div class="select">City: <b>All</b> ▾</div>
+        <div class="select hide-sm">Source: <b>All</b> ▾</div>
+      </div>
+      <div class="card table-wrap">
+        <table>
+          <thead><tr><th style="width:36px"><span class="chk"></span></th><th>Company</th><th>Stage</th><th>Best contact</th><th class="hide-sm">Location</th><th class="hide-sm">Source</th><th class="hide-sm">Found</th></tr></thead>
+          <tbody>
+            <tr><td><span class="chk"></span></td><td><div class="cell-main">Ascend Group</div><div class="cell-sub">theagencytexas.com</div></td><td><span class="badge brand">Contacted</span></td><td><div>General inbox</div><div class="cell-sub">info@theagencytexas.com · <span style="color:var(--ok)">verified</span></div></td><td class="hide-sm">Texas, US</td><td class="hide-sm">Google Maps</td><td class="hide-sm muted">Oct 12</td></tr>
+            <tr><td><span class="chk"></span></td><td><div class="cell-main">24 Doors Property Management</div><div class="cell-sub">24doorspm.com</div></td><td><span class="badge warn">Pitch ready</span></td><td><div>Bettina</div><div class="cell-sub">bettina@24doorspm.com · <span style="color:var(--ok)">verified</span></div></td><td class="hide-sm">Fort Worth, US</td><td class="hide-sm">Google Maps</td><td class="hide-sm muted">Oct 12</td></tr>
+            <tr><td><span class="chk"></span></td><td><div class="cell-main">Cole Group Property Management</div><div class="cell-sub">rentthefort.com</div></td><td><span class="badge info">Enriched</span></td><td><div>R. Smith</div><div class="cell-sub">resmith@ffin.com · <span style="color:var(--ok)">verified</span></div></td><td class="hide-sm">Fort Worth, US</td><td class="hide-sm">Google Maps</td><td class="hide-sm muted">Oct 12</td></tr>
+            <tr><td><span class="chk"></span></td><td><div class="cell-main">Tarrant Management Inc</div><div class="cell-sub">dwfip.com</div></td><td><span class="badge bad">Bad email</span></td><td><div>Kendall</div><div class="cell-sub">kendall@dwfip.com · <span style="color:var(--bad)">invalid</span></div></td><td class="hide-sm">Fort Worth, US</td><td class="hide-sm">Google Maps</td><td class="hide-sm muted">Oct 12</td></tr>
+            <tr><td><span class="chk"></span></td><td><div class="cell-main">1st Texas Realtors</div><div class="cell-sub">1sttexasrealtors.com</div></td><td><span class="badge">Finding contact</span></td><td class="muted">—</td><td class="hide-sm">Texas, US</td><td class="hide-sm">Google Maps</td><td class="hide-sm muted">Oct 12</td></tr>
+            <tr><td><span class="chk"></span></td><td><div class="cell-main">Agents of Texas</div><div class="cell-sub">zillow.com</div></td><td><span class="badge plain">Skipped · portal site</span></td><td class="muted">—</td><td class="hide-sm">Texas, US</td><td class="hide-sm">Google Maps</td><td class="hide-sm muted">Oct 12</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="toolbar mt"><span class="muted">Showing 1–25 of 58</span><span style="flex:1"></span><button class="btn">Previous</button><button class="btn">Next</button></div>
+    </div></section>
+
+    <!-- ================= OUTREACH ================= -->
+    <section class="view" id="view-outreach"><div class="page">
+      <div class="page-head">
+        <div><h1 class="page-title">Outreach</h1><p class="page-sub">What gets sent, to whom, and when.</p></div>
+        <div class="page-actions"><button class="btn primary"><svg><use href="#i-plus"/></svg>New sequence</button></div>
+      </div>
+      <div class="tabs"><a class="tab active">Pitch review <span class="n">4</span></a><a class="tab">Sequences <span class="n">2</span></a><a class="tab">Scheduled <span class="n">12</span></a><a class="tab">Sent</a><a class="tab">Mailboxes</a></div>
+      <div class="stack">
+        <div class="card">
+          <div class="card-head"><div><div class="card-title">24 Doors Property Management</div><div class="card-sub">To Bettina · bettina@24doorspm.com · Fort Worth</div></div><span class="badge warn" style="margin-left:auto">Waiting approval</span></div>
+          <div class="card-body">
+            <div class="cell-sub" style="margin-bottom:6px">WHAT WE NOTICED</div>
+            <div class="cell-main">Tenants can't pay rent or request maintenance online</div>
+            <p class="muted" style="margin:6px 0 14px">Evidence: no portal or login link on 4 crawled pages · mobile speed 38/100</p>
+            <div class="field area">"I was on 24doorspm.com and noticed tenants still have to call or email for maintenance and rent…"</div>
+            <div class="toolbar mt" style="margin-bottom:0"><button class="btn primary"><svg><use href="#i-check"/></svg>Approve</button><button class="btn">Edit</button><button class="btn">Preview email</button><span style="flex:1"></span><button class="btn">Reject</button></div>
+          </div>
+        </div>
+      </div>
+    </div></section>
+
+    <!-- ================= INBOX ================= -->
+    <section class="view" id="view-inbox"><div class="page">
+      <div class="page-head">
+        <div><h1 class="page-title">Inbox</h1><p class="page-sub">Replies from prospects. The AI answers most of them for you.</p></div>
+        <div class="page-actions"><div class="select">Show: <b>Needs me</b> ▾</div></div>
+      </div>
+      <div class="card inbox">
+        <div class="thread-list">
+          <div class="thread active"><span class="unread"></span><div style="flex:1;min-width:0"><div class="thread-top"><span class="thread-name">Bettina · 24 Doors PM</span><span class="thread-time">10:42</span></div><div class="thread-snip">What would something like this cost for 40 units?</div><div style="margin-top:6px"><span class="badge warn">Needs you · pricing</span></div></div></div>
+          <div class="thread"><span class="unread"></span><div style="flex:1;min-width:0"><div class="thread-top"><span class="thread-name">Ascend Group</span><span class="thread-time">09:15</span></div><div class="thread-snip">Sure, next Tuesday works for a demo.</div><div style="margin-top:6px"><span class="badge ok">Interested</span></div></div></div>
+          <div class="thread"><span style="width:8px"></span><div style="flex:1;min-width:0"><div class="thread-top"><span class="thread-name">Jon · Traverse PM</span><span class="thread-time">Yest.</span></div><div class="thread-snip">AI: Thanks Jon, here are a few times that work…</div><div style="margin-top:6px"><span class="badge brand">AI replied</span></div></div></div>
+          <div class="thread"><span style="width:8px"></span><div style="flex:1;min-width:0"><div class="thread-top"><span class="thread-name">LOCKE Property Mgmt</span><span class="thread-time">Mon</span></div><div class="thread-snip">Not interested right now, maybe next year.</div><div style="margin-top:6px"><span class="badge">Follow up in 60 days</span></div></div></div>
+        </div>
+        <div class="reader">
+          <div class="reader-head"><div class="avatar" style="background:var(--surface-3);color:var(--text)">B</div><div style="flex:1"><div class="cell-main">Bettina · 24 Doors Property Management</div><div class="cell-sub">bettina@24doorspm.com · Deal: Tenant portal · $6,000</div></div><button class="btn">Open company</button></div>
+          <div class="msg"><div class="msg-meta"><span class="badge brand plain">You</span>Oct 13 · 8:12 AM</div>I was on 24doorspm.com and noticed tenants can't pay rent or request maintenance online…</div>
+          <div class="msg in"><div class="msg-meta"><span class="badge plain">Bettina</span>Oct 13 · 10:42 AM</div>Hi Shahroz, this is interesting. What would something like this cost for about 40 units?</div>
+          <div class="ai-box"><div style="display:flex;align-items:center;gap:8px"><svg width="16" height="16" style="color:var(--brand-hover)"><use href="#i-sparkle"/></svg><b>AI draft</b><span class="muted">· held for you because it mentions pricing</span></div>
+            <textarea>Hi Bettina, great question. For a portfolio around 40 units, a tenant portal with online rent and maintenance tracking typically falls between $4,000 and $8,000 depending on integrations. Would a 15-minute call this week help me give you an exact number?</textarea>
+            <div class="toolbar" style="margin:10px 0 0"><button class="btn primary"><svg><use href="#i-send"/></svg>Send</button><button class="btn">Offer meeting times</button></div>
+          </div>
+        </div>
+      </div>
+    </div></section>
+
+    <!-- ================= DEALS ================= -->
+    <section class="view" id="view-deals"><div class="page">
+      <div class="page-head">
+        <div><h1 class="page-title">Deals</h1><p class="page-sub">Only real conversations live here. Cold leads stay in Leads.</p></div>
+        <div class="page-actions"><button class="btn">Board ▾</button><button class="btn primary"><svg><use href="#i-plus"/></svg>New deal</button></div>
+      </div>
+      <div class="board">
+        <div class="col"><div class="col-head">Replied <span class="n">2</span><span class="sum">$12k</span></div>
+          <div class="deal"><div class="deal-name">24 Doors PM</div><div class="deal-meta">Tenant portal</div><div class="deal-foot"><span class="deal-val">$6,000</span><span class="mini-av">B</span></div></div>
+          <div class="deal"><div class="deal-name">Traverse PM</div><div class="deal-meta">Owner dashboard</div><div class="deal-foot"><span class="deal-val">$6,000</span><span class="mini-av">J</span></div></div></div>
+        <div class="col"><div class="col-head">Meeting <span class="n">1</span><span class="sum">$8k</span></div>
+          <div class="deal"><div class="deal-name">Ascend Group</div><div class="deal-meta">Tue 3:00 PM · Zoom</div><div class="deal-foot"><span class="deal-val">$8,000</span><span class="mini-av">A</span></div></div></div>
+        <div class="col"><div class="col-head">Proposal <span class="n">1</span><span class="sum">$18k</span></div>
+          <div class="deal"><div class="deal-name">Realty Texas</div><div class="deal-meta">Custom CRM · sent Oct 10</div><div class="deal-foot"><span class="deal-val">$18,200</span><span class="mini-av">R</span></div></div></div>
+        <div class="col"><div class="col-head">Won <span class="n">1</span><span class="sum">$4.5k</span></div>
+          <div class="deal"><div class="deal-name">Jill Wente Realtor</div><div class="deal-meta">Website rebuild</div><div class="deal-foot"><span class="deal-val">$4,500</span><span class="badge ok">Paid</span></div></div></div>
+        <div class="col"><div class="col-head">Lost <span class="n">0</span></div><div class="empty-col">Drag a deal here when it's lost. The AI learns from the reason.</div></div>
+      </div>
+    </div></section>
+
+    <!-- ================= MEETINGS ================= -->
+    <section class="view" id="view-meetings"><div class="page">
+      <div class="page-head"><div><h1 class="page-title">Meetings</h1><p class="page-sub">Calls the AI booked for you, with prep notes.</p></div><div class="page-actions"><button class="btn">Copy booking link</button></div></div>
+      <div class="card">
+        <div class="task"><div class="feed-icon brand"><svg><use href="#i-cal"/></svg></div><div class="task-text"><div class="task-title">Realty Texas · Custom CRM</div><div class="cell-sub">Today · 7:00 PM your time (9:00 AM Dallas) · Zoom</div></div><button class="btn">Prep notes</button><button class="btn primary">Join</button></div>
+        <div class="task"><div class="feed-icon brand"><svg><use href="#i-cal"/></svg></div><div class="task-text"><div class="task-title">Ascend Group · Demo</div><div class="cell-sub">Tue Oct 20 · 1:00 AM your time (3:00 PM Dallas) · Zoom</div></div><button class="btn">Prep notes</button></div>
+      </div>
+    </div></section>
+
+    <!-- ================= SETTINGS ================= -->
+    <section class="view" id="view-settings"><div class="page">
+      <div class="page-head"><div><h1 class="page-title">Settings</h1><p class="page-sub">Set these once. Autopilot uses them for every lead and email.</p></div></div>
+      <div class="settings">
+        <nav class="settings-nav">
+          <div class="grp">Your business</div>
+          <a class="active">Business profile</a><a>Services & pricing</a><a>Case studies</a><a>Target customers</a><a>Revenue goal</a>
+          <div class="grp">Sending</div>
+          <a>Email & branding</a><a>Mailboxes</a><a>AI reply rules</a>
+          <div class="grp">Workspace</div>
+          <a>Integrations</a><a>Team</a><a>Billing</a><a>My account</a>
+        </nav>
+        <div class="card"><div class="card-body" style="padding:6px 22px">
+          <div class="form-row"><div><div class="form-label">Company name</div><div class="form-help">Shown in emails and proposals</div></div><div class="field">Delvix Studio</div></div>
+          <div class="form-row"><div><div class="form-label">What you do</div><div class="form-help">One or two sentences. The AI uses this in every pitch.</div></div><div class="field area">We design and ship web apps, mobile apps, custom ERP and CRM systems, and AI integrations. Fixed scope, a working demo every week, and code you own.</div></div>
+          <div class="form-row"><div><div class="form-label">Website</div></div><div class="field">delvixstudio.com</div></div>
+          <div class="form-row"><div><div class="form-label">Markets you serve</div><div class="form-help">Used for send times and targeting</div></div><div class="chips"><span class="chip">United States</span><span class="chip">United Kingdom</span><span class="chip">UAE</span><span class="chip">+ Add</span></div></div>
+          <div class="form-row"><div><div class="form-label">Why clients pick you</div></div><div class="chips"><span class="chip">Weekly demos</span><span class="chip">Fixed price</span><span class="chip">You own the code</span><span class="chip">+ Add</span></div></div>
+          <div class="form-row" style="justify-content:end"><div></div><div><button class="btn primary">Save changes</button></div></div>
+        </div></div>
+      </div>
+    </div></section>
+  </div>
+</div>
+
+<div class="ref-note"><b>Reference design.</b> Click the sidebar to switch pages. Numbers are sample data.</div>
+
+<script>
+document.querySelectorAll('[data-view]').forEach(function(a){
+  a.addEventListener('click',function(){
+    document.querySelectorAll('.nav-item').forEach(function(n){n.classList.toggle('active',n===a)});
+    document.querySelectorAll('.view').forEach(function(v){v.classList.toggle('active',v.id==='view-'+a.dataset.view)});
+    document.getElementById('sidebar').classList.remove('open');
+    window.scrollTo(0,0);
+  });
+});
+function toggleTheme(){
+  var r=document.documentElement, cur=r.getAttribute('data-theme');
+  var dark = cur ? cur==='dark' : !window.matchMedia('(prefers-color-scheme: light)').matches;
+  r.setAttribute('data-theme', dark ? 'light' : 'dark');
+}
+if(location.hash){var t=document.querySelector('[data-view="'+location.hash.slice(1)+'"]'); if(t) t.click();}
+</script>
+</body>
+</html>

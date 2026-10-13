@@ -1,6 +1,7 @@
 import * as React from "react";
 
-const MOBILE_BREAKPOINT = 768;
+/** Match Delvix reference: drawer below ~860px */
+const MOBILE_BREAKPOINT = 860;
 
 function subscribe(callback: () => void) {
   const mql = window.matchMedia(`(max-width: ${MOBILE_BREAKPOINT - 1}px)`);

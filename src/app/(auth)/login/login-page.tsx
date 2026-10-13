@@ -4,7 +4,7 @@ import { useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { toast } from "sonner";
-import { Zap } from "lucide-react";
+import { DelvixLogoMark } from "@/components/dashboard/delvix-logo";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -68,10 +68,13 @@ export default function LoginPage() {
     <div className="flex min-h-screen items-center justify-center bg-muted/30 p-4">
       <div className="w-full max-w-md space-y-6">
         <div className="flex flex-col items-center space-y-2 text-center">
-          <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-primary text-primary-foreground">
-            <Zap className="h-6 w-6" />
+          <DelvixLogoMark size={40} />
+          <div>
+            <h1 className="text-2xl font-bold tracking-tight">Delvix</h1>
+            <p className="font-mono text-[10px] tracking-[1.8px] text-muted-foreground">
+              REVENUE OS
+            </p>
           </div>
-          <h1 className="text-2xl font-bold tracking-tight">Delvix</h1>
           <p className="text-sm text-muted-foreground">
             Sign in to your account to continue
           </p>

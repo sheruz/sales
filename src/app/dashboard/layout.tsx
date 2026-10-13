@@ -6,6 +6,7 @@ import { getFeatureFlags } from "@/lib/features/flags";
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/dashboard/app-sidebar";
 import { DashboardHeader } from "@/components/dashboard/dashboard-header";
+import { getAutopilotShellStatus } from "@/lib/autopilot/shell-status";
 
 export const dynamic = "force-dynamic";
 
@@ -17,17 +18,15 @@ export default async function DashboardLayout({
   const user = await getCurrentUser();
 
   if (!user) {
-    // Drop stale cookie so middleware/login cannot loop on an invalid session
     try {
       const jar = await cookies();
       jar.delete(SESSION_COOKIE);
     } catch {
-      // Cookie mutation may be restricted in some render paths; login still works
+      // ignore
     }
     redirect("/login");
   }
 
-  // Super Admin uses the separate platform console — not the company sales app
   if (isSuperAdmin(user.role)) {
     redirect("/platform");
   }
@@ -37,12 +36,30 @@ export default async function DashboardLayout({
   const defaultOpen = sidebarCookie !== "false";
   const flags = await getFeatureFlags(user.organizationId);
 
+  const autopilotStatus = user.organizationId
+    ? await getAutopilotShellStatus(user.organizationId)
+    : {
+        tone: "warn" as const,
+        label: "Paused",
+        lastRunAt: null,
+        minutesAgo: null,
+      };
+
   return (
-    <SidebarProvider defaultOpen={defaultOpen}>
-      <AppSidebar user={user} flags={flags} />
-      <SidebarInset>
+    <SidebarProvider
+      defaultOpen={defaultOpen}
+      className="min-h-svh bg-background"
+    >
+      <AppSidebar
+        user={user}
+        flags={flags}
+        autopilotStatus={autopilotStatus}
+      />
+      <SidebarInset className="min-h-svh">
         <DashboardHeader user={user} />
-        <main className="flex-1 overflow-auto p-4 md:p-6">{children}</main>
+        <div className="mx-auto w-full max-w-[1280px] flex-1 overflow-auto p-4 md:p-7">
+          {children}
+        </div>
       </SidebarInset>
     </SidebarProvider>
   );
