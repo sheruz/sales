@@ -16,17 +16,8 @@ if (!styleMatch) throw new Error("no <style> in reference");
 const style = styleMatch[1];
 let content = src.slice(styleMatch.index + styleMatch[0].length).trim();
 
-// Log in (desktop nav)
-content = content.replace(
-  '<a class="btn btn-primary mag hov" href="#contact">Start a project <span class="arr">→</span></a>',
-  '<a class="btn btn-ghost mag hov" href="https://app.delvixstudio.com">Log in</a>\n        <a class="btn btn-primary mag hov" href="#contact">Start a project <span class="arr">→</span></a>'
-);
+// No Log in in nav — use /login directly on the same domain.
 
-// Log in (mobile)
-content = content.replace(
-  '<a href="#contact">Start a project →</a>',
-  '<a href="https://app.delvixstudio.com">Log in →</a><a href="#contact">Start a project →</a>'
-);
 
 // Honeypot — waitlist
 content = content.replace(
