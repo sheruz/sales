@@ -92,16 +92,23 @@ export async function PATCH(request: NextRequest) {
         )
       );
     }
-    const status =
-      body.action === "pause"
-        ? OutboundMailboxStatus.PAUSED
-        : OutboundMailboxStatus.ACTIVE;
+    if (body.action === "pause") {
+      return NextResponse.json(
+        apiSuccess(
+          await mailboxPoolService.setStatus(
+            user.organizationId,
+            body.mailboxId,
+            OutboundMailboxStatus.PAUSED
+          )
+        )
+      );
+    }
+    // activate: re-check DNS first (clears stale Gmail/Outlook DKIM pause)
     return NextResponse.json(
       apiSuccess(
-        await mailboxPoolService.setStatus(
+        await mailboxPoolService.refreshDns(
           user.organizationId,
-          body.mailboxId,
-          status
+          body.mailboxId
         )
       )
     );
