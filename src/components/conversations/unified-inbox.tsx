@@ -123,9 +123,13 @@ function shortTime(iso: string | null): string {
 
 export function UnifiedInbox({ initialConversations }: UnifiedInboxProps) {
   const router = useRouter();
-  const [selectedId, setSelectedId] = useState(
-    initialConversations[0]?.id ?? ""
-  );
+  // Don't auto-open a thread on narrow screens (list-first mobile UX)
+  const [selectedId, setSelectedId] = useState(() => {
+    if (typeof window !== "undefined" && window.matchMedia("(max-width: 900px)").matches) {
+      return "";
+    }
+    return initialConversations[0]?.id ?? "";
+  });
   const [detail, setDetail] = useState<InboxConversation | null>(null);
   const [loading, setLoading] = useState(false);
   const [syncing, setSyncing] = useState(false);
@@ -261,7 +265,7 @@ export function UnifiedInbox({ initialConversations }: UnifiedInboxProps) {
         </div>
       </div>
 
-      <div className="card inbox">
+      <div className={`card inbox${selectedId ? " show-reader" : ""}`}>
         <div className="thread-list">
           {initialConversations.length === 0 ? (
             <div className="reader-empty">
@@ -322,6 +326,14 @@ export function UnifiedInbox({ initialConversations }: UnifiedInboxProps) {
           ) : (
             <>
               <div className="reader-head">
+                <button
+                  type="button"
+                  className="btn inbox-back"
+                  onClick={() => setSelectedId("")}
+                  aria-label="Back to threads"
+                >
+                  ← Threads
+                </button>
                 <div className="avatar">
                   {threadName(selected).charAt(0).toUpperCase()}
                 </div>

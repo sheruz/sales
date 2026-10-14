@@ -85,9 +85,11 @@ export default async function DashboardLayout({
         autopilotStatus={autopilotStatus}
         navCounts={navCounts}
       />
-      <SidebarInset className="min-h-svh">
+      <SidebarInset className="min-h-svh min-w-0 overflow-hidden">
         <DashboardHeader user={user} />
-        <div className="dx w-full flex-1 overflow-auto">{children}</div>
+        <div className="dx w-full min-w-0 flex-1 overflow-x-hidden overflow-y-auto">
+          {children}
+        </div>
       </SidebarInset>
     </SidebarProvider>
   );

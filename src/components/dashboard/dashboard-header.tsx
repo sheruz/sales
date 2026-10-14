@@ -13,12 +13,12 @@ interface DashboardHeaderProps {
 export function DashboardHeader({ user }: DashboardHeaderProps) {
   void user;
   return (
-    <header className="sticky top-0 z-20 flex h-14 shrink-0 items-center gap-3 border-b border-border bg-background/88 px-4 backdrop-blur-md md:px-7">
-      <SidebarTrigger className="-ml-1 md:hidden" />
-      <div className="relative mx-auto w-full max-w-[440px] flex-1">
+    <header className="sticky top-0 z-20 flex h-14 shrink-0 items-center gap-2 border-b border-border bg-background/88 px-3 backdrop-blur-md sm:gap-3 sm:px-4 md:px-7">
+      <SidebarTrigger className="-ml-1 shrink-0" />
+      <div className="relative min-w-0 flex-1 md:mx-auto md:max-w-[440px]">
         <button
           type="button"
-          className="flex h-[34px] w-full items-center gap-2 overflow-hidden rounded-lg border border-border bg-card px-3 text-[13px] text-muted-foreground"
+          className="flex h-[34px] w-full min-w-0 items-center gap-2 overflow-hidden rounded-lg border border-border bg-card px-3 text-[13px] text-muted-foreground"
           onClick={() => {
             /* ⌘K wired in R4 */
           }}
