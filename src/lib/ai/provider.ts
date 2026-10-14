@@ -52,7 +52,8 @@ export async function aiComplete(
     const result = await provider.complete({
       ...options,
       apiKey: runtime.apiKey,
-      model: runtime.model,
+      // Per-call model override (e.g. Phase 5 classify vs draft) wins over resolved default
+      model: options.model?.trim() || runtime.model,
     });
 
     if (options.organizationId && (result.totalTokens ?? 0) > 0) {

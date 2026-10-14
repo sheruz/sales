@@ -38,6 +38,11 @@ type InboundNormalized = {
   receivedAt?: Date;
   inReplyTo?: string | null;
   references?: string | null;
+  /** RFC Message-ID header (for In-Reply-To threading on AI replies) */
+  rfcMessageId?: string | null;
+  autoSubmitted?: string | null;
+  xAutoreply?: string | null;
+  precedence?: string | null;
 };
 
 type ClassificationResult = {
@@ -78,6 +83,7 @@ export class InboxService {
         },
         opportunity: { select: { id: true, stage: true, score: true } },
         messages: { orderBy: { createdAt: "desc" }, take: 1 },
+        aiReplyDrafts: { orderBy: { createdAt: "desc" }, take: 1 },
         assignedTo: {
           select: { id: true, firstName: true, lastName: true },
         },
@@ -96,6 +102,7 @@ export class InboxService {
         opportunity: true,
         lead: { select: { id: true, fullName: true, email: true } },
         messages: { orderBy: { createdAt: "asc" } },
+        aiReplyDrafts: { orderBy: { createdAt: "desc" }, take: 1 },
         events: { orderBy: { occurredAt: "desc" }, take: 50 },
         emailAccount: {
           select: {
@@ -525,29 +532,10 @@ export class InboxService {
       },
     });
 
-    const classified = await this.classifyReply({
-      organizationId,
-      userId,
-      body: inbound.body || inbound.subject || "",
-      subject: inbound.subject,
-    });
-
-    const classification = mapClassification(classified.classification);
-    await prisma.message.update({
-      where: { id: message.id },
-      data: {
-        aiClassification: classification,
-        aiSummary: classified.summary,
-        suggestedNextAction: classified.suggestedNextAction,
-      },
-    });
-
     await prisma.inboxConversation.update({
       where: { id: conversation.id },
       data: {
         lastMessageAt: inbound.receivedAt ?? new Date(),
-        sentiment: classified.sentiment,
-        intent: classified.intent,
         status: InboxConversationStatus.NEEDS_ACTION,
         nextActionAt: new Date(),
         companyId: conversation.companyId ?? contact?.companyId ?? lead?.companyId,
@@ -555,46 +543,37 @@ export class InboxService {
         opportunityId: conversation.opportunityId ?? opportunity?.id,
         leadId: conversation.leadId ?? lead?.id,
         subject: conversation.subject ?? inbound.subject,
+        emailAccountId: conversation.emailAccountId ?? account.id,
       },
     });
 
-    const replyContactId = conversation.contactId ?? contact?.id;
-    if (replyContactId) {
-      const { sequenceEnrollmentService } = await import(
-        "@/services/sequence-enrollment.service"
-      );
-      await sequenceEnrollmentService.stopForContactReply(
-        organizationId,
-        replyContactId
-      );
-    }
+    // Refresh conversation for AI reply handler
+    conversation =
+      (await prisma.inboxConversation.findFirst({
+        where: { id: conversation.id, organizationId },
+      })) ?? conversation;
 
-    if (classification === MessageAiClassification.UNSUBSCRIBE) {
-      await emailSafetyService.suppress({
-        organizationId,
-        email: from,
-        reason: SuppressionReason.UNSUBSCRIBE,
-        source: "inbox_ai",
-      });
-      if (contact?.id) {
-        const { sequenceEnrollmentService } = await import(
-          "@/services/sequence-enrollment.service"
-        );
-        await sequenceEnrollmentService.stopForContactUnsubscribe(
-          organizationId,
-          contact.id
-        );
-      }
-      await prisma.emailEvent.create({
-        data: {
-          organizationId,
-          messageId: message.id,
-          conversationId: conversation.id,
-          type: EmailEventType.UNSUBSCRIBED,
-          recipientEmail: from,
-        },
-      });
-    }
+    const { aiReplyService } = await import("@/services/ai-reply.service");
+    const ai = await aiReplyService.handleInbound({
+      organizationId,
+      userId,
+      message,
+      conversation,
+      contact,
+      company: contact?.company ?? null,
+      opportunity,
+      headers: {
+        subject: inbound.subject,
+        autoSubmitted: inbound.autoSubmitted,
+        xAutoreply: inbound.xAutoreply,
+        precedence: inbound.precedence,
+        messageId: inbound.rfcMessageId,
+        references: inbound.references,
+      },
+    });
+
+    const classification =
+      ai.classification ?? MessageAiClassification.OTHER;
 
     // Bounce / complaint signals from mailbox (provider webhooks may also feed suppressions)
     const bodyLower = `${inbound.subject || ""} ${inbound.body || ""}`.toLowerCase();
@@ -632,17 +611,20 @@ export class InboxService {
           subject: inbound.subject,
           content: inbound.body,
           isInbound: true,
-          summary: classified.summary,
+          summary: ai.classification
+            ? `Classified: ${ai.classification}`
+            : null,
           metadata: {
             inboxConversationId: conversation.id,
             messageId: message.id,
             classification,
+            aiOutcome: ai.outcome,
           },
         },
       });
     }
 
-    return { message, conversation, created: true, classification };
+    return { message, conversation, created: true, classification, ai };
   }
 
   async classifyReply(input: {
@@ -852,6 +834,11 @@ export class InboxService {
       const subject = getHeader("Subject");
       const inReplyTo = getHeader("In-Reply-To") || null;
       const references = getHeader("References") || null;
+      const rfcMessageId = getHeader("Message-ID") || getHeader("Message-Id") || null;
+      const autoSubmitted = getHeader("Auto-Submitted") || null;
+      const xAutoreply =
+        getHeader("X-Autoreply") || getHeader("X-Auto-Response-Suppress") || null;
+      const precedence = getHeader("Precedence") || null;
       const fromEmail = extractEmailAddress(from);
       // Skip mail that originated from this mailbox (SENT copies / self-send)
       if (!fromEmail || fromEmail === account.email.toLowerCase()) {
@@ -872,6 +859,10 @@ export class InboxService {
           : new Date(),
         inReplyTo,
         references,
+        rfcMessageId,
+        autoSubmitted,
+        xAutoreply,
+        precedence,
       });
     }
     return out;

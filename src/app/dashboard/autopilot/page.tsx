@@ -9,6 +9,9 @@ import { websiteAuditService } from "@/services/website-audit.service";
 import { outboundJobService } from "@/services/outbound-job.service";
 import { cronTickService } from "@/services/cron-tick.service";
 import { autopilotOverviewService } from "@/services/autopilot-overview.service";
+import { aiReplyService } from "@/services/ai-reply.service";
+import { aiReplyConfigService } from "@/services/ai-reply-config.service";
+import { RepliesPanel } from "@/components/autopilot/replies-panel";
 import { SourcingPanel } from "@/components/autopilot/sourcing-panel";
 import { EnrichmentPanel } from "@/components/autopilot/enrichment-panel";
 import { AuditPanel } from "@/components/autopilot/audit-panel";
@@ -92,7 +95,9 @@ export default async function AutopilotPage({
         ? "sourcing"
         : params.tab === "audit"
           ? "audit"
-          : "overview";
+          : params.tab === "replies"
+            ? "replies"
+            : "overview";
 
   let data;
   let enrichment;
@@ -164,6 +169,26 @@ pm2 restart all`}
       }
     : null;
 
+  // Replies tab data is loaded only when needed and never blocks the other tabs.
+  let replies:
+    | (Awaited<ReturnType<typeof aiReplyService.dashboard>> & {
+        config: Awaited<ReturnType<typeof aiReplyConfigService.getConfig>>;
+      })
+    | null = null;
+  let repliesError: string | null = null;
+  if (tab === "replies") {
+    try {
+      const [dash, cfg] = await Promise.all([
+        aiReplyService.dashboard(user.organizationId),
+        aiReplyConfigService.getConfig(user.organizationId),
+      ]);
+      replies = { ...dash, config: cfg };
+    } catch (err) {
+      repliesError = err instanceof Error ? err.message : String(err);
+      console.error("[autopilot] replies dashboard failed", repliesError);
+    }
+  }
+
   const toggles = overview.toggles;
   const anyRunning =
     toggles.sourcing ||
@@ -203,6 +228,11 @@ pm2 restart all`}
       href: "/dashboard/autopilot?tab=enrichment",
     },
     { key: "audit", label: "Audit", href: "/dashboard/autopilot?tab=audit" },
+    {
+      key: "replies",
+      label: "Replies",
+      href: "/dashboard/autopilot?tab=replies",
+    },
     {
       key: "pitch",
       label: "Pitch review",
@@ -521,6 +551,33 @@ pm2 restart all`}
             lastCronRun,
           }}
         />
+      ) : null}
+
+      {tab === "replies" ? (
+        replies ? (
+          <RepliesPanel
+            initial={{
+              timezone: replies.timezone,
+              today: replies.today,
+              open: {
+                ...replies.open,
+                oldestHeldAt: replies.open.oldestHeldAt?.toISOString() ?? null,
+              },
+              config: replies.config,
+            }}
+          />
+        ) : (
+          <div className="card">
+            <div className="card-body muted">
+              Could not load the reply agent.
+              {repliesError ? (
+                <p className="mt" style={{ wordBreak: "break-all" }}>
+                  {repliesError}
+                </p>
+              ) : null}
+            </div>
+          </div>
+        )
       ) : null}
 
       {tab === "audit" ? (

@@ -444,6 +444,102 @@ export class SequenceEnrollmentService {
     });
   }
 
+  /**
+   * Out-of-office auto-reply: do NOT stop the sequence — pause until the contact returns.
+   * Also pushes any already-queued cold outbox rows past `until` so they cannot fire early.
+   * Resumed by `resumeDueOooPauses` (called from the AI reply cron).
+   */
+  async pauseUntilOoo(organizationId: string, contactId: string, until: Date) {
+    const open = await prisma.sequenceEnrollment.findMany({
+      where: {
+        organizationId,
+        contactId,
+        status: {
+          in: [
+            SequenceEnrollmentStatus.ACTIVE,
+            SequenceEnrollmentStatus.PENDING,
+          ],
+        },
+      },
+      select: { id: true, metadata: true },
+    });
+
+    for (const row of open) {
+      const meta =
+        row.metadata && typeof row.metadata === "object" && !Array.isArray(row.metadata)
+          ? (row.metadata as Record<string, unknown>)
+          : {};
+      await prisma.sequenceEnrollment.updateMany({
+        where: {
+          id: row.id,
+          status: {
+            in: [
+              SequenceEnrollmentStatus.ACTIVE,
+              SequenceEnrollmentStatus.PENDING,
+            ],
+          },
+        },
+        data: {
+          status: SequenceEnrollmentStatus.PAUSED,
+          pausedAt: new Date(),
+          nextRunAt: until,
+          claimToken: null,
+          claimedAt: null,
+          metadata: {
+            ...meta,
+            oooPause: { until: until.toISOString(), at: new Date().toISOString() },
+          } as Prisma.InputJsonValue,
+        },
+      });
+    }
+
+    const delayed = await prisma.emailOutbox.updateMany({
+      where: {
+        organizationId,
+        contactId,
+        purpose: "SEQUENCE",
+        status: "QUEUED",
+        OR: [{ scheduledFor: null }, { scheduledFor: { lt: until } }],
+      },
+      data: { scheduledFor: until },
+    });
+
+    return { paused: open.length, delayedOutbox: delayed.count };
+  }
+
+  /** Resume enrollments paused by `pauseUntilOoo` whose return date has passed. */
+  async resumeDueOooPauses(organizationId: string, now = new Date()) {
+    const due = await prisma.sequenceEnrollment.findMany({
+      where: {
+        organizationId,
+        status: SequenceEnrollmentStatus.PAUSED,
+        nextRunAt: { lte: now },
+      },
+      select: { id: true, metadata: true },
+      take: 200,
+    });
+
+    let resumed = 0;
+    for (const row of due) {
+      const meta =
+        row.metadata && typeof row.metadata === "object" && !Array.isArray(row.metadata)
+          ? { ...(row.metadata as Record<string, unknown>) }
+          : {};
+      if (!meta.oooPause) continue; // only OOO pauses — never auto-resume manual pauses
+      delete meta.oooPause;
+      const res = await prisma.sequenceEnrollment.updateMany({
+        where: { id: row.id, status: SequenceEnrollmentStatus.PAUSED },
+        data: {
+          status: SequenceEnrollmentStatus.ACTIVE,
+          pausedAt: null,
+          metadata: meta as Prisma.InputJsonValue,
+        },
+      });
+      resumed += res.count;
+    }
+    return { resumed };
+  }
+
   async stopForContactUnsubscribe(organizationId: string, contactId: string) {
     return prisma.sequenceEnrollment.updateMany({
       where: {

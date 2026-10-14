@@ -23,6 +23,7 @@ export type OpportunityListFilter =
   | "needs_action"
   | "contacted"
   | "replied"
+  | "positive"
   | "meeting"
   | "proposal"
   | "won"
@@ -104,6 +105,9 @@ export class OpportunityService {
         break;
       case "replied":
         where.stage = OpportunityStage.REPLIED;
+        break;
+      case "positive":
+        where.stage = OpportunityStage.POSITIVE_REPLY;
         break;
       case "meeting":
         where.stage = OpportunityStage.MEETING;

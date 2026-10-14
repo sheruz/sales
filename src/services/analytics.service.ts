@@ -123,6 +123,7 @@ export class AnalyticsService {
       Qualified: 0,
       Contacted: 0,
       Replied: 0,
+      Positive: 0,
       Meeting: 0,
       Proposal: 0,
       Negotiation: 0,
@@ -171,6 +172,9 @@ export class AnalyticsService {
         case OpportunityStage.REPLIED:
           funnel.Replied += 1;
           break;
+        case OpportunityStage.POSITIVE_REPLY:
+          funnel.Positive += 1;
+          break;
         case OpportunityStage.MEETING:
           funnel.Meeting += 1;
           break;
@@ -195,6 +199,7 @@ export class AnalyticsService {
       OpportunityStage.QUALIFIED,
       OpportunityStage.CONTACTED,
       OpportunityStage.REPLIED,
+      OpportunityStage.POSITIVE_REPLY,
       OpportunityStage.MEETING,
       OpportunityStage.PROPOSAL,
       OpportunityStage.NEGOTIATION,
@@ -217,9 +222,10 @@ export class AnalyticsService {
       Qualified: pipelineOpps.filter((o) => stageRank(o.stage) >= 1).length,
       Contacted: pipelineOpps.filter((o) => stageRank(o.stage) >= 2).length,
       Replied: pipelineOpps.filter((o) => stageRank(o.stage) >= 3).length,
-      Meeting: pipelineOpps.filter((o) => stageRank(o.stage) >= 4).length,
-      Proposal: pipelineOpps.filter((o) => stageRank(o.stage) >= 5).length,
-      Negotiation: pipelineOpps.filter((o) => stageRank(o.stage) >= 6).length,
+      Positive: pipelineOpps.filter((o) => stageRank(o.stage) >= 4).length,
+      Meeting: pipelineOpps.filter((o) => stageRank(o.stage) >= 5).length,
+      Proposal: pipelineOpps.filter((o) => stageRank(o.stage) >= 6).length,
+      Negotiation: pipelineOpps.filter((o) => stageRank(o.stage) >= 7).length,
       Won: pipelineOpps.filter((o) => o.stage === OpportunityStage.WON).length,
     };
 

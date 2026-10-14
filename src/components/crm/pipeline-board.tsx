@@ -41,6 +41,11 @@ const BOARD_COLUMNS: {
       OpportunityStage.DISCOVERY,
     ],
   },
+  {
+    key: "positive",
+    label: "Positive",
+    stages: [OpportunityStage.POSITIVE_REPLY],
+  },
   { key: "meeting", label: "Meeting", stages: [OpportunityStage.MEETING] },
   {
     key: "proposal",

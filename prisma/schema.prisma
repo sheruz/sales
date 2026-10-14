@@ -81,10 +81,38 @@ enum EmailOutboxStatus {
   HELD
 }
 
+/// SEQUENCE = Phase 4 cold/sequence send; AI_REPLY = Phase 5 AI reply (same outbox, different purpose)
+enum EmailOutboxPurpose {
+  SEQUENCE
+  AI_REPLY
+}
+
 enum OutboundMailboxStatus {
   ACTIVE
   PAUSED
   ERROR
+}
+
+enum AiReplyStatus {
+  DRAFT
+  HELD
+  QUEUED
+  SENT
+  CANCELLED
+  DISMISSED
+}
+
+enum AiReplyMode {
+  OFF
+  DRAFT_ONLY
+  AUTO_SEND
+}
+
+enum NotificationType {
+  AI_HELD
+  INTERESTED_REPLY
+  REFERRAL_CREATED
+  DAILY_HELD_DIGEST
 }
 
 /// BRANDED = Delvix HTML template; PLAIN = personal text in-thread reply
@@ -127,15 +155,26 @@ enum SuppressionReason {
 }
 
 enum MessageAiClassification {
+  /// Phase 5 canonical classes
   INTERESTED
-  POSITIVE
-  NEGATIVE
-  OBJECTION
   QUESTION
+  NOT_NOW
+  NOT_INTERESTED
+  WRONG_PERSON
   UNSUBSCRIBE
   OUT_OF_OFFICE
+  OTHER
+  /// @deprecated legacy — keep for existing rows; map in code, do not emit from new classifiers
+  POSITIVE
+  /// @deprecated legacy
+  NEGATIVE
+  /// @deprecated legacy — map to QUESTION
+  OBJECTION
+  /// @deprecated legacy — map to OTHER
   NOT_RELEVANT
+  /// @deprecated legacy — map to WRONG_PERSON
   REFERRAL
+  /// @deprecated legacy — map to OTHER
   UNKNOWN
 }
 
@@ -422,6 +461,14 @@ enum CompanyTimelineEventType {
   PITCH_EDITED
   CONTACTED
   REPLIED
+  REPLY_RECEIVED
+  REPLY_CLASSIFIED
+  AI_DRAFTED
+  AI_SENT
+  HELD_FOR_HUMAN
+  HUMAN_SENT
+  FOLLOWUP_SCHEDULED
+  REFERRAL_CREATED
   MEETING_BOOKED
   PROPOSAL_SENT
   WON
@@ -554,6 +601,7 @@ enum OpportunityStage {
   QUALIFIED
   CONTACTED
   REPLIED
+  POSITIVE_REPLY
   DISCOVERY
   MEETING
   PROPOSAL
@@ -569,6 +617,7 @@ enum OpportunityEventType {
   RESEARCHED
   CONTACTED
   REPLIED
+  POSITIVE_REPLY
   MEETING_BOOKED
   PROPOSAL_SENT
   WON
@@ -706,6 +755,8 @@ model Organization {
   pitches           Pitch[]
   outboundMailboxes OutboundMailbox[]
   emailOutbox       EmailOutbox[]
+  aiReplyDrafts     AiReplyDraft[]
+  notifications     Notification[]
 
   @@index([status])
   @@index([deletedAt])
@@ -884,6 +935,7 @@ model User {
   sequenceEnrollmentsEnrolled SequenceEnrollment[] @relation("SequenceEnrollmentEnrolledBy")
   companyTimelineEvents  CompanyTimelineEvent[]
   pitchesApproved        Pitch[] @relation("PitchApprovedBy")
+  notifications          Notification[]
 
   @@index([email])
   @@index([role])
@@ -1884,8 +1936,13 @@ model OutboundMailbox {
 model EmailOutbox {
   id               String           @id @default(uuid())
   organizationId   String           @map("organization_id")
-  enrollmentId     String           @map("enrollment_id")
-  stepOrder        Int              @map("step_order")
+  /// Required when purpose=SEQUENCE (enforced by DB CHECK). Nullable for AI_REPLY.
+  enrollmentId     String?          @map("enrollment_id")
+  /// Required when purpose=SEQUENCE (enforced by DB CHECK). Nullable for AI_REPLY.
+  stepOrder        Int?             @map("step_order")
+  purpose          EmailOutboxPurpose @default(SEQUENCE)
+  /// Required when purpose=AI_REPLY (enforced by DB CHECK). One AI reply per inbound.
+  inboundMessageId String?          @map("inbound_message_id")
   contactId        String           @map("contact_id")
   companyId        String?          @map("company_id")
   opportunityId    String?          @map("opportunity_id")
@@ -1896,7 +1953,9 @@ model EmailOutbox {
   subject          String
   bodyText         String           @map("body_text") @db.Text
   bodyHtml         String?          @map("body_html") @db.Text
-  /// Earliest UTC time this may send (prospect local Mon–Fri 8–11)
+  inReplyTo        String?          @map("in_reply_to")
+  referencesHeader String?          @map("references_header") @db.Text
+  /// Earliest UTC time this may send (prospect local Mon–Fri window)
   scheduledFor     DateTime?        @map("scheduled_for")
   heldReason       String?          @map("held_reason")
   attemptCount     Int              @default(0) @map("attempt_count")
@@ -1904,26 +1963,31 @@ model EmailOutbox {
   messageId        String?          @map("message_id")
   providerMessageId String?         @map("provider_message_id")
   sentAt           DateTime?        @map("sent_at")
-  /// enrollmentId:stepOrder
+  /// SEQUENCE: enrollmentId:stepOrder; AI_REPLY: ai-reply:{inboundMessageId}
   idempotencyKey   String           @unique @map("idempotency_key")
   shadowMode       Boolean          @default(false) @map("shadow_mode")
   metadata         Json?
   createdAt        DateTime         @default(now()) @map("created_at")
   updatedAt        DateTime         @updatedAt @map("updated_at")
 
-  organization    Organization     @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  enrollment      SequenceEnrollment @relation(fields: [enrollmentId], references: [id], onDelete: Cascade)
-  contact         Contact          @relation(fields: [contactId], references: [id], onDelete: Cascade)
-  company         Company?         @relation(fields: [companyId], references: [id], onDelete: SetNull)
-  opportunity     Opportunity?     @relation(fields: [opportunityId], references: [id], onDelete: SetNull)
-  emailAccount    EmailAccount     @relation(fields: [emailAccountId], references: [id], onDelete: Cascade)
-  outboundMailbox OutboundMailbox? @relation(fields: [outboundMailboxId], references: [id], onDelete: SetNull)
-  message         Message?         @relation(fields: [messageId], references: [id], onDelete: SetNull)
+  organization    Organization      @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  enrollment      SequenceEnrollment? @relation(fields: [enrollmentId], references: [id], onDelete: Cascade)
+  contact         Contact           @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  company         Company?          @relation(fields: [companyId], references: [id], onDelete: SetNull)
+  opportunity     Opportunity?      @relation(fields: [opportunityId], references: [id], onDelete: SetNull)
+  emailAccount    EmailAccount      @relation(fields: [emailAccountId], references: [id], onDelete: Cascade)
+  outboundMailbox OutboundMailbox?  @relation(fields: [outboundMailboxId], references: [id], onDelete: SetNull)
+  message         Message?          @relation(fields: [messageId], references: [id], onDelete: SetNull)
+  inboundMessage  Message?          @relation("AiReplyInbound", fields: [inboundMessageId], references: [id], onDelete: SetNull)
+  aiReplyDrafts   AiReplyDraft[]
 
+  /// Phase 4 double-send guard — do NOT drop. Postgres allows multiple NULLs.
   @@unique([enrollmentId, stepOrder])
+  @@unique([inboundMessageId])
   @@index([organizationId, status, scheduledFor])
   @@index([emailAccountId, status])
   @@index([status, scheduledFor])
+  @@index([purpose, status])
   @@map("email_outbox")
 }
 
@@ -1945,6 +2009,12 @@ model InboxConversation {
   lastMessageAt    DateTime?               @map("last_message_at")
   nextActionAt     DateTime?               @map("next_action_at")
   assignedToId     String?                 @map("assigned_to")
+  latestClass      MessageAiClassification? @map("latest_class")
+  latestConfidence Decimal?                @map("latest_confidence") @db.Decimal(4, 3)
+  holdReason       String?                 @map("hold_reason")
+  /// Counts only AI replies actually SENT (not drafts)
+  aiReplyCount     Int                     @default(0) @map("ai_reply_count")
+  oooUntil         DateTime?               @map("ooo_until")
   createdAt        DateTime                @default(now()) @map("created_at")
   updatedAt        DateTime                @updatedAt @map("updated_at")
 
@@ -1957,6 +2027,7 @@ model InboxConversation {
   assignedTo   User?         @relation("InboxAssignee", fields: [assignedToId], references: [id], onDelete: SetNull)
   messages     Message[]
   events       EmailEvent[]
+  aiReplyDrafts AiReplyDraft[]
 
   @@index([organizationId])
   @@index([companyId])
@@ -1966,6 +2037,7 @@ model InboxConversation {
   @@index([status])
   @@index([lastMessageAt])
   @@index([providerThreadId])
+  @@index([latestClass])
   @@map("inbox_conversations")
 }
 
@@ -1985,6 +2057,12 @@ model Message {
   status              EmailStatus              @default(DRAFT)
   aiClassification    MessageAiClassification? @map("ai_classification")
   aiSummary           String?                  @map("ai_summary")
+  aiReasoningSummary  String?                  @map("ai_reasoning_summary")
+  aiConfidence        Decimal?                 @map("ai_confidence") @db.Decimal(4, 3)
+  aiModel             String?                  @map("ai_model")
+  aiCost              Decimal?                 @map("ai_cost") @db.Decimal(10, 6)
+  holdReason          String?                  @map("hold_reason")
+  sentByAi            Boolean                  @default(false) @map("sent_by_ai")
   suggestedNextAction String?                  @map("suggested_next_action")
   idempotencyKey      String?                  @map("idempotency_key")
   sentAt              DateTime?                @map("sent_at")
@@ -2000,6 +2078,9 @@ model Message {
   attachments  MessageAttachment[]
   sequenceEnrollmentExecutions SequenceEnrollmentExecution[]
   emailOutbox  EmailOutbox[]
+  aiReplyInboundFor EmailOutbox[]  @relation("AiReplyInbound")
+  aiReplyDrafts     AiReplyDraft[] @relation("AiReplyInboundDraft")
+  aiReplyOutboundDrafts AiReplyDraft[] @relation("AiReplyOutboundDraft")
 
   @@unique([organizationId, idempotencyKey])
   @@unique([organizationId, providerMessageId])
@@ -2008,7 +2089,68 @@ model Message {
   @@index([direction])
   @@index([status])
   @@index([threadId])
+  @@index([aiClassification])
   @@map("messages")
+}
+
+/// Phase 5 — AI reply draft lifecycle (inbox actions + regenerate)
+model AiReplyDraft {
+  id                 String                   @id @default(uuid())
+  organizationId     String                   @map("organization_id")
+  conversationId     String                   @map("conversation_id")
+  inboundMessageId   String                   @unique @map("inbound_message_id")
+  outboxId           String?                  @map("outbox_id")
+  outboundMessageId  String?                  @map("outbound_message_id")
+  status             AiReplyStatus            @default(DRAFT)
+  class              MessageAiClassification  @map("class")
+  confidence         Decimal                  @db.Decimal(4, 3)
+  holdReason         String?                  @map("hold_reason")
+  replyText          String                   @map("reply_text") @db.Text
+  offersBooking      Boolean                  @default(false) @map("offers_booking")
+  classifyModel      String?                  @map("classify_model")
+  draftModel         String?                  @map("draft_model")
+  classifyCost       Decimal?                 @map("classify_cost") @db.Decimal(10, 6)
+  draftCost          Decimal?                 @map("draft_cost") @db.Decimal(10, 6)
+  scheduledFor       DateTime?                @map("scheduled_for")
+  humanOverrideClass MessageAiClassification? @map("human_override_class")
+  dismissedAt        DateTime?                @map("dismissed_at")
+  metadata           Json?
+  createdAt          DateTime                 @default(now()) @map("created_at")
+  updatedAt          DateTime                 @updatedAt @map("updated_at")
+
+  organization    Organization      @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  conversation    InboxConversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  inboundMessage  Message           @relation("AiReplyInboundDraft", fields: [inboundMessageId], references: [id], onDelete: Cascade)
+  outboundMessage Message?          @relation("AiReplyOutboundDraft", fields: [outboundMessageId], references: [id], onDelete: SetNull)
+  outbox          EmailOutbox?      @relation(fields: [outboxId], references: [id], onDelete: SetNull)
+
+  @@index([organizationId, status])
+  @@index([conversationId])
+  @@index([status, scheduledFor])
+  @@map("ai_reply_drafts")
+}
+
+/// In-app owner notifications (Phase 5). Email via transactional/primary inbox — never outbound pool.
+model Notification {
+  id             String           @id @default(uuid())
+  organizationId String           @map("organization_id")
+  userId         String           @map("user_id")
+  type           NotificationType
+  title          String
+  body           String           @db.Text
+  href           String?
+  readAt         DateTime?        @map("read_at")
+  emailSentAt    DateTime?        @map("email_sent_at")
+  metadata       Json?
+  createdAt      DateTime         @default(now()) @map("created_at")
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId, userId, readAt])
+  @@index([userId, createdAt])
+  @@index([type, createdAt])
+  @@map("notifications")
 }
 
 model MessageAttachment {

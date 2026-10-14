@@ -407,6 +407,11 @@ export default async function DashboardPage() {
       href: "/dashboard/opportunities?filter=replied",
     },
     {
+      label: "Positive",
+      value: mf?.Positive ?? 0,
+      href: "/dashboard/opportunities?filter=positive",
+    },
+    {
       label: "Meeting",
       value: mf?.Meeting ?? 0,
       href: "/dashboard/opportunities?filter=meeting",

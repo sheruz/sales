@@ -12,6 +12,7 @@ export type FunnelStageKey =
   | "audited"
   | "contacted"
   | "replied"
+  | "positive"
   | "meeting"
   | "won";
 
@@ -26,9 +27,10 @@ export const FUNNEL_STAGES: Array<{
   { key: "enriched", label: "Enriched", phase: 2 },
   { key: "audited", label: "Audited", phase: 3 },
   { key: "contacted", label: "Contacted", phase: 4 },
-  { key: "replied", label: "Replied", phase: 5, comingSoon: true },
-  { key: "meeting", label: "Meeting booked", phase: 5, comingSoon: true },
-  { key: "won", label: "Won", phase: 5, comingSoon: true },
+  { key: "replied", label: "Replied", phase: 5 },
+  { key: "positive", label: "Positive replies", phase: 5 },
+  { key: "meeting", label: "Meeting booked", phase: 6, comingSoon: true },
+  { key: "won", label: "Won", phase: 6, comingSoon: true },
 ];
 
 export function deriveCompanyFunnelStage(input: {
@@ -41,6 +43,7 @@ export function deriveCompanyFunnelStage(input: {
   const opp = input.opportunityStage;
   if (opp === "WON") return "won";
   if (opp === "MEETING") return "meeting";
+  if (opp === "POSITIVE_REPLY") return "positive";
   if (opp === "REPLIED") return "replied";
   if (opp === "CONTACTED" || opp === "QUALIFIED" || opp === "NEW") {
     return "contacted";

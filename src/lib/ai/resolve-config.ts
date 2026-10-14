@@ -6,7 +6,11 @@ const QUALITY_FEATURES = new Set([
   "outreach_email",
   "outreach_linkedin",
   "reply_analysis",
+  /** Phase 5 — customer-facing AI reply drafts (quality tier) */
+  "ai_reply_draft",
 ]);
+// NOTE: `inbox_reply_classification` is intentionally NOT listed — it stays on
+// the economy tier (default) so inbound triage is cheap.
 
 export type AiRuntimeConfig = {
   provider: "openai" | "anthropic";

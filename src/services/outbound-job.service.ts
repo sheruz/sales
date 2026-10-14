@@ -4,6 +4,7 @@ import {
   CompanyAuditStatus,
   CompanyEnrichmentStatus,
   ConversationChannel,
+  EmailOutboxPurpose,
   EmailOutboxStatus,
   OpportunityStage,
   OutreachSequenceStatus,
@@ -909,6 +910,7 @@ export class OutboundJobService {
     const sentToday = await prisma.emailOutbox.count({
       where: {
         organizationId,
+        purpose: EmailOutboxPurpose.SEQUENCE,
         status: EmailOutboxStatus.SENT,
         sentAt: { gte: day },
       },
@@ -938,6 +940,7 @@ export class OutboundJobService {
     const due = await prisma.emailOutbox.findMany({
       where: {
         organizationId,
+        purpose: EmailOutboxPurpose.SEQUENCE,
         status: EmailOutboxStatus.QUEUED,
         ...scheduleFilter,
       },
@@ -1010,6 +1013,8 @@ export class OutboundJobService {
       where: {
         id: outboxId,
         organizationId,
+        // AI_REPLY rows are delivered only by aiReplyService.flushDueReplies
+        purpose: EmailOutboxPurpose.SEQUENCE,
         status: EmailOutboxStatus.QUEUED,
       },
       data: { status: EmailOutboxStatus.SENDING, attemptCount: { increment: 1 } },
@@ -1061,7 +1066,8 @@ export class OutboundJobService {
         ? (item.metadata as { emailStyle?: string })
         : {};
     const wantsBranded =
-      item.stepOrder <= 1 || metaEarly.emailStyle === "BRANDED";
+      (item.stepOrder != null && item.stepOrder <= 1) ||
+      metaEarly.emailStyle === "BRANDED";
     const htmlLooksBranded =
       typeof bodyHtml === "string" &&
       (bodyHtml.includes("WHAT WE NOTICED") ||
@@ -1163,21 +1169,23 @@ export class OutboundJobService {
         await mailboxPoolService.recordSend(item.outboundMailboxId);
       }
 
-      await prisma.sequenceEnrollmentExecution.upsert({
-        where: { idempotencyKey: item.idempotencyKey },
-        create: {
-          organizationId,
-          enrollmentId: item.enrollmentId,
-          stepOrder: item.stepOrder,
-          status: SequenceExecutionStatus.SUCCESS,
-          messageId: sent.message.id,
-          idempotencyKey: item.idempotencyKey,
-        },
-        update: {
-          status: SequenceExecutionStatus.SUCCESS,
-          messageId: sent.message.id,
-        },
-      });
+      if (item.enrollmentId != null && item.stepOrder != null) {
+        await prisma.sequenceEnrollmentExecution.upsert({
+          where: { idempotencyKey: item.idempotencyKey },
+          create: {
+            organizationId,
+            enrollmentId: item.enrollmentId,
+            stepOrder: item.stepOrder,
+            status: SequenceExecutionStatus.SUCCESS,
+            messageId: sent.message.id,
+            idempotencyKey: item.idempotencyKey,
+          },
+          update: {
+            status: SequenceExecutionStatus.SUCCESS,
+            messageId: sent.message.id,
+          },
+        });
+      }
 
       await this.afterSuccessfulSend(item, false);
       return { id: outboxId, status: "sent" };
@@ -1255,16 +1263,22 @@ export class OutboundJobService {
   private async afterSuccessfulSend(
     item: {
       organizationId: string;
-      enrollmentId: string;
-      stepOrder: number;
+      enrollmentId: string | null;
+      stepOrder: number | null;
       companyId: string | null;
       contactId: string;
       opportunityId: string | null;
     },
     shadow: boolean
   ) {
+    // AI replies use purpose=AI_REPLY and have no enrollment — skip sequence advance
+    if (item.enrollmentId == null || item.stepOrder == null) return;
+
+    const enrollmentId = item.enrollmentId;
+    const stepOrder = item.stepOrder;
+
     // CONTACTED after first send
-    if (item.opportunityId && item.stepOrder <= 1) {
+    if (item.opportunityId && stepOrder <= 1) {
       await prisma.opportunity.updateMany({
         where: {
           id: item.opportunityId,
@@ -1283,17 +1297,17 @@ export class OutboundJobService {
         opportunityId: item.opportunityId,
         type: CompanyTimelineEventType.CONTACTED,
         title: shadow
-          ? `Shadow send step ${item.stepOrder} (not delivered)`
-          : `Email sent (step ${item.stepOrder})`,
-        details: { enrollmentId: item.enrollmentId, shadow },
+          ? `Shadow send step ${stepOrder} (not delivered)`
+          : `Email sent (step ${stepOrder})`,
+        details: { enrollmentId, shadow },
         actor: TimelineActor.SYSTEM,
-        dedupeKey: `outbox_sent:${item.enrollmentId}:${item.stepOrder}`,
+        dedupeKey: `outbox_sent:${enrollmentId}:${stepOrder}`,
       });
     }
 
     // Advance enrollment + queue next step
     const enrollment = await prisma.sequenceEnrollment.findFirst({
-      where: { id: item.enrollmentId },
+      where: { id: enrollmentId },
       include: {
         sequence: { include: { steps: { orderBy: { stepOrder: "asc" } } } },
       },
@@ -1302,7 +1316,7 @@ export class OutboundJobService {
 
     const steps = resolveEnrollmentSteps(enrollment);
     const next = steps.find(
-      (s) => s.stepOrder > item.stepOrder && s.isActive
+      (s) => s.stepOrder > stepOrder && s.isActive
     );
     if (!next) {
       await prisma.sequenceEnrollment.update({

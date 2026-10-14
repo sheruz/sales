@@ -6,6 +6,7 @@ import { sourcingJobService } from "@/services/sourcing-job.service";
 import { enrichmentJobService } from "@/services/enrichment-job.service";
 import { websiteAuditService } from "@/services/website-audit.service";
 import { outboundJobService } from "@/services/outbound-job.service";
+import { aiReplyService } from "@/services/ai-reply.service";
 import { cronTickService } from "@/services/cron-tick.service";
 import { apiSuccess } from "@/lib/api/response";
 import { handleApiError } from "@/lib/api/error-handler";
@@ -47,6 +48,7 @@ export async function POST(request: NextRequest) {
         enrichment,
         audit,
         outbound,
+        aiReplies,
       ] = await Promise.all([
           automationService.processPendingJobs().catch((e: unknown) => {
             errors.push(
@@ -97,6 +99,12 @@ export async function POST(request: NextRequest) {
             );
             return { orgs: 0, results: [] };
           }),
+          aiReplyService.processAllEnabled().catch((e: unknown) => {
+            errors.push(
+              `ai_replies: ${e instanceof Error ? e.message : "failed"}`
+            );
+            return { organizations: 0, results: [] };
+          }),
         ]);
 
       console.info("[cron/automation] tick", {
@@ -110,6 +118,7 @@ export async function POST(request: NextRequest) {
         enrichmentOrgs: enrichment.orgs,
         auditOrgs: audit.orgs,
         outboundOrgs: outbound.orgs,
+        aiReplyOrgs: aiReplies.organizations,
         errors: errors.length ? errors : undefined,
       });
 
@@ -123,6 +132,7 @@ export async function POST(request: NextRequest) {
           enrichment: true,
           audit: true,
           outbound: true,
+          aiReplies: true,
         },
         counts: {
           sequencesClaimed: sequences.claimed,
@@ -132,6 +142,7 @@ export async function POST(request: NextRequest) {
           enrichmentOrgs: enrichment.orgs,
           auditOrgs: audit.orgs,
           outboundOrgs: outbound.orgs,
+          aiReplyOrgs: aiReplies.organizations,
         },
         errors: errors.length ? errors : null,
       });
@@ -145,6 +156,7 @@ export async function POST(request: NextRequest) {
           enrichment: { orgs: enrichment.orgs },
           audit: { orgs: audit.orgs },
           outbound: { orgs: outbound.orgs },
+          aiReplies: { orgs: aiReplies.organizations },
           sequences: {
             claimed: sequences.claimed,
             success: sequences.success,

@@ -11,6 +11,7 @@ export const PIPELINE_VALUE_STAGES: OpportunityStage[] = [
   OpportunityStage.QUALIFIED,
   OpportunityStage.CONTACTED,
   OpportunityStage.REPLIED,
+  OpportunityStage.POSITIVE_REPLY,
   OpportunityStage.DISCOVERY,
   OpportunityStage.MEETING,
   OpportunityStage.PROPOSAL,
@@ -35,6 +36,8 @@ export function opportunityStageToDealStage(
     case OpportunityStage.CONTACTED:
       return DealStage.CONTACTED;
     case OpportunityStage.REPLIED:
+      return DealStage.REPLIED;
+    case OpportunityStage.POSITIVE_REPLY:
       return DealStage.REPLIED;
     case OpportunityStage.DISCOVERY:
       return DealStage.DISCOVERY;
@@ -73,6 +76,7 @@ export const PIPELINE_STAGES: OpportunityStage[] = [
   OpportunityStage.QUALIFIED,
   OpportunityStage.CONTACTED,
   OpportunityStage.REPLIED,
+  OpportunityStage.POSITIVE_REPLY,
   OpportunityStage.DISCOVERY,
   OpportunityStage.MEETING,
   OpportunityStage.PROPOSAL,
