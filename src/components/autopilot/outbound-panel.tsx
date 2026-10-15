@@ -175,6 +175,7 @@ function formatSendResult(data: {
   reason?: string;
   waitingForWindow?: number;
   nextScheduledFor?: string | null;
+  held?: number;
   results?: Array<{ status?: string; reason?: string }>;
 }): string {
   const processed = data.processed ?? 0;
@@ -192,6 +193,9 @@ function formatSendResult(data: {
       ? new Date(data.nextScheduledFor).toLocaleString()
       : "later";
     return `0 due now — ${data.waitingForWindow ?? 0} waiting for Mon–Fri 8–11 window (next ${when}). Process outbox sends immediately.`;
+  }
+  if (data.reason === "held_not_queued" || (data.held ?? 0) > 0) {
+    return `${data.held ?? 0} held (not queued) — open Scheduled tab for reason, then Process outbox again after deploy/fix`;
   }
   return "Nothing due in outbox";
 }

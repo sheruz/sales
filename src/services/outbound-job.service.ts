@@ -633,13 +633,14 @@ export class OutboundJobService {
     const existing = await prisma.emailOutbox.findUnique({
       where: { idempotencyKey },
     });
-    // Allow rebuild when previously held for missing timezone (or cancelled)
+    // Allow rebuild when previously held for fixable reasons (or cancelled)
+    const rebuildHeld =
+      existing?.status === EmailOutboxStatus.HELD &&
+      (existing.heldReason === "timezone_needed" ||
+        existing.heldReason === "missing_approved_pitch");
     if (
       existing &&
-      !(
-        existing.status === EmailOutboxStatus.HELD &&
-        existing.heldReason === "timezone_needed"
-      ) &&
+      !rebuildHeld &&
       existing.status !== EmailOutboxStatus.CANCELLED
     ) {
       return existing;
@@ -650,13 +651,14 @@ export class OutboundJobService {
 
     const company =
       enrollment.opportunity?.company ?? enrollment.contact.company;
+    // Enroll marks the pitch SUPERSEDED so it won't re-enroll — still use it to send
     const pitch = await prisma.pitch.findFirst({
       where: {
         organizationId,
         contactId: enrollment.contactId,
-        status: PitchStatus.APPROVED,
+        status: { in: [PitchStatus.APPROVED, PitchStatus.SUPERSEDED] },
       },
-      orderBy: { updatedAt: "desc" },
+      orderBy: [{ approvedAt: "desc" }, { updatedAt: "desc" }],
     });
 
     // Step 1 is always BRANDED (our designed HTML template). Never trust a
@@ -932,29 +934,35 @@ export class OutboundJobService {
     });
   }
 
-  /** Rebuild outbox rows that were stuck on missing company timezone. */
-  async releaseTimezoneHolds(organizationId: string, limit = 25) {
+  /**
+   * Rebuild outbox rows stuck on fixable holds (timezone / pitch after SUPERSEDED).
+   * Called from manual Process outbox.
+   */
+  async releaseFixableHolds(organizationId: string, limit = 25) {
     const held = await prisma.emailOutbox.findMany({
       where: {
         organizationId,
         purpose: EmailOutboxPurpose.SEQUENCE,
         status: EmailOutboxStatus.HELD,
-        heldReason: "timezone_needed",
+        heldReason: {
+          in: ["timezone_needed", "missing_approved_pitch"],
+        },
         enrollmentId: { not: null },
       },
       take: limit,
-      select: { id: true, enrollmentId: true },
+      select: { id: true, enrollmentId: true, heldReason: true },
     });
     let released = 0;
     for (const row of held) {
       if (!row.enrollmentId) continue;
       try {
-        await this.queueStep(organizationId, row.enrollmentId);
-        released += 1;
+        const out = await this.queueStep(organizationId, row.enrollmentId);
+        if (out && out.status === EmailOutboxStatus.QUEUED) released += 1;
       } catch (err) {
         console.warn(
-          "[outbound] releaseTimezoneHolds failed",
+          "[outbound] releaseFixableHolds failed",
           row.id,
+          row.heldReason,
           err instanceof Error ? err.message : err
         );
       }
@@ -967,9 +975,9 @@ export class OutboundJobService {
     limit = 5,
     opts?: { bypassSchedule?: boolean }
   ) {
-    // Manual Process outbox: unblock timezone holds first
+    // Manual Process outbox: unblock fixable holds first (timezone / pitch)
     if (opts?.bypassSchedule) {
-      await this.releaseTimezoneHolds(organizationId, limit);
+      await this.releaseFixableHolds(organizationId, limit);
     }
 
     const config = await this.getConfig(organizationId);
@@ -1045,14 +1053,24 @@ export class OutboundJobService {
         });
 
     if (due.length === 0) {
+      const stillHeld = await prisma.emailOutbox.count({
+        where: {
+          organizationId,
+          purpose: EmailOutboxPurpose.SEQUENCE,
+          status: EmailOutboxStatus.HELD,
+        },
+      });
       return {
         processed: 0,
         results: [],
         reason:
           waitingForWindow > 0
             ? ("waiting_for_window" as const)
-            : ("nothing_due" as const),
+            : stillHeld > 0
+              ? ("held_not_queued" as const)
+              : ("nothing_due" as const),
         waitingForWindow,
+        held: stillHeld,
         nextScheduledFor: nextWaiting?.scheduledFor?.toISOString() ?? null,
       };
     }
