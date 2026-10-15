@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { Loader2 } from "lucide-react";
@@ -196,6 +196,20 @@ function formatSendResult(data: {
   return "Nothing due in outbox";
 }
 
+type DashStats = {
+  queued: number;
+  held: number;
+  heldTimezone: number;
+  sentToday: number;
+  failed: number;
+  enrolledToday: number;
+  dueNow: number;
+  waitingForWindow: number;
+  nextScheduledFor: string | null;
+  suppressCount: number;
+  mailboxes: Mailbox[];
+};
+
 export function OutboundPanel({ initial }: Props) {
   const router = useRouter();
   const [config, setConfig] = useState(initial.config);
@@ -203,6 +217,57 @@ export function OutboundPanel({ initial }: Props) {
   const [businessName, setBusinessName] = useState(initial.config.businessName);
   const [busy, setBusy] = useState<string | null>(null);
   const [available, setAvailable] = useState(initial.availableAccounts ?? []);
+  const [stats, setStats] = useState<DashStats>({
+    queued: initial.queued,
+    held: initial.held,
+    heldTimezone: initial.heldTimezone,
+    sentToday: initial.sentToday,
+    failed: initial.failed,
+    enrolledToday: initial.enrolledToday,
+    dueNow: initial.dueNow ?? 0,
+    waitingForWindow: initial.waitingForWindow ?? 0,
+    nextScheduledFor: initial.nextScheduledFor ?? null,
+    suppressCount: initial.suppressCount,
+    mailboxes: initial.mailboxes,
+  });
+
+  useEffect(() => {
+    setConfig(initial.config);
+    setStats({
+      queued: initial.queued,
+      held: initial.held,
+      heldTimezone: initial.heldTimezone,
+      sentToday: initial.sentToday,
+      failed: initial.failed,
+      enrolledToday: initial.enrolledToday,
+      dueNow: initial.dueNow ?? 0,
+      waitingForWindow: initial.waitingForWindow ?? 0,
+      nextScheduledFor: initial.nextScheduledFor ?? null,
+      suppressCount: initial.suppressCount,
+      mailboxes: initial.mailboxes,
+    });
+  }, [initial]);
+
+  async function refreshStats() {
+    const res = await fetch("/api/autopilot/outbound");
+    const json = await res.json();
+    if (!json.success) throw new Error(json.error?.message || "Refresh failed");
+    const d = json.data;
+    if (d.config) setConfig(d.config);
+    setStats({
+      queued: d.queued ?? 0,
+      held: d.held ?? 0,
+      heldTimezone: d.heldTimezone ?? 0,
+      sentToday: d.sentToday ?? 0,
+      failed: d.failed ?? 0,
+      enrolledToday: d.enrolledToday ?? 0,
+      dueNow: d.dueNow ?? 0,
+      waitingForWindow: d.waitingForWindow ?? 0,
+      nextScheduledFor: d.nextScheduledFor ?? null,
+      suppressCount: d.suppressCount ?? 0,
+      mailboxes: d.mailboxes ?? [],
+    });
+  }
 
   async function patchConfig(patch: Partial<OutboundConfig>) {
     setBusy("config");
@@ -216,6 +281,7 @@ export function OutboundPanel({ initial }: Props) {
       if (!json.success) throw new Error(json.error?.message);
       setConfig(json.data.config);
       toast.success("Outbound settings saved");
+      await refreshStats();
       router.refresh();
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Failed");
@@ -235,9 +301,29 @@ export function OutboundPanel({ initial }: Props) {
       const json = await res.json();
       if (!json.success) throw new Error(json.error?.message);
       if (action === "enroll") {
-        toast.success(
-          `Enrolled ${json.data?.processed ?? json.data?.results?.length ?? 0}`
-        );
+        const results = (json.data?.results ?? []) as Array<{
+          status: string;
+          reason?: string;
+        }>;
+        const enrolled =
+          json.data?.enrolled ??
+          results.filter((r) => r.status === "enrolled").length;
+        const skipped =
+          json.data?.skipped ??
+          results.filter((r) => r.status === "skipped").length;
+        if (enrolled > 0) {
+          toast.success(
+            `Enrolled ${enrolled}` +
+              (skipped ? ` · skipped ${skipped}` : "")
+          );
+        } else {
+          const reason = results.find((r) => r.reason)?.reason;
+          toast.message(
+            `Enrolled 0` +
+              (skipped ? ` · skipped ${skipped}` : "") +
+              (reason ? ` (${reason})` : "")
+          );
+        }
       } else if (action === "send") {
         const msg = formatSendResult(json.data ?? {});
         if ((json.data?.processed ?? 0) > 0) toast.success(msg);
@@ -249,6 +335,7 @@ export function OutboundPanel({ initial }: Props) {
           `Tick done (shadow=${config.shadowMode}). ${msg}`
         );
       }
+      await refreshStats();
       router.refresh();
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Failed");
@@ -391,37 +478,37 @@ export function OutboundPanel({ initial }: Props) {
           <div className="grid gap-4 sm:grid-cols-4">
             <div>
               <p className="text-muted-foreground">Queued</p>
-              <p className="text-2xl font-semibold">{initial.queued}</p>
-              {(initial.waitingForWindow ?? 0) > 0 ? (
+              <p className="text-2xl font-semibold">{stats.queued}</p>
+              {stats.waitingForWindow > 0 ? (
                 <p className="text-xs text-muted-foreground">
-                  {initial.waitingForWindow} waiting for send window
-                  {initial.nextScheduledFor
-                    ? ` (next ${new Date(initial.nextScheduledFor).toLocaleString()})`
+                  {stats.waitingForWindow} waiting for send window
+                  {stats.nextScheduledFor
+                    ? ` (next ${new Date(stats.nextScheduledFor).toLocaleString()})`
                     : ""}
                 </p>
-              ) : (initial.dueNow ?? 0) > 0 ? (
+              ) : stats.dueNow > 0 ? (
                 <p className="text-xs text-muted-foreground">
-                  {initial.dueNow} due now
+                  {stats.dueNow} due now
                 </p>
               ) : null}
             </div>
             <div>
               <p className="text-muted-foreground">Held</p>
-              <p className="text-2xl font-semibold">{initial.held}</p>
+              <p className="text-2xl font-semibold">{stats.held}</p>
               <p className="text-xs text-muted-foreground">
-                {initial.heldTimezone} need timezone
+                {stats.heldTimezone} need timezone
               </p>
             </div>
             <div>
               <p className="text-muted-foreground">Sent today</p>
-              <p className="text-2xl font-semibold">{initial.sentToday}</p>
+              <p className="text-2xl font-semibold">{stats.sentToday}</p>
               <p className="text-xs text-muted-foreground">
                 Cap {config.dailyGlobalCap}
               </p>
             </div>
             <div>
               <p className="text-muted-foreground">Enrolled today</p>
-              <p className="text-2xl font-semibold">{initial.enrolledToday}</p>
+              <p className="text-2xl font-semibold">{stats.enrolledToday}</p>
             </div>
           </div>
         </CardContent>
@@ -496,7 +583,7 @@ export function OutboundPanel({ initial }: Props) {
           </Button>
           <p className="text-xs text-muted-foreground">
             Countries: {config.countryAllowList.join(", ")} · Suppressions:{" "}
-            {initial.suppressCount}
+            {stats.suppressCount}
           </p>
         </CardContent>
       </Card>
@@ -515,12 +602,12 @@ export function OutboundPanel({ initial }: Props) {
           </Button>
         </CardHeader>
         <CardContent className="space-y-3 text-sm">
-          {initial.mailboxes.length === 0 ? (
+          {stats.mailboxes.length === 0 ? (
             <p className="text-muted-foreground">
               Pool empty. Connect SMTP/Gmail/Outlook in Settings, then add here.
             </p>
           ) : (
-            initial.mailboxes.map((m) => {
+            stats.mailboxes.map((m) => {
               const dns =
                 m.dnsCheck && typeof m.dnsCheck === "object"
                   ? (m.dnsCheck as {

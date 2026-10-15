@@ -524,7 +524,16 @@ export class OutboundJobService {
       }
     }
 
-    return { processed: results.length, results };
+    const enrolled = results.filter((r) => r.status === "enrolled").length;
+    const skipped = results.filter((r) => r.status === "skipped").length;
+    return {
+      /** Successfully enrolled count (not total pitches examined) */
+      processed: enrolled,
+      enrolled,
+      skipped,
+      examined: results.length,
+      results,
+    };
   }
 
   async eligibilityCheck(
