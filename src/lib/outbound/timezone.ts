@@ -17,6 +17,23 @@ const COUNTRY_DEFAULT_TZ: Record<string, string> = {
   "UNITED KINGDOM": "Europe/London",
   AU: "Australia/Sydney",
   AUSTRALIA: "Australia/Sydney",
+  PK: "Asia/Karachi",
+  PAKISTAN: "Asia/Karachi",
+  IN: "Asia/Kolkata",
+  INDIA: "Asia/Kolkata",
+  AE: "Asia/Dubai",
+  UAE: "Asia/Dubai",
+  "UNITED ARAB EMIRATES": "Asia/Dubai",
+  DE: "Europe/Berlin",
+  GERMANY: "Europe/Berlin",
+  FR: "Europe/Paris",
+  FRANCE: "Europe/Paris",
+  NL: "Europe/Amsterdam",
+  "NETHERLANDS": "Europe/Amsterdam",
+  SG: "Asia/Singapore",
+  SINGAPORE: "Asia/Singapore",
+  NZ: "Pacific/Auckland",
+  "NEW ZEALAND": "Pacific/Auckland",
 };
 
 /** Valid IANA-ish check (Area/Location). */
@@ -66,12 +83,37 @@ export function deriveCompanyTimezone(input: {
   return { timezone: null, from: "none" };
 }
 
-/** Soft hint only — never use for send window when lat/lng missing. */
+/** Soft hint from country name/code. */
 export function countryTimezoneHint(country: string | null | undefined): string | null {
   if (!country?.trim()) return null;
   const key = country.trim().toUpperCase();
   const tz = COUNTRY_DEFAULT_TZ[key] ?? null;
   return isValidIanaTimezone(tz) ? tz : null;
+}
+
+/**
+ * Resolve a send timezone for outbound.
+ * Order: company.timezone → lat/lng → country default → org/fallback → UTC.
+ * Prefer not holding forever when country allow-all is on and TZ is unknown.
+ */
+export function resolveOutboundTimezone(input: {
+  timezone?: string | null;
+  lat?: number | null;
+  lng?: number | null;
+  country?: string | null;
+  fallbackTimezone?: string | null;
+}): { timezone: string; from: "company" | "latlng" | "country" | "fallback" | "utc" } {
+  if (isValidIanaTimezone(input.timezone)) {
+    return { timezone: input.timezone!.trim(), from: "company" };
+  }
+  const fromLat = timezoneFromLatLng(input.lat, input.lng);
+  if (fromLat) return { timezone: fromLat, from: "latlng" };
+  const fromCountry = countryTimezoneHint(input.country);
+  if (fromCountry) return { timezone: fromCountry, from: "country" };
+  if (isValidIanaTimezone(input.fallbackTimezone)) {
+    return { timezone: input.fallbackTimezone!.trim(), from: "fallback" };
+  }
+  return { timezone: "UTC", from: "utc" };
 }
 
 /**

@@ -42,8 +42,8 @@ import {
   INBOUND_OUTREACH_STEPS,
 } from "@/lib/outbound/cold-sequence";
 import {
-  isValidIanaTimezone,
   nextSendWindowUtc,
+  resolveOutboundTimezone,
 } from "@/lib/outbound/timezone";
 import {
   buildSequenceTemplateVars,
@@ -633,7 +633,20 @@ export class OutboundJobService {
     const existing = await prisma.emailOutbox.findUnique({
       where: { idempotencyKey },
     });
-    if (existing) return existing;
+    // Allow rebuild when previously held for missing timezone (or cancelled)
+    if (
+      existing &&
+      !(
+        existing.status === EmailOutboxStatus.HELD &&
+        existing.heldReason === "timezone_needed"
+      ) &&
+      existing.status !== EmailOutboxStatus.CANCELLED
+    ) {
+      return existing;
+    }
+    if (existing) {
+      await prisma.emailOutbox.delete({ where: { id: existing.id } });
+    }
 
     const company =
       enrollment.opportunity?.company ?? enrollment.contact.company;
@@ -721,14 +734,23 @@ export class OutboundJobService {
       });
     }
 
-    const tz = company?.timezone;
-    if (!isValidIanaTimezone(tz)) {
-      return prisma.emailOutbox.create({
-        data: {
-          ...heldBase,
-          bodyText: "(timezone needed)",
-          heldReason: "timezone_needed",
-        },
+    const resolvedTz = resolveOutboundTimezone({
+      timezone: company?.timezone,
+      country: company?.country,
+      fallbackTimezone:
+        enrollment.organization.timezone || "Asia/Karachi",
+    });
+    const tz = resolvedTz.timezone;
+
+    // Persist so future steps / UI don't show "need timezone"
+    if (
+      company?.id &&
+      resolvedTz.from !== "company" &&
+      company.timezone !== tz
+    ) {
+      await prisma.company.update({
+        where: { id: company.id },
+        data: { timezone: tz },
       });
     }
 
@@ -866,7 +888,7 @@ export class OutboundJobService {
       }
     }
 
-    const scheduledFor = nextSendWindowUtc(tz!);
+    const scheduledFor = nextSendWindowUtc(tz);
 
     return prisma.emailOutbox.create({
       data: {
@@ -890,6 +912,8 @@ export class OutboundJobService {
         metadata: {
           unsubscribeUrl: unsub,
           emailStyle,
+          timezone: tz,
+          timezoneSource: resolvedTz.from,
           ...threadMeta,
           headers: {
             ...buildListUnsubscribeHeaders({
@@ -908,11 +932,46 @@ export class OutboundJobService {
     });
   }
 
+  /** Rebuild outbox rows that were stuck on missing company timezone. */
+  async releaseTimezoneHolds(organizationId: string, limit = 25) {
+    const held = await prisma.emailOutbox.findMany({
+      where: {
+        organizationId,
+        purpose: EmailOutboxPurpose.SEQUENCE,
+        status: EmailOutboxStatus.HELD,
+        heldReason: "timezone_needed",
+        enrollmentId: { not: null },
+      },
+      take: limit,
+      select: { id: true, enrollmentId: true },
+    });
+    let released = 0;
+    for (const row of held) {
+      if (!row.enrollmentId) continue;
+      try {
+        await this.queueStep(organizationId, row.enrollmentId);
+        released += 1;
+      } catch (err) {
+        console.warn(
+          "[outbound] releaseTimezoneHolds failed",
+          row.id,
+          err instanceof Error ? err.message : err
+        );
+      }
+    }
+    return { held: held.length, released };
+  }
+
   async processOutboxBatch(
     organizationId: string,
     limit = 5,
     opts?: { bypassSchedule?: boolean }
   ) {
+    // Manual Process outbox: unblock timezone holds first
+    if (opts?.bypassSchedule) {
+      await this.releaseTimezoneHolds(organizationId, limit);
+    }
+
     const config = await this.getConfig(organizationId);
     const day = startOfUtcDay();
     const now = new Date();

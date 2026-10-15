@@ -3,6 +3,7 @@ import {
   isCountryAllowed,
   DEFAULT_COUNTRY_ALLOW_LIST,
 } from "@/lib/outbound/country-allowlist";
+import { resolveOutboundTimezone } from "@/lib/outbound/timezone";
 import {
   appendComplianceFooter,
   countHttpLinks,
@@ -35,6 +36,20 @@ describe("country allow-list", () => {
     expect(isCountryAllowed("Canada", ["ALL"])).toBe(true);
     expect(isCountryAllowed(null, ["*"])).toBe(true);
     expect(isCountryAllowed("Anywhere", [])).toBe(true);
+  });
+});
+
+describe("resolveOutboundTimezone", () => {
+  it("uses country default then fallback", () => {
+    expect(resolveOutboundTimezone({ country: "Pakistan" }).timezone).toBe(
+      "Asia/Karachi"
+    );
+    expect(
+      resolveOutboundTimezone({
+        fallbackTimezone: "America/New_York",
+      }).timezone
+    ).toBe("America/New_York");
+    expect(resolveOutboundTimezone({}).timezone).toBe("UTC");
   });
 });
 
