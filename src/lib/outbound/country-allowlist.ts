@@ -12,16 +12,27 @@ const US_ALIASES = new Set([
   "U S A",
 ]);
 
+/** Default stays US-focused for cold outreach safety. Use ["*"] to allow all. */
 export const DEFAULT_COUNTRY_ALLOW_LIST = ["US", "USA", "United States"];
+
+export const ALLOW_ALL_COUNTRIES = ["*"];
+
+export function isAllowAllCountries(allowList: string[]): boolean {
+  const allowed = allowList.map(normalizeCountry).filter(Boolean);
+  if (!allowed.length) return true; // empty list = no restriction
+  return allowed.some((a) => a === "*" || a === "ALL" || a === "ANY");
+}
 
 export function isCountryAllowed(
   country: string | null | undefined,
   allowList: string[]
 ): boolean {
+  // Explicit allow-all (or empty list): never block on country
+  if (isAllowAllCountries(allowList)) return true;
+
   const c = normalizeCountry(country);
   if (!c) return false;
   const allowed = allowList.map(normalizeCountry).filter(Boolean);
-  if (!allowed.length) return false;
 
   for (const a of allowed) {
     if (c === a) return true;

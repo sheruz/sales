@@ -29,6 +29,13 @@ describe("country allow-list", () => {
     expect(isCountryAllowed("Canada", DEFAULT_COUNTRY_ALLOW_LIST)).toBe(false);
     expect(isCountryAllowed("UK", DEFAULT_COUNTRY_ALLOW_LIST)).toBe(false);
   });
+
+  it("allows all countries when list is * or empty", () => {
+    expect(isCountryAllowed("Pakistan", ["*"])).toBe(true);
+    expect(isCountryAllowed("Canada", ["ALL"])).toBe(true);
+    expect(isCountryAllowed(null, ["*"])).toBe(true);
+    expect(isCountryAllowed("Anywhere", [])).toBe(true);
+  });
 });
 
 describe("compliance", () => {

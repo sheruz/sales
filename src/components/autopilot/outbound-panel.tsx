@@ -215,6 +215,9 @@ export function OutboundPanel({ initial }: Props) {
   const [config, setConfig] = useState(initial.config);
   const [address, setAddress] = useState(initial.config.physicalAddress);
   const [businessName, setBusinessName] = useState(initial.config.businessName);
+  const [countries, setCountries] = useState(
+    initial.config.countryAllowList.join(", ")
+  );
   const [busy, setBusy] = useState<string | null>(null);
   const [available, setAvailable] = useState(initial.availableAccounts ?? []);
   const [stats, setStats] = useState<DashStats>({
@@ -233,6 +236,9 @@ export function OutboundPanel({ initial }: Props) {
 
   useEffect(() => {
     setConfig(initial.config);
+    setAddress(initial.config.physicalAddress);
+    setBusinessName(initial.config.businessName);
+    setCountries(initial.config.countryAllowList.join(", "));
     setStats({
       queued: initial.queued,
       held: initial.held,
@@ -247,6 +253,14 @@ export function OutboundPanel({ initial }: Props) {
       mailboxes: initial.mailboxes,
     });
   }, [initial]);
+
+  function parseCountries(raw: string): string[] {
+    return raw
+      .split(/[,;\n]+/)
+      .map((s) => s.trim())
+      .filter(Boolean)
+      .slice(0, 40);
+  }
 
   async function refreshStats() {
     const res = await fetch("/api/autopilot/outbound");
@@ -569,21 +583,55 @@ export function OutboundPanel({ initial }: Props) {
               />
             </div>
           </div>
-          <Button
-            size="sm"
-            disabled={busy === "config"}
-            onClick={() =>
-              patchConfig({
-                businessName,
-                physicalAddress: address,
-              })
-            }
-          >
-            Save compliance footer
-          </Button>
+          <div className="space-y-2">
+            <label className="text-xs text-muted-foreground">
+              Allowed countries (comma-separated). Use{" "}
+              <code className="text-[11px]">*</code> or click Allow all to
+              disable country blocking.
+            </label>
+            <Input
+              value={countries}
+              onChange={(e) => setCountries(e.target.value)}
+              placeholder="*  or  US, Pakistan, United Kingdom"
+            />
+            <div className="flex flex-wrap gap-2">
+              <Button
+                size="sm"
+                variant="outline"
+                disabled={busy === "config"}
+                onClick={() => {
+                  setCountries("*");
+                  patchConfig({
+                    businessName,
+                    physicalAddress: address,
+                    countryAllowList: ["*"],
+                  });
+                }}
+              >
+                Allow all countries
+              </Button>
+              <Button
+                size="sm"
+                disabled={busy === "config"}
+                onClick={() => {
+                  const list = parseCountries(countries);
+                  patchConfig({
+                    businessName,
+                    physicalAddress: address,
+                    countryAllowList: list.length ? list : ["*"],
+                  });
+                }}
+              >
+                Save compliance + countries
+              </Button>
+            </div>
+          </div>
           <p className="text-xs text-muted-foreground">
-            Countries: {config.countryAllowList.join(", ")} · Suppressions:{" "}
-            {stats.suppressCount}
+            Active allow-list:{" "}
+            {config.countryAllowList.some((c) => c.trim() === "*")
+              ? "All countries (*)"
+              : config.countryAllowList.join(", ") || "All countries"}{" "}
+            · Suppressions: {stats.suppressCount}
           </p>
         </CardContent>
       </Card>
