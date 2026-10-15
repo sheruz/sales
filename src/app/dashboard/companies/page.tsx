@@ -42,7 +42,11 @@ export default async function CompaniesPage({ searchParams }: PageProps) {
       crawlStatus: params.crawlStatus?.trim() || undefined,
       enrichmentStatus: params.enrichmentStatus?.trim() || undefined,
       funnel: params.funnel?.trim() || undefined,
-      sort: params.sort === "createdAt" || params.sort === "city" ? params.sort : "name",
+      sort:
+        params.sort === "name" || params.sort === "city"
+          ? params.sort
+          : "createdAt",
+      sortDir: params.sort === "name" || params.sort === "city" ? "asc" : "desc",
     });
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);

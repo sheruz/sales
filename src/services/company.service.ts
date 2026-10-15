@@ -169,8 +169,9 @@ export class CompanyService {
         : {}),
     };
 
-    const sortField = query.sort ?? "name";
-    const sortDir = query.sortDir ?? "asc";
+    // Newest sourced companies on top by default (enrichment / review order)
+    const sortField = query.sort ?? "createdAt";
+    const sortDir = query.sortDir ?? "desc";
 
     const [items, total] = await Promise.all([
       prisma.company.findMany({

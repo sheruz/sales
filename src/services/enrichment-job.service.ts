@@ -166,12 +166,40 @@ export class EnrichmentJobService {
     return agg._sum.units ?? 0;
   }
 
+  /**
+   * Companies eligible for Hunter.
+   * Only null / PENDING / FAILED(under max attempts) — never re-runs
+   * ENRICHED, NO_CONTACT, or SKIPPED (those already burned credits or finished).
+   */
+  private pendingEnrichmentWhere(
+    organizationId: string,
+    config: EnrichmentConfig
+  ): Prisma.CompanyWhereInput {
+    return {
+      organizationId,
+      deletedAt: null,
+      domain: { not: null },
+      crawlStatus: {
+        in: [CompanyCrawlStatus.DONE, CompanyCrawlStatus.BLOCKED],
+      },
+      OR: [
+        { enrichmentStatus: null },
+        { enrichmentStatus: CompanyEnrichmentStatus.PENDING },
+        {
+          enrichmentStatus: CompanyEnrichmentStatus.FAILED,
+          enrichmentAttempts: { lt: config.maxAttempts },
+        },
+      ],
+    };
+  }
+
   async dashboard(organizationId: string) {
     const day = startOfUtcDay();
     const config = await this.getConfig(organizationId);
     const [
       pending,
       enrichedToday,
+      noContactToday,
       noContact,
       failed,
       skipped,
@@ -181,27 +209,20 @@ export class EnrichmentJobService {
       riskyContacts,
     ] = await Promise.all([
       prisma.company.count({
-        where: {
-          organizationId,
-          deletedAt: null,
-          OR: [
-            { enrichmentStatus: null },
-            { enrichmentStatus: CompanyEnrichmentStatus.PENDING },
-            {
-              enrichmentStatus: CompanyEnrichmentStatus.FAILED,
-              enrichmentAttempts: { lt: config.maxAttempts },
-            },
-          ],
-          crawlStatus: {
-            in: [CompanyCrawlStatus.DONE, CompanyCrawlStatus.BLOCKED],
-          },
-          domain: { not: null },
-        },
+        where: this.pendingEnrichmentWhere(organizationId, config),
       }),
       prisma.company.count({
         where: {
           organizationId,
           enrichmentStatus: CompanyEnrichmentStatus.ENRICHED,
+          enrichedAt: { gte: day },
+          deletedAt: null,
+        },
+      }),
+      prisma.company.count({
+        where: {
+          organizationId,
+          enrichmentStatus: CompanyEnrichmentStatus.NO_CONTACT,
           enrichedAt: { gte: day },
           deletedAt: null,
         },
@@ -235,6 +256,7 @@ export class EnrichmentJobService {
             in: [
               CompanyEnrichmentStatus.FAILED,
               CompanyEnrichmentStatus.SKIPPED,
+              CompanyEnrichmentStatus.NO_CONTACT,
             ],
           },
           deletedAt: null,
@@ -280,6 +302,8 @@ export class EnrichmentJobService {
       config,
       pending,
       enrichedToday,
+      /** Hunter ran today but found no enrollable contact (still spends credits) */
+      noContactToday,
       noContact,
       failed,
       skipped,
@@ -719,30 +743,38 @@ export class EnrichmentJobService {
     }
 
     const take = Math.min(25, Math.max(1, limit));
+    // Newest sourced companies first so a fresh ICP run is enriched before old backlog
     const companies = await prisma.company.findMany({
-      where: {
-        organizationId,
-        deletedAt: null,
-        domain: { not: null },
-        crawlStatus: {
-          in: [CompanyCrawlStatus.DONE, CompanyCrawlStatus.BLOCKED],
-        },
-        OR: [
-          { enrichmentStatus: null },
-          { enrichmentStatus: CompanyEnrichmentStatus.PENDING },
-          {
-            enrichmentStatus: CompanyEnrichmentStatus.FAILED,
-            enrichmentAttempts: { lt: config.maxAttempts },
-          },
-        ],
-      },
-      orderBy: { createdAt: "asc" },
+      where: this.pendingEnrichmentWhere(organizationId, config),
+      orderBy: [{ createdAt: "desc" }, { id: "desc" }],
       take,
-      select: { id: true, domain: true },
+      select: { id: true, domain: true, enrichmentStatus: true },
     });
 
-    const results = [];
+    const results: Array<{
+      companyId: string;
+      status: string;
+      error?: string;
+      emailStatus?: string;
+      contactId?: string;
+      skippedReason?: string;
+    }> = [];
+
     for (const c of companies) {
+      // Belt-and-suspenders: never re-bill Hunter for finished companies
+      if (
+        c.enrichmentStatus === CompanyEnrichmentStatus.ENRICHED ||
+        c.enrichmentStatus === CompanyEnrichmentStatus.NO_CONTACT ||
+        c.enrichmentStatus === CompanyEnrichmentStatus.SKIPPED
+      ) {
+        results.push({
+          companyId: c.id,
+          status: "ALREADY_DONE",
+          skippedReason: String(c.enrichmentStatus),
+        });
+        continue;
+      }
+
       if (isDomainBlocked(c.domain, config.domainBlocklist)) {
         await prisma.company.update({
           where: { id: c.id },
