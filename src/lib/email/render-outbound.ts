@@ -4,13 +4,21 @@ import type { EmailStyle } from "@prisma/client";
 import { env } from "@/lib/config/env";
 import { buildGreeting } from "@/lib/email/greeting";
 import type { ResolvedSender } from "@/lib/email/branding";
+import { whatsappMeUrl } from "@/lib/email/whatsapp";
+import {
+  clickTrackUrl,
+  openPixelUrl,
+  withEmailUtm,
+} from "@/lib/email/track-token";
 
 const MAX_HTML_BYTES = 100 * 1024;
 
 let cachedTemplate: string | null = null;
 
 function loadBrandedTemplate(): string {
-  if (cachedTemplate) return cachedTemplate;
+  if (cachedTemplate && process.env.NODE_ENV === "production") {
+    return cachedTemplate;
+  }
   const path = join(
     process.cwd(),
     "src/lib/email/templates/branded-outbound.html"
@@ -35,6 +43,13 @@ export type PitchEmailFields = {
   topIssue?: string | null;
 };
 
+/** When set, CTA / WhatsApp / website links + open pixel are tracked. */
+export type EmailTrackContext = {
+  organizationId: string;
+  outboxId: string;
+  campaign?: string;
+};
+
 export type RenderOutboundInput = {
   style: EmailStyle | "BRANDED" | "PLAIN";
   subject: string;
@@ -49,6 +64,7 @@ export type RenderOutboundInput = {
   };
   sender: ResolvedSender;
   unsubscribeUrl: string;
+  track?: EmailTrackContext | null;
 };
 
 export type RenderOutboundResult = {
@@ -171,6 +187,66 @@ function resolvePitchCopy(pitch: PitchEmailFields, domain: string) {
   };
 }
 
+function resolveTrackedLinks(
+  sender: ResolvedSender,
+  track: EmailTrackContext | null | undefined
+) {
+  const campaign = track?.campaign || "cold_outreach";
+  const rawWa = sender.whatsappDigits
+    ? whatsappMeUrl(sender.whatsappDigits) ||
+      `https://wa.me/${sender.whatsappDigits}`
+    : "";
+
+  if (!track) {
+    return {
+      ctaUrl: sender.ctaUrl,
+      websiteUrl: sender.websiteUrl,
+      whatsappUrl: rawWa,
+      openPixelUrl: "",
+    };
+  }
+
+  const ctaDest = withEmailUtm(sender.ctaUrl, {
+    campaign,
+    content: "cta",
+    outboxId: track.outboxId,
+  });
+  const websiteDest = withEmailUtm(sender.websiteUrl, {
+    campaign,
+    content: "website",
+    outboxId: track.outboxId,
+  });
+  // WhatsApp: no UTM on wa.me (ignored); click still tracked via redirect.
+  const whatsappDest = rawWa;
+
+  return {
+    ctaUrl: clickTrackUrl({
+      organizationId: track.organizationId,
+      outboxId: track.outboxId,
+      linkType: "cta",
+      destUrl: ctaDest,
+    }),
+    websiteUrl: clickTrackUrl({
+      organizationId: track.organizationId,
+      outboxId: track.outboxId,
+      linkType: "website",
+      destUrl: websiteDest,
+    }),
+    whatsappUrl: whatsappDest
+      ? clickTrackUrl({
+          organizationId: track.organizationId,
+          outboxId: track.outboxId,
+          linkType: "whatsapp",
+          destUrl: whatsappDest,
+        })
+      : "",
+    openPixelUrl: openPixelUrl({
+      organizationId: track.organizationId,
+      outboxId: track.outboxId,
+    }),
+  };
+}
+
 function renderBranded(input: RenderOutboundInput): RenderOutboundResult {
   const domain =
     input.company.domain?.replace(/^www\./, "") ||
@@ -187,6 +263,7 @@ function renderBranded(input: RenderOutboundInput): RenderOutboundResult {
   const logoUrl = s.logoUrl || `${base}/branding/placeholder-logo.png`;
   const photoUrl =
     s.senderPhotoUrl || `${base}/branding/placeholder-photo.png`;
+  const links = resolveTrackedLinks(s, input.track);
 
   const vars: Record<string, string> = {
     subject: escapeHtml(input.subject),
@@ -197,14 +274,15 @@ function renderBranded(input: RenderOutboundInput): RenderOutboundResult {
     finding_title: escapeHtml(copy.findingTitle),
     finding_text: escapeHtml(copy.findingText),
     body_html: copy.bodyHtml,
-    cta_url: escapeHtml(s.ctaUrl),
+    cta_url: escapeHtml(links.ctaUrl),
     cta_label: escapeHtml(s.ctaLabel),
+    whatsapp_url: escapeHtml(links.whatsappUrl),
     whatsapp_digits: s.whatsappDigits,
     whatsapp_display: escapeHtml(s.whatsappDisplay || s.whatsappDigits),
     sender_name: escapeHtml(s.senderName),
     sender_title: escapeHtml(s.senderTitle),
     sender_photo_url: photoUrl,
-    website_url: escapeHtml(s.websiteUrl),
+    website_url: escapeHtml(links.websiteUrl),
     website_label: escapeHtml(s.websiteLabel),
     company_legal_name: escapeHtml(s.companyLegalName),
     business_address: escapeHtml(s.businessAddress),
@@ -213,6 +291,7 @@ function renderBranded(input: RenderOutboundInput): RenderOutboundResult {
     availability_line: escapeHtml(s.availabilityLine)
       .replace(/·/g, "&middot;")
       .replace(/  /g, " &nbsp;"),
+    open_pixel_url: escapeHtml(links.openPixelUrl),
   };
 
   let html = fillTemplate(loadBrandedTemplate(), vars);
@@ -224,9 +303,16 @@ function renderBranded(input: RenderOutboundInput): RenderOutboundResult {
     );
     // Signature WhatsApp link → drop
     html = html.replace(
-      /<span style="color:#c5c8d8;">&nbsp;\|&nbsp;<\/span>\s*<a href="https:\/\/wa\.me\/"[\s\S]*?<\/a>/,
+      /<span style="color:#c5c8d8;">&nbsp;\|&nbsp;<\/span>\s*<a href="[^"]*"[\s\S]*?<\/a>/,
       ""
     );
+  }
+  if (!links.openPixelUrl) {
+    html = html.replace(
+      /<img[^>]*src="\{\{open_pixel_url\}\}"[^>]*>/gi,
+      ""
+    );
+    html = html.replace(/<img[^>]*width="1"[^>]*height="1"[^>]*>/gi, "");
   }
 
   const textParts = [
@@ -238,14 +324,14 @@ function renderBranded(input: RenderOutboundInput): RenderOutboundResult {
     "",
     htmlToPlainText(copy.bodyHtml),
     "",
-    `${s.ctaLabel}: ${s.ctaUrl}`,
-    s.whatsappDigits ? `WhatsApp: https://wa.me/${s.whatsappDigits}` : "",
+    `${s.ctaLabel}: ${links.ctaUrl}`,
+    links.whatsappUrl ? `WhatsApp: ${links.whatsappUrl}` : "",
     "",
     s.senderName,
     s.senderTitle
       ? `${s.senderTitle} · ${s.companyLegalName || "Delvix Studio"}`
       : s.companyLegalName || "Delvix Studio",
-    s.websiteUrl,
+    links.websiteUrl,
     "",
     [s.companyLegalName, s.businessAddress].filter(Boolean).join(" · "),
     `Unsubscribe: ${input.unsubscribeUrl}`,
@@ -268,6 +354,7 @@ function renderPlain(input: RenderOutboundInput): RenderOutboundResult {
     email: input.contact.email,
   });
   const s = input.sender;
+  const links = resolveTrackedLinks(s, input.track);
 
   const text = [
     greeting,
@@ -279,8 +366,8 @@ function renderPlain(input: RenderOutboundInput): RenderOutboundResult {
     "",
     htmlToPlainText(copy.bodyHtml),
     "",
-    s.ctaUrl ? `${s.ctaLabel}: ${s.ctaUrl}` : null,
-    s.whatsappDigits ? `WhatsApp: https://wa.me/${s.whatsappDigits}` : null,
+    links.ctaUrl ? `${s.ctaLabel}: ${links.ctaUrl}` : null,
+    links.whatsappUrl ? `WhatsApp: ${links.whatsappUrl}` : null,
     "",
     s.senderName,
     s.senderTitle,
@@ -289,6 +376,10 @@ function renderPlain(input: RenderOutboundInput): RenderOutboundResult {
   ]
     .filter((x) => x != null && x !== "")
     .join("\n");
+
+  const pixel = links.openPixelUrl
+    ? `<img src="${escapeHtml(links.openPixelUrl)}" width="1" height="1" alt="" style="display:none;width:1px;height:1px;border:0;" />`
+    : "";
 
   const html = `<div style="font-family:Helvetica,Arial,sans-serif;font-size:15px;line-height:1.6;color:#1d2033;">${text
     .split("\n")
@@ -300,7 +391,7 @@ function renderPlain(input: RenderOutboundInput): RenderOutboundResult {
             '<a href="$1" style="color:#5b63f5;">$1</a>'
           )}</div>`
     )
-    .join("")}</div>`;
+    .join("")}${pixel}</div>`;
 
   return {
     subject: input.subject,

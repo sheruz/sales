@@ -54,6 +54,8 @@ type Props = {
     dueNow?: number;
     waitingForWindow?: number;
     nextScheduledFor?: string | null;
+    openedToday?: number;
+    clickedToday?: number;
     mailboxes: Mailbox[];
     suppressCount: number;
     availableAccounts?: Array<{ id: string; email: string; provider: string }>;
@@ -210,6 +212,8 @@ type DashStats = {
   dueNow: number;
   waitingForWindow: number;
   nextScheduledFor: string | null;
+  openedToday: number;
+  clickedToday: number;
   suppressCount: number;
   mailboxes: Mailbox[];
 };
@@ -234,6 +238,8 @@ export function OutboundPanel({ initial }: Props) {
     dueNow: initial.dueNow ?? 0,
     waitingForWindow: initial.waitingForWindow ?? 0,
     nextScheduledFor: initial.nextScheduledFor ?? null,
+    openedToday: initial.openedToday ?? 0,
+    clickedToday: initial.clickedToday ?? 0,
     suppressCount: initial.suppressCount,
     mailboxes: initial.mailboxes,
   });
@@ -253,6 +259,8 @@ export function OutboundPanel({ initial }: Props) {
       dueNow: initial.dueNow ?? 0,
       waitingForWindow: initial.waitingForWindow ?? 0,
       nextScheduledFor: initial.nextScheduledFor ?? null,
+      openedToday: initial.openedToday ?? 0,
+      clickedToday: initial.clickedToday ?? 0,
       suppressCount: initial.suppressCount,
       mailboxes: initial.mailboxes,
     });
@@ -282,6 +290,8 @@ export function OutboundPanel({ initial }: Props) {
       dueNow: d.dueNow ?? 0,
       waitingForWindow: d.waitingForWindow ?? 0,
       nextScheduledFor: d.nextScheduledFor ?? null,
+      openedToday: d.openedToday ?? 0,
+      clickedToday: d.clickedToday ?? 0,
       suppressCount: d.suppressCount ?? 0,
       mailboxes: d.mailboxes ?? [],
     });
@@ -493,7 +503,7 @@ export function OutboundPanel({ initial }: Props) {
           </div>
         </CardHeader>
         <CardContent className="space-y-3 text-sm">
-          <div className="grid gap-4 sm:grid-cols-4">
+          <div className="grid gap-4 sm:grid-cols-3 lg:grid-cols-6">
             <div>
               <p className="text-muted-foreground">Queued</p>
               <p className="text-2xl font-semibold">{stats.queued}</p>
@@ -527,6 +537,16 @@ export function OutboundPanel({ initial }: Props) {
             <div>
               <p className="text-muted-foreground">Enrolled today</p>
               <p className="text-2xl font-semibold">{stats.enrolledToday}</p>
+            </div>
+            <div>
+              <p className="text-muted-foreground">Opens today</p>
+              <p className="text-2xl font-semibold">{stats.openedToday}</p>
+              <p className="text-xs text-muted-foreground">Pixel (approx.)</p>
+            </div>
+            <div>
+              <p className="text-muted-foreground">Clicks today</p>
+              <p className="text-2xl font-semibold">{stats.clickedToday}</p>
+              <p className="text-xs text-muted-foreground">CTA / WhatsApp / site</p>
             </div>
           </div>
         </CardContent>

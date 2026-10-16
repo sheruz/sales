@@ -118,7 +118,9 @@ export function EmailBrandingPanel() {
           <CardTitle className="text-base">Email branding</CardTitle>
           <CardDescription>
             Org-level sender identity for BRANDED outbound. Images are resized
-            to 96×96 PNG and served from your domain.
+            to 96×96 PNG and served from your domain. CTA, WhatsApp, and website
+            links are tracked (opens + clicks). Set GA4_MEASUREMENT_ID and
+            GA4_API_SECRET in .env to mirror events into Google Analytics.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-3 text-sm">

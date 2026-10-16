@@ -28,10 +28,12 @@ export function middleware(request: NextRequest) {
   );
   // Stable public branding assets (logo / sender photo) — no auth
   const isBrandingAsset = pathname.startsWith("/branding/");
+  // Email open pixel + click redirects (no auth)
+  const isEmailTrack = pathname.startsWith("/t/");
   const isDashboardRoute = pathname.startsWith("/dashboard");
   const isPlatformRoute = pathname.startsWith("/platform");
 
-  if (isBrandingAsset) {
+  if (isBrandingAsset || isEmailTrack) {
     return NextResponse.next();
   }
 
@@ -49,6 +51,7 @@ export function middleware(request: NextRequest) {
   if (
     !isPublicPage &&
     !isBrandingAsset &&
+    !isEmailTrack &&
     !isDashboardRoute &&
     !isPlatformRoute &&
     !sessionToken

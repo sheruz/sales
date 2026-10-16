@@ -108,6 +108,31 @@ describe("multipart + render", () => {
     expect(validateOutboundHtml(out.html).ok).toBe(true);
   });
 
+  it("embeds open pixel and tracked click links when track context is set", () => {
+    const out = renderOutboundEmail({
+      style: "BRANDED",
+      subject: "Test",
+      pitch: {
+        findingTitle: "Finding",
+        findingText: "Detail",
+        bodyHtml: "<p>Body</p>",
+      },
+      contact: { firstName: "Sam", email: "sam@acme.com" },
+      company: { name: "Acme", domain: "acme.com" },
+      sender,
+      unsubscribeUrl: "https://example.com/unsubscribe?token=x",
+      track: {
+        organizationId: "00000000-0000-0000-0000-000000000001",
+        outboxId: "11111111-1111-1111-1111-111111111111",
+        campaign: "cold_outreach",
+      },
+    });
+    expect(out.html).toContain("/t/o/");
+    expect(out.html).toContain("/t/c/");
+    expect(out.html).not.toContain("https://wa.me/12105550100");
+    expect(out.text).toContain("/t/c/");
+  });
+
   it("renders PLAIN follow-up style", () => {
     const out = renderOutboundEmail({
       style: "PLAIN",

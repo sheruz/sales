@@ -63,7 +63,7 @@ export type SequenceAnalytics = {
 };
 
 const LIMITATIONS = [
-  "Open/click/delivered rates are not reported — EmailEvent OPENED/CLICKED/DELIVERED are not reliably written.",
+  "Open/click events are written via first-party pixel + click redirects (/t/o, /t/c). Opens undercount when images are blocked; Apple MPP may inflate opens.",
   "Bounce count uses enrollment stopReason only (not provider bounce webhooks).",
   "Revenue is summed from Deals linked to Opportunities that share campaignId or enrollment.opportunityId.",
 ];

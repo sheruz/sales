@@ -4,6 +4,7 @@ import {
   CompanyAuditStatus,
   CompanyEnrichmentStatus,
   ConversationChannel,
+  EmailEventType,
   EmailOutboxPurpose,
   EmailOutboxStatus,
   OpportunityStage,
@@ -219,6 +220,8 @@ export class OutboundJobService {
       suppressCount,
       dueNow,
       waitingForWindow,
+      openedToday,
+      clickedToday,
     ] = await Promise.all([
       prisma.emailOutbox.count({
         where: { organizationId, status: EmailOutboxStatus.QUEUED },
@@ -259,6 +262,20 @@ export class OutboundJobService {
           scheduledFor: { gt: now },
         },
       }),
+      prisma.emailEvent.count({
+        where: {
+          organizationId,
+          type: EmailEventType.OPENED,
+          occurredAt: { gte: day },
+        },
+      }),
+      prisma.emailEvent.count({
+        where: {
+          organizationId,
+          type: EmailEventType.CLICKED,
+          occurredAt: { gte: day },
+        },
+      }),
     ]);
 
     const heldTimezone = await prisma.emailOutbox.count({
@@ -293,6 +310,8 @@ export class OutboundJobService {
       dueNow,
       waitingForWindow,
       nextScheduledFor: nextQueued?.scheduledFor?.toISOString() ?? null,
+      openedToday,
+      clickedToday,
     };
   }
 
@@ -793,6 +812,7 @@ export class OutboundJobService {
       organizationId,
       pool?.id
     );
+    const outboxId = randomUUID();
 
     let rendered;
     try {
@@ -820,6 +840,11 @@ export class OutboundJobService {
         },
         sender,
         unsubscribeUrl: unsub,
+        track: {
+          organizationId,
+          outboxId,
+          campaign: "cold_outreach",
+        },
       });
     } catch (err) {
       return prisma.emailOutbox.create({
@@ -894,7 +919,7 @@ export class OutboundJobService {
 
     return prisma.emailOutbox.create({
       data: {
-        id: randomUUID(),
+        id: outboxId,
         organizationId,
         enrollmentId: enrollment.id,
         stepOrder: step.stepOrder,
@@ -916,6 +941,7 @@ export class OutboundJobService {
           emailStyle,
           timezone: tz,
           timezoneSource: resolvedTz.from,
+          tracked: true,
           ...threadMeta,
           headers: {
             ...buildListUnsubscribeHeaders({
@@ -1158,7 +1184,9 @@ export class OutboundJobService {
       typeof bodyHtml === "string" &&
       (bodyHtml.includes("WHAT WE NOTICED") ||
         bodyHtml.includes("SOFTWARE STUDIO"));
-    if (wantsBranded && !htmlLooksBranded) {
+    const missingTrackPixel =
+      typeof bodyHtml !== "string" || !bodyHtml.includes("/t/o/");
+    if (wantsBranded && (!htmlLooksBranded || missingTrackPixel)) {
       try {
         const rebuilt = await this.reRenderBrandedOutbox(organizationId, item);
         if (rebuilt) {
@@ -1292,6 +1320,7 @@ export class OutboundJobService {
   private async reRenderBrandedOutbox(
     organizationId: string,
     item: {
+      id: string;
       contactId: string;
       companyId: string | null;
       outboundMailboxId: string | null;
@@ -1343,6 +1372,11 @@ export class OutboundJobService {
       },
       sender,
       unsubscribeUrl: unsub,
+      track: {
+        organizationId,
+        outboxId: item.id,
+        campaign: "cold_outreach",
+      },
     });
   }
 

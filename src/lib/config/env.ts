@@ -85,6 +85,9 @@ const envSchema = z.object({
   WEBSITE_INBOUND_ORG_ID: z.string().uuid().optional(),
   /** Email for inbound lead notifications (falls back to org owners) */
   NOTIFY_EMAIL: z.union([z.string().email(), z.undefined()]).optional(),
+  /** GA4 Measurement Protocol — email open/click mirroring (optional) */
+  GA4_MEASUREMENT_ID: z.string().optional(),
+  GA4_API_SECRET: z.string().optional(),
 });
 
 let cachedEnv: z.infer<typeof envSchema> | null = null;

@@ -10,11 +10,12 @@
 <!--
   Delvix Studio — branded outbound template.
   Email-safe: table layout, inline styles, bulletproof buttons, no JS, no web fonts required.
-  Max width 600px. All images hosted on our own https domain. No tracking pixel.
+  Max width 600px. All images hosted on our own https domain.
+  Open pixel + click redirects: {{open_pixel_url}} {{cta_url}} {{whatsapp_url}} {{website_url}}
   Variables: {{subject}} {{preheader}} {{logo_url}} {{greeting}} {{intro_html}} {{finding_title}} {{finding_text}}
-             {{body_html}} {{cta_url}} {{cta_label}} {{whatsapp_digits}} {{whatsapp_display}}
+             {{body_html}} {{cta_url}} {{cta_label}} {{whatsapp_url}} {{whatsapp_digits}} {{whatsapp_display}}
              {{sender_name}} {{sender_title}} {{sender_photo_url}} {{website_url}} {{website_label}}
-             {{company_legal_name}} {{business_address}} {{unsubscribe_url}}
+             {{company_legal_name}} {{business_address}} {{unsubscribe_url}} {{open_pixel_url}}
 -->
 </head>
 <body style="margin:0;padding:0;background:#f4f5f9;-webkit-text-size-adjust:100%;">
@@ -86,7 +87,7 @@
           <td style="padding:0 0 10px 0;">
             <table role="presentation" cellpadding="0" cellspacing="0" border="0"><tr>
               <td align="center" style="border:1px solid #d6d9e8;border-radius:999px;">
-                <a href="https://wa.me/{{whatsapp_digits}}" style="display:inline-block;padding:12px 20px;white-space:nowrap;font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;font-size:15px;font-weight:bold;color:#1d2033;text-decoration:none;border-radius:999px;"><span style="color:#25d366;">&#9679;</span>&nbsp;WhatsApp</a>
+                <a href="{{whatsapp_url}}" style="display:inline-block;padding:12px 20px;white-space:nowrap;font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;font-size:15px;font-weight:bold;color:#1d2033;text-decoration:none;border-radius:999px;"><span style="color:#25d366;">&#9679;</span>&nbsp;WhatsApp</a>
               </td>
             </tr></table>
           </td>
@@ -109,7 +110,7 @@
               <div style="font-size:13px;line-height:1.6;padding-top:2px;">
                 <a href="{{website_url}}" style="color:#5b63f5;text-decoration:none;font-weight:bold;">{{website_label}}</a>
                 <span style="color:#c5c8d8;">&nbsp;|&nbsp;</span>
-                <a href="https://wa.me/{{whatsapp_digits}}" style="color:#5b63f5;text-decoration:none;font-weight:bold;white-space:nowrap;">{{whatsapp_display}}</a>
+                <a href="{{whatsapp_url}}" style="color:#5b63f5;text-decoration:none;font-weight:bold;white-space:nowrap;">{{whatsapp_display}}</a>
               </div>
             </td>
           </tr></table>
@@ -135,6 +136,9 @@
     </td></tr>
 
   </table>
+
+  <!-- Open tracking pixel (1x1). Prefetch/image-blocking may under/over-count. -->
+  <img src="{{open_pixel_url}}" width="1" height="1" alt="" style="display:block;width:1px;height:1px;border:0;opacity:0;" />
 
 </td></tr>
 </table>
