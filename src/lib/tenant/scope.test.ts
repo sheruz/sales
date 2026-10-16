@@ -21,6 +21,7 @@ function mockUser(overrides: Partial<AuthUser> = {}): AuthUser {
     lastName: "User",
     role: UserRole.ADMIN,
     avatarUrl: null,
+    platformRole: null,
     isPlatformAdmin: false,
     organizationId: "org-a",
     organizationName: "Org A",
@@ -58,7 +59,8 @@ describe("tenant scope", () => {
     expect(() =>
       assertSameOrganization(
         mockUser({
-          isPlatformAdmin: true,
+          platformRole: 'SUPER_ADMIN' as const,
+    isPlatformAdmin: true,
           organizationId: null,
           permissions: ["platform.manage"],
         }),
@@ -71,7 +73,8 @@ describe("tenant scope", () => {
     expect(() =>
       assertSameOrganization(
         mockUser({
-          isPlatformAdmin: true,
+          platformRole: 'SUPER_ADMIN' as const,
+    isPlatformAdmin: true,
           organizationId: "org-a",
           permissions: ["platform.manage"],
         }),

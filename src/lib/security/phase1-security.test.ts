@@ -23,6 +23,7 @@ function mockUser(overrides: Partial<AuthUser> = {}): AuthUser {
     lastName: "Ser",
     role: UserRole.ADMIN,
     avatarUrl: null,
+    platformRole: null,
     isPlatformAdmin: false,
     organizationId: "org-a",
     organizationName: "Org A",
@@ -43,6 +44,7 @@ function roleUser(
     organizationRoleKey: roleKey,
     permissions: ROLE_PERMISSION_MAP[roleKey] ?? [],
     role: legacyRole,
+    platformRole: null,
     isPlatformAdmin: false,
   });
 }
@@ -69,7 +71,8 @@ describe("Phase 1 — tenant isolation helpers", () => {
     expect(() =>
       requireOrganizationId(
         mockUser({
-          isPlatformAdmin: true,
+          platformRole: 'SUPER_ADMIN' as const,
+    isPlatformAdmin: true,
           organizationId: null,
           permissions: ["platform.manage"],
         })
@@ -79,7 +82,8 @@ describe("Phase 1 — tenant isolation helpers", () => {
 
   it("SUPER_ADMIN does not inherit all org permissions via bypass", () => {
     const sa = mockUser({
-      isPlatformAdmin: true,
+      platformRole: 'SUPER_ADMIN' as const,
+    isPlatformAdmin: true,
       organizationId: "org-a",
       permissions: ["platform.manage"],
     });

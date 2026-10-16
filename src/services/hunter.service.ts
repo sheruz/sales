@@ -2,12 +2,32 @@ import { IntegrationPlatform } from "@prisma/client";
 import prisma from "@/lib/db/prisma";
 import { env } from "@/lib/config/env";
 import { decryptCredentials } from "@/lib/integrations/credentials";
+import {
+  canUsePlatformProviderKeys,
+  platformKeyMissingMessage,
+} from "@/lib/integrations/platform-keys";
 import { ValidationError } from "@/lib/api/response";
 import { HunterAdapter } from "@/lib/enrichment/adapters/hunter.adapter";
 import type { EnrichmentProvider } from "@/lib/enrichment/types";
 
 export class HunterService {
   async resolveApiKey(organizationId: string, userId?: string): Promise<string> {
+    const ti = await prisma.tenantIntegration.findFirst({
+      where: {
+        organizationId,
+        providerId: "hunter",
+        status: "CONNECTED",
+        encryptedCredentials: { not: null },
+      },
+      orderBy: { updatedAt: "desc" },
+    });
+    if (ti?.encryptedCredentials) {
+      const creds = decryptCredentials(ti.encryptedCredentials) as {
+        apiKey?: string;
+      };
+      if (creds.apiKey) return creds.apiKey;
+    }
+
     if (userId) {
       const mine = await prisma.userIntegration.findFirst({
         where: {
@@ -44,11 +64,11 @@ export class HunterService {
       if (creds.apiKey) return creds.apiKey;
     }
 
-    if (env.HUNTER_API_KEY) return env.HUNTER_API_KEY;
+    if (canUsePlatformProviderKeys(organizationId) && env.HUNTER_API_KEY) {
+      return env.HUNTER_API_KEY;
+    }
 
-    throw new ValidationError(
-      "Hunter API key not configured. Add it in Settings → Integrations."
-    );
+    throw new ValidationError(platformKeyMissingMessage("Hunter"));
   }
 
   async getProvider(

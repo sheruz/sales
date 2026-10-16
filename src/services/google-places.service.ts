@@ -3,6 +3,10 @@ import { env } from "@/lib/config/env";
 import { IntegrationPlatform } from "@prisma/client";
 import { decryptCredentials } from "@/lib/integrations/credentials";
 import {
+  canUsePlatformProviderKeys,
+  platformKeyMissingMessage,
+} from "@/lib/integrations/platform-keys";
+import {
   googlePlacesAdapter,
   type GooglePlaceResult,
 } from "@/lib/sourcing/adapters/google-places.adapter";
@@ -14,6 +18,21 @@ export class GooglePlacesService {
     organizationId: string,
     userId?: string
   ): Promise<string> {
+    // TenantIntegration first (S1), then legacy UserIntegration
+    const ti = await prisma.tenantIntegration.findFirst({
+      where: {
+        organizationId,
+        providerId: "google_places",
+        status: "CONNECTED",
+        encryptedCredentials: { not: null },
+      },
+      orderBy: { updatedAt: "desc" },
+    });
+    if (ti?.encryptedCredentials) {
+      const creds = decryptCredentials(ti.encryptedCredentials);
+      if (creds.apiKey) return creds.apiKey;
+    }
+
     if (userId) {
       const row = await prisma.userIntegration.findUnique({
         where: {
@@ -44,10 +63,11 @@ export class GooglePlacesService {
       if (creds.apiKey) return creds.apiKey;
     }
 
-    if (env.GOOGLE_PLACES_API_KEY) return env.GOOGLE_PLACES_API_KEY;
-    throw new ValidationError(
-      "Google Places API key not configured. Add it in Settings → Integrations."
-    );
+    // Platform .env keys: Default Workspace (PLATFORM_OWNER_ORG_ID) only
+    if (canUsePlatformProviderKeys(organizationId) && env.GOOGLE_PLACES_API_KEY) {
+      return env.GOOGLE_PLACES_API_KEY;
+    }
+    throw new ValidationError(platformKeyMissingMessage("Google Places"));
   }
 
   async textSearch(input: {

@@ -1,4 +1,4 @@
-import { UserRole } from "@prisma/client";
+import { PlatformRole, UserRole } from "@prisma/client";
 import type { PermissionKey } from "@/lib/auth/permission-catalog";
 
 export interface AuthUser {
@@ -8,8 +8,10 @@ export interface AuthUser {
   lastName: string;
   /** Legacy UserRole — kept for compatibility */
   role: UserRole;
+  /** S1 platform role — source of truth for /platform access */
+  platformRole: PlatformRole | null;
   avatarUrl: string | null;
-  /** True when User.role === SUPER_ADMIN */
+  /** True when platformRole is SUPER_ADMIN (legacy UserRole.SUPER_ADMIN during transition) */
   isPlatformAdmin: boolean;
   /** Active organization for this session (null for platform-only) */
   organizationId: string | null;

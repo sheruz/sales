@@ -63,10 +63,24 @@ export async function requireAnyOrgPermission(
 
 export async function requireSuperAdmin(): Promise<AuthUser> {
   const user = await requireUser();
-  if (!user.isPlatformAdmin && !hasPermission(user.role, "platform:manage")) {
-    throw new ForbiddenError();
+  // S1: platformRole SUPER_ADMIN is source of truth
+  if (user.platformRole === "SUPER_ADMIN" || user.isPlatformAdmin) {
+    if (user.platformRole !== "SUPER_ADMIN" && user.role === "SUPER_ADMIN") {
+      console.warn(
+        "[auth] requireSuperAdmin legacy fallback (UserRole.SUPER_ADMIN)",
+        { userId: user.id }
+      );
+    }
+    return user;
   }
-  return user;
+  if (hasPermission(user.role, "platform:manage")) {
+    console.warn(
+      "[auth] requireSuperAdmin legacy fallback (platform:manage permission)",
+      { userId: user.id }
+    );
+    return user;
+  }
+  throw new ForbiddenError();
 }
 
 export async function requireOrganizationContext(): Promise<

@@ -71,6 +71,15 @@ const envSchema = z.object({
   LINKEDIN_CLIENT_ID: z.string().optional(),
   LINKEDIN_CLIENT_SECRET: z.string().optional(),
   LINKEDIN_REDIRECT_URI: z.string().url().optional(),
+  /**
+   * Default Workspace (Delvix) org id — only this org may use platform .env
+   * provider keys (Places, Hunter, AI, etc.) as fallback. Never "any OWNER plan org".
+   */
+  PLATFORM_OWNER_ORG_ID: z.string().uuid().optional(),
+  /** Record usage + shadow would-blocks. Default on for S1. */
+  BILLING_METERING_ENABLED: z.coerce.boolean().default(true),
+  /** Actually block over-limit actions. Default off (shadow) for S1. */
+  BILLING_ENFORCEMENT_ENABLED: z.coerce.boolean().default(false),
   AUTOPILOT_ENABLED: z.coerce.boolean().default(false),
   CRON_SECRET: z.string().optional(),
   /** Comma-separated: email, linkedin. Default email-only to protect LinkedIn account */

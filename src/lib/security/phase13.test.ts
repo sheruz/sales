@@ -30,6 +30,7 @@ function mockUser(overrides: Partial<AuthUser> = {}): AuthUser {
     lastName: "B",
     role: UserRole.ADMIN,
     avatarUrl: null,
+    platformRole: null,
     isPlatformAdmin: false,
     organizationId: "org-1",
     organizationName: "Org",

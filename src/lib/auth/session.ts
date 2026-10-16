@@ -46,11 +46,21 @@ async function buildAuthUser(
     firstName: string;
     lastName: string;
     role: UserRole;
+    platformRole?: import("@prisma/client").PlatformRole | null;
     avatarUrl: string | null;
   },
   activeOrganizationId: string | null
 ): Promise<AuthUser> {
-  const isPlatformAdmin = user.role === UserRole.SUPER_ADMIN;
+  const platformRole = user.platformRole ?? null;
+  // S1: platformRole is source of truth; legacy UserRole.SUPER_ADMIN only during transition
+  let isPlatformAdmin = platformRole === "SUPER_ADMIN";
+  if (!isPlatformAdmin && user.role === UserRole.SUPER_ADMIN) {
+    console.warn(
+      "[auth] legacy UserRole.SUPER_ADMIN used for platform access; set platformRole",
+      { userId: user.id }
+    );
+    isPlatformAdmin = true;
+  }
 
   let organizationId: string | null = null;
   let organizationName: string | null = null;
@@ -105,6 +115,7 @@ async function buildAuthUser(
     firstName: user.firstName,
     lastName: user.lastName,
     role: user.role,
+    platformRole,
     avatarUrl: user.avatarUrl,
     isPlatformAdmin,
     organizationId,
@@ -123,6 +134,7 @@ const sessionUserSelect = {
       firstName: true,
       lastName: true,
       role: true,
+      platformRole: true,
       avatarUrl: true,
       isActive: true,
       deletedAt: true,
