@@ -454,6 +454,136 @@ export class EnrichmentJobService {
     return opp;
   }
 
+  /**
+   * Manual leads: mark ENRICHED from existing contact details (skip Hunter).
+   * Sets contact emailStatus to valid so audit/outbound eligibility passes.
+   */
+  async markManuallyEnriched(
+    organizationId: string,
+    companyId: string,
+    userId?: string
+  ) {
+    const company = await prisma.company.findFirst({
+      where: { id: companyId, organizationId, deletedAt: null },
+      include: {
+        contacts: {
+          where: { email: { not: null } },
+          orderBy: { createdAt: "asc" },
+          take: 20,
+        },
+      },
+    });
+    if (!company) throw new ValidationError("Company not found");
+    if (!company.website && !company.domain) {
+      throw new ValidationError(
+        "Add a website or domain before marking ready for audit"
+      );
+    }
+    if (!company.contacts.length) {
+      throw new ValidationError(
+        "Add at least one contact with an email, then mark ready for audit"
+      );
+    }
+
+    if (company.enrichmentStatus === CompanyEnrichmentStatus.ENRICHED) {
+      const enrollable = company.contacts.filter((c) =>
+        isEnrollableVerification(
+          (c.emailStatus || "unknown") as "valid" | "accept_all" | "invalid" | "unknown",
+          true
+        )
+      );
+      if (enrollable.length) {
+        return {
+          status: "ALREADY_ENRICHED" as const,
+          companyId,
+          contactId: enrollable[0].id,
+        };
+      }
+    }
+
+    const primary = company.contacts[0];
+    await prisma.$transaction(async (tx) => {
+      for (const c of company.contacts) {
+        if (!c.email) continue;
+        const status = (c.emailStatus || "").toLowerCase();
+        if (status !== "valid" && status !== "accept_all") {
+          await tx.contact.update({
+            where: { id: c.id },
+            data: {
+              emailStatus: "valid",
+              verifiedAt: new Date(),
+              metadata: {
+                ...((c.metadata && typeof c.metadata === "object"
+                  ? c.metadata
+                  : {}) as object),
+                manualEnrichment: true,
+                assertedByUserId: userId ?? null,
+              } as Prisma.InputJsonValue,
+            },
+          });
+        }
+      }
+
+      await tx.company.update({
+        where: { id: companyId },
+        data: {
+          enrichmentStatus: CompanyEnrichmentStatus.ENRICHED,
+          enrichmentError: null,
+          enrichedAt: new Date(),
+          website:
+            company.website ||
+            (company.domain ? `https://${company.domain}` : company.website),
+          // Funnel: don't block on crawl for manual client details
+          ...(company.crawlStatus === CompanyCrawlStatus.PENDING ||
+          !company.crawlStatus
+            ? { crawlStatus: CompanyCrawlStatus.DONE }
+            : {}),
+        },
+      });
+    });
+
+    const opp = await this.ensureSourcedOpportunity(
+      organizationId,
+      companyId,
+      primary.id
+    );
+
+    await timelineService.record({
+      organizationId,
+      companyId,
+      contactId: primary.id,
+      opportunityId: opp.id,
+      type: CompanyTimelineEventType.ENRICHED,
+      title: "Marked enriched from client details (manual)",
+      details: {
+        source: "manual_client_details",
+        contactEmail: primary.email,
+        skippedHunter: true,
+      },
+      actor: TimelineActor.USER,
+      userId: userId ?? null,
+      dedupeKey: `enriched_manual:${companyId}`,
+    });
+    await timelineService.record({
+      organizationId,
+      companyId,
+      contactId: primary.id,
+      type: CompanyTimelineEventType.VERIFIED,
+      title: "Email asserted valid (manual client details)",
+      details: { email: primary.email, manual: true },
+      actor: TimelineActor.USER,
+      userId: userId ?? null,
+      dedupeKey: `verified_manual:${primary.id}`,
+    });
+
+    return {
+      status: "ENRICHED" as const,
+      companyId,
+      contactId: primary.id,
+      opportunityId: opp.id,
+    };
+  }
+
   async enrichOneCompany(
     organizationId: string,
     companyId: string,

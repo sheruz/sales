@@ -64,6 +64,8 @@ type Preview = {
 
 type Props = {
   companyId: string;
+  enrichmentStatus?: string | null;
+  contactCount?: number;
   latestAudit: AuditData | null;
   activePitch: PitchData | null;
   newerAuditAvailable: boolean;
@@ -72,6 +74,8 @@ type Props = {
 
 export function CompanyAuditPitchCards({
   companyId,
+  enrichmentStatus,
+  contactCount = 0,
   latestAudit,
   activePitch,
   newerAuditAvailable,
@@ -84,6 +88,32 @@ export function CompanyAuditPitchCards({
   );
   const [shortPitch, setShortPitch] = useState(activePitch?.shortPitch ?? "");
 
+  const needsManualEnrich =
+    enrichmentStatus !== "ENRICHED" && enrichmentStatus !== "SKIPPED";
+
+  async function useClientDetails() {
+    setBusy("manual");
+    try {
+      const res = await fetch("/api/autopilot/enrichment/manual", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ companyId }),
+      });
+      const json = await res.json();
+      if (!json.success) throw new Error(json.error?.message);
+      toast.success(
+        json.data?.status === "ALREADY_ENRICHED"
+          ? "Already enriched — you can audit now"
+          : "Marked enriched from client details — Audit now is ready"
+      );
+      router.refresh();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed");
+    } finally {
+      setBusy(null);
+    }
+  }
+
   async function auditNow() {
     setBusy("audit");
     try {
@@ -94,7 +124,14 @@ export function CompanyAuditPitchCards({
       });
       const json = await res.json();
       if (!json.success) throw new Error(json.error?.message);
-      toast.success("Audit started");
+      const processed = json.data?.processed ?? 0;
+      if (processed === 0) {
+        toast.error(
+          "Nothing audited — mark enriched (Use client details) or check website + contact email"
+        );
+      } else {
+        toast.success("Audit started");
+      }
       router.refresh();
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Audit failed");
@@ -146,23 +183,47 @@ export function CompanyAuditPitchCards({
               PageSpeed + rule checks. History kept; latest shown.
             </CardDescription>
           </div>
-          <Button
-            size="sm"
-            variant="outline"
-            disabled={busy === "audit"}
-            onClick={auditNow}
-          >
-            {busy === "audit" ? (
-              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+          <div className="flex flex-wrap gap-2">
+            {needsManualEnrich ? (
+              <Button
+                size="sm"
+                variant="secondary"
+                disabled={busy === "manual" || contactCount === 0}
+                onClick={useClientDetails}
+                title={
+                  contactCount === 0
+                    ? "Add a contact with email first"
+                    : "Skip Hunter — use contacts you already entered"
+                }
+              >
+                {busy === "manual" ? (
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                ) : null}
+                Use client details
+              </Button>
             ) : null}
-            Audit now
-          </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              disabled={busy === "audit"}
+              onClick={auditNow}
+            >
+              {busy === "audit" ? (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              ) : null}
+              Audit now
+            </Button>
+          </div>
         </CardHeader>
         <CardContent className="space-y-3 text-sm">
           {!latestAudit ? (
             <EmptyState
               title="Not audited yet"
-              description="Requires ENRICHED + valid contact. Use Autopilot → Audit or Audit now here."
+              description={
+                needsManualEnrich
+                  ? "For manual leads: click Use client details (needs website + contact email), then Audit now. Or run Hunter enrichment."
+                  : "Ready — click Audit now (or Autopilot → Audit)."
+              }
               actionHref="/dashboard/autopilot?tab=audit"
               actionLabel="Open Audit"
             />

@@ -71,7 +71,16 @@ function nextStepCopy(input: {
   if (input.funnelStage === "crawled") {
     return {
       title: "Waiting for enrichment",
-      body: "Use Autopilot → Enrichment → Enrich now (or turn Enrichment ON after testing).",
+      body: "Use Autopilot → Enrichment → Enrich now, or on this page click Use client details if you already entered the contact.",
+    };
+  }
+  if (
+    input.enrichmentStatus !== "ENRICHED" &&
+    input.enrichmentStatus !== "SKIPPED"
+  ) {
+    return {
+      title: "Waiting for enrichment",
+      body: "Manual lead? Click Use client details on the audit card (needs website + contact email), then Audit now. Or run Hunter enrichment.",
     };
   }
   return {
@@ -168,6 +177,10 @@ export default async function CompanyDetailPage({ params }: PageProps) {
 
       <CompanyAuditPitchCards
         companyId={company.id}
+        enrichmentStatus={company.enrichmentStatus}
+        contactCount={
+          company.contacts.filter((c) => Boolean(c.email?.trim())).length
+        }
         latestAudit={
           company.latestAudit
             ? {

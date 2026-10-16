@@ -808,6 +808,11 @@ export class WebsiteAuditService {
       config,
       onlyIds
     );
+    if (onlyIds?.length && ids.length === 0) {
+      throw new ValidationError(
+        "Not ready for audit: company needs ENRICHED status, a website, and a contact with a valid email. For manual leads use “Use client details” first."
+      );
+    }
     const results = [];
     for (const id of ids) {
       const one = await this.auditOne(organizationId, id, userId);
