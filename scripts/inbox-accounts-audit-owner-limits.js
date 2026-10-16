@@ -366,12 +366,13 @@ async function main() {
   console.log("");
 
   console.log("Subscription assignment (this org only)");
+  const onOwnerPlan =
+    Boolean(ownerPlan) && sub && sub.planId === ownerPlan.id;
   if (!sub) {
-    console.log(
-      DRY_RUN
-        ? { action: "would_create_subscription", plan: PLAN_NAME }
-        : { action: "create_subscription", plan: PLAN_NAME }
-    );
+    console.log({
+      action: DRY_RUN ? "would_create_subscription" : "create_subscription",
+      plan: PLAN_NAME,
+    });
     if (!DRY_RUN && ownerPlan) {
       await prisma.subscription.create({
         data: {
@@ -384,7 +385,7 @@ async function main() {
         },
       });
     }
-  } else if (ownerPlan && sub.planId !== ownerPlan.id) {
+  } else if (!onOwnerPlan) {
     console.log({
       action: DRY_RUN ? "would_switch_plan" : "switch_plan",
       from: sub.plan.name,
@@ -392,6 +393,11 @@ async function main() {
       subscriptionId: sub.id,
     });
     if (!DRY_RUN) {
+      if (!ownerPlan) {
+        throw new Error(
+          `Internal Owner plan missing after create — cannot switch subscription`
+        );
+      }
       await prisma.subscription.update({
         where: { id: sub.id },
         data: {
