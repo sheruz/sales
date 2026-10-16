@@ -12,11 +12,58 @@ export type ProviderSendResult = {
 };
 
 function toBase64Url(raw: string): string {
-  return Buffer.from(raw)
+  return Buffer.from(raw, "utf8")
     .toString("base64")
     .replace(/\+/g, "-")
     .replace(/\//g, "_")
     .replace(/=+$/, "");
+}
+
+function hasNonAscii(value: string): boolean {
+  return /[^\x00-\x7F]/.test(value);
+}
+
+/**
+ * RFC 2047 encoded-word for header values (Subject, display-name, etc.).
+ * Without this, Gmail/raw MIME shows mojibake like Ã¢Â€Â” for an em dash.
+ */
+export function encodeRfc2047Header(value: string): string {
+  if (!hasNonAscii(value)) return value;
+  // Split into ≤60-octet chunks so each encoded-word stays under ~75 chars.
+  const bytes = Buffer.from(value, "utf8");
+  const words: string[] = [];
+  const chunkSize = 45; // 45 raw bytes → 60 base64 chars
+  for (let i = 0; i < bytes.length; i += chunkSize) {
+    const slice = bytes.subarray(i, i + chunkSize);
+    words.push(`=?UTF-8?B?${slice.toString("base64")}?=`);
+  }
+  return words.join(" ");
+}
+
+/** Encode "Name <email@x>" From/To headers when the display name is non-ASCII. */
+export function encodeAddressHeader(value: string): string {
+  const m = value.match(/^(.*?)\s*<([^>]+)>\s*$/);
+  if (!m) return value;
+  const name = m[1].trim().replace(/^"|"$/g, "");
+  const email = m[2].trim();
+  if (!name) return `<${email}>`;
+  if (!hasNonAscii(name)) {
+    return `"${name.replace(/\\/g, "\\\\").replace(/"/g, '\\"')}" <${email}>`;
+  }
+  return `${encodeRfc2047Header(name)} <${email}>`;
+}
+
+function encodeMimeBody(content: string): {
+  transferEncoding: string;
+  body: string;
+} {
+  if (!hasNonAscii(content)) {
+    return { transferEncoding: "7bit", body: content };
+  }
+  const b64 = Buffer.from(content, "utf8")
+    .toString("base64")
+    .replace(/(.{76})/g, "$1\r\n");
+  return { transferEncoding: "base64", body: b64 };
 }
 
 /** Build RFC 2046 multipart/alternative (text + html). */
@@ -34,7 +81,7 @@ export function buildMultipartAlternative(params: {
   const extra: string[] = [];
   if (params.headers) {
     for (const [k, v] of Object.entries(params.headers)) {
-      if (v) extra.push(`${k}: ${v}`);
+      if (v) extra.push(`${k}: ${encodeRfc2047Header(v)}`);
     }
   }
   if (params.inReplyTo) {
@@ -54,25 +101,28 @@ export function buildMultipartAlternative(params: {
     }
   }
 
+  const textPart = encodeMimeBody(params.text);
+  const htmlPart = encodeMimeBody(params.html);
+
   return [
-    `From: ${params.from}`,
-    `To: ${params.to}`,
-    `Subject: ${params.subject}`,
+    `From: ${encodeAddressHeader(params.from)}`,
+    `To: ${encodeAddressHeader(params.to)}`,
+    `Subject: ${encodeRfc2047Header(params.subject)}`,
     "MIME-Version: 1.0",
     ...extra,
     `Content-Type: multipart/alternative; boundary="${boundary}"`,
     "",
     `--${boundary}`,
     'Content-Type: text/plain; charset="UTF-8"',
-    "Content-Transfer-Encoding: 7bit",
+    `Content-Transfer-Encoding: ${textPart.transferEncoding}`,
     "",
-    params.text,
+    textPart.body,
     "",
     `--${boundary}`,
     'Content-Type: text/html; charset="UTF-8"',
-    "Content-Transfer-Encoding: 7bit",
+    `Content-Transfer-Encoding: ${htmlPart.transferEncoding}`,
     "",
-    params.html,
+    htmlPart.body,
     "",
     `--${boundary}--`,
   ].join("\r\n");

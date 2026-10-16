@@ -55,7 +55,7 @@ export async function POST(
       user.organizationId,
       pitch.contact.email || "preview@example.com"
     );
-    const subject = `${pitch.company.name} — quick idea`;
+    const subject = `${pitch.company.name} - quick idea`;
     const rendered = renderOutboundEmail({
       style: body.style,
       subject,

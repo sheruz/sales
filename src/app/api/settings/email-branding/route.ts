@@ -40,7 +40,7 @@ export async function GET() {
     });
     const preview = renderOutboundEmail({
       style: "BRANDED",
-      subject: "Acme Realty — quick idea",
+      subject: "Acme Realty - quick idea",
       pitch: {
         greeting: "Hi there,",
         introHtml:

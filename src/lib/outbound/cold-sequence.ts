@@ -8,7 +8,7 @@ export const COLD_OUTREACH_STEPS = [
     stepOrder: 1,
     delayMinutes: 0,
     emailStyle: "BRANDED" as const,
-    subjectTemplate: `{{company_name}} — quick idea`,
+    subjectTemplate: `{{company_name}} - quick idea`,
     bodyTemplate: `{{greeting}}
 
 {{intro_html}}
@@ -23,7 +23,7 @@ export const COLD_OUTREACH_STEPS = [
     stepOrder: 2,
     delayMinutes: 3 * 24 * 60,
     emailStyle: "PLAIN" as const,
-    subjectTemplate: `Re: {{company_name}} — quick idea`,
+    subjectTemplate: `Re: {{company_name}} - quick idea`,
     bodyTemplate: `{{greeting}}
 
 Circling back on {{finding_title}}.
@@ -36,10 +36,10 @@ Happy to share a short example of {{recommended_service}} if useful.`,
     stepOrder: 3,
     delayMinutes: 7 * 24 * 60,
     emailStyle: "PLAIN" as const,
-    subjectTemplate: `Re: {{company_name}} — quick idea`,
+    subjectTemplate: `Re: {{company_name}} - quick idea`,
     bodyTemplate: `{{greeting}}
 
-Last note from me — if {{finding_title}} isn't a priority, no worries at all.
+Last note from me - if {{finding_title}} isn't a priority, no worries at all.
 
 If it is, I can outline how {{recommended_service}} usually helps teams like {{company_name}}.`,
   },
@@ -51,7 +51,7 @@ export const INBOUND_OUTREACH_STEPS = [
     stepOrder: 1,
     delayMinutes: 0,
     emailStyle: "BRANDED" as const,
-    subjectTemplate: `{{company_name}} — next steps`,
+    subjectTemplate: `{{company_name}} - next steps`,
     bodyTemplate: `{{greeting}}
 
 {{intro_html}}

@@ -111,7 +111,7 @@ describe("multipart + render", () => {
   it("renders PLAIN follow-up style", () => {
     const out = renderOutboundEmail({
       style: "PLAIN",
-      subject: "Re: Acme — quick idea",
+      subject: "Re: Acme - quick idea",
       pitch: {
         findingTitle: "Mobile bounce risk",
         findingText: "Impact",
