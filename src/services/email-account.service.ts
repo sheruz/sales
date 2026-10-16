@@ -68,7 +68,8 @@ export class EmailAccountService {
       where: { organizationId, email },
     });
 
-    if (!existing) {
+    // New row OR reactivating a non-ACTIVE row consumes an inbox seat.
+    if (!existing || existing.status !== EmailAccountStatus.ACTIVE) {
       await entitlementService.assertSeatAvailable(
         organizationId,
         FEATURE_KEYS.INBOX_ACCOUNTS
@@ -122,7 +123,8 @@ export class EmailAccountService {
       where: { organizationId: input.organizationId, email },
     });
 
-    if (!existing) {
+    // New row OR reactivating a non-ACTIVE row consumes an inbox seat.
+    if (!existing || existing.status !== EmailAccountStatus.ACTIVE) {
       await entitlementService.assertSeatAvailable(
         input.organizationId,
         FEATURE_KEYS.INBOX_ACCOUNTS
@@ -211,6 +213,10 @@ export class EmailAccountService {
         encryptedSmtpPassword: null,
         lastError: null,
       },
+    });
+    // Drop cold-outbound pool membership — disconnected inboxes must not hold seats.
+    await prisma.outboundMailbox.deleteMany({
+      where: { organizationId, emailAccountId: account.id },
     });
     if (account.provider === EmailProvider.SMTP) {
       await userIntegrationService.disconnect(

@@ -8,6 +8,8 @@ import { ValidationError, NotFoundError } from "@/lib/api/response";
 import { checkSendingDomainDns } from "@/lib/outbound/dns-health";
 import { outboundConfigService } from "@/services/outbound-config.service";
 import { inboxService } from "@/services/inbox.service";
+import { entitlementService } from "@/services/entitlement.service";
+import { FEATURE_KEYS } from "@/lib/billing/features";
 
 function startOfUtcDay() {
   const d = new Date();
@@ -78,6 +80,11 @@ export class MailboxPoolService {
       where: { emailAccountId },
     });
     if (existing) throw new ValidationError("Already in outbound pool");
+
+    await entitlementService.assertSeatAvailable(
+      organizationId,
+      FEATURE_KEYS.OUTBOUND_MAILBOXES
+    );
 
     const org = await prisma.organization.findUnique({
       where: { id: organizationId },

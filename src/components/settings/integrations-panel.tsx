@@ -41,6 +41,15 @@ interface IntegrationItem {
   isConnected: boolean;
   maskedPreview: string | null;
   lastError?: string | null;
+  staleAccountId?: string | null;
+  staleEmail?: string | null;
+}
+
+interface EmailAccountSummary {
+  id: string;
+  provider: string;
+  email: string;
+  status: string;
 }
 
 interface IntegrationsPanelProps {
@@ -53,6 +62,10 @@ interface IntegrationsPanelProps {
       discoveryMode: string;
     };
     integrations: IntegrationItem[];
+    gmailAccount?: EmailAccountSummary | null;
+    outlookAccount?: EmailAccountSummary | null;
+    staleGmail?: EmailAccountSummary | null;
+    staleOutlook?: EmailAccountSummary | null;
   };
 }
 
@@ -288,10 +301,31 @@ export function IntegrationsPanel({ initialData }: IntegrationsPanelProps) {
     }
   }
 
+  async function removeEmailAccount(accountId: string) {
+    setSaving(`remove-${accountId}`);
+    try {
+      const res = await fetch(`/api/email-accounts/${accountId}`, {
+        method: "DELETE",
+      });
+      const json = await res.json();
+      if (!json.success) throw new Error(json.error?.message);
+      toast.success("Removed");
+      router.refresh();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed");
+    } finally {
+      setSaving(null);
+    }
+  }
+
   const openAi = getIntegration("OPENAI");
   const anthropic = getIntegration("ANTHROPIC");
   const email = getIntegration("EMAIL_SMTP");
   const linkedin = getIntegration("LINKEDIN");
+  const gmailActive = data.gmailAccount ?? null;
+  const outlookActive = data.outlookAccount ?? null;
+  const staleGmail = data.staleGmail ?? null;
+  const staleOutlook = data.staleOutlook ?? null;
 
   return (
     <div className="space-y-6">
@@ -526,17 +560,45 @@ export function IntegrationsPanel({ initialData }: IntegrationsPanelProps) {
         title="Gmail"
         description="Connect Gmail via OAuth to send outreach and sync inbox replies (required for Sync inbox)."
         price="Bring your own Google account"
-        connected={Boolean(gmailConnected)}
-        preview={null}
+        connected={Boolean(gmailActive)}
+        preview={gmailActive?.email ?? null}
+        staleLabel={
+          !gmailActive && staleGmail
+            ? `Disconnected · ${staleGmail.email}`
+            : null
+        }
       >
-        <Button onClick={connectGmail} disabled={saving === "GMAIL"}>
-          {saving === "GMAIL" ? (
-            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-          ) : (
-            <Plug className="mr-2 h-4 w-4" />
-          )}
-          Connect Gmail
-        </Button>
+        {gmailActive ? (
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => removeEmailAccount(gmailActive.id)}
+            disabled={!!saving}
+          >
+            <Unplug className="mr-2 h-4 w-4" /> Disconnect
+          </Button>
+        ) : (
+          <div className="flex flex-wrap gap-2 items-center">
+            {staleGmail && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => removeEmailAccount(staleGmail.id)}
+                disabled={!!saving}
+              >
+                Remove
+              </Button>
+            )}
+            <Button onClick={connectGmail} disabled={saving === "GMAIL"}>
+              {saving === "GMAIL" ? (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              ) : (
+                <Plug className="mr-2 h-4 w-4" />
+              )}
+              Connect Gmail
+            </Button>
+          </div>
+        )}
       </IntegrationCard>
 
       <IntegrationCard
@@ -544,17 +606,45 @@ export function IntegrationsPanel({ initialData }: IntegrationsPanelProps) {
         title="Microsoft Outlook"
         description="Connect Outlook / Microsoft 365 via OAuth for send + inbox sync."
         price="Bring your own Microsoft account"
-        connected={Boolean(outlookConnected)}
-        preview={null}
+        connected={Boolean(outlookActive)}
+        preview={outlookActive?.email ?? null}
+        staleLabel={
+          !outlookActive && staleOutlook
+            ? `Disconnected · ${staleOutlook.email}`
+            : null
+        }
       >
-        <Button onClick={connectOutlook} disabled={saving === "OUTLOOK"}>
-          {saving === "OUTLOOK" ? (
-            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-          ) : (
-            <Plug className="mr-2 h-4 w-4" />
-          )}
-          Connect Outlook
-        </Button>
+        {outlookActive ? (
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => removeEmailAccount(outlookActive.id)}
+            disabled={!!saving}
+          >
+            <Unplug className="mr-2 h-4 w-4" /> Disconnect
+          </Button>
+        ) : (
+          <div className="flex flex-wrap gap-2 items-center">
+            {staleOutlook && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => removeEmailAccount(staleOutlook.id)}
+                disabled={!!saving}
+              >
+                Remove
+              </Button>
+            )}
+            <Button onClick={connectOutlook} disabled={saving === "OUTLOOK"}>
+              {saving === "OUTLOOK" ? (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              ) : (
+                <Plug className="mr-2 h-4 w-4" />
+              )}
+              Connect Outlook
+            </Button>
+          </div>
+        )}
       </IntegrationCard>
 
       <IntegrationCard
@@ -563,23 +653,44 @@ export function IntegrationsPanel({ initialData }: IntegrationsPanelProps) {
         description={email?.description ?? "Outbound SMTP only — use Connect Gmail/Outlook to sync inbound replies"}
         price={email?.monthlyPriceLabel ?? "Bring your own key"}
         connected={email?.isConnected ?? false}
-        preview={email?.maskedPreview}
+        preview={email?.isConnected ? email?.maskedPreview : null}
+        staleLabel={
+          !email?.isConnected && email?.staleEmail
+            ? `Disconnected · ${email.staleEmail}`
+            : null
+        }
       >
         {email?.isConnected ? (
           <Button variant="outline" size="sm" onClick={() => disconnect("EMAIL_SMTP")} disabled={!!saving}>
             <Unplug className="mr-2 h-4 w-4" /> Disconnect
           </Button>
         ) : (
-          <div className="grid gap-3 md:grid-cols-2">
-            <Input placeholder="SMTP host" value={emailForm.smtpHost} onChange={(e) => setEmailForm({ ...emailForm, smtpHost: e.target.value })} />
-            <Input placeholder="Port" value={emailForm.smtpPort} onChange={(e) => setEmailForm({ ...emailForm, smtpPort: e.target.value })} />
-            <Input placeholder="SMTP user" value={emailForm.smtpUser} onChange={(e) => setEmailForm({ ...emailForm, smtpUser: e.target.value })} />
-            <Input type="password" placeholder="App password" value={emailForm.smtpPassword} onChange={(e) => setEmailForm({ ...emailForm, smtpPassword: e.target.value })} />
-            <Input placeholder="From name" value={emailForm.fromName} onChange={(e) => setEmailForm({ ...emailForm, fromName: e.target.value })} />
-            <Input placeholder="From email" value={emailForm.fromEmail} onChange={(e) => setEmailForm({ ...emailForm, fromEmail: e.target.value })} />
-            <Button className="md:col-span-2" onClick={connectEmail} disabled={saving === "EMAIL_SMTP"}>
-              Connect & send test email
-            </Button>
+          <div className="space-y-3">
+            {email?.staleEmail && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() =>
+                  email.staleAccountId
+                    ? removeEmailAccount(email.staleAccountId)
+                    : disconnect("EMAIL_SMTP")
+                }
+                disabled={!!saving}
+              >
+                Remove
+              </Button>
+            )}
+            <div className="grid gap-3 md:grid-cols-2">
+              <Input placeholder="SMTP host" value={emailForm.smtpHost} onChange={(e) => setEmailForm({ ...emailForm, smtpHost: e.target.value })} />
+              <Input placeholder="Port" value={emailForm.smtpPort} onChange={(e) => setEmailForm({ ...emailForm, smtpPort: e.target.value })} />
+              <Input placeholder="SMTP user" value={emailForm.smtpUser} onChange={(e) => setEmailForm({ ...emailForm, smtpUser: e.target.value })} />
+              <Input type="password" placeholder="App password" value={emailForm.smtpPassword} onChange={(e) => setEmailForm({ ...emailForm, smtpPassword: e.target.value })} />
+              <Input placeholder="From name" value={emailForm.fromName} onChange={(e) => setEmailForm({ ...emailForm, fromName: e.target.value })} />
+              <Input placeholder="From email" value={emailForm.fromEmail} onChange={(e) => setEmailForm({ ...emailForm, fromEmail: e.target.value })} />
+              <Button className="md:col-span-2" onClick={connectEmail} disabled={saving === "EMAIL_SMTP"}>
+                Connect & send test email
+              </Button>
+            </div>
           </div>
         )}
       </IntegrationCard>
@@ -625,6 +736,7 @@ function IntegrationCard({
   price,
   connected,
   preview,
+  staleLabel,
   children,
 }: {
   icon: React.ReactNode;
@@ -633,6 +745,7 @@ function IntegrationCard({
   price: string;
   connected: boolean;
   preview: string | null | undefined;
+  staleLabel?: string | null;
   children: React.ReactNode;
 }) {
   return (
@@ -653,9 +766,11 @@ function IntegrationCard({
             <p className="text-xs text-muted-foreground mt-1">{price}</p>
           </div>
         </div>
-        {preview && (
+        {connected && preview ? (
           <p className="text-xs text-muted-foreground mt-2">Connected as: {preview}</p>
-        )}
+        ) : staleLabel ? (
+          <p className="text-xs text-amber-700 dark:text-amber-400 mt-2">{staleLabel}</p>
+        ) : null}
       </CardHeader>
       <CardContent>{children}</CardContent>
     </Card>

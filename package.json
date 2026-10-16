@@ -32,6 +32,7 @@
     "db:migrate:phase5-ai-reply": "node scripts/run-with-env.js node scripts/phase5-ai-reply-migrate.js",
     "db:migrate:email-redesign": "node scripts/run-with-env.js node scripts/email-redesign-migrate.js",
     "db:migrate:website-inbound": "node scripts/run-with-env.js node scripts/website-inbound-migrate.js",
+    "db:audit:inbox-owner-limits": "node scripts/run-with-env.js node scripts/inbox-accounts-audit-owner-limits.js",
     "db:studio": "node scripts/prisma-cli.js studio",
     "db:reset": "node scripts/prisma-cli.js migrate reset",
     "docker:up": "docker compose up -d postgres",

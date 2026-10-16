@@ -37,14 +37,27 @@ export class UserIntegrationService {
   async listForUser(organizationId: string, userId: string) {
     await this.ensureProductsSeeded();
 
-    const [products, integrations, outreachSettings] = await Promise.all([
-      prisma.integrationProduct.findMany({
-        where: { isActive: true },
-        orderBy: { sortOrder: "asc" },
-      }),
-      prisma.userIntegration.findMany({ where: { organizationId, userId } }),
-      getOrCreateOutreachSettings(userId),
-    ]);
+    const [products, integrations, outreachSettings, emailAccounts] =
+      await Promise.all([
+        prisma.integrationProduct.findMany({
+          where: { isActive: true },
+          orderBy: { sortOrder: "asc" },
+        }),
+        prisma.userIntegration.findMany({ where: { organizationId, userId } }),
+        getOrCreateOutreachSettings(userId),
+        prisma.emailAccount.findMany({
+          where: { organizationId, userId },
+          select: {
+            id: true,
+            provider: true,
+            email: true,
+            status: true,
+            createdAt: true,
+            updatedAt: true,
+          },
+          orderBy: { createdAt: "desc" },
+        }),
+      ]);
 
     const integrationMap = new Map(integrations.map((i) => [i.platform, i]));
     const productMap = new Map(products.map((p) => [p.platform, p]));
@@ -62,14 +75,53 @@ export class UserIntegrationService {
       return (ca?.sortOrder ?? 99) - (cb?.sortOrder ?? 99);
     });
 
+    const activeByProvider = (provider: "GMAIL" | "OUTLOOK" | "SMTP") =>
+      emailAccounts.find((a) => a.provider === provider && a.status === "ACTIVE");
+    const inactiveByProvider = (provider: "GMAIL" | "OUTLOOK" | "SMTP") =>
+      emailAccounts.find((a) => a.provider === provider && a.status !== "ACTIVE");
+
     return {
       outreachSettings,
+      emailAccounts,
       integrations: ordered.map((platform) => {
         const product = productMap.get(platform);
         const catalog = INTEGRATION_CATALOG.find((c) => c.platform === platform);
         const userInt = integrationMap.get(platform);
         const monthlyPriceCents =
           product?.monthlyPriceCents ?? catalog?.monthlyPriceCents ?? 0;
+
+        // Prefer live EmailAccount status for SMTP so UI matches seat counting.
+        let isConnected = userInt?.isConnected ?? false;
+        let maskedPreview: string | null = this.buildMaskedPreview(
+          userInt
+            ? {
+                ...userInt,
+                isConnected: userInt.isConnected,
+              }
+            : undefined
+        );
+        let staleAccountId: string | null = null;
+        let staleEmail: string | null = null;
+
+        if (platform === IntegrationPlatform.EMAIL_SMTP) {
+          const active = activeByProvider("SMTP");
+          const inactive = inactiveByProvider("SMTP");
+          if (active) {
+            isConnected = true;
+            maskedPreview = active.email;
+          } else {
+            isConnected = false;
+            maskedPreview = null;
+            if (inactive || (userInt && !userInt.isConnected && userInt.publicConfig)) {
+              staleAccountId = inactive?.id ?? null;
+              staleEmail = inactive?.email ??
+                ((userInt?.publicConfig as { fromEmail?: string } | null)?.fromEmail ??
+                  userInt?.displayLabel ??
+                  null);
+            }
+          }
+        }
+
         return {
           platform,
           name: product?.name ?? catalog?.name ?? platform,
@@ -80,27 +132,40 @@ export class UserIntegrationService {
               ? "Bring your own key"
               : `$${(monthlyPriceCents / 100).toFixed(0)}/mo`,
           fields: catalog?.fields ?? [],
-          isConnected: userInt?.isConnected ?? false,
+          isConnected,
           isEnabled: userInt?.isEnabled ?? false,
           displayLabel: userInt?.displayLabel,
           lastVerifiedAt: userInt?.lastVerifiedAt,
           lastError: userInt?.lastError,
           publicConfig: userInt?.publicConfig,
-          maskedPreview: this.buildMaskedPreview(userInt),
+          maskedPreview,
+          staleAccountId,
+          staleEmail,
         };
       }),
+      gmailAccount: activeByProvider("GMAIL") ?? null,
+      outlookAccount: activeByProvider("OUTLOOK") ?? null,
+      staleGmail: !activeByProvider("GMAIL")
+        ? inactiveByProvider("GMAIL") ?? null
+        : null,
+      staleOutlook: !activeByProvider("OUTLOOK")
+        ? inactiveByProvider("OUTLOOK") ?? null
+        : null,
     };
   }
 
   private buildMaskedPreview(
     integration: {
       platform: IntegrationPlatform;
+      isConnected?: boolean;
       encryptedCredentials: string | null;
       publicConfig: unknown;
       displayLabel: string | null;
     } | undefined
   ) {
     if (!integration) return null;
+    // Never surface "Connected as …" when the integration is disconnected
+    if (integration.isConnected === false) return null;
 
     try {
       if (integration.platform === IntegrationPlatform.EMAIL_SMTP) {
@@ -327,6 +392,8 @@ export class UserIntegrationService {
         isConnected: false,
         isEnabled: false,
         encryptedCredentials: null,
+        publicConfig: {},
+        displayLabel: null,
         lastError: null,
       },
     });

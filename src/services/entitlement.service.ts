@@ -1,6 +1,8 @@
 import prisma from "@/lib/db/prisma";
 import {
+  EmailAccountStatus,
   MembershipStatus,
+  OutboundMailboxStatus,
   SubscriptionStatus,
   UsageMetric,
   type PlanFeature,
@@ -31,34 +33,59 @@ const SEAT_FEATURES = new Set<FeatureKey>([
   FEATURE_KEYS.USERS,
   FEATURE_KEYS.SEQUENCES,
   FEATURE_KEYS.INBOX_ACCOUNTS,
+  FEATURE_KEYS.OUTBOUND_MAILBOXES,
   FEATURE_KEYS.CONNECTORS,
 ]);
 
 export class EntitlementService {
   async ensureDefaultPlans() {
     const count = await prisma.plan.count();
-    if (count > 0) return;
-
-    for (const plan of DEFAULT_PLANS) {
-      await prisma.plan.create({
-        data: {
-          name: plan.name,
-          description: plan.description,
-          price: plan.price,
-          currency: plan.currency,
-          billingInterval: plan.billingInterval,
-          isDefault: plan.isDefault,
-          sortOrder: plan.sortOrder,
-          active: true,
-          features: {
-            create: plan.features.map((f) => ({
-              featureKey: f.featureKey,
-              limitValue: f.limitValue,
-              enabled: f.enabled,
-            })),
+    if (count === 0) {
+      for (const plan of DEFAULT_PLANS) {
+        await prisma.plan.create({
+          data: {
+            name: plan.name,
+            description: plan.description,
+            price: plan.price,
+            currency: plan.currency,
+            billingInterval: plan.billingInterval,
+            isDefault: plan.isDefault,
+            sortOrder: plan.sortOrder,
+            active: true,
+            features: {
+              create: plan.features.map((f) => ({
+                featureKey: f.featureKey,
+                limitValue: f.limitValue,
+                enabled: f.enabled,
+              })),
+            },
           },
-        },
-      });
+        });
+      }
+      return;
+    }
+
+    // Backfill newly introduced feature keys onto catalog plans (idempotent).
+    for (const plan of DEFAULT_PLANS) {
+      const row = await prisma.plan.findFirst({ where: { name: plan.name } });
+      if (!row) continue;
+      for (const f of plan.features) {
+        await prisma.planFeature.upsert({
+          where: {
+            planId_featureKey: {
+              planId: row.id,
+              featureKey: f.featureKey,
+            },
+          },
+          create: {
+            planId: row.id,
+            featureKey: f.featureKey,
+            limitValue: f.limitValue,
+            enabled: f.enabled,
+          },
+          update: {},
+        });
+      }
     }
   }
 
@@ -130,8 +157,21 @@ export class EntitlementService {
           where: { organizationId },
         });
       case FEATURE_KEYS.INBOX_ACCOUNTS:
+        // Only live connected inboxes — DISCONNECTED / ERROR / DISABLED / PAUSED
+        // must not block reconnecting Gmail/Outlook/SMTP.
+        // .env platform SMTP is never an EmailAccount row and never counts.
         return prisma.emailAccount.count({
-          where: { organizationId },
+          where: {
+            organizationId,
+            status: EmailAccountStatus.ACTIVE,
+          },
+        });
+      case FEATURE_KEYS.OUTBOUND_MAILBOXES:
+        return prisma.outboundMailbox.count({
+          where: {
+            organizationId,
+            status: OutboundMailboxStatus.ACTIVE,
+          },
         });
       case FEATURE_KEYS.CONNECTORS:
         return prisma.sourceConnector.count({

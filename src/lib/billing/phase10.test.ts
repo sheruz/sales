@@ -24,6 +24,7 @@ describe("Phase 10 billing + entitlements", () => {
       "sources",
       "enrichment",
       "inbox_accounts",
+      "outbound_mailboxes",
       "automation",
       "advanced_ai",
       "learning",
