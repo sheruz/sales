@@ -16,6 +16,12 @@ enum UserRole {
   SALES_REPRESENTATIVE
 }
 
+/// Platform-level role (S1). Source of truth for /platform access. Null = tenant user only.
+enum PlatformRole {
+  SUPER_ADMIN
+  PLATFORM_SUPPORT
+}
+
 enum LeadStatus {
   NEW
   RESEARCHING
@@ -757,6 +763,9 @@ model Organization {
   emailOutbox       EmailOutbox[]
   aiReplyDrafts     AiReplyDraft[]
   notifications     Notification[]
+  tenantIntegrations TenantIntegration[]
+  usageEvents       UsageEvent[]
+  platformAuditLogs PlatformAuditLog[]
 
   @@index([status])
   @@index([deletedAt])
@@ -899,6 +908,8 @@ model User {
   lastName     String   @map("last_name")
   /// Legacy role kept for backward compatibility; org membership uses Role via OrganizationUser
   role         UserRole @default(SALES_REPRESENTATIVE)
+  /// S1 platform role — SUPER_ADMIN | PLATFORM_SUPPORT | null (tenant-only)
+  platformRole PlatformRole? @map("platform_role")
   isActive     Boolean  @default(true) @map("is_active")
   avatarUrl    String?  @map("avatar_url")
   createdAt    DateTime @default(now()) @map("created_at")
@@ -936,9 +947,12 @@ model User {
   companyTimelineEvents  CompanyTimelineEvent[]
   pitchesApproved        Pitch[] @relation("PitchApprovedBy")
   notifications          Notification[]
+  platformAuditLogs      PlatformAuditLog[] @relation("PlatformAuditActor")
+  tenantIntegrationsConnected TenantIntegration[] @relation("TenantIntegrationConnectedBy")
 
   @@index([email])
   @@index([role])
+  @@index([platformRole])
   @@map("users")
 }
 
@@ -3203,6 +3217,31 @@ enum SubscriptionStatus {
   INCOMPLETE
   UNPAID
   INCOMPLETE_EXPIRED
+  SUSPENDED
+}
+
+enum PlanVisibility {
+  PUBLIC
+  PRIVATE
+  INTERNAL
+  DRAFT
+}
+
+enum TenantIntegrationStatus {
+  CONNECTED
+  NEEDS_RECONNECT
+  ERROR
+  DISCONNECTED
+}
+
+enum IntegrationOAuthMode {
+  PLATFORM_APP
+  TENANT_APP
+}
+
+enum IntegrationKeyMode {
+  BYOK
+  MANAGED
 }
 
 enum UsageMetric {
@@ -3221,6 +3260,8 @@ enum UsageMetric {
 model Plan {
   id              String          @id @default(uuid())
   name            String
+  /// Stable plan code (e.g. OWNER, FREE, STARTER). Additive S1.
+  code            String?         @unique
   description     String?
   price           Decimal         @db.Decimal(12, 2)
   currency        String          @default("USD")
@@ -3230,6 +3271,7 @@ model Plan {
   active          Boolean         @default(true)
   sortOrder       Int             @default(0) @map("sort_order")
   isDefault       Boolean         @default(false) @map("is_default")
+  visibility      PlanVisibility  @default(PUBLIC)
   createdAt       DateTime        @default(now()) @map("created_at")
   updatedAt       DateTime        @updatedAt @map("updated_at")
 
@@ -3237,6 +3279,7 @@ model Plan {
   subscriptions Subscription[]
 
   @@index([active])
+  @@index([visibility])
   @@map("plans")
 }
 
@@ -3474,4 +3517,91 @@ model Settings {
   updatedAt DateTime @updatedAt @map("updated_at")
 
   @@map("settings")
+}
+
+// ─── S1: SaaS foundation (additive) ──────────────────────────────────────────
+
+/// Per-tenant provider connection. providerId is a string catalog id (no enum).
+model TenantIntegration {
+  id                   String                   @id @default(uuid())
+  organizationId       String                   @map("organization_id")
+  providerId           String                   @map("provider_id")
+  /// Distinguishes multiple connections (e.g. mailbox email). Default "default".
+  externalKey          String                   @default("default") @map("external_key")
+  label                String?
+  status               TenantIntegrationStatus  @default(DISCONNECTED)
+  /// Encrypted credentials blob — never returned by APIs.
+  encryptedCredentials String?                  @map("encrypted_credentials")
+  publicConfig         Json?                    @map("public_config")
+  oauthMode            IntegrationOAuthMode?    @map("oauth_mode")
+  /// MANAGED = platform-billed key (future). Default BYOK. OFF/unused until offered.
+  keyMode              IntegrationKeyMode       @default(BYOK) @map("key_mode")
+  /// Explicit MANAGED-mode offer flag per connection — OFF by default.
+  managedModeEnabled   Boolean                  @default(false) @map("managed_mode_enabled")
+  scopes               String[]                 @default([])
+  tokenExpiresAt       DateTime?                @map("token_expires_at")
+  lastHealthCheckAt    DateTime?                @map("last_health_check_at")
+  lastHealthOk         Boolean?                 @map("last_health_ok")
+  lastError            String?                  @map("last_error")
+  connectedByUserId    String?                  @map("connected_by_user_id")
+  legacySource         String?                  @map("legacy_source")
+  legacySourceId       String?                  @map("legacy_source_id")
+  metadata             Json?
+  createdAt            DateTime                 @default(now()) @map("created_at")
+  updatedAt            DateTime                 @updatedAt @map("updated_at")
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  connectedBy  User?        @relation("TenantIntegrationConnectedBy", fields: [connectedByUserId], references: [id], onDelete: SetNull)
+
+  @@unique([organizationId, providerId, externalKey])
+  @@index([organizationId])
+  @@index([providerId])
+  @@index([status])
+  @@map("tenant_integrations")
+}
+
+/// Metered usage events (S1 shadow + future enforcement).
+model UsageEvent {
+  id             String   @id @default(uuid())
+  organizationId String   @map("organization_id")
+  metric         String
+  quantity       Int      @default(1)
+  periodStart    DateTime @map("period_start") @db.Date
+  referenceType  String?  @map("reference_type")
+  referenceId    String?  @map("reference_id")
+  idempotencyKey String?  @map("idempotency_key")
+  metadata       Json?
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@unique([organizationId, idempotencyKey])
+  @@index([organizationId, metric, periodStart])
+  @@index([createdAt])
+  @@map("usage_events")
+}
+
+/// Every super-admin write is audited here.
+model PlatformAuditLog {
+  id             String   @id @default(uuid())
+  actorUserId    String?  @map("actor_user_id")
+  action         String
+  targetType     String   @map("target_type")
+  targetId       String?  @map("target_id")
+  organizationId String?  @map("organization_id")
+  before         Json?
+  after          Json?
+  reason         String?
+  ipAddress      String?  @map("ip_address")
+  userAgent      String?  @map("user_agent")
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  actor        User?         @relation("PlatformAuditActor", fields: [actorUserId], references: [id], onDelete: SetNull)
+  organization Organization? @relation(fields: [organizationId], references: [id], onDelete: SetNull)
+
+  @@index([actorUserId])
+  @@index([organizationId])
+  @@index([createdAt])
+  @@index([action])
+  @@map("platform_audit_logs")
 }

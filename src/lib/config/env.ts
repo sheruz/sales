@@ -61,6 +61,13 @@ const envSchema = z.object({
   FOLLOWUP_CHECK_INTERVAL_MS: z.coerce.number().default(300000),
   LINKEDIN_LI_AT: z.string().optional(),
   LINKEDIN_JSESSIONID: z.string().optional(),
+  /**
+   * Cookie/Voyager SESSION mode (li_at + JSESSIONID). Default OFF for S1:
+   * hide session UI, refuse new SESSION connects, no env cron fallback.
+   * Existing LinkedInAccount SESSION rows are left in DB but unused.
+   * Official OAuth is unaffected.
+   */
+  LINKEDIN_SESSION_ENABLED: z.coerce.boolean().default(false),
   LINKEDIN_CLIENT_ID: z.string().optional(),
   LINKEDIN_CLIENT_SECRET: z.string().optional(),
   LINKEDIN_REDIRECT_URI: z.string().url().optional(),

@@ -1,8 +1,11 @@
 import prisma from "@/lib/db/prisma";
 import { LinkedInConnectionType } from "@prisma/client";
 import { encrypt, decrypt, isEncryptionConfigured } from "@/lib/crypto/encrypt";
-import { env } from "@/lib/config/env";
 import { buildSession, LinkedInVoyagerClient } from "@/lib/linkedin/voyager-client";
+import {
+  isLinkedInSessionEnabled,
+  LINKEDIN_SESSION_DISABLED_MESSAGE,
+} from "@/lib/linkedin/session-mode";
 import { NotFoundError, ValidationError } from "@/lib/api/response";
 
 export class LinkedInAccountService {
@@ -10,6 +13,10 @@ export class LinkedInAccountService {
     userId: string,
     data: { liAt: string; jsessionId: string; linkedInEmail?: string }
   ) {
+    if (!isLinkedInSessionEnabled()) {
+      throw new ValidationError(LINKEDIN_SESSION_DISABLED_MESSAGE);
+    }
+
     if (!isEncryptionConfigured()) {
       throw new ValidationError(
         "ENCRYPTION_KEY must be set in .env to store LinkedIn credentials securely"
@@ -52,6 +59,10 @@ export class LinkedInAccountService {
   }
 
   async getClient(userId: string): Promise<LinkedInVoyagerClient> {
+    if (!isLinkedInSessionEnabled()) {
+      throw new NotFoundError(LINKEDIN_SESSION_DISABLED_MESSAGE);
+    }
+
     const account = await prisma.linkedInAccount.findUnique({
       where: { userId, isActive: true },
     });
@@ -72,15 +83,10 @@ export class LinkedInAccountService {
       return new LinkedInVoyagerClient(buildSession(liAt, jsessionId));
     }
 
-    // Fallback to env vars (for server-wide cron)
-    const liAt = env.LINKEDIN_LI_AT;
-    const jsessionId = env.LINKEDIN_JSESSIONID;
-    if (liAt && jsessionId) {
-      return new LinkedInVoyagerClient(buildSession(liAt, jsessionId));
-    }
-
+    // Env cron fallback (LINKEDIN_LI_AT / LINKEDIN_JSESSIONID) only when SESSION mode is enabled.
+    // When disabled (S1 default), never fall back to platform env cookies.
     throw new NotFoundError(
-      "LinkedIn account not connected. Add your session in Settings → LinkedIn."
+      "LinkedIn account not connected. Use official OAuth in Settings → Integrations."
     );
   }
 
@@ -107,12 +113,14 @@ export class LinkedInAccountService {
   }
 
   async canSearch(userId: string, limit: number): Promise<boolean> {
+    if (!isLinkedInSessionEnabled()) return false;
     const account = await this.checkAndResetDailyLimits(userId);
     if (!account) return false;
     return account.dailySearchCount < limit;
   }
 
   async canMessage(userId: string, limit: number): Promise<boolean> {
+    if (!isLinkedInSessionEnabled()) return false;
     const account = await this.checkAndResetDailyLimits(userId);
     if (!account) return false;
     return account.dailyMessageCount < limit;
@@ -139,8 +147,8 @@ export class LinkedInAccountService {
     });
   }
 
-  getStatus(userId: string) {
-    return prisma.linkedInAccount.findUnique({
+  async getStatus(userId: string) {
+    const account = await prisma.linkedInAccount.findUnique({
       where: { userId },
       select: {
         id: true,
@@ -150,8 +158,26 @@ export class LinkedInAccountService {
         dailySearchCount: true,
         dailyMessageCount: true,
         profileUrn: true,
+        connectionType: true,
       },
     });
+
+    return {
+      sessionModeEnabled: isLinkedInSessionEnabled(),
+      account: account
+        ? {
+            id: account.id,
+            linkedInEmail: account.linkedInEmail,
+            isActive: account.isActive,
+            lastVerifiedAt: account.lastVerifiedAt,
+            dailySearchCount: account.dailySearchCount,
+            dailyMessageCount: account.dailyMessageCount,
+            profileUrn: account.profileUrn,
+            connectionType: account.connectionType,
+            // Never expose cookie/token fields
+          }
+        : null,
+    };
   }
 }
 

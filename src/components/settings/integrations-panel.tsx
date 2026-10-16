@@ -714,7 +714,7 @@ export function IntegrationsPanel({ initialData }: IntegrationsPanelProps) {
         ) : (
           <div className="space-y-2">
             <p className="text-sm text-muted-foreground">
-              Sign in with your LinkedIn username and password on LinkedIn&apos;s official login page — we never store your password.
+              Official LinkedIn OAuth only — cookie/session mode is disabled. Sign in on LinkedIn&apos;s login page; we never store your password.
             </p>
             <a href="/api/integrations/linkedin/oauth">
               <Button>

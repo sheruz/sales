@@ -1,0 +1,220 @@
+﻿{
+  "meta": {
+    "generatedAt": "2026-10-16T10:23:12.205Z",
+    "readOnly": true,
+    "mode": "APPLY_DRY_RUN",
+    "ownerOrgName": "Default Workspace",
+    "mySuperAdminEmailSet": true,
+    "myLoginEmailSet": true,
+    "mySuperAdminEmailMasked": "p***r@example.com",
+    "myLoginEmailMasked": "p***n@example.com",
+    "warnings": [],
+    "applyOrder": [
+      "1 schema migrate",
+      "2 plans (OWNER + drafts)",
+      "3 subscriptions (Default Workspace → OWNER)",
+      "4 users/roles/password resets",
+      "5 integrations copy → TenantIntegration",
+      "6 LinkedIn cookie NULL cleanup"
+    ]
+  },
+  "schema": {
+    "planned": [
+      {
+        "action": "skip",
+        "item": "users.platform_role (PlatformRole)"
+      },
+      {
+        "action": "skip",
+        "item": "plans.code + plans.visibility"
+      },
+      {
+        "action": "skip",
+        "item": "tenant_integrations"
+      },
+      {
+        "action": "skip",
+        "item": "usage_events"
+      },
+      {
+        "action": "skip",
+        "item": "platform_audit_logs"
+      },
+      {
+        "action": "ensure_enum",
+        "item": "PlatformRole, PlanVisibility, TenantIntegrationStatus, IntegrationOAuthMode, IntegrationKeyMode, SubscriptionStatus.SUSPENDED"
+      }
+    ]
+  },
+  "plans": {
+    "planned": [
+      {
+        "action": "create_OWNER",
+        "name": "OWNER",
+        "code": "OWNER",
+        "visibility": "INTERNAL",
+        "unlimited": true,
+        "replace": null
+      },
+      {
+        "action": "create_draft",
+        "name": "Starter",
+        "code": "STARTER",
+        "visibility": "DRAFT",
+        "note": "Draft — not auto-assigned"
+      },
+      {
+        "action": "create_draft",
+        "name": "Agency",
+        "code": "AGENCY",
+        "visibility": "DRAFT",
+        "note": "Draft — not auto-assigned"
+      },
+      {
+        "action": "keep",
+        "names": [
+          "Free",
+          "Growth",
+          "Scale"
+        ],
+        "note": "Existing catalog kept; Stripe left disabled"
+      }
+    ]
+  },
+  "subscriptions": {
+    "planned": [
+      {
+        "organizationId": "61fb668e-2a34-4ae4-813c-1cd67b8e1bad",
+        "organizationName": "Default Workspace",
+        "currentPlan": null,
+        "action": "set_plan_OWNER",
+        "subscriptionStatus": "would_create_ACTIVE"
+      }
+    ]
+  },
+  "users": {
+    "planned": [
+      {
+        "target": "platform_super_admin",
+        "from": {
+          "id": "f6409dac-5e6d-4aa8-9f6b-6dec05a50db6",
+          "email": "s***n@salesplatform.local",
+          "name": "Super Admin",
+          "userRole": "SUPER_ADMIN"
+        },
+        "toEmail": "p***r@example.com",
+        "actions": [
+          "change email to MY_SUPER_ADMIN_EMAIL",
+          "invalidate sessions",
+          "set random unknown passwordHash (old Admin@123 dies)",
+          "create one-time PasswordResetToken; print reset URL once to stdout (NOT logged in JSON)",
+          "set platformRole=SUPER_ADMIN (after schema)",
+          "Do NOT leave platformRole on seed email as-is"
+        ],
+        "blocked": false
+      },
+      {
+        "target": "default_workspace_primary_admin",
+        "from": {
+          "id": "c463dd8c-9fb2-4109-9a56-6c771f4acd92",
+          "email": "a***n@salesplatform.local",
+          "name": "Admin User",
+          "isPrimaryAdmin": true
+        },
+        "toEmail": "p***n@example.com",
+        "actions": [
+          "change email to MY_LOGIN_EMAIL",
+          "invalidate sessions",
+          "password reset via one-time link (same as above)",
+          "keep org primary admin membership",
+          "platformRole stays null (tenant admin)"
+        ],
+        "blocked": false
+      }
+    ],
+    "seedPasswordFlags": [
+      {
+        "id": "f6409dac-5e6d-4aa8-9f6b-6dec05a50db6",
+        "email": "s***n@salesplatform.local",
+        "name": "Super Admin",
+        "usesSeedPassword": true,
+        "isSeedEmail": true,
+        "role": "SUPER_ADMIN",
+        "isActive": true
+      },
+      {
+        "id": "c463dd8c-9fb2-4109-9a56-6c771f4acd92",
+        "email": "a***n@salesplatform.local",
+        "name": "Admin User",
+        "usesSeedPassword": true,
+        "isSeedEmail": true,
+        "role": "ADMIN",
+        "isActive": true
+      },
+      {
+        "id": "a9668b68-aa7a-4a1e-9309-bfe93ba84811",
+        "email": "m***r@salesplatform.local",
+        "name": "Sales Manager",
+        "usesSeedPassword": true,
+        "isSeedEmail": true,
+        "role": "SALES_MANAGER",
+        "isActive": true
+      },
+      {
+        "id": "9cc9a59c-9ee4-4e2d-bdbf-603b1cdefbba",
+        "email": "r***p@salesplatform.local",
+        "name": "Sales Rep",
+        "usesSeedPassword": true,
+        "isSeedEmail": true,
+        "role": "SALES_REPRESENTATIVE",
+        "isActive": true
+      }
+    ],
+    "deactivate": [
+      {
+        "id": "a9668b68-aa7a-4a1e-9309-bfe93ba84811",
+        "email": "m***r@salesplatform.local",
+        "name": "Sales Manager",
+        "currentIsActive": true,
+        "action": "set isActive=false (no delete)"
+      },
+      {
+        "id": "9cc9a59c-9ee4-4e2d-bdbf-603b1cdefbba",
+        "email": "r***p@salesplatform.local",
+        "name": "Sales Rep",
+        "currentIsActive": true,
+        "action": "set isActive=false (no delete)"
+      }
+    ]
+  },
+  "integrations": {
+    "copy": [],
+    "skip": [],
+    "envPolicy": [
+      {
+        "provider": "anthropic",
+        "policy": "Copy from UserIntegration only; skip .env if UI row exists (no duplicates)"
+      },
+      {
+        "provider": "smtp_platform",
+        "policy": "Platform SMTP in .env stays PLATFORM system sender — NOT copied to TenantIntegration"
+      },
+      {
+        "provider": "linkedin_session_env",
+        "policy": "LINKEDIN_SESSION_ENABLED=false; env cookies never copied"
+      },
+      {
+        "provider": "anthropic_env",
+        "secretPresent": false,
+        "action": "SKIP — no .env key"
+      }
+    ]
+  },
+  "linkedIn": {
+    "planned": [],
+    "sessionFlag": {
+      "LINKEDIN_SESSION_ENABLED": false,
+      "note": "Refuse new SESSION connects; no env cron fallback"
+    }
+  }
+}
