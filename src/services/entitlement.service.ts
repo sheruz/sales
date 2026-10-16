@@ -7,7 +7,7 @@ import {
   UsageMetric,
   type PlanFeature,
 } from "@prisma/client";
-import { ForbiddenError, ValidationError } from "@/lib/api/response";
+import { ValidationError } from "@/lib/api/response";
 import {
   FEATURE_KEYS,
   type FeatureKey,
@@ -281,79 +281,53 @@ export class EntitlementService {
   }
 
   /**
-   * Server-side entitlement gate. Never trust the frontend.
-   * Boolean features: enabled must be true.
-   * Limited features: usage/seats < limit (null limit = unlimited when enabled).
+   * Server-side entitlement gate. Delegates to S1 entitlementsService
+   * (metering + shadow would-blocks; enforcement behind flag).
    */
   async assertFeature(
     organizationId: string,
     featureKey: FeatureKey,
-    opts?: { increment?: boolean; amount?: number }
+    opts?: { increment?: boolean; amount?: number; purpose?: string; exempt?: boolean }
   ) {
-    const sub = await this.ensureSubscription(organizationId);
-    if (
-      sub.status === SubscriptionStatus.CANCELED ||
-      sub.status === SubscriptionStatus.UNPAID ||
-      sub.status === SubscriptionStatus.INCOMPLETE_EXPIRED
-    ) {
-      throw new ForbiddenError(
-        "Subscription is inactive. Please update billing to continue."
-      );
-    }
-
-    const feature = this.getFeature(sub.plan.features, featureKey);
-    if (!feature || !feature.enabled) {
-      throw new ForbiddenError(
-        `Feature "${featureKey}" is not included in the ${sub.plan.name} plan. Upgrade to continue.`
-      );
-    }
-
-    const amount = opts?.amount ?? 1;
-
-    if (SEAT_FEATURES.has(featureKey) && feature.limitValue != null) {
-      const used = await this.getSeatCount(organizationId, featureKey);
-      if (used + amount > feature.limitValue) {
-        throw new ForbiddenError(
-          `Plan limit reached for ${featureKey} (${used}/${feature.limitValue}). Upgrade to continue.`
-        );
+    const { entitlementsService } = await import("@/lib/billing/entitlements");
+    const result = await entitlementsService.consume(
+      organizationId,
+      featureKey,
+      opts?.amount ?? 1,
+      {
+        purpose: opts?.purpose,
+        exempt: opts?.exempt,
+        increment: opts?.increment === true,
       }
-      return { ok: true as const, plan: sub.plan.name };
-    }
-
-    const metric = FEATURE_TO_METRIC[featureKey];
-    if (metric && feature.limitValue != null) {
-      const used = await this.getUsage(organizationId, metric);
-      if (opts?.increment) {
-        if (used + amount > feature.limitValue) {
-          throw new ForbiddenError(
-            `Plan limit reached for ${featureKey} (${used}/${feature.limitValue} this period). Upgrade to continue.`
-          );
-        }
-        await this.incrementUsage(organizationId, metric, amount);
-      } else if (used >= feature.limitValue) {
-        throw new ForbiddenError(
-          `Plan limit reached for ${featureKey} (${used}/${feature.limitValue} this period). Upgrade to continue.`
-        );
-      }
-    }
-
-    return { ok: true as const, plan: sub.plan.name };
+    );
+    return { ok: true as const, plan: result.planName ?? "unknown", shadow: result };
   }
 
   async assertAndConsume(
     organizationId: string,
     featureKey: FeatureKey,
-    amount = 1
+    amount = 1,
+    opts?: { purpose?: string; exempt?: boolean }
   ) {
     return this.assertFeature(organizationId, featureKey, {
       increment: true,
       amount,
+      purpose: opts?.purpose,
+      exempt: opts?.exempt,
     });
   }
 
   /** Pre-check before creating a seat-limited resource */
   async assertSeatAvailable(organizationId: string, featureKey: FeatureKey) {
-    return this.assertFeature(organizationId, featureKey, { amount: 1 });
+    return this.assertFeature(organizationId, featureKey, {
+      amount: 1,
+      increment: false,
+    });
+  }
+
+  async getShadowWouldBlocks(organizationId: string) {
+    const { entitlementsService } = await import("@/lib/billing/entitlements");
+    return entitlementsService.listShadowWouldBlocks(organizationId);
   }
 }
 

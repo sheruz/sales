@@ -28,6 +28,11 @@ export async function aiComplete(
     /** Rare platform/system AI only — never for tenant features. */
     isPlatformScoped?: boolean;
     operation?: string;
+    /**
+     * Purpose tag for metering. Inbound purposes
+     * (reply classification, bounce/unsub) are metered for stats but always exempt.
+     */
+    purpose?: string;
   }
 ): Promise<AICompletionResult> {
   const isPlatformScoped = Boolean(options.isPlatformScoped);
@@ -37,10 +42,13 @@ export async function aiComplete(
     );
   }
 
+  const purpose = options.purpose ?? options.feature;
   if (options.organizationId) {
     await entitlementService.assertAndConsume(
       options.organizationId,
-      FEATURE_KEYS.AI_CALLS
+      FEATURE_KEYS.AI_CALLS,
+      1,
+      { purpose }
     );
   }
 

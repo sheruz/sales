@@ -1,7 +1,7 @@
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth/session";
-import { isSuperAdmin, SESSION_COOKIE } from "@/lib/auth/permissions";
+import { SESSION_COOKIE } from "@/lib/auth/permissions";
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
 import { PlatformSidebar } from "@/components/platform/platform-sidebar";
 import { DashboardHeader } from "@/components/dashboard/dashboard-header";
@@ -25,7 +25,7 @@ export default async function PlatformLayout({
     redirect("/login");
   }
 
-  if (!isSuperAdmin(user.role)) {
+  if (!user.isPlatformAdmin) {
     redirect("/dashboard");
   }
 

@@ -636,6 +636,7 @@ export class InboxService {
     try {
       const result = await aiComplete({
         feature: "inbox_reply_classification",
+        purpose: "inbox_reply_classification",
         operation: "inbox_reply_classification",
         organizationId: input.organizationId,
         userId: input.userId,

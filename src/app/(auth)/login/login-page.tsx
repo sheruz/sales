@@ -43,9 +43,17 @@ export default function LoginPage() {
       }
 
       toast.success(`Welcome back, ${data.data.user.firstName}!`);
-      const role = data.data.user.role as string;
+      const u = data.data.user as {
+        role?: string;
+        platformRole?: string | null;
+        isPlatformAdmin?: boolean;
+      };
+      const isPlatform =
+        u.isPlatformAdmin === true ||
+        u.platformRole === "SUPER_ADMIN" ||
+        u.role === "SUPER_ADMIN";
       let home = redirect;
-      if (role === "SUPER_ADMIN") {
+      if (isPlatform) {
         home =
           !redirect || redirect === "/dashboard" || redirect.startsWith("/dashboard")
             ? "/platform"

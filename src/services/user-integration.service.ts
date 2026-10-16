@@ -184,24 +184,26 @@ export class UserIntegrationService {
 
   async saveOpenAi(organizationId: string, userId: string, apiKey: string) {
     await this.verifyOpenAiKey(apiKey);
-    return this.saveCredentials(
+    const row = await this.saveCredentials(
       organizationId,
       userId,
       IntegrationPlatform.OPENAI,
       { apiKey },
       "OpenAI connected"
     );
+    return this.toPublicIntegration(row);
   }
 
   async saveAnthropic(organizationId: string, userId: string, apiKey: string) {
     await this.verifyAnthropicKey(apiKey);
-    return this.saveCredentials(
+    const row = await this.saveCredentials(
       organizationId,
       userId,
       IntegrationPlatform.ANTHROPIC,
       { apiKey },
       "Claude connected"
     );
+    return this.toPublicIntegration(row);
   }
 
   async saveGooglePlaces(
@@ -210,24 +212,26 @@ export class UserIntegrationService {
     apiKey: string
   ) {
     await this.verifyGooglePlacesKey(apiKey);
-    return this.saveCredentials(
+    const row = await this.saveCredentials(
       organizationId,
       userId,
       IntegrationPlatform.GOOGLE_PLACES,
       { apiKey },
       "Google Places connected"
     );
+    return this.toPublicIntegration(row);
   }
 
   async saveHunter(organizationId: string, userId: string, apiKey: string) {
     await this.verifyHunterKey(apiKey);
-    return this.saveCredentials(
+    const row = await this.saveCredentials(
       organizationId,
       userId,
       IntegrationPlatform.HUNTER,
       { apiKey },
       "Hunter.io connected"
     );
+    return this.toPublicIntegration(row);
   }
 
   async saveEmailSmtp(
@@ -406,6 +410,13 @@ export class UserIntegrationService {
     return { success: true };
   }
 
+  /** Strip secrets before any API response. */
+  toPublicIntegration<T extends { encryptedCredentials?: string | null }>(row: T) {
+    const hasCredentials = Boolean(row.encryptedCredentials);
+    const { encryptedCredentials: _omit, ...rest } = row;
+    return { ...rest, hasCredentials };
+  }
+
   private async saveCredentials(
     organizationId: string,
     userId: string,
@@ -414,8 +425,9 @@ export class UserIntegrationService {
     displayLabel: string
   ) {
     const product = await prisma.integrationProduct.findUnique({ where: { platform } });
+    const encrypted = encryptCredentials(credentials);
 
-    return prisma.userIntegration.upsert({
+    const row = await prisma.userIntegration.upsert({
       where: {
         organizationId_userId_platform: { organizationId, userId, platform },
       },
@@ -426,7 +438,7 @@ export class UserIntegrationService {
         productId: product?.id,
         isConnected: true,
         isEnabled: true,
-        encryptedCredentials: encryptCredentials(credentials),
+        encryptedCredentials: encrypted,
         displayLabel,
         lastVerifiedAt: new Date(),
         lastError: null,
@@ -434,12 +446,61 @@ export class UserIntegrationService {
       update: {
         isConnected: true,
         isEnabled: true,
-        encryptedCredentials: encryptCredentials(credentials),
+        encryptedCredentials: encrypted,
         displayLabel,
         lastVerifiedAt: new Date(),
         lastError: null,
       },
     });
+
+    // S1 dual-write TenantIntegration (never drop legacy)
+    const providerId = this.platformToProviderId(platform);
+    if (providerId) {
+      await prisma.tenantIntegration.upsert({
+        where: {
+          organizationId_providerId_externalKey: {
+            organizationId,
+            providerId,
+            externalKey: "default",
+          },
+        },
+        create: {
+          organizationId,
+          providerId,
+          externalKey: "default",
+          label: displayLabel,
+          status: "CONNECTED",
+          encryptedCredentials: encrypted,
+          keyMode: "BYOK",
+          managedModeEnabled: false,
+          connectedByUserId: userId,
+          legacySource: "UserIntegration",
+          legacySourceId: row.id,
+        },
+        update: {
+          status: "CONNECTED",
+          encryptedCredentials: encrypted,
+          label: displayLabel,
+          legacySource: "UserIntegration",
+          legacySourceId: row.id,
+          lastError: null,
+        },
+      });
+    }
+
+    return row;
+  }
+
+  private platformToProviderId(platform: IntegrationPlatform): string | null {
+    const map: Partial<Record<IntegrationPlatform, string>> = {
+      ANTHROPIC: "anthropic",
+      OPENAI: "openai",
+      GOOGLE_PLACES: "google_places",
+      HUNTER: "hunter",
+      EMAIL_SMTP: "smtp",
+      LINKEDIN: "linkedin",
+    };
+    return map[platform] ?? null;
   }
 
   private async verifyOpenAiKey(apiKey: string) {

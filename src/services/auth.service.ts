@@ -48,6 +48,7 @@ export class AuthService {
         firstName: true,
         lastName: true,
         role: true,
+        platformRole: true,
         avatarUrl: true,
         passwordHash: true,
         isActive: true,
@@ -86,12 +87,15 @@ export class AuthService {
       orderBy: [{ isPrimaryAdmin: "desc" }, { createdAt: "asc" }],
     });
 
+    const isPlatformAdmin =
+      user.platformRole === "SUPER_ADMIN" ||
+      user.role === UserRole.SUPER_ADMIN;
+
     const token = await createSession(user.id, {
       ...meta,
-      organizationId:
-        user.role === UserRole.SUPER_ADMIN
-          ? null
-          : primaryMembership?.organizationId ?? null,
+      organizationId: isPlatformAdmin
+        ? null
+        : primaryMembership?.organizationId ?? null,
     });
 
     logger.info("User logged in", { userId: user.id, email: user.email });

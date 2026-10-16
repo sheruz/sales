@@ -1,7 +1,7 @@
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth/session";
-import { isSuperAdmin, SESSION_COOKIE } from "@/lib/auth/permissions";
+import { SESSION_COOKIE } from "@/lib/auth/permissions";
 import { getFeatureFlags } from "@/lib/features/flags";
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/dashboard/app-sidebar";
@@ -49,7 +49,8 @@ export default async function DashboardLayout({
     redirect("/login");
   }
 
-  if (isSuperAdmin(user.role)) {
+  // S1: platformRole / isPlatformAdmin is source of truth (not legacy UserRole alone)
+  if (user.isPlatformAdmin) {
     redirect("/platform");
   }
 

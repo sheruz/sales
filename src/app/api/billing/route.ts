@@ -12,12 +12,16 @@ export async function GET() {
   try {
     await requireOrgPermission("billing.manage");
     const user = await requireOrganizationContext();
-    const snapshot = await entitlementService.getUsageSnapshot(
-      user.organizationId
-    );
+    const [snapshot, shadowWouldBlocks] = await Promise.all([
+      entitlementService.getUsageSnapshot(user.organizationId),
+      entitlementService.getShadowWouldBlocks(user.organizationId),
+    ]);
     return NextResponse.json(
       apiSuccess({
         ...snapshot,
+        shadowWouldBlocks,
+        meteringEnabled: process.env.BILLING_METERING_ENABLED !== "false",
+        enforcementEnabled: process.env.BILLING_ENFORCEMENT_ENABLED === "true",
         stripeConfigured: isStripeConfigured(),
       })
     );

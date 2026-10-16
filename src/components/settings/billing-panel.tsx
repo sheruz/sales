@@ -46,6 +46,16 @@ type BillingSnapshot = {
     used: number | null;
     remaining: number | null;
   }>;
+  shadowWouldBlocks?: Array<{
+    id: string;
+    metric: string;
+    quantity: number;
+    createdAt: string;
+    reason: string | null;
+    purpose: string | null;
+  }>;
+  meteringEnabled?: boolean;
+  enforcementEnabled?: boolean;
   stripeConfigured: boolean;
 };
 
@@ -133,9 +143,12 @@ export function BillingPanel() {
       {billing && (
         <Card>
           <CardHeader>
-            <CardTitle className="text-base">Current plan</CardTitle>
+            <CardTitle className="text-base">Plan &amp; usage</CardTitle>
             <CardDescription>
-              Server-enforced entitlements for this organization
+              Limits and usage for this workspace.
+              {billing.enforcementEnabled
+                ? " Enforcement is on."
+                : " Shadow mode: over-limit actions are logged, not blocked."}
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
@@ -144,6 +157,9 @@ export function BillingPanel() {
                 {billing.subscription.planName}
               </span>
               <Badge variant="secondary">{billing.subscription.status}</Badge>
+              {!billing.enforcementEnabled && (
+                <Badge variant="outline">Shadow metering</Badge>
+              )}
               {billing.subscription.cancelAtPeriodEnd && (
                 <Badge variant="outline">Cancels at period end</Badge>
               )}
@@ -173,6 +189,29 @@ export function BillingPanel() {
                 </div>
               ))}
             </div>
+
+            {billing.shadowWouldBlocks &&
+              billing.shadowWouldBlocks.length > 0 && (
+                <div className="space-y-2">
+                  <h4 className="text-sm font-medium">
+                    Shadow would-blocks (not enforced)
+                  </h4>
+                  <ul className="max-h-48 space-y-1 overflow-y-auto text-xs text-muted-foreground">
+                    {billing.shadowWouldBlocks.map((b) => (
+                      <li key={b.id} className="rounded border px-2 py-1">
+                        <span className="font-medium text-foreground">
+                          {b.metric}
+                        </span>
+                        {b.purpose ? ` · ${b.purpose}` : ""}
+                        {b.reason ? ` — ${b.reason}` : ""}
+                        <span className="ml-1 opacity-70">
+                          {new Date(b.createdAt).toLocaleString()}
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
 
             {billing.stripeConfigured &&
               billing.subscription.provider === "stripe" && (

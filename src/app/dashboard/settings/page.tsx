@@ -157,7 +157,7 @@ export default async function SettingsPage({
         ...(canManageBilling
           ? [
               {
-                label: "Billing",
+                label: "Plan & Usage",
                 href: "/dashboard/settings?tab=billing",
                 tab: "billing" as const,
               },
