@@ -66,7 +66,10 @@ import { outboundConfigService } from "@/services/outbound-config.service";
 import { sequenceEnrollmentService } from "@/services/sequence-enrollment.service";
 import { companyService } from "@/services/company.service";
 import { normalizeEmail } from "@/services/contact.service";
-import { contactEmailMatchWhere } from "@/lib/email/inbound-sync";
+import {
+  contactEmailMatchWhere,
+  extractEmailAddress,
+} from "@/lib/email/inbound-sync";
 import { randomUUID } from "crypto";
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -1886,30 +1889,105 @@ export class AiReplyService {
     return `${text.trim()}\n\n${signature}`;
   }
 
+  /** Resolve prospect email from inbound From, prior outbound To, or lead. */
+  private async resolveProspectEmail(ctx: Ctx): Promise<string | null> {
+    const candidates: Array<string | null | undefined> = [
+      extractEmailAddress(ctx.message.fromEmail),
+      extractEmailAddress(ctx.contact?.email),
+    ];
+
+    const priorOut = await prisma.message.findFirst({
+      where: {
+        organizationId: ctx.organizationId,
+        conversationId: ctx.conversation.id,
+        direction: MessageDirection.OUTBOUND,
+        toEmail: { not: null },
+      },
+      orderBy: [{ sentAt: "desc" }, { createdAt: "desc" }],
+      select: { toEmail: true },
+    });
+    if (priorOut?.toEmail) {
+      candidates.push(extractEmailAddress(priorOut.toEmail));
+    }
+
+    if (ctx.conversation.leadId) {
+      const lead = await prisma.lead.findFirst({
+        where: {
+          id: ctx.conversation.leadId,
+          organizationId: ctx.organizationId,
+        },
+        select: { email: true },
+      });
+      if (lead?.email) candidates.push(extractEmailAddress(lead.email));
+    }
+
+    for (const raw of candidates) {
+      const email = (raw || "").trim().toLowerCase();
+      if (email && EMAIL_RE.test(email)) return email;
+    }
+    return null;
+  }
+
   /**
    * Outbox requires contactId. Inbound threads sometimes have no linked Contact
-   * (e.g. reply matched by thread only). Find-or-create from From: address.
+   * (e.g. reply matched by thread only). Find-or-create from prospect email.
    */
-  private async ensureContactForReply(ctx: Ctx): Promise<Contact | null> {
-    if (ctx.contact) return ctx.contact;
+  private async ensureContactForReply(
+    ctx: Ctx
+  ): Promise<
+    { ok: true; contact: Contact; toEmail: string } | { ok: false; reason: string }
+  > {
+    const toEmail = await this.resolveProspectEmail(ctx);
+    if (!toEmail) {
+      return {
+        ok: false,
+        reason:
+          "no_contact: could not resolve prospect email (empty From on inbound)",
+      };
+    }
 
-    const toEmail = (ctx.message.fromEmail || "").trim().toLowerCase();
-    if (!toEmail || !EMAIL_RE.test(toEmail)) return null;
+    if (ctx.contact) {
+      return { ok: true, contact: ctx.contact, toEmail };
+    }
 
     let contact = await prisma.contact.findFirst({
       where: contactEmailMatchWhere(ctx.organizationId, toEmail),
     });
 
     if (!contact) {
-      const domain = toEmail.split("@")[1]?.toLowerCase() || "unknown";
+      const domain = toEmail.split("@")[1]?.toLowerCase() || "unknown.local";
       let companyId = ctx.conversation.companyId ?? ctx.company?.id ?? null;
+
+      if (companyId) {
+        const companyOk = await prisma.company.findFirst({
+          where: {
+            id: companyId,
+            organizationId: ctx.organizationId,
+            deletedAt: null,
+          },
+          select: { id: true },
+        });
+        if (!companyOk) companyId = null;
+      }
+
       if (!companyId) {
-        const company = await companyService.findOrCreate(
-          ctx.organizationId,
-          domain,
-          { domain, website: `https://${domain}` }
-        );
-        companyId = company.id;
+        try {
+          const company = await companyService.findOrCreate(
+            ctx.organizationId,
+            domain,
+            { domain, website: `https://${domain}`, source: "inbound_reply" }
+          );
+          companyId = company.id;
+        } catch (err) {
+          console.error(
+            "[ai-reply] ensureContact company failed",
+            err instanceof Error ? err.message : err
+          );
+          return {
+            ok: false,
+            reason: `no_contact: company_create_failed (${domain})`,
+          };
+        }
       }
 
       const local = toEmail.split("@")[0] || "Prospect";
@@ -1933,15 +2011,22 @@ export class AiReplyService {
             status: ContactStatus.ACTIVE,
           },
         });
-      } catch {
-        // Race / unique: another request created the same email
+      } catch (err) {
+        console.error(
+          "[ai-reply] ensureContact create failed",
+          err instanceof Error ? err.message : err
+        );
         contact = await prisma.contact.findFirst({
           where: contactEmailMatchWhere(ctx.organizationId, toEmail),
         });
+        if (!contact) {
+          return {
+            ok: false,
+            reason: `no_contact: create_failed for ${toEmail}`,
+          };
+        }
       }
     }
-
-    if (!contact) return null;
 
     // Persist link so future sends / UI don't hit no_contact again
     if (
@@ -1963,7 +2048,7 @@ export class AiReplyService {
     }
 
     ctx.contact = contact;
-    return contact;
+    return { ok: true, contact, toEmail };
   }
 
   /** l. Queue (or re-queue) the single AI_REPLY outbox row for an inbound message. */
@@ -1973,10 +2058,11 @@ export class AiReplyService {
     text: string,
     opts: { immediate: boolean }
   ): Promise<{ ok: true; outbox: EmailOutbox } | { ok: false; reason: string }> {
-    const contact = await this.ensureContactForReply(ctx);
-    if (!contact) return { ok: false, reason: "no_contact" };
+    const ensured = await this.ensureContactForReply(ctx);
+    if (!ensured.ok) return { ok: false, reason: ensured.reason };
 
-    const toEmail = (ctx.message.fromEmail || contact.email || "").trim().toLowerCase();
+    const contact = ensured.contact;
+    const toEmail = ensured.toEmail;
     if (!toEmail || !EMAIL_RE.test(toEmail)) return { ok: false, reason: "no_recipient" };
 
     const suppressed = await emailSafetyService.isSuppressed(ctx.organizationId, toEmail);
