@@ -640,7 +640,9 @@ export class EnrichmentJobService {
 
     const used = await this.creditsUsedToday(organizationId);
     if (used >= config.dailyCreditLimit) {
-      throw new ValidationError("Daily Hunter credit limit reached");
+      throw new ValidationError(
+        `App daily enrichment cap reached (${used}/${config.dailyCreditLimit}). Hunter may still have credits — raise the daily limit in Enrichment settings, or wait until tomorrow (UTC).`
+      );
     }
 
     const credited = await withCreditReservation({
@@ -911,7 +913,9 @@ export class EnrichmentJobService {
     const config = await this.getConfig(organizationId);
     const used = await this.creditsUsedToday(organizationId);
     if (used >= config.dailyCreditLimit) {
-      throw new ValidationError("Daily Hunter credit limit reached");
+      throw new ValidationError(
+        `App daily enrichment cap reached (${used}/${config.dailyCreditLimit}). Hunter may still have credits — raise the daily limit in Enrichment settings, or wait until tomorrow (UTC).`
+      );
     }
 
     let creditsRemaining: number | null = null;
@@ -920,7 +924,9 @@ export class EnrichmentJobService {
       const credits = await provider.getCredits();
       creditsRemaining = credits.available;
       if (creditsRemaining !== null && creditsRemaining < 2) {
-        throw new ValidationError("Hunter credits too low to continue");
+        throw new ValidationError(
+          `Hunter account credits too low (${creditsRemaining} available). Top up or connect a key with more credits.`
+        );
       }
     } catch (err) {
       if (err instanceof ValidationError) throw err;

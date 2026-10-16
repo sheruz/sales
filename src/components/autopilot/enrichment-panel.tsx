@@ -150,6 +150,7 @@ export function EnrichmentPanel({ initial }: Props) {
   }
 
   const config = stats.config;
+  const appCapHit = stats.creditsUsed >= stats.dailyCreditLimit;
 
   return (
     <div className="space-y-6">
@@ -157,6 +158,16 @@ export function EnrichmentPanel({ initial }: Props) {
         <div className="rounded-lg border border-amber-500/40 bg-amber-500/10 p-3 text-sm">
           Cron warning: last run is missing or older than 15 minutes. Check
           server crontab / scripts/cron-tick.sh.
+        </div>
+      ) : null}
+
+      {appCapHit ? (
+        <div className="rounded-lg border border-amber-500/40 bg-amber-500/10 p-3 text-sm">
+          <b>App daily enrichment cap reached</b> ({stats.creditsUsed}/
+          {stats.dailyCreditLimit}). This is <em>not</em> Hunter being empty —
+          Hunter available is still{" "}
+          {stats.creditsRemaining != null ? stats.creditsRemaining : "—"}. Raise
+          the daily limit below to continue today, or wait until UTC midnight.
         </div>
       ) : null}
 
@@ -168,7 +179,7 @@ export function EnrichmentPanel({ initial }: Props) {
               Newest sourced companies first. Already enriched / no-contact
               companies are never charged again. &quot;Enriched today&quot; =
               contact found; &quot;No contact today&quot; still uses Hunter
-              credits.
+              credits. App daily cap is separate from Hunter&apos;s plan balance.
             </CardDescription>
           </div>
           <div className="flex flex-wrap gap-2">
@@ -196,8 +207,13 @@ export function EnrichmentPanel({ initial }: Props) {
             <Button
               size="sm"
               variant="outline"
-              disabled={busy === "run"}
+              disabled={busy === "run" || appCapHit}
               onClick={enrichNow}
+              title={
+                appCapHit
+                  ? "Raise app daily limit first — Hunter still has credits"
+                  : undefined
+              }
             >
               {busy === "run" ? (
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -257,8 +273,25 @@ export function EnrichmentPanel({ initial }: Props) {
               </span>
             </p>
             <p className="text-xs text-muted-foreground">
-              Org daily cap · failed {stats.failed} · skipped {stats.skipped}
+              Org daily cap (blocks Enrich now) · failed {stats.failed} ·
+              skipped {stats.skipped}
             </p>
+          </div>
+        </CardContent>
+        <CardContent className="border-t pt-4">
+          <div className="flex flex-wrap items-center gap-2 text-sm">
+            <span className="text-muted-foreground">Daily limit:</span>
+            {[50, 100, 200, 500, 1000].map((n) => (
+              <Button
+                key={n}
+                size="sm"
+                variant={config.dailyCreditLimit === n ? "default" : "outline"}
+                disabled={busy === "config"}
+                onClick={() => void patchConfig({ dailyCreditLimit: n })}
+              >
+                {n}/day
+              </Button>
+            ))}
           </div>
         </CardContent>
       </Card>
