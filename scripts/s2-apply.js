@@ -149,11 +149,25 @@ async function ensureTestTenant(prisma, starterPlanId) {
     update: { planId: starterPlanId, status: "ACTIVE" },
   });
 
-  const role = await prisma.role.findFirst({
-    where: { key: "OWNER", scope: "ORGANIZATION" },
-  });
+  // App org-owner role key is company_admin (see ROLE_KEYS), not OWNER.
+  let role =
+    (await prisma.role.findUnique({ where: { key: "company_admin" } })) ||
+    (await prisma.role.findFirst({
+      where: { scope: "ORGANIZATION", key: { in: ["OWNER", "owner"] } },
+    }));
   if (!role) {
-    throw new Error("ORGANIZATION OWNER role missing — run S1 seed/roles first");
+    role = await prisma.role.create({
+      data: {
+        id: randomUUID(),
+        key: "company_admin",
+        name: "Company Admin",
+        scope: "ORGANIZATION",
+        isSystem: true,
+      },
+    });
+    console.error(
+      "[s2-apply] created missing company_admin role (run seedRolesAndPermissions when convenient)"
+    );
   }
 
   const passwordPlain = `Tt-${crypto.randomBytes(9).toString("base64url")}!`;
