@@ -131,7 +131,8 @@ export function withEmailUtm(
 /** Stable GA4 client_id derived from org + recipient (no raw email sent to GA). */
 export function gaClientId(organizationId: string, email?: string | null): string {
   const seed = `${organizationId}:${(email || "anon").toLowerCase()}`;
-  const hex = createHash("sha256").update(seed).digest("hex").slice(0, 16);
-  const n = BigInt(`0x${hex}`);
-  return `${n % 2147483647n}.${Math.floor(Date.now() / 1000)}`;
+  // Avoid BigInt literals (tsconfig target ES2017).
+  const hex = createHash("sha256").update(seed).digest("hex").slice(0, 8);
+  const n = Number.parseInt(hex, 16) % 2147483647;
+  return `${n}.${Math.floor(Date.now() / 1000)}`;
 }
