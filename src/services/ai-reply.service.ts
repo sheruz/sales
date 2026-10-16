@@ -31,6 +31,11 @@ import { NotFoundError, ValidationError } from "@/lib/api/response";
 import { aiComplete, parseAIJson } from "@/lib/ai/provider";
 import type { AICompletionResult } from "@/lib/ai/types";
 import { FEATURE_KEYS } from "@/lib/billing/features";
+import { CREDIT_ACTIONS } from "@/lib/billing/credit-actions";
+import {
+  isOutOfCreditsPause,
+  withCreditReservation,
+} from "@/lib/billing/with-credits";
 import { wrapUntrustedContent, sanitizeExternalForAI } from "@/lib/security/untrusted-content";
 import type { AiReplyConfig } from "@/lib/ai-reply/config";
 import {
@@ -575,9 +580,20 @@ export class AiReplyService {
       hold === "low_confidence";
 
     if (!skipDrafting) {
-      const gen = await this.generateDraft(ctx, cls.slug, cls);
-      draftText = gen.draft;
-      draftHold = gen.holdReason;
+      const credited = await withCreditReservation({
+        organizationId: ctx.organizationId,
+        actionType: CREDIT_ACTIONS.AI_REPLY_DRAFT,
+        idempotencyKey: `ai_reply_draft:${ctx.organizationId}:${ctx.conversation.id}:${ctx.message.id}`,
+        referenceType: "inbox_message",
+        referenceId: ctx.message.id,
+        fn: () => this.generateDraft(ctx, cls.slug, cls),
+      });
+      if (isOutOfCreditsPause(credited)) {
+        draftHold = "out_of_credits";
+      } else {
+        draftText = credited.result.draft;
+        draftHold = credited.result.holdReason;
+      }
     }
     hold = hold ?? draftHold;
 
@@ -2180,7 +2196,18 @@ export class AiReplyService {
       nonEnglishHold: ctx.cfg.nonEnglishHold,
     });
 
-    const gen = await this.generateDraft(ctx, slug, cls);
+    const credited = await withCreditReservation({
+      organizationId,
+      actionType: CREDIT_ACTIONS.AI_REPLY_DRAFT,
+      idempotencyKey: `ai_reply_draft:regen:${organizationId}:${draft.id}:${Date.now()}`,
+      referenceType: "ai_reply_draft",
+      referenceId: draft.id,
+      actorUserId: userId,
+      fn: () => this.generateDraft(ctx, slug, cls),
+    });
+    const gen = isOutOfCreditsPause(credited)
+      ? { draft: null, holdReason: "out_of_credits" as const }
+      : credited.result;
     const holdReason = hold0 ?? gen.holdReason;
 
     const { draft: updated } = await this.persistDraft(ctx, {

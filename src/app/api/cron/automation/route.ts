@@ -8,6 +8,7 @@ import { websiteAuditService } from "@/services/website-audit.service";
 import { outboundJobService } from "@/services/outbound-job.service";
 import { aiReplyService } from "@/services/ai-reply.service";
 import { cronTickService } from "@/services/cron-tick.service";
+import { creditLedgerService } from "@/services/credit-ledger.service";
 import { apiSuccess } from "@/lib/api/response";
 import { handleApiError } from "@/lib/api/error-handler";
 import { assertCronAuthorized } from "@/lib/security/cron-auth";
@@ -40,6 +41,18 @@ export async function POST(request: NextRequest) {
     const errors: string[] = [];
 
     try {
+      // S2: expire open RESERVEs + monthly grants (idempotent per org+period)
+      let creditSweep = 0;
+      let monthlyGrants = { orgs: 0, granted: 0 };
+      try {
+        creditSweep = await creditLedgerService.sweepExpiredReserves(200);
+        monthlyGrants = await creditLedgerService.runMonthlyGrants();
+      } catch (e: unknown) {
+        errors.push(
+          `credits: ${e instanceof Error ? e.message : "credits maintenance failed"}`
+        );
+      }
+
       const [
         automation,
         autopilot,
@@ -119,6 +132,8 @@ export async function POST(request: NextRequest) {
         auditOrgs: audit.orgs,
         outboundOrgs: outbound.orgs,
         aiReplyOrgs: aiReplies.organizations,
+        creditSweep,
+        monthlyGrants,
         errors: errors.length ? errors : undefined,
       });
 
@@ -133,6 +148,7 @@ export async function POST(request: NextRequest) {
           audit: true,
           outbound: true,
           aiReplies: true,
+          credits: true,
         },
         counts: {
           sequencesClaimed: sequences.claimed,
@@ -143,6 +159,8 @@ export async function POST(request: NextRequest) {
           auditOrgs: audit.orgs,
           outboundOrgs: outbound.orgs,
           aiReplyOrgs: aiReplies.organizations,
+          creditSweep,
+          monthlyGrantsGranted: monthlyGrants.granted,
         },
         errors: errors.length ? errors : null,
       });
@@ -152,6 +170,7 @@ export async function POST(request: NextRequest) {
           tickId: tick.id,
           automation,
           autopilot,
+          credits: { sweep: creditSweep, monthlyGrants },
           sourcing: { orgs: sourcing.orgs },
           enrichment: { orgs: enrichment.orgs },
           audit: { orgs: audit.orgs },

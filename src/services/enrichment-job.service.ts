@@ -27,6 +27,11 @@ import {
   EnrichmentApiError,
   EnrichmentRateLimitError,
 } from "@/lib/enrichment/types";
+import { CREDIT_ACTIONS } from "@/lib/billing/credit-actions";
+import {
+  isOutOfCreditsPause,
+  withCreditReservation,
+} from "@/lib/billing/with-credits";
 
 export type EnrichmentConfig = {
   enabled: boolean;
@@ -501,12 +506,52 @@ export class EnrichmentJobService {
       throw new ValidationError("Daily Hunter credit limit reached");
     }
 
+    const credited = await withCreditReservation({
+      organizationId,
+      actionType: CREDIT_ACTIONS.ENRICHMENT,
+      idempotencyKey: `enrichment:${organizationId}:${companyId}:a${company.enrichmentAttempts ?? 0}`,
+      referenceType: "company",
+      referenceId: companyId,
+      actorUserId: userId,
+      fn: () => this.enrichOneCompanyCharged(organizationId, company, config, userId),
+    });
+    if (isOutOfCreditsPause(credited)) {
+      return {
+        status: "PAUSED" as const,
+        reason: "out_of_credits" as const,
+      };
+    }
+    return credited.result;
+  }
+
+  private async enrichOneCompanyCharged(
+    organizationId: string,
+    company: {
+      id: string;
+      emails: Array<{ email: string; type: string | null }>;
+      enrichmentAttempts?: number | null;
+    },
+    config: EnrichmentConfig,
+    userId?: string
+  ) {
+    const domain = (
+      await prisma.company.findFirst({
+        where: { id: company.id, organizationId },
+        select: { normalizedDomain: true, domain: true },
+      })
+    );
+    const domainStr = (domain?.normalizedDomain || domain?.domain || "")
+      .toLowerCase()
+      .replace(/^www\./, "");
+
     const provider = await hunterService.getProvider(organizationId, userId);
 
     const isHunterPlanLimit = (message: string) =>
       /limited to \d+ email|current plan|upgrade your plan/i.test(message);
 
     try {
+      // rebind domain for body below
+      const domain = domainStr;
       let people: Awaited<
         ReturnType<typeof provider.domainSearch>
       >["people"] = [];
@@ -565,7 +610,10 @@ export class EnrichmentJobService {
 
       if (!person) {
         const generic = pickBestGenericEmail(
-          company.emails.map((e) => ({ email: e.email, type: e.type }))
+          company.emails.map((e) => ({
+            email: e.email,
+            type: e.type ?? undefined,
+          }))
         );
         if (!generic) {
           await prisma.company.update({
@@ -698,7 +746,7 @@ export class EnrichmentJobService {
         const planLimit = isHunterPlanLimit(message);
         const attempts = planLimit
           ? config.maxAttempts
-          : company.enrichmentAttempts + 1;
+          : Number(company.enrichmentAttempts ?? 0) + 1;
         await prisma.company.update({
           where: { id: company.id },
           data: {
@@ -788,10 +836,12 @@ export class EnrichmentJobService {
         continue;
       }
       try {
+        const one = await this.enrichOneCompany(organizationId, c.id, userId);
         results.push({
           companyId: c.id,
-          ...(await this.enrichOneCompany(organizationId, c.id, userId)),
+          ...one,
         });
+        if (one.status === "PAUSED") break; // resume next cron tick
       } catch (err) {
         results.push({
           companyId: c.id,

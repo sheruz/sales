@@ -17,6 +17,11 @@ import {
 } from "@/lib/sourcing/company-dedupe";
 import { crawlWebsiteForContacts } from "@/lib/sourcing/website-contact-crawler";
 import type { GooglePlaceResult } from "@/lib/sourcing/adapters/google-places.adapter";
+import { CREDIT_ACTIONS } from "@/lib/billing/credit-actions";
+import {
+  isOutOfCreditsPause,
+  withCreditReservation,
+} from "@/lib/billing/with-credits";
 
 export type SourcingConfig = {
   enabled: boolean;
@@ -332,50 +337,75 @@ export class SourcingJobService {
       throw new ValidationError("Query is paused — set Active first");
     }
 
-    const result = await googlePlacesService.textSearch({
+    const credited = await withCreditReservation({
       organizationId,
-      userId,
-      textQuery: query.query,
-      pageToken: query.pageToken,
-    });
+      actionType: CREDIT_ACTIONS.GOOGLE_SOURCING_PAGE,
+      idempotencyKey: `google_sourcing_page:${organizationId}:${queryId}:${query.pageToken ?? "p0"}:${query.lastRunAt?.toISOString() ?? "init"}`,
+      referenceType: "search_query",
+      referenceId: queryId,
+      actorUserId: userId,
+      fn: async () => {
+        const result = await googlePlacesService.textSearch({
+          organizationId,
+          userId,
+          textQuery: query.query,
+          pageToken: query.pageToken,
+        });
 
-    let created = 0;
-    let updated = 0;
-    for (const place of result.places) {
-      const upsert = await this.upsertPlaceCompany(
-        organizationId,
-        place,
-        {
-          country: query.country,
-          city: query.city,
-        },
-        { queryLabel: query.query }
-      );
-      if (upsert.created) created += 1;
-      else updated += 1;
-    }
+        let created = 0;
+        let updated = 0;
+        for (const place of result.places) {
+          const upsert = await this.upsertPlaceCompany(
+            organizationId,
+            place,
+            {
+              country: query.country,
+              city: query.city,
+            },
+            { queryLabel: query.query }
+          );
+          if (upsert.created) created += 1;
+          else updated += 1;
+        }
 
-    const done = !result.nextPageToken;
-    await prisma.searchQuery.update({
-      where: { id: query.id },
-      data: {
-        lastRunAt: new Date(),
-        resultsCount: { increment: result.places.length },
-        pageToken: result.nextPageToken,
-        status: done ? SearchQueryStatus.DONE : SearchQueryStatus.ACTIVE,
-        lastError: null,
+        const done = !result.nextPageToken;
+        await prisma.searchQuery.update({
+          where: { id: query.id },
+          data: {
+            lastRunAt: new Date(),
+            resultsCount: { increment: result.places.length },
+            pageToken: result.nextPageToken,
+            status: done ? SearchQueryStatus.DONE : SearchQueryStatus.ACTIVE,
+            lastError: null,
+          },
+        });
+
+        return {
+          queryId: query.id,
+          places: result.places.length,
+          created,
+          updated,
+          nextPageToken: result.nextPageToken,
+          done,
+          estimatedCostUsd: result.estimatedCostUsd,
+        };
       },
     });
 
-    return {
-      queryId: query.id,
-      places: result.places.length,
-      created,
-      updated,
-      nextPageToken: result.nextPageToken,
-      done,
-      estimatedCostUsd: result.estimatedCostUsd,
-    };
+    if (isOutOfCreditsPause(credited)) {
+      return {
+        queryId,
+        paused: true as const,
+        reason: "out_of_credits" as const,
+        places: 0,
+        created: 0,
+        updated: 0,
+        nextPageToken: null,
+        done: false,
+        estimatedCostUsd: 0,
+      };
+    }
+    return credited.result;
   }
 
   async processTickForOrg(organizationId: string) {
@@ -422,7 +452,16 @@ export class SourcingJobService {
           break;
         }
         try {
-          queryResults.push(await this.runOneQuery(organizationId, q.id));
+          const r = await this.runOneQuery(organizationId, q.id);
+          queryResults.push(r);
+          if (
+            r &&
+            typeof r === "object" &&
+            "paused" in r &&
+            (r as { paused?: boolean }).paused
+          ) {
+            break; // soft-pause; resume next cron tick when credits available
+          }
         } catch (err) {
           await prisma.searchQuery.update({
             where: { id: q.id },

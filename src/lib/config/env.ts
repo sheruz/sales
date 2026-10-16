@@ -78,8 +78,13 @@ const envSchema = z.object({
   PLATFORM_OWNER_ORG_ID: z.string().uuid().optional(),
   /** Record usage + shadow would-blocks. Default on for S1. */
   BILLING_METERING_ENABLED: z.coerce.boolean().default(true),
-  /** Actually block over-limit actions. Default off (shadow) for S1. */
+  /**
+   * Global enforcement kill-switch. S2 keeps this FALSE.
+   * Per-org Organization.billingEnforcementEnabled controls real blocking.
+   */
   BILLING_ENFORCEMENT_ENABLED: z.coerce.boolean().default(false),
+  /** Minutes before an open RESERVE is auto-refunded. */
+  CREDIT_RESERVE_TTL_MINUTES: z.coerce.number().default(15),
   AUTOPILOT_ENABLED: z.coerce.boolean().default(false),
   CRON_SECRET: z.string().optional(),
   /** Comma-separated: email, linkedin. Default email-only to protect LinkedIn account */

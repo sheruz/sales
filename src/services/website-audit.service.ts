@@ -34,6 +34,11 @@ import {
   buildSequenceTemplateVars,
   renderSequenceTemplateDetailed,
 } from "@/lib/sequences/runtime";
+import { CREDIT_ACTIONS } from "@/lib/billing/credit-actions";
+import {
+  isOutOfCreditsPause,
+  withCreditReservation,
+} from "@/lib/billing/with-credits";
 
 export type AuditConfig = {
   enabled: boolean;
@@ -330,6 +335,87 @@ export class WebsiteAuditService {
       throw new ValidationError("Daily audit limit reached");
     }
 
+    const auditId = randomUUID();
+    const enrollableSafe = enrollable
+      .filter((c): c is typeof c & { email: string } => Boolean(c.email))
+      .map((c) => ({
+        id: c.id,
+        firstName: c.firstName,
+        title: c.title,
+        email: c.email,
+      }));
+    if (!enrollableSafe.length) {
+      throw new ValidationError(
+        "No valid (or allowed risky) contact — skip audit spend"
+      );
+    }
+    const credited = await withCreditReservation({
+      organizationId,
+      actionType: CREDIT_ACTIONS.AUDIT_PITCH,
+      idempotencyKey: `audit_pitch:${organizationId}:${companyId}:${auditId}`,
+      referenceType: "website_audit",
+      referenceId: auditId,
+      actorUserId: userId,
+      fn: () =>
+        this.runAuditCharged(
+          organizationId,
+          companyId,
+          {
+            id: company.id,
+            name: company.name,
+            website: company.website!,
+            domain: company.domain,
+            city: company.city,
+            industry: company.industry,
+            opportunities: company.opportunities.map((o) => ({
+              id: o.id,
+              primaryContactId: o.primaryContactId,
+            })),
+          },
+          enrollableSafe,
+          config,
+          auditId,
+          userId,
+          opts
+        ),
+    });
+    if (isOutOfCreditsPause(credited)) {
+      return {
+        status: "PAUSED" as const,
+        reason: "out_of_credits" as const,
+        companyId,
+      };
+    }
+    return credited.result;
+  }
+
+  private async runAuditCharged(
+    organizationId: string,
+    companyId: string,
+    // company row with contacts + opportunities from auditOne()
+    company: {
+      id: string;
+      name: string;
+      website: string;
+      domain: string | null;
+      city: string | null;
+      industry: string | null;
+      opportunities: Array<{
+        id: string;
+        primaryContactId: string | null;
+      }>;
+    },
+    enrollable: Array<{
+      id: string;
+      firstName: string | null;
+      title: string | null;
+      email: string;
+    }>,
+    config: AuditConfig,
+    auditId: string,
+    userId?: string,
+    opts?: { force?: boolean; regeneratePitch?: boolean }
+  ) {
     await prisma.company.update({
       where: { id: companyId },
       data: {
@@ -339,7 +425,6 @@ export class WebsiteAuditService {
       },
     });
 
-    const auditId = randomUUID();
     await prisma.websiteAudit.create({
       data: {
         id: auditId,
@@ -725,7 +810,16 @@ export class WebsiteAuditService {
     );
     const results = [];
     for (const id of ids) {
-      results.push(await this.auditOne(organizationId, id, userId));
+      const one = await this.auditOne(organizationId, id, userId);
+      results.push(one);
+      if (
+        one &&
+        typeof one === "object" &&
+        "status" in one &&
+        one.status === "PAUSED"
+      ) {
+        break;
+      }
     }
     return { processed: results.length, results };
   }

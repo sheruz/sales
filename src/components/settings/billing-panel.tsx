@@ -56,26 +56,51 @@ type BillingSnapshot = {
   }>;
   meteringEnabled?: boolean;
   enforcementEnabled?: boolean;
+  orgBillingEnforcementEnabled?: boolean;
+  credits?: {
+    balance: number;
+    isOwner: boolean;
+    consumedThisMonth: Array<{ actionType: string; credits: number }>;
+    warnings: {
+      at20: string | null;
+      at5: string | null;
+      at0: string | null;
+    };
+  };
   stripeConfigured: boolean;
+};
+
+type LedgerEntry = {
+  id: string;
+  type: string;
+  amount: number;
+  balanceAfter: number;
+  actionType: string | null;
+  reason: string | null;
+  createdAt: string;
 };
 
 export function BillingPanel() {
   const [plans, setPlans] = useState<Plan[]>([]);
   const [billing, setBilling] = useState<BillingSnapshot | null>(null);
+  const [ledger, setLedger] = useState<LedgerEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const [plansRes, billingRes] = await Promise.all([
+      const [plansRes, billingRes, creditsRes] = await Promise.all([
         fetch("/api/plans"),
         fetch("/api/billing"),
+        fetch("/api/billing/credits?take=30"),
       ]);
       const plansJson = await plansRes.json();
       const billingJson = await billingRes.json();
+      const creditsJson = await creditsRes.json();
       if (plansJson.success) setPlans(plansJson.data);
       if (billingJson.success) setBilling(billingJson.data);
+      if (creditsJson.success) setLedger(creditsJson.data.ledger ?? []);
     } catch {
       toast.error("Failed to load billing");
     } finally {
@@ -138,8 +163,110 @@ export function BillingPanel() {
     return <p className="text-sm text-muted-foreground">Loading billing…</p>;
   }
 
+  const credits = billing?.credits;
+  const outOfCredits =
+    Boolean(billing?.orgBillingEnforcementEnabled) &&
+    credits != null &&
+    !credits.isOwner &&
+    credits.balance <= 0;
+
   return (
     <div className="space-y-6">
+      {outOfCredits && (
+        <div className="rounded-md border border-amber-500/40 bg-amber-500/10 px-4 py-3 text-sm">
+          Out of credits — Autopilot credit-consuming jobs are paused until you
+          add credits. Inbound replies are still processed and held for you.
+        </div>
+      )}
+
+      {billing && credits && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">Credits</CardTitle>
+            <CardDescription>
+              {credits.isOwner
+                ? "Owner workspace — credits are not consumed (usage recorded for stats only)."
+                : billing.orgBillingEnforcementEnabled
+                  ? "Enforcement on for this workspace: jobs pause at 0 credits."
+                  : "Credits are metered; enforcement is off for this workspace."}
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="flex flex-wrap items-baseline gap-3">
+              <span className="text-3xl font-semibold tabular-nums">
+                {credits.balance}
+              </span>
+              <span className="text-sm text-muted-foreground">
+                balance
+              </span>
+              {credits.warnings.at0 && (
+                <Badge variant="destructive">0 credits</Badge>
+              )}
+              {!credits.warnings.at0 && credits.warnings.at5 && (
+                <Badge variant="outline">≤5%</Badge>
+              )}
+              {!credits.warnings.at0 &&
+                !credits.warnings.at5 &&
+                credits.warnings.at20 && (
+                  <Badge variant="outline">≤20%</Badge>
+                )}
+            </div>
+            {credits.consumedThisMonth.length > 0 && (
+              <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+                {credits.consumedThisMonth.map((row) => (
+                  <div
+                    key={row.actionType}
+                    className="rounded-md border px-3 py-2 text-sm"
+                  >
+                    <div className="font-medium">{row.actionType}</div>
+                    <div className="text-muted-foreground">
+                      {row.credits} this month
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+            {ledger.length > 0 && (
+              <div className="space-y-2">
+                <h4 className="text-sm font-medium">Recent ledger</h4>
+                <ul className="max-h-56 space-y-1 overflow-y-auto text-xs">
+                  {ledger.map((e) => (
+                    <li
+                      key={e.id}
+                      className="flex flex-wrap items-center gap-2 rounded border px-2 py-1"
+                    >
+                      <Badge variant="outline">{e.type}</Badge>
+                      <span
+                        className={
+                          e.amount < 0
+                            ? "text-red-600 tabular-nums"
+                            : e.amount > 0
+                              ? "text-emerald-700 tabular-nums"
+                              : "tabular-nums"
+                        }
+                      >
+                        {e.amount > 0 ? `+${e.amount}` : e.amount}
+                      </span>
+                      <span className="text-muted-foreground">
+                        bal {e.balanceAfter}
+                      </span>
+                      {e.actionType && (
+                        <span className="text-muted-foreground">
+                          {e.actionType}
+                        </span>
+                      )}
+                      <span className="ml-auto text-muted-foreground">
+                        {new Date(e.createdAt).toLocaleString()}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
       {billing && (
         <Card>
           <CardHeader>

@@ -766,6 +766,15 @@ model Organization {
   tenantIntegrations TenantIntegration[]
   usageEvents       UsageEvent[]
   platformAuditLogs PlatformAuditLog[]
+  creditLedgerEntries CreditLedgerEntry[]
+
+  /// S2 cached credit balance (absolute). Reconcile from ledger.
+  creditBalanceCached       Int       @default(0) @map("credit_balance_cached")
+  /// Per-org enforcement (global BILLING_ENFORCEMENT_ENABLED stays false).
+  billingEnforcementEnabled Boolean   @default(false) @map("billing_enforcement_enabled")
+  creditsWarnedAt20         DateTime? @map("credits_warned_at_20")
+  creditsWarnedAt5          DateTime? @map("credits_warned_at_5")
+  creditsWarnedAt0          DateTime? @map("credits_warned_at_0")
 
   @@index([status])
   @@index([deletedAt])
@@ -3272,6 +3281,10 @@ model Plan {
   sortOrder       Int             @default(0) @map("sort_order")
   isDefault       Boolean         @default(false) @map("is_default")
   visibility      PlanVisibility  @default(PUBLIC)
+  /// S2 monthly credit grant (null = none; OWNER ignores)
+  monthlyCredits        Int?     @map("monthly_credits")
+  creditRolloverEnabled Boolean  @default(false) @map("credit_rollover_enabled")
+  creditRolloverCap     Int?     @map("credit_rollover_cap")
   createdAt       DateTime        @default(now()) @map("created_at")
   updatedAt       DateTime        @updatedAt @map("updated_at")
 
@@ -3579,6 +3592,69 @@ model UsageEvent {
   @@index([organizationId, metric, periodStart])
   @@index([createdAt])
   @@map("usage_events")
+}
+
+// ─── S2: Credits ledger ──────────────────────────────────────────────────────
+
+enum CreditLedgerType {
+  GRANT_PLAN
+  GRANT_MANUAL
+  PURCHASE
+  CONSUME
+  RESERVE
+  COMMIT
+  REFUND
+  EXPIRE
+  ADJUST
+}
+
+enum CreditKeyMode {
+  BYOK
+  MANAGED
+}
+
+model CreditPrice {
+  id         String        @id @default(uuid())
+  actionType String        @map("action_type")
+  keyMode    CreditKeyMode @default(BYOK) @map("key_mode")
+  credits    Int
+  active     Boolean       @default(true)
+  createdAt  DateTime      @default(now()) @map("created_at")
+  updatedAt  DateTime      @updatedAt @map("updated_at")
+
+  @@unique([actionType, keyMode])
+  @@index([actionType])
+  @@map("credit_prices")
+}
+
+/// Append-only credit ledger. Amounts are signed (+grant / -consume/reserve).
+/// RESERVE deducts immediately; COMMIT is amount 0; REFUND returns credits.
+model CreditLedgerEntry {
+  id                   String           @id @default(uuid())
+  organizationId       String           @map("organization_id")
+  type                 CreditLedgerType
+  /// Signed: + grant/refund, - reserve/consume, 0 commit
+  amount               Int
+  balanceAfter         Int              @map("balance_after")
+  actionType           String?          @map("action_type")
+  referenceType        String?          @map("reference_type")
+  referenceId          String?          @map("reference_id")
+  /// Globally unique — one COMMIT or one REFUND per reservation via `:commit` / `:refund` suffix
+  idempotencyKey       String           @unique @map("idempotency_key")
+  /// For RESERVE rows: links outcomes; for COMMIT/REFUND: parent reserve key
+  reserveIdempotencyKey String?         @map("reserve_idempotency_key")
+  actorUserId          String?          @map("actor_user_id")
+  reason               String?
+  metadata             Json?
+  createdAt            DateTime         @default(now()) @map("created_at")
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId, createdAt])
+  @@index([organizationId, type])
+  @@index([reserveIdempotencyKey])
+  @@index([referenceType, referenceId])
+  @@map("credit_ledger_entries")
 }
 
 /// Every super-admin write is audited here.
