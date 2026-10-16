@@ -194,6 +194,15 @@ async function ensureUnlimitedOwnerPlan(prisma) {
   return plan;
 }
 
+async function findUserByEmails(prisma, emails) {
+  for (const email of emails) {
+    if (!email) continue;
+    const u = await prisma.user.findUnique({ where: { email } });
+    if (u) return u;
+  }
+  return null;
+}
+
 async function main() {
   if (!APPLY) {
     console.log(
@@ -212,19 +221,43 @@ async function main() {
     console.error("MY_SUPER_ADMIN_EMAIL and MY_LOGIN_EMAIL are required for APPLY");
     process.exit(1);
   }
+  if (MY_SUPER_ADMIN_EMAIL === MY_LOGIN_EMAIL) {
+    console.error("MY_SUPER_ADMIN_EMAIL and MY_LOGIN_EMAIL must be different (Option B)");
+    process.exit(1);
+  }
 
-  console.log("=== S1 APPLY: running schema migrate ===");
   const { spawnSync } = require("child_process");
-  const mig = spawnSync(
-    process.execPath,
-    ["scripts/s1-schema-migrate.js"],
-    {
-      cwd: require("path").join(__dirname, ".."),
+  const path = require("path");
+  const rootDir = path.join(__dirname, "..");
+  const phase = process.env.S1_APPLY_PHASE || "all";
+
+  // Schema + prisma generate must run in a separate process from data APPLY,
+  // otherwise the already-loaded Prisma client stays stale.
+  if (phase === "all") {
+    console.log("=== S1 APPLY: schema migrate ===");
+    const mig = spawnSync(process.execPath, ["scripts/s1-schema-migrate.js"], {
+      cwd: rootDir,
       env: { ...process.env, APPLY: "1" },
       stdio: "inherit",
-    }
-  );
-  if (mig.status !== 0) process.exit(mig.status ?? 1);
+    });
+    if (mig.status !== 0) process.exit(mig.status ?? 1);
+
+    console.log("=== S1 APPLY: prisma generate (refresh client) ===");
+    const gen = spawnSync(process.execPath, ["scripts/prisma-cli.js", "generate"], {
+      cwd: rootDir,
+      env: process.env,
+      stdio: "inherit",
+    });
+    if (gen.status !== 0) process.exit(gen.status ?? 1);
+
+    console.log("=== S1 APPLY: data phase (fresh Prisma client) ===");
+    const data = spawnSync(process.execPath, ["scripts/s1-apply.js"], {
+      cwd: rootDir,
+      env: { ...process.env, APPLY: "1", S1_APPLY_PHASE: "data" },
+      stdio: "inherit",
+    });
+    process.exit(data.status ?? 1);
+  }
 
   const prisma = createPrisma();
   const summary = { plans: null, subscription: null, users: [], integrations: [], linkedIn: [] };
@@ -263,10 +296,11 @@ async function main() {
     summary.subscription = { organizationId: ownerOrg.id, plan: "OWNER" };
 
     console.log("=== users ===");
-    const superSeed = await prisma.user.findUnique({
-      where: { email: "superadmin@salesplatform.local" },
-    });
-    if (!superSeed) throw new Error("Seed Super Admin not found");
+    const superSeed = await findUserByEmails(prisma, [
+      MY_SUPER_ADMIN_EMAIL,
+      "superadmin@salesplatform.local",
+    ]);
+    if (!superSeed) throw new Error("Super Admin user not found (seed or target email)");
     const emailTaken = await prisma.user.findUnique({
       where: { email: MY_SUPER_ADMIN_EMAIL },
     });
@@ -289,10 +323,11 @@ async function main() {
       platformRole: "SUPER_ADMIN",
     });
 
-    const adminSeed = await prisma.user.findUnique({
-      where: { email: "admin@salesplatform.local" },
-    });
-    if (!adminSeed) throw new Error("Seed Admin User not found");
+    const adminSeed = await findUserByEmails(prisma, [
+      MY_LOGIN_EMAIL,
+      "admin@salesplatform.local",
+    ]);
+    if (!adminSeed) throw new Error("Admin User not found (seed or target email)");
     const loginTaken = await prisma.user.findUnique({
       where: { email: MY_LOGIN_EMAIL },
     });
