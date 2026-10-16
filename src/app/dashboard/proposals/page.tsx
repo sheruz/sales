@@ -1,3 +1,4 @@
+import { appHome } from "@/lib/app-paths";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { format } from "date-fns";
@@ -10,8 +11,8 @@ import { EmptyState } from "@/components/crm/empty-state";
 
 export default async function ProposalsPage() {
   const user = await getCurrentUser();
-  if (!user?.organizationId) redirect("/dashboard");
-  if (!hasOrgPermission(user, "deals.manage")) redirect("/dashboard");
+  if (!user?.organizationId) redirect(appHome());
+  if (!hasOrgPermission(user, "deals.manage")) redirect(appHome());
 
   const proposals = await proposalService.list(user.organizationId);
 
@@ -32,7 +33,7 @@ export default async function ProposalsPage() {
             <EmptyState
               title="No proposals yet"
               description="Create a proposal from an opportunity detail page."
-              actionHref="/dashboard/opportunities"
+              actionHref={appHome("/opportunities")}
               actionLabel="View opportunities"
             />
           ) : (
@@ -52,7 +53,7 @@ export default async function ProposalsPage() {
                   <div className="mt-1 flex flex-wrap gap-2 text-xs">
                     {p.company ? (
                       <Link
-                        href={`/dashboard/companies/${p.company.id}`}
+                        href={appHome(`/companies/${p.company.id}`)}
                         className="text-primary hover:underline"
                       >
                         {p.company.name}
@@ -60,7 +61,7 @@ export default async function ProposalsPage() {
                     ) : null}
                     {p.contact ? (
                       <Link
-                        href={`/dashboard/contacts/${p.contact.id}`}
+                        href={appHome(`/contacts/${p.contact.id}`)}
                         className="text-primary hover:underline"
                       >
                         {p.contact.fullName}
@@ -68,7 +69,7 @@ export default async function ProposalsPage() {
                     ) : null}
                     {p.opportunityId ? (
                       <Link
-                        href={`/dashboard/opportunities/${p.opportunityId}`}
+                        href={appHome(`/opportunities/${p.opportunityId}`)}
                         className="text-primary hover:underline"
                       >
                         Opportunity

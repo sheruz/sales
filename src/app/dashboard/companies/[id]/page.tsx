@@ -1,3 +1,4 @@
+import { appHome } from "@/lib/app-paths";
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import { format } from "date-fns";
@@ -150,15 +151,15 @@ export default async function CompanyDetailPage({ params }: PageProps) {
         <EntityRelatedLinks
           links={[
             {
-              href: `/dashboard/contacts?companyId=${company.id}`,
+              href: appHome(`/contacts?companyId=${company.id}`),
               label: `Contacts (${company._count.contacts})`,
             },
             {
-              href: `/dashboard/opportunities?filter=sourced`,
+              href: appHome("/opportunities?filter=sourced"),
               label: `Opportunities (${company._count.opportunities})`,
             },
             {
-              href: "/dashboard/conversations",
+              href: appHome("/conversations"),
               label: `Inbox (${company.inboxConversations.length})`,
             },
           ]}
@@ -223,7 +224,7 @@ export default async function CompanyDetailPage({ params }: PageProps) {
               <EmptyState
                 title="No contacts yet"
                 description="Contacts appear after Hunter enrichment (or website email fallback). Use Autopilot → Enrichment."
-                actionHref="/dashboard/autopilot?tab=enrichment"
+                actionHref={appHome("/autopilot?tab=enrichment")}
                 actionLabel="Open Enrichment"
               />
             ) : (
@@ -232,7 +233,7 @@ export default async function CompanyDetailPage({ params }: PageProps) {
                 return (
                   <Link
                     key={c.id}
-                    href={`/dashboard/contacts/${c.id}`}
+                    href={appHome(`/contacts/${c.id}`)}
                     className="flex flex-wrap items-center justify-between gap-2 rounded-md border p-2 hover:bg-muted/40"
                   >
                     <div>
@@ -326,7 +327,7 @@ export default async function CompanyDetailPage({ params }: PageProps) {
             company.opportunities.map((o) => (
               <Link
                 key={o.id}
-                href={`/dashboard/opportunities/${o.id}`}
+                href={appHome(`/opportunities/${o.id}`)}
                 className="flex justify-between hover:underline"
               >
                 <span>

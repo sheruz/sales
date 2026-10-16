@@ -1,4 +1,5 @@
 "use client";
+import { appHome } from "@/lib/app-paths";
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
@@ -574,7 +575,7 @@ export function UnifiedInbox({
                 </div>
                 {selected.company ? (
                   <Link
-                    href={`/dashboard/companies/${selected.company.id}`}
+                    href={appHome(`/companies/${selected.company.id}`)}
                     className="btn"
                   >
                     Open company
@@ -584,13 +585,13 @@ export function UnifiedInbox({
 
               <div className="reader-links">
                 {selected.contact ? (
-                  <Link href={`/dashboard/contacts/${selected.contact.id}`}>
+                  <Link href={appHome(`/contacts/${selected.contact.id}`)}>
                     Contact
                   </Link>
                 ) : null}
                 {selected.opportunity ? (
                   <Link
-                    href={`/dashboard/opportunities/${selected.opportunity.id}`}
+                    href={appHome(`/opportunities/${selected.opportunity.id}`)}
                   >
                     Opportunity
                   </Link>

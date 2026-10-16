@@ -1,3 +1,4 @@
+import { appHome } from "@/lib/app-paths";
 import { taskService } from "@/services/task.service";
 import { getCurrentUser } from "@/lib/auth/session";
 import { redirect } from "next/navigation";
@@ -12,7 +13,7 @@ export default async function TasksPage({ searchParams }: PageProps) {
   const user = await getCurrentUser();
   if (!user?.organizationId) redirect("/login");
   if (!hasAnyOrgPermission(user, ["leads.view", "opportunities.view"])) {
-    redirect("/dashboard");
+    redirect(appHome());
   }
 
   const { filter } = await searchParams;

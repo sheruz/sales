@@ -1,6 +1,7 @@
+import { appOps } from "@/lib/app-paths";
 import { redirect } from "next/navigation";
 
-/** Legacy path — Super Admin console lives at /platform */
+/** Internal redirect — Super Admin console lives at APP_OPS_BASE */
 export default function LegacyPlatformPage() {
-  redirect("/platform");
+  redirect(appOps());
 }

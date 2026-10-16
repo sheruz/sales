@@ -1,4 +1,5 @@
 "use client";
+import { appHome } from "@/lib/app-paths";
 
 import { useState } from "react";
 import Link from "next/link";
@@ -79,14 +80,14 @@ export function ContactsList({ initialData }: ContactsListProps) {
     const params = new URLSearchParams();
     if (search) params.set("search", search);
     const qs = params.toString();
-    router.push(qs ? `/dashboard/contacts?${qs}` : "/dashboard/contacts");
+    router.push(qs ? appHome(`/contacts?${qs}`) : appHome("/contacts"));
   }
 
   function goToPage(page: number) {
     const params = new URLSearchParams();
     if (search) params.set("search", search);
     params.set("page", String(page));
-    router.push(`/dashboard/contacts?${params.toString()}`);
+    router.push(appHome(`/contacts?${params.toString()}`));
   }
 
   const from =
@@ -146,7 +147,7 @@ export function ContactsList({ initialData }: ContactsListProps) {
                   <tr key={c.id}>
                     <td>
                       <Link
-                        href={`/dashboard/contacts/${c.id}`}
+                        href={appHome(`/contacts/${c.id}`)}
                         className="cell-main"
                       >
                         {display.label}
@@ -158,7 +159,7 @@ export function ContactsList({ initialData }: ContactsListProps) {
                       </div>
                     </td>
                     <td>
-                      <Link href={`/dashboard/companies/${c.company.id}`}>
+                      <Link href={appHome(`/companies/${c.company.id}`)}>
                         {c.company.name}
                       </Link>
                       {c.company.domain ? (

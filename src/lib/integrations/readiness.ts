@@ -1,3 +1,4 @@
+import { appHome } from "@/lib/app-paths";
 import prisma from "@/lib/db/prisma";
 import { IntegrationPlatform } from "@prisma/client";
 import { userIntegrationService } from "@/services/user-integration.service";
@@ -73,31 +74,31 @@ export async function getUserReadiness(organizationId: string, userId: string) {
       id: "ai",
       label: "Connect AI provider (OpenAI or Claude)",
       done: ai,
-      href: "/dashboard/settings?tab=integrations",
+      href: appHome("/settings?tab=integrations"),
     },
     {
       id: "email",
       label: "Connect your business email (SMTP)",
       done: email,
-      href: "/dashboard/settings?tab=integrations",
+      href: appHome("/settings?tab=integrations"),
     },
     {
       id: "services",
       label: "Configure at least one company service",
       done: services > 0,
-      href: "/dashboard/services",
+      href: appHome("/services"),
     },
     {
       id: "campaign",
       label: "Create your first campaign",
       done: campaigns > 0,
-      href: "/dashboard/campaigns",
+      href: appHome("/campaigns"),
     },
     {
       id: "autopilot",
       label: "Set autopilot goal and enable",
       done: Boolean(autopilot?.isEnabled && autopilot.goal),
-      href: "/dashboard/autopilot",
+      href: appHome("/autopilot"),
     },
   ];
 

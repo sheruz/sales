@@ -1,3 +1,4 @@
+import { appHome, appOps, modernizeAppPath } from "@/lib/app-paths";
 import { Suspense } from "react";
 import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth/session";
@@ -14,16 +15,16 @@ export default async function Page({
   const user = await getCurrentUser();
   if (user) {
     const params = await searchParams;
-    const dest = params.redirect;
+    const dest = params.redirect
+      ? modernizeAppPath(params.redirect)
+      : undefined;
     if (isSuperAdmin(user.role)) {
-      redirect(
-        dest?.startsWith("/platform") ? dest : "/platform"
-      );
+      redirect(dest?.startsWith(appOps()) ? dest : appOps());
     }
-    if (dest?.startsWith("/dashboard")) {
+    if (dest?.startsWith(appHome())) {
       redirect(dest);
     }
-    redirect("/dashboard");
+    redirect(appHome());
   }
 
   return (

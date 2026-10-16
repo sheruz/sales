@@ -20,6 +20,7 @@ import { opportunityService } from "@/services/opportunity.service";
 import { timelineService } from "@/services/timeline.service";
 import { companyService, extractDomain } from "@/services/company.service";
 import { sendEmailWithConfig } from "@/lib/email/send-mail";
+import { appHome } from "@/lib/app-paths";
 
 export type WebsiteInboundPayload = {
   source: InboundSourceKey;
@@ -338,7 +339,7 @@ export class WebsiteInboundService {
       `Company: ${companyName}`,
       `Domain: ${domain || "—"}`,
       ``,
-      `Opportunity: ${appUrl}/dashboard/opportunities/${opportunity.id}`,
+      `Opportunity: ${appUrl}${appHome(`/opportunities/${opportunity.id}`)}`,
       ``,
       `—— Brief ——`,
       payload.brief,

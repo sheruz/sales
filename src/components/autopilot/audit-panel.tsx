@@ -1,4 +1,5 @@
 "use client";
+import { appHome } from "@/lib/app-paths";
 
 import { useState } from "react";
 import Link from "next/link";
@@ -145,7 +146,7 @@ export function AuditPanel({ initial }: Props) {
         </CardHeader>
         <CardContent className="grid gap-4 sm:grid-cols-4 text-sm">
           <Link
-            href="/dashboard/companies?funnel=audit_pending"
+            href={appHome("/companies?funnel=audit_pending")}
             className="rounded-md p-1 -m-1 hover:bg-muted/50 transition-colors"
           >
             <p className="text-muted-foreground">Eligible pending</p>
@@ -153,7 +154,7 @@ export function AuditPanel({ initial }: Props) {
             <p className="text-xs text-muted-foreground">View companies →</p>
           </Link>
           <Link
-            href="/dashboard/companies?funnel=audited_today"
+            href={appHome("/companies?funnel=audited_today")}
             className="rounded-md p-1 -m-1 hover:bg-muted/50 transition-colors"
           >
             <p className="text-muted-foreground">Audited today</p>
@@ -164,7 +165,7 @@ export function AuditPanel({ initial }: Props) {
             </p>
           </Link>
           <Link
-            href="/dashboard/companies?funnel=audited"
+            href={appHome("/companies?funnel=audited")}
             className="rounded-md p-1 -m-1 hover:bg-muted/50 transition-colors"
           >
             <p className="text-muted-foreground">Avg mobile score</p>
@@ -176,7 +177,7 @@ export function AuditPanel({ initial }: Props) {
             </p>
           </Link>
           <Link
-            href="/dashboard/autopilot?tab=pitches"
+            href={appHome("/autopilot?tab=pitches")}
             className="rounded-md p-1 -m-1 hover:bg-muted/50 transition-colors"
           >
             <p className="text-muted-foreground">Pitches</p>

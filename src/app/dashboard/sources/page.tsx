@@ -1,3 +1,4 @@
+import { appHome } from "@/lib/app-paths";
 import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth/session";
 import { hasOrgPermission } from "@/lib/tenant/scope";
@@ -8,8 +9,8 @@ import { EmptyState } from "@/components/crm/empty-state";
 
 export default async function SourcesPage() {
   const user = await getCurrentUser();
-  if (!user?.organizationId) redirect("/dashboard");
-  if (!hasOrgPermission(user, "integrations.manage")) redirect("/dashboard");
+  if (!user?.organizationId) redirect(appHome());
+  if (!hasOrgPermission(user, "integrations.manage")) redirect(appHome());
 
   const flags = await getFeatureFlags(user.organizationId);
   if (!flags.sources_enabled) {
@@ -24,7 +25,7 @@ export default async function SourcesPage() {
         <EmptyState
           title="Sources disabled"
           description="Hiring/funding/Meta scrapers are off (sources_enabled=false). Google Places and Meta Lead Ads replace them in later phases."
-          actionHref="/dashboard/autopilot"
+          actionHref={appHome("/autopilot")}
           actionLabel="Open Autopilot"
         />
       </div>

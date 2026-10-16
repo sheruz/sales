@@ -1,3 +1,4 @@
+import { appHome } from "@/lib/app-paths";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth/session";
@@ -26,7 +27,7 @@ export default async function PlatformLayout({
   }
 
   if (!user.isPlatformAdmin) {
-    redirect("/dashboard");
+    redirect(appHome());
   }
 
   const jar = await cookies();

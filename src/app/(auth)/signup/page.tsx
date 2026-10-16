@@ -1,4 +1,5 @@
 "use client";
+import { appHome } from "@/lib/app-paths";
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
@@ -69,7 +70,7 @@ export default function SignupPage() {
         return;
       }
       toast.success("Account created");
-      router.push("/dashboard");
+      router.push(appHome());
       router.refresh();
     } catch {
       toast.error("Signup failed");

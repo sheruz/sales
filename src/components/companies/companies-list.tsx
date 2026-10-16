@@ -1,4 +1,5 @@
 "use client";
+import { appHome } from "@/lib/app-paths";
 
 import { useState } from "react";
 import Link from "next/link";
@@ -140,7 +141,7 @@ export function CompaniesList({ initialData }: CompaniesListProps) {
     if (enr && enr !== "all") params.set("enrichmentStatus", String(enr));
     if (page && Number(page) > 1) params.set("page", String(page));
     const qs = params.toString();
-    return qs ? `/dashboard/companies?${qs}` : "/dashboard/companies";
+    return qs ? appHome(`/companies?${qs}`) : appHome("/companies");
   }
 
   function applyFilters(overrides: Record<string, string | number | undefined> = {}) {
@@ -364,7 +365,7 @@ export function CompaniesList({ initialData }: CompaniesListProps) {
                     </td>
                     <td>
                       <Link
-                        href={`/dashboard/companies/${c.id}`}
+                        href={appHome(`/companies/${c.id}`)}
                         className="cell-main"
                       >
                         {c.name}

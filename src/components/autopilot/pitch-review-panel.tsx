@@ -1,4 +1,5 @@
 "use client";
+import { appHome } from "@/lib/app-paths";
 
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
@@ -141,7 +142,7 @@ export function PitchReviewPanel({ initial }: Props) {
             Draft pitches appear here for approve / edit / reject before
             anything is sent. They are written after a company is audited.
           </p>
-          <Link href="/dashboard/autopilot?tab=audit" className="btn">
+          <Link href={appHome("/autopilot?tab=audit")} className="btn">
             Open Audit
           </Link>
         </div>
@@ -209,7 +210,7 @@ export function PitchReviewPanel({ initial }: Props) {
               />
               <div>
                 <div className="card-title">
-                  <Link href={`/dashboard/companies/${p.company.id}`}>
+                  <Link href={appHome(`/companies/${p.company.id}`)}>
                     {p.company.name}
                   </Link>
                 </div>

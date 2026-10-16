@@ -1,3 +1,4 @@
+import { appHome } from "@/lib/app-paths";
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
@@ -8,14 +9,14 @@ import { Button } from "@/components/ui/button";
 
 export default async function NewSequencePage() {
   const user = await getCurrentUser();
-  if (!user?.organizationId) redirect("/dashboard");
+  if (!user?.organizationId) redirect(appHome());
   if (!hasOrgPermission(user, "sequences.manage")) {
-    redirect("/dashboard/sequences");
+    redirect(appHome("/sequences"));
   }
 
   return (
     <div className="space-y-6">
-      <Link href="/dashboard/sequences">
+      <Link href={appHome("/sequences")}>
         <Button variant="ghost" size="sm">
           <ArrowLeft className="mr-2 h-4 w-4" />
           Back

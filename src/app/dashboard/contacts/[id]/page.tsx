@@ -1,3 +1,4 @@
+import { appHome } from "@/lib/app-paths";
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import { format } from "date-fns";
@@ -70,23 +71,23 @@ export default async function ContactDetailPage({ params }: PageProps) {
         <EntityRelatedLinks
           links={[
             {
-              href: `/dashboard/companies/${contact.company.id}`,
+              href: appHome(`/companies/${contact.company.id}`),
               label: "Company",
             },
             {
-              href: "/dashboard/opportunities",
+              href: appHome("/opportunities"),
               label: `Opportunities (${contact.primaryOpportunities.length})`,
             },
             {
-              href: "/dashboard/conversations",
+              href: appHome("/conversations"),
               label: `Inbox (${contact.inboxConversations.length})`,
             },
             {
-              href: "/dashboard/meetings",
+              href: appHome("/meetings"),
               label: `Meetings (${contact.meetings.length})`,
             },
             {
-              href: "/dashboard/tasks",
+              href: appHome("/tasks"),
               label: "Tasks",
             },
           ]}
@@ -129,7 +130,7 @@ export default async function ContactDetailPage({ params }: PageProps) {
             <div className="flex items-center gap-2">
               <Building2 className="h-4 w-4 text-muted-foreground" />
               <Link
-                href={`/dashboard/companies/${contact.company.id}`}
+                href={appHome(`/companies/${contact.company.id}`)}
                 className="hover:underline"
               >
                 {contact.company.name}
@@ -140,7 +141,7 @@ export default async function ContactDetailPage({ params }: PageProps) {
                 <LegacyBadge />
                 Lead bridge:{" "}
                 <Link
-                  href={`/dashboard/leads/${contact.lead.id}`}
+                  href={appHome(`/leads/${contact.lead.id}`)}
                   className="hover:underline"
                 >
                   {contact.lead.fullName}
@@ -162,7 +163,7 @@ export default async function ContactDetailPage({ params }: PageProps) {
                 contact.primaryOpportunities.map((o) => (
                   <Link
                     key={o.id}
-                    href={`/dashboard/opportunities/${o.id}`}
+                    href={appHome(`/opportunities/${o.id}`)}
                     className="flex justify-between hover:underline"
                   >
                     <span>
@@ -187,14 +188,14 @@ export default async function ContactDetailPage({ params }: PageProps) {
                 <EmptyState
                   title="No conversations yet"
                   description="Canonical outreach replies appear in Inbox."
-                  actionHref="/dashboard/conversations"
+                  actionHref={appHome("/conversations")}
                   actionLabel="Open inbox"
                 />
               ) : (
                 contact.inboxConversations.map((c) => (
                   <Link
                     key={c.id}
-                    href="/dashboard/conversations"
+                    href={appHome("/conversations")}
                     className="flex justify-between hover:underline"
                   >
                     <span className="truncate">
@@ -220,14 +221,14 @@ export default async function ContactDetailPage({ params }: PageProps) {
                 <EmptyState
                   title="No meetings yet"
                   description="Schedule meetings from an opportunity linked to this contact."
-                  actionHref="/dashboard/opportunities"
+                  actionHref={appHome("/opportunities")}
                   actionLabel="View opportunities"
                 />
               ) : (
                 contact.meetings.map((m) => (
                   <Link
                     key={m.id}
-                    href="/dashboard/meetings"
+                    href={appHome("/meetings")}
                     className="flex justify-between hover:underline"
                   >
                     <span>{m.title || m.outcome}</span>

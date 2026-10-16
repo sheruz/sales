@@ -1,3 +1,4 @@
+import { appHome } from "@/lib/app-paths";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { AlertTriangle } from "lucide-react";
@@ -21,15 +22,15 @@ import {
 } from "@/components/autopilot/autopilot-controls";
 
 const SETUP_HREFS: Record<string, string> = {
-  ai: "/dashboard/settings?tab=integrations",
-  places: "/dashboard/settings?tab=integrations",
-  pagespeed: "/dashboard/settings?tab=integrations",
-  hunter: "/dashboard/settings?tab=integrations",
-  icp: "/dashboard/icp",
-  services: "/dashboard/services",
-  cron: "/dashboard/autopilot",
-  outbound_compliance: "/dashboard/outreach?tab=outbound",
-  inboxes: "/dashboard/outreach?tab=outbound",
+  ai: appHome("/settings?tab=integrations"),
+  places: appHome("/settings?tab=integrations"),
+  pagespeed: appHome("/settings?tab=integrations"),
+  hunter: appHome("/settings?tab=integrations"),
+  icp: appHome("/icp"),
+  services: appHome("/services"),
+  cron: appHome("/autopilot"),
+  outbound_compliance: appHome("/outreach?tab=outbound"),
+  inboxes: appHome("/outreach?tab=outbound"),
 };
 
 function formatAgo(date: Date): string {
@@ -52,7 +53,7 @@ export default async function AutopilotPage({
 }) {
   const user = await getCurrentUser();
   if (!user) redirect("/login");
-  if (!user.organizationId) redirect("/dashboard");
+  if (!user.organizationId) redirect(appHome());
 
   const canSourcing = hasAnyOrgPermission(user, [
     "integrations.manage",
@@ -82,10 +83,10 @@ export default async function AutopilotPage({
   const params = await searchParams;
 
   if (params.tab === "pitch" || params.tab === "pitches") {
-    redirect("/dashboard/outreach?tab=pitch");
+    redirect(appHome("/outreach?tab=pitch"));
   }
   if (params.tab === "outbound") {
-    redirect("/dashboard/outreach?tab=mailboxes");
+    redirect(appHome("/outreach?tab=mailboxes"));
   }
 
   const tab =
@@ -110,7 +111,7 @@ export default async function AutopilotPage({
     [data, enrichment, audit, outbound, lastTick, overview] =
       await Promise.all([
         sourcingJobService.dashboard(user.organizationId),
-        enrichmentJobService.dashboard(user.organizationId),
+        enrichmentJobService.dashboard(user.organizationId, user.id),
         websiteAuditService.dashboard(user.organizationId),
         outboundJobService.dashboard(user.organizationId),
         cronTickService.lastTick(),
@@ -216,33 +217,33 @@ pm2 restart all`}
     href: string;
     count?: number;
   }[] = [
-    { key: "overview", label: "Overview", href: "/dashboard/autopilot" },
+    { key: "overview", label: "Overview", href: appHome("/autopilot") },
     {
       key: "sourcing",
       label: "Sourcing",
-      href: "/dashboard/autopilot?tab=sourcing",
+      href: appHome("/autopilot?tab=sourcing"),
     },
     {
       key: "enrichment",
       label: "Enrichment",
-      href: "/dashboard/autopilot?tab=enrichment",
+      href: appHome("/autopilot?tab=enrichment"),
     },
-    { key: "audit", label: "Audit", href: "/dashboard/autopilot?tab=audit" },
+    { key: "audit", label: "Audit", href: appHome("/autopilot?tab=audit") },
     {
       key: "replies",
       label: "Replies",
-      href: "/dashboard/autopilot?tab=replies",
+      href: appHome("/autopilot?tab=replies"),
     },
     {
       key: "pitch",
       label: "Pitch review",
-      href: "/dashboard/outreach?tab=pitch",
+      href: appHome("/outreach?tab=pitch"),
       count: audit.draftPitches,
     },
     {
       key: "outbound",
       label: "Outbound",
-      href: "/dashboard/outreach?tab=outbound",
+      href: appHome("/outreach?tab=outbound"),
     },
   ];
 
@@ -259,7 +260,7 @@ pm2 restart all`}
         <div className="page-actions">
           <AutopilotMasterButtons
             running={anyRunning}
-            settingsHref="/dashboard/autopilot"
+            settingsHref={appHome("/autopilot")}
           />
         </div>
       </div>
@@ -274,7 +275,7 @@ pm2 restart all`}
               mode.
             </span>
           </div>
-          <Link href="/dashboard/outreach?tab=outbound" className="btn">
+          <Link href={appHome("/outreach?tab=outbound")} className="btn">
             Go live
           </Link>
         </div>
@@ -417,7 +418,7 @@ pm2 restart all`}
                 </b>{" "}
                 replied
               </div>
-              <Link href="/dashboard/conversations" className="btn">
+              <Link href={appHome("/conversations")} className="btn">
                 Open inbox
               </Link>
             </div>
@@ -503,7 +504,7 @@ pm2 restart all`}
                         &nbsp; {item.label}
                         {!item.done ? (
                           <Link
-                            href={SETUP_HREFS[item.key] ?? "/dashboard/settings"}
+                            href={SETUP_HREFS[item.key] ?? appHome("/settings")}
                             className="muted"
                             style={{ float: "right" }}
                           >

@@ -1,3 +1,4 @@
+import { appHome } from "@/lib/app-paths";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { format } from "date-fns";
@@ -38,11 +39,11 @@ function isHttpUrl(value: string | null | undefined): value is string {
 
 export default async function MeetingsPage() {
   const user = await getCurrentUser();
-  if (!user?.organizationId) redirect("/dashboard");
+  if (!user?.organizationId) redirect(appHome());
   if (
     !hasAnyOrgPermission(user, ["opportunities.view", "deals.manage"])
   ) {
-    redirect("/dashboard");
+    redirect(appHome());
   }
 
   const [meetings, branding] = await Promise.all([
@@ -73,7 +74,7 @@ export default async function MeetingsPage() {
           <EmptyState
             title="No meetings yet"
             description="Book a meeting from an opportunity detail page."
-            actionHref="/dashboard/opportunities"
+            actionHref={appHome("/opportunities")}
             actionLabel="View opportunities"
           />
         ) : (
@@ -115,17 +116,17 @@ export default async function MeetingsPage() {
                   links={
                     <>
                       {m.company ? (
-                        <Link href={`/dashboard/companies/${m.company.id}`}>
+                        <Link href={appHome(`/companies/${m.company.id}`)}>
                           {m.company.name}
                         </Link>
                       ) : null}
                       {m.contact ? (
-                        <Link href={`/dashboard/contacts/${m.contact.id}`}>
+                        <Link href={appHome(`/contacts/${m.contact.id}`)}>
                           {m.contact.fullName}
                         </Link>
                       ) : null}
                       {m.opportunityId ? (
-                        <Link href={`/dashboard/opportunities/${m.opportunityId}`}>
+                        <Link href={appHome(`/opportunities/${m.opportunityId}`)}>
                           Opportunity
                           {m.opportunity?.stage ? ` · ${m.opportunity.stage}` : ""}
                         </Link>

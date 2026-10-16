@@ -1,4 +1,5 @@
 "use client";
+import { appHome } from "@/lib/app-paths";
 
 import { useState } from "react";
 import Link from "next/link";
@@ -151,7 +152,7 @@ export function ServicesPageClient({
         <p className="text-sm text-muted-foreground">
           Settings → Services still works for a quick add.{" "}
           <Link
-            href="/dashboard/settings?tab=services"
+            href={appHome("/settings?tab=services")}
             className="underline underline-offset-2"
           >
             Open quick add

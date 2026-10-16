@@ -1,3 +1,4 @@
+import { appHome } from "@/lib/app-paths";
 import { redirect } from "next/navigation";
 import { inboxService } from "@/services/inbox.service";
 import { UnifiedInbox } from "@/components/conversations/unified-inbox";
@@ -10,8 +11,8 @@ export default async function ConversationsPage({
   searchParams: Promise<{ conversationId?: string }>;
 }) {
   const user = await getCurrentUser();
-  if (!user?.organizationId) redirect("/dashboard");
-  if (!hasOrgPermission(user, "conversations.view")) redirect("/dashboard");
+  if (!user?.organizationId) redirect(appHome());
+  if (!hasOrgPermission(user, "conversations.view")) redirect(appHome());
 
   const { conversationId } = await searchParams;
 

@@ -29,8 +29,12 @@ type Stats = {
   noContact: number;
   failed: number;
   skipped: number;
+  /** App-side Hunter API units logged today (org daily limit) */
   creditsUsed: number;
+  /** Live available from this org's Hunter API key */
   creditsRemaining: number | null;
+  /** Live used from Hunter account (plan meter), if returned */
+  hunterCreditsUsed?: number | null;
   dailyCreditLimit: number;
   validEmailsToday: number;
   riskyEmailsToday: number;
@@ -70,8 +74,16 @@ export function EnrichmentPanel({ initial }: Props) {
     });
   }, [initial]);
 
+  // Always re-fetch live Hunter balance for this org's key (tenants bring their own).
+  useEffect(() => {
+    void refreshStats().catch(() => undefined);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- mount-only live refresh
+  }, []);
+
   async function refreshStats() {
-    const res = await fetch("/api/autopilot/enrichment");
+    const res = await fetch("/api/autopilot/enrichment", {
+      cache: "no-store",
+    });
     const json = await res.json();
     if (!json.success) throw new Error(json.error?.message || "Refresh failed");
     const d = json.data as Stats & { lastCronRun?: Stats["lastCronRun"] };
@@ -163,6 +175,27 @@ export function EnrichmentPanel({ initial }: Props) {
             <Button
               size="sm"
               variant="outline"
+              disabled={busy === "refresh"}
+              onClick={() => {
+                setBusy("refresh");
+                void refreshStats()
+                  .then(() => toast.success("Hunter balance refreshed"))
+                  .catch((err) =>
+                    toast.error(
+                      err instanceof Error ? err.message : "Refresh failed"
+                    )
+                  )
+                  .finally(() => setBusy(null));
+              }}
+            >
+              {busy === "refresh" ? (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              ) : null}
+              Refresh balance
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
               disabled={busy === "run"}
               onClick={enrichNow}
             >
@@ -181,7 +214,7 @@ export function EnrichmentPanel({ initial }: Props) {
             </Button>
           </div>
         </CardHeader>
-        <CardContent className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5 text-sm">
+        <CardContent className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 text-sm">
           <div>
             <p className="text-muted-foreground">Pending</p>
             <p className="text-2xl font-semibold">{stats.pending}</p>
@@ -203,16 +236,28 @@ export function EnrichmentPanel({ initial }: Props) {
             </p>
           </div>
           <div>
-            <p className="text-muted-foreground">Credits used / remaining</p>
+            <p className="text-muted-foreground">Hunter available</p>
             <p className="text-2xl font-semibold">
-              {stats.creditsUsed}
-              {stats.creditsRemaining != null
-                ? ` / ${stats.creditsRemaining}`
-                : ""}
+              {stats.creditsRemaining != null ? stats.creditsRemaining : "—"}
             </p>
             <p className="text-xs text-muted-foreground">
-              Daily limit {stats.dailyCreditLimit} · no contact total{" "}
-              {stats.noContact} · failed {stats.failed} · skipped {stats.skipped}
+              Live from your connected Hunter key
+              {stats.hunterCreditsUsed != null
+                ? ` · Hunter used ${stats.hunterCreditsUsed}`
+                : ""}
+            </p>
+          </div>
+          <div>
+            <p className="text-muted-foreground">App used today</p>
+            <p className="text-2xl font-semibold">
+              {stats.creditsUsed}
+              <span className="text-base font-normal text-muted-foreground">
+                {" "}
+                / {stats.dailyCreditLimit}
+              </span>
+            </p>
+            <p className="text-xs text-muted-foreground">
+              Org daily cap · failed {stats.failed} · skipped {stats.skipped}
             </p>
           </div>
         </CardContent>

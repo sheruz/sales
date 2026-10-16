@@ -1,4 +1,5 @@
 "use client";
+import { appHome } from "@/lib/app-paths";
 
 import { useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -47,7 +48,7 @@ export default function InviteAcceptForm() {
       }
 
       toast.success("Welcome! Your account is ready.");
-      router.push("/dashboard");
+      router.push(appHome());
       router.refresh();
     } catch (error) {
       toast.error(

@@ -1,4 +1,5 @@
 "use client";
+import { appHome } from "@/lib/app-paths";
 
 import { useState } from "react";
 import Link from "next/link";
@@ -141,7 +142,7 @@ export function ConversationsInbox({ initialConversations }: ConversationsInboxP
                   <div className="flex-1">
                     <div className="flex items-center gap-2 mb-1">
                       <Link
-                        href={`/dashboard/leads/${conv.lead.id}`}
+                        href={appHome(`/leads/${conv.lead.id}`)}
                         className="font-medium hover:underline flex items-center gap-1"
                       >
                         {conv.lead.fullName}

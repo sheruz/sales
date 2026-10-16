@@ -1,4 +1,5 @@
 "use client";
+import { appOps } from "@/lib/app-paths";
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -27,11 +28,11 @@ import { SidebarUserFooter } from "@/components/dashboard/sidebar-user-footer";
 import type { AuthUser } from "@/types/auth";
 
 const platformNav = [
-  { title: "Overview", href: "/platform", icon: LayoutDashboard },
-  { title: "Organizations", href: "/platform/companies", icon: Building2 },
-  { title: "All Users", href: "/platform/users", icon: Users },
-  { title: "Activity", href: "/platform/activity", icon: Activity },
-  { title: "Settings", href: "/platform/settings", icon: Settings },
+  { title: "Overview", href: appOps(), icon: LayoutDashboard },
+  { title: "Organizations", href: appOps("/companies"), icon: Building2 },
+  { title: "All Users", href: appOps("/users"), icon: Users },
+  { title: "Activity", href: appOps("/activity"), icon: Activity },
+  { title: "Settings", href: appOps("/settings"), icon: Settings },
 ];
 
 interface PlatformSidebarProps {
@@ -46,7 +47,7 @@ export function PlatformSidebar({ user }: PlatformSidebarProps) {
       <SidebarHeader>
         <SidebarMenu>
           <SidebarMenuItem>
-            <SidebarMenuButton size="lg" render={<Link href="/platform" />}>
+            <SidebarMenuButton size="lg" render={<Link href={appOps()} />}>
               <div className="flex aspect-square size-8 items-center justify-center rounded-lg bg-primary text-primary-foreground">
                 <Shield className="size-4" />
               </div>
@@ -70,8 +71,8 @@ export function PlatformSidebar({ user }: PlatformSidebarProps) {
                 <SidebarMenuItem key={item.href}>
                   <SidebarMenuButton
                     isActive={
-                      item.href === "/platform"
-                        ? pathname === "/platform"
+                      item.href === appOps()
+                        ? pathname === appOps()
                         : pathname.startsWith(item.href)
                     }
                     tooltip={item.title}
@@ -88,7 +89,7 @@ export function PlatformSidebar({ user }: PlatformSidebarProps) {
       </SidebarContent>
 
       <SidebarFooter>
-        <SidebarUserFooter user={user} settingsHref="/platform/settings" />
+        <SidebarUserFooter user={user} settingsHref={appOps("/settings")} />
       </SidebarFooter>
 
       <SidebarRail />

@@ -1,3 +1,4 @@
+import { appHome } from "@/lib/app-paths";
 import { Suspense } from "react";
 import { redirect } from "next/navigation";
 import { contactService } from "@/services/contact.service";
@@ -13,9 +14,9 @@ interface PageProps {
 
 export default async function ContactsPage({ searchParams }: PageProps) {
   const user = await getCurrentUser();
-  if (!user?.organizationId) redirect("/dashboard");
+  if (!user?.organizationId) redirect(appHome());
   if (!hasAnyOrgPermission(user, ["opportunities.view", "leads.view"])) {
-    redirect("/dashboard");
+    redirect(appHome());
   }
 
   const params = await searchParams;

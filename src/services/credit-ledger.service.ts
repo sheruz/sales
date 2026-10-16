@@ -1,3 +1,4 @@
+import { appHome } from "@/lib/app-paths";
 import { randomUUID } from "crypto";
 import {
   CreditKeyMode,
@@ -724,7 +725,7 @@ export class CreditLedgerService {
         type: NotificationType.AI_HELD,
         title,
         body,
-        href: "/dashboard/settings?tab=billing",
+        href: appHome("/settings?tab=billing"),
         sendEmail: true,
       });
     } catch (err) {

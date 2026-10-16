@@ -1,3 +1,4 @@
+import { appHome } from "@/lib/app-paths";
 import prisma from "@/lib/db/prisma";
 import {
   CatalogItemStatus,
@@ -170,22 +171,22 @@ export class AutopilotOverviewService {
         count: s.comingSoon ? 0 : count,
         href:
           s.key === "found"
-            ? "/dashboard/companies"
+            ? appHome("/companies")
             : s.key === "crawled"
-              ? "/dashboard/companies?funnel=crawled"
+              ? appHome("/companies?funnel=crawled")
               : s.key === "enriched"
-                ? "/dashboard/companies?funnel=enriched"
+                ? appHome("/companies?funnel=enriched")
                 : s.key === "audited"
-                  ? "/dashboard/companies?funnel=audited"
+                  ? appHome("/companies?funnel=audited")
                   : s.key === "contacted"
-                    ? "/dashboard/opportunities?filter=contacted"
+                    ? appHome("/opportunities?filter=contacted")
                     : s.key === "replied"
-                      ? "/dashboard/opportunities?filter=replied"
+                      ? appHome("/opportunities?filter=replied")
                       : s.key === "meeting"
-                        ? "/dashboard/opportunities?filter=meeting"
+                        ? appHome("/opportunities?filter=meeting")
                         : s.key === "won"
-                          ? "/dashboard/opportunities?filter=won"
-                          : "/dashboard/companies",
+                          ? appHome("/opportunities?filter=won")
+                          : appHome("/companies"),
       };
     });
 

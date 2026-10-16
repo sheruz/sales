@@ -1,4 +1,5 @@
 "use client";
+import { appHome, appOps, modernizeAppPath } from "@/lib/app-paths";
 
 import { useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -19,7 +20,9 @@ import {
 export default function LoginPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const redirect = searchParams.get("redirect") ?? "/dashboard";
+  const redirect = modernizeAppPath(
+    searchParams.get("redirect") ?? appHome()
+  );
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -55,11 +58,11 @@ export default function LoginPage() {
       let home = redirect;
       if (isPlatform) {
         home =
-          !redirect || redirect === "/dashboard" || redirect.startsWith("/dashboard")
-            ? "/platform"
+          !redirect || redirect === appHome() || redirect.startsWith(appHome())
+            ? appOps()
             : redirect;
-      } else if (redirect.startsWith("/platform")) {
-        home = "/dashboard";
+      } else if (redirect.startsWith(appOps())) {
+        home = appHome();
       }
       router.push(home);
       router.refresh();

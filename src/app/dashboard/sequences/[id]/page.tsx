@@ -1,3 +1,4 @@
+import { appHome } from "@/lib/app-paths";
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import { format } from "date-fns";
@@ -53,7 +54,7 @@ export default async function SequenceDetailPage({ params }: PageProps) {
 
   return (
     <div className="space-y-8">
-      <Link href="/dashboard/sequences">
+      <Link href={appHome("/sequences")}>
         <Button variant="ghost" size="sm">
           <ArrowLeft className="mr-2 h-4 w-4" />
           Back
@@ -73,9 +74,9 @@ export default async function SequenceDetailPage({ params }: PageProps) {
 
       <EntityRelatedLinks
         links={[
-          { href: "/dashboard/sequences", label: "All sequences" },
-          { href: "/dashboard/campaigns", label: "Campaigns" },
-          { href: "/dashboard/conversations", label: "Inbox" },
+          { href: appHome("/sequences"), label: "All sequences" },
+          { href: appHome("/campaigns"), label: "Campaigns" },
+          { href: appHome("/conversations"), label: "Inbox" },
         ]}
       />
 
@@ -109,14 +110,14 @@ export default async function SequenceDetailPage({ params }: PageProps) {
               <div key={e.id} className="flex justify-between gap-4">
                 <span className="flex flex-wrap items-center gap-x-2 gap-y-1">
                   <Link
-                    href={`/dashboard/contacts/${e.contact.id}`}
+                    href={appHome(`/contacts/${e.contact.id}`)}
                     className="hover:underline"
                   >
                     {e.contact.fullName}
                   </Link>
                   {e.opportunity ? (
                     <Link
-                      href={`/dashboard/opportunities/${e.opportunity.id}`}
+                      href={appHome(`/opportunities/${e.opportunity.id}`)}
                       className="text-muted-foreground hover:underline"
                     >
                       · {e.opportunity.stage}
@@ -124,7 +125,7 @@ export default async function SequenceDetailPage({ params }: PageProps) {
                   ) : null}
                   {e.campaign ? (
                     <Link
-                      href={`/dashboard/campaigns/${e.campaign.id}`}
+                      href={appHome(`/campaigns/${e.campaign.id}`)}
                       className="text-muted-foreground hover:underline"
                     >
                       · {e.campaign.name}

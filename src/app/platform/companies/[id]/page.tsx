@@ -1,3 +1,4 @@
+import { appOps } from "@/lib/app-paths";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { format } from "date-fns";
@@ -47,7 +48,7 @@ export default async function OrganizationDetailPage({ params }: PageProps) {
   return (
     <div className="space-y-6">
       <div className="flex flex-col gap-2">
-        <Link href="/platform/companies">
+        <Link href={appOps("/companies")}>
           <Button variant="link" className="px-0 h-auto text-sm">
             ← Organizations
           </Button>

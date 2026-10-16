@@ -1,3 +1,4 @@
+import { appOps } from "@/lib/app-paths";
 import Link from "next/link";
 import { format } from "date-fns";
 import { organizationService } from "@/services/organization.service";
@@ -71,7 +72,7 @@ export default async function PlatformOrganizationsPage() {
                     <TableRow key={org.id}>
                       <TableCell>
                         <Link
-                          href={`/platform/companies/${org.id}`}
+                          href={appOps(`/companies/${org.id}`)}
                           className="font-medium hover:underline"
                         >
                           {org.name}

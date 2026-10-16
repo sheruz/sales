@@ -1,4 +1,5 @@
 "use client";
+import { appHome } from "@/lib/app-paths";
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
@@ -148,7 +149,7 @@ export function DailyRevenueCopilot() {
               </p>
               <div className="flex flex-wrap gap-2">
                 {item.entityType === "opportunity" && item.entityId && (
-                  <Link href={`/dashboard/opportunities/${item.entityId}`}>
+                  <Link href={appHome(`/opportunities/${item.entityId}`)}>
                     <Button size="sm" variant="secondary">
                       Open opportunity
                     </Button>

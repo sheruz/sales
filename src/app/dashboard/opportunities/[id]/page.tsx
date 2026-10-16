@@ -1,3 +1,4 @@
+import { appHome } from "@/lib/app-paths";
 import type { ReactNode } from "react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
@@ -135,7 +136,7 @@ export default async function OpportunityDetailPage({ params }: PageProps) {
   return (
     <div className="space-y-6">
       <div className="flex items-center gap-2 text-sm text-muted-foreground">
-        <Link href="/dashboard/opportunities" className="hover:underline">
+        <Link href={appHome("/opportunities")} className="hover:underline">
           Opportunities
         </Link>
         <span>/</span>
@@ -145,13 +146,13 @@ export default async function OpportunityDetailPage({ params }: PageProps) {
       <EntityRelatedLinks
         links={[
           {
-            href: `/dashboard/companies/${opportunity.companyId}`,
+            href: appHome(`/companies/${opportunity.companyId}`),
             label: "Company",
           },
           ...(opportunity.primaryContactId
             ? [
                 {
-                  href: `/dashboard/contacts/${opportunity.primaryContactId}`,
+                  href: appHome(`/contacts/${opportunity.primaryContactId}`),
                   label: "Contact",
                 },
               ]
@@ -159,25 +160,25 @@ export default async function OpportunityDetailPage({ params }: PageProps) {
           ...(opportunity.campaignId
             ? [
                 {
-                  href: `/dashboard/campaigns/${opportunity.campaignId}`,
+                  href: appHome(`/campaigns/${opportunity.campaignId}`),
                   label: "Campaign",
                 },
               ]
             : []),
           {
-            href: "/dashboard/conversations",
+            href: appHome("/conversations"),
             label: "Inbox",
           },
           {
-            href: "/dashboard/meetings",
+            href: appHome("/meetings"),
             label: "Meetings",
           },
           {
-            href: "/dashboard/proposals",
+            href: appHome("/proposals"),
             label: "Proposals",
           },
           {
-            href: "/dashboard/pipeline",
+            href: appHome("/pipeline"),
             label: "Pipeline / Deals",
           },
         ]}
@@ -188,7 +189,7 @@ export default async function OpportunityDetailPage({ params }: PageProps) {
           <LegacyBadge />
           Linked legacy lead{" "}
           <Link
-            href={`/dashboard/leads/${opportunity.leadId}`}
+            href={appHome(`/leads/${opportunity.leadId}`)}
             className="hover:underline"
           >
             open lead
@@ -520,7 +521,7 @@ export default async function OpportunityDetailPage({ params }: PageProps) {
                   <p>
                     Campaign:{" "}
                     <Link
-                      href={`/dashboard/campaigns/${opportunity.campaign.id}`}
+                      href={appHome(`/campaigns/${opportunity.campaign.id}`)}
                       className="text-primary hover:underline"
                     >
                       {opportunity.campaign.name}
@@ -729,7 +730,7 @@ export default async function OpportunityDetailPage({ params }: PageProps) {
             <Card>
               <CardHeader className="flex flex-row items-center justify-between space-y-0">
                 <CardTitle className="text-base">Linked lead</CardTitle>
-                <Link href={`/dashboard/leads/${opportunity.lead.id}`}>
+                <Link href={appHome(`/leads/${opportunity.lead.id}`)}>
                   <Button variant="outline" size="sm">
                     Open lead
                   </Button>
@@ -757,7 +758,7 @@ export default async function OpportunityDetailPage({ params }: PageProps) {
                       ))}
                       <li>
                         <Link
-                          href="/dashboard/conversations"
+                          href={appHome("/conversations")}
                           className="text-primary hover:underline"
                         >
                           View conversations
@@ -782,7 +783,7 @@ export default async function OpportunityDetailPage({ params }: PageProps) {
                       ))}
                       <li>
                         <Link
-                          href="/dashboard/tasks"
+                          href={appHome("/tasks")}
                           className="text-primary hover:underline"
                         >
                           View tasks
@@ -805,7 +806,7 @@ export default async function OpportunityDetailPage({ params }: PageProps) {
                       ))}
                       <li>
                         <Link
-                          href="/dashboard/meetings"
+                          href={appHome("/meetings")}
                           className="text-primary hover:underline"
                         >
                           View meetings
@@ -830,7 +831,7 @@ export default async function OpportunityDetailPage({ params }: PageProps) {
                       ))}
                       <li>
                         <Link
-                          href="/dashboard/proposals"
+                          href={appHome("/proposals")}
                           className="text-primary hover:underline"
                         >
                           View proposals
@@ -854,7 +855,7 @@ export default async function OpportunityDetailPage({ params }: PageProps) {
                       ))}
                       <li>
                         <Link
-                          href="/dashboard/pipeline"
+                          href={appHome("/pipeline")}
                           className="text-primary hover:underline"
                         >
                           View pipeline

@@ -1,4 +1,5 @@
 "use client";
+import { appHome } from "@/lib/app-paths";
 
 import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
@@ -61,33 +62,33 @@ function canSee(user: AuthUser, anyOf?: PermissionKey[]): boolean {
 const NAV: NavItem[] = [
   {
     title: "Home",
-    href: "/dashboard",
+    href: appHome(),
     icon: Home,
-    match: ({ pathname }) => pathname === "/dashboard",
+    match: ({ pathname }) => pathname === appHome(),
   },
   {
     title: "Autopilot",
-    href: "/dashboard/autopilot",
+    href: appHome("/autopilot"),
     icon: Rocket,
     match: ({ pathname, tab }) =>
-      pathname.startsWith("/dashboard/autopilot") &&
+      pathname.startsWith(appHome("/autopilot")) &&
       tab !== "pitch" &&
       tab !== "pitches" &&
       tab !== "outbound",
   },
   {
     title: "Leads",
-    href: "/dashboard/companies",
+    href: appHome("/companies"),
     icon: Building2,
     anyOf: ["opportunities.view", "leads.view"],
     match: ({ pathname }) =>
-      pathname.startsWith("/dashboard/companies") ||
-      pathname.startsWith("/dashboard/contacts") ||
-      pathname.startsWith("/dashboard/leads"),
+      pathname.startsWith(appHome("/companies")) ||
+      pathname.startsWith(appHome("/contacts")) ||
+      pathname.startsWith(appHome("/leads")),
   },
   {
     title: "Outreach",
-    href: "/dashboard/outreach",
+    href: appHome("/outreach"),
     icon: Send,
     anyOf: [
       "campaigns.manage",
@@ -96,35 +97,35 @@ const NAV: NavItem[] = [
       "integrations.manage",
     ],
     match: ({ pathname, tab }) =>
-      pathname.startsWith("/dashboard/outreach") ||
-      pathname.startsWith("/dashboard/sequences") ||
-      pathname.startsWith("/dashboard/campaigns") ||
-      (pathname.startsWith("/dashboard/autopilot") &&
+      pathname.startsWith(appHome("/outreach")) ||
+      pathname.startsWith(appHome("/sequences")) ||
+      pathname.startsWith(appHome("/campaigns")) ||
+      (pathname.startsWith(appHome("/autopilot")) &&
         (tab === "pitch" || tab === "pitches" || tab === "outbound")),
   },
   {
     title: "Inbox",
-    href: "/dashboard/conversations",
+    href: appHome("/conversations"),
     icon: Inbox,
     anyOf: ["conversations.view"],
-    match: ({ pathname }) => pathname.startsWith("/dashboard/conversations"),
+    match: ({ pathname }) => pathname.startsWith(appHome("/conversations")),
   },
   {
     title: "Deals",
-    href: "/dashboard/pipeline",
+    href: appHome("/pipeline"),
     icon: Briefcase,
     anyOf: ["deals.manage", "opportunities.view"],
     match: ({ pathname }) =>
-      pathname.startsWith("/dashboard/pipeline") ||
-      pathname.startsWith("/dashboard/opportunities") ||
-      pathname.startsWith("/dashboard/proposals"),
+      pathname.startsWith(appHome("/pipeline")) ||
+      pathname.startsWith(appHome("/opportunities")) ||
+      pathname.startsWith(appHome("/proposals")),
   },
   {
     title: "Meetings",
-    href: "/dashboard/meetings",
+    href: appHome("/meetings"),
     icon: Calendar,
     anyOf: ["opportunities.view", "deals.manage"],
-    match: ({ pathname }) => pathname.startsWith("/dashboard/meetings"),
+    match: ({ pathname }) => pathname.startsWith(appHome("/meetings")),
   },
 ];
 
@@ -174,7 +175,7 @@ export function AppSidebar({
   return (
     <Sidebar collapsible="offcanvas" className="border-r border-sidebar-border">
       <SidebarHeader className="gap-3 border-b border-sidebar-border px-3 py-4">
-        <Link href="/dashboard" className="flex items-center gap-2.5 px-1">
+        <Link href={appHome()} className="flex items-center gap-2.5 px-1">
           <DelvixLogoMark size={30} />
           <div className="min-w-0 leading-tight">
             <div className="truncate text-[15px] font-bold tracking-tight text-sidebar-foreground">
@@ -186,7 +187,7 @@ export function AppSidebar({
           </div>
         </Link>
         <Link
-          href="/dashboard/settings"
+          href={appHome("/settings")}
           title="Workspace settings"
           className="flex items-center justify-between gap-2 rounded-lg border border-sidebar-border bg-sidebar-accent/40 px-3 py-2 text-[13px] font-semibold text-sidebar-foreground transition-colors hover:bg-sidebar-accent"
         >
@@ -210,9 +211,9 @@ export function AppSidebar({
         <SidebarMenu>
           <SidebarMenuItem>
             <SidebarMenuButton
-              isActive={pathname.startsWith("/dashboard/settings")}
+              isActive={pathname.startsWith(appHome("/settings"))}
               tooltip="Settings"
-              render={<Link href="/dashboard/settings" />}
+              render={<Link href={appHome("/settings")} />}
             >
               <Settings />
               <span>Settings</span>

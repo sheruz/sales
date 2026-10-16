@@ -1,4 +1,5 @@
 "use client";
+import { appHome } from "@/lib/app-paths";
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -75,7 +76,7 @@ export function OpportunitiesListClient({
     if (q) params.set("search", q);
     if (page > 1) params.set("page", String(page));
     const qs = params.toString();
-    return `/dashboard/opportunities${qs ? `?${qs}` : ""}`;
+    return appHome(`/opportunities${qs ? `?${qs}` : ""}`);
   }
 
   function setFilter(filter: OpportunityListFilter) {
@@ -153,7 +154,7 @@ export function OpportunitiesListClient({
                     <TableCell>
                       <div className="flex flex-wrap items-center gap-2">
                         <Link
-                          href={`/dashboard/opportunities/${item.id}`}
+                          href={appHome(`/opportunities/${item.id}`)}
                           className="font-medium hover:underline"
                         >
                           {item.company.name}

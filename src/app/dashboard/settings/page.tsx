@@ -1,3 +1,4 @@
+import { appHome } from "@/lib/app-paths";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { Suspense } from "react";
@@ -84,30 +85,30 @@ export default async function SettingsPage({
           ? [
               {
                 label: "Business profile",
-                href: "/dashboard/business-brain",
+                href: appHome("/business-brain"),
               },
               {
                 label: "Services",
-                href: "/dashboard/services",
+                href: appHome("/services"),
                 tab: "services" as const,
               },
               {
                 label: "Case studies",
-                href: "/dashboard/business-brain#documents",
+                href: appHome("/business-brain#documents"),
               },
-              { label: "Target customers", href: "/dashboard/icp" },
+              { label: "Target customers", href: appHome("/icp") },
             ]
           : allowedTabs.services
             ? [
                 {
                   label: "Services",
-                  href: "/dashboard/settings?tab=services",
+                  href: appHome("/settings?tab=services"),
                   tab: "services" as const,
                 },
               ]
             : []),
         ...(canRevenue
-          ? [{ label: "Revenue goal", href: "/dashboard/revenue-goals" }]
+          ? [{ label: "Revenue goal", href: appHome("/revenue-goals") }]
           : []),
       ],
     },
@@ -118,7 +119,7 @@ export default async function SettingsPage({
           ? [
               {
                 label: "Email & branding",
-                href: "/dashboard/settings?tab=email-branding",
+                href: appHome("/settings?tab=email-branding"),
                 tab: "email-branding" as const,
               },
             ]
@@ -127,7 +128,7 @@ export default async function SettingsPage({
           ? [
               {
                 label: "Mailboxes",
-                href: "/dashboard/outreach?tab=mailboxes",
+                href: appHome("/outreach?tab=mailboxes"),
               },
             ]
           : []),
@@ -140,7 +141,7 @@ export default async function SettingsPage({
           ? [
               {
                 label: "Integrations",
-                href: "/dashboard/settings?tab=integrations",
+                href: appHome("/settings?tab=integrations"),
                 tab: "integrations" as const,
               },
             ]
@@ -149,7 +150,7 @@ export default async function SettingsPage({
           ? [
               {
                 label: "Team",
-                href: "/dashboard/settings?tab=users",
+                href: appHome("/settings?tab=users"),
                 tab: "users" as const,
               },
             ]
@@ -158,14 +159,14 @@ export default async function SettingsPage({
           ? [
               {
                 label: "Plan & Usage",
-                href: "/dashboard/settings?tab=billing",
+                href: appHome("/settings?tab=billing"),
                 tab: "billing" as const,
               },
             ]
           : []),
         {
           label: "My account",
-          href: "/dashboard/settings?tab=profile",
+          href: appHome("/settings?tab=profile"),
           tab: "profile" as const,
         },
       ],
@@ -238,7 +239,7 @@ export default async function SettingsPage({
                     <p className="muted">
                       Quick edit shortcut. For the full Delvix catalog use{" "}
                       <Link
-                        href="/dashboard/services"
+                        href={appHome("/services")}
                         className="underline underline-offset-2"
                       >
                         Services

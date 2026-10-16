@@ -1,5 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { SESSION_COOKIE } from "@/lib/auth/permissions";
+import {
+  APP_HOME_BASE,
+  APP_OPS_BASE,
+  LEGACY_HOME_BASE,
+  LEGACY_OPS_BASE,
+} from "@/lib/app-paths";
 
 const publicPages = [
   "/",
@@ -13,12 +19,15 @@ const publicPages = [
   "/terms",
 ];
 
+function startsWithPath(pathname: string, base: string): boolean {
+  return pathname === base || pathname.startsWith(`${base}/`);
+}
+
 export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
   const sessionToken = request.cookies.get(SESSION_COOKIE)?.value;
 
   const isApiRoute = pathname.startsWith("/api");
-  // Route handlers enforce auth; cron/webhook/public APIs stay open here.
   if (isApiRoute) {
     return NextResponse.next();
   }
@@ -26,34 +35,52 @@ export function middleware(request: NextRequest) {
   const isPublicPage = publicPages.some(
     (route) => pathname === route || pathname.startsWith(`${route}/`)
   );
-  // Stable public branding assets (logo / sender photo) — no auth
   const isBrandingAsset = pathname.startsWith("/branding/");
-  // Email open pixel + click redirects (no auth)
   const isEmailTrack = pathname.startsWith("/t/");
-  const isDashboardRoute = pathname.startsWith("/dashboard");
-  const isPlatformRoute = pathname.startsWith("/platform");
 
   if (isBrandingAsset || isEmailTrack) {
     return NextResponse.next();
   }
 
-  if ((isDashboardRoute || isPlatformRoute) && !sessionToken) {
+  // Hide legacy obvious URLs
+  if (
+    startsWithPath(pathname, LEGACY_HOME_BASE) ||
+    startsWithPath(pathname, LEGACY_OPS_BASE)
+  ) {
+    return new NextResponse("Not Found", { status: 404 });
+  }
+
+  const isHomeRoute = startsWithPath(pathname, APP_HOME_BASE);
+  const isOpsRoute = startsWithPath(pathname, APP_OPS_BASE);
+
+  if ((isHomeRoute || isOpsRoute) && !sessionToken) {
     const loginUrl = new URL("/login", request.url);
     loginUrl.searchParams.set("redirect", pathname);
     return NextResponse.redirect(loginUrl);
   }
 
-  // Do NOT redirect /login → /dashboard just because a cookie exists.
-  // Middleware cannot validate hashed sessions; an invalid/stale cookie would
-  // bounce login ↔ dashboard forever (blank page). The login page redirects
-  // only after getCurrentUser() succeeds.
+  // Rewrite obscure public paths → internal App Router folders
+  if (isHomeRoute) {
+    const url = request.nextUrl.clone();
+    url.pathname =
+      LEGACY_HOME_BASE + pathname.slice(APP_HOME_BASE.length);
+    return NextResponse.rewrite(url);
+  }
+  if (isOpsRoute) {
+    const url = request.nextUrl.clone();
+    url.pathname = LEGACY_OPS_BASE + pathname.slice(APP_OPS_BASE.length);
+    return NextResponse.rewrite(url);
+  }
+
+  // Do NOT redirect /login → home just because a cookie exists.
+  // Login page redirects only after getCurrentUser() succeeds.
 
   if (
     !isPublicPage &&
     !isBrandingAsset &&
     !isEmailTrack &&
-    !isDashboardRoute &&
-    !isPlatformRoute &&
+    !isHomeRoute &&
+    !isOpsRoute &&
     !sessionToken
   ) {
     return NextResponse.redirect(new URL("/login", request.url));

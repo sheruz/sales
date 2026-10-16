@@ -1,4 +1,5 @@
 "use client";
+import { appHome } from "@/lib/app-paths";
 
 import { useState } from "react";
 import Link from "next/link";
@@ -71,7 +72,7 @@ export function LeadsList({ initialData }: LeadsListProps) {
     if (search) params.set("search", search);
     if (status !== "all") params.set("status", status);
     if (score !== "all") params.set("score", score);
-    router.push(`/dashboard/leads?${params.toString()}`);
+    router.push(appHome(`/leads?${params.toString()}`));
   }
 
   function goToPage(page: number) {
@@ -80,7 +81,7 @@ export function LeadsList({ initialData }: LeadsListProps) {
     if (status !== "all") params.set("status", status);
     if (score !== "all") params.set("score", score);
     params.set("page", String(page));
-    router.push(`/dashboard/leads?${params.toString()}`);
+    router.push(appHome(`/leads?${params.toString()}`));
   }
 
   function toggleSelect(id: string) {
@@ -185,7 +186,7 @@ export function LeadsList({ initialData }: LeadsListProps) {
         </div>
         <div className="flex gap-2">
           <ImportCsvDialog />
-          <Link href="/dashboard/leads/new">
+          <Link href={appHome("/leads/new")}>
             <Button size="sm">
               <Plus className="mr-2 h-4 w-4" />
               Add Lead
@@ -249,7 +250,7 @@ export function LeadsList({ initialData }: LeadsListProps) {
                 <TableRow
                   key={lead.id}
                   className="cursor-pointer"
-                  onClick={() => router.push(`/dashboard/leads/${lead.id}`)}
+                  onClick={() => router.push(appHome(`/leads/${lead.id}`))}
                 >
                   <TableCell onClick={(e) => e.stopPropagation()}>
                     <input
@@ -302,10 +303,10 @@ export function LeadsList({ initialData }: LeadsListProps) {
                         </Button>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end">
-                        <DropdownMenuItem onClick={() => router.push(`/dashboard/leads/${lead.id}`)}>
+                        <DropdownMenuItem onClick={() => router.push(appHome(`/leads/${lead.id}`))}>
                           View
                         </DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => router.push(`/dashboard/leads/${lead.id}/edit`)}>
+                        <DropdownMenuItem onClick={() => router.push(appHome(`/leads/${lead.id}/edit`))}>
                           Edit
                         </DropdownMenuItem>
                       </DropdownMenuContent>

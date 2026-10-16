@@ -1,3 +1,4 @@
+import { appOps } from "@/lib/app-paths";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth/session";
@@ -51,7 +52,7 @@ export default async function DashboardLayout({
 
   // S1: platformRole / isPlatformAdmin is source of truth (not legacy UserRole alone)
   if (user.isPlatformAdmin) {
-    redirect("/platform");
+    redirect(appOps());
   }
 
   const jar = await cookies();

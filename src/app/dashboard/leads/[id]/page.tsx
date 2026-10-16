@@ -1,3 +1,4 @@
+import { appHome } from "@/lib/app-paths";
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import { format } from "date-fns";
@@ -45,7 +46,7 @@ export default async function LeadDetailPage({ params }: PageProps) {
             {lead.companyName ? ` at ${lead.companyName}` : ""}
           </p>
         </div>
-        <Link href={`/dashboard/leads/${id}/edit`}>
+        <Link href={appHome(`/leads/${id}/edit`)}>
           <Button variant="outline" size="sm">
             <Pencil className="mr-2 h-4 w-4" />
             Edit

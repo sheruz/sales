@@ -1,3 +1,4 @@
+import { appHome } from "@/lib/app-paths";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { Plus } from "lucide-react";
@@ -17,11 +18,11 @@ import {
 
 export default async function SequencesPage() {
   const user = await getCurrentUser();
-  if (!user?.organizationId) redirect("/dashboard");
+  if (!user?.organizationId) redirect(appHome());
   if (
     !hasAnyOrgPermission(user, ["sequences.view", "sequences.manage"])
   ) {
-    redirect("/dashboard");
+    redirect(appHome());
   }
 
   const canManage = hasOrgPermission(user, "sequences.manage");
@@ -39,7 +40,7 @@ export default async function SequencesPage() {
           </p>
         </div>
         {canManage ? (
-          <Link href="/dashboard/sequences/new">
+          <Link href={appHome("/sequences/new")}>
             <Button>
               <Plus className="mr-2 h-4 w-4" />
               New sequence
@@ -69,7 +70,7 @@ export default async function SequencesPage() {
                     <>
                       No sequences yet —{" "}
                       <Link
-                        href="/dashboard/sequences/new"
+                        href={appHome("/sequences/new")}
                         className="underline"
                       >
                         create one
@@ -85,7 +86,7 @@ export default async function SequencesPage() {
                 <TableRow key={s.id}>
                   <TableCell>
                     <Link
-                      href={`/dashboard/sequences/${s.id}`}
+                      href={appHome(`/sequences/${s.id}`)}
                       className="font-medium hover:underline"
                     >
                       {s.name}

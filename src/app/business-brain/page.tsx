@@ -1,5 +1,6 @@
+import { appHome } from "@/lib/app-paths";
 import { redirect } from "next/navigation";
 
 export default function BusinessBrainRedirect() {
-  redirect("/dashboard/business-brain");
+  redirect(appHome("/business-brain"));
 }

@@ -1,4 +1,5 @@
 "use client";
+import { appHome, appOps } from "@/lib/app-paths";
 
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
@@ -26,8 +27,8 @@ export function UserNav({ user }: UserNavProps) {
     `${user.firstName?.[0] ?? ""}${user.lastName?.[0] ?? ""}`.toUpperCase() ||
     "?";
   const settingsHref = isSuperAdmin(user.role)
-    ? "/platform/settings"
-    : "/dashboard/settings";
+    ? appOps("/settings")
+    : appHome("/settings");
 
   async function handleLogout() {
     try {

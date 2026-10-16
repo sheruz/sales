@@ -1,4 +1,5 @@
 "use client";
+import { appHome } from "@/lib/app-paths";
 
 import { useState } from "react";
 import Link from "next/link";
@@ -46,7 +47,7 @@ export function TasksList({ initialTasks, currentFilter }: TasksListProps) {
   function setFilter(filter: string) {
     const params = new URLSearchParams();
     if (filter !== "all") params.set("filter", filter);
-    router.push(`/dashboard/tasks?${params.toString()}`);
+    router.push(appHome(`/tasks?${params.toString()}`));
   }
 
   async function completeTask(taskId: string) {
@@ -91,7 +92,7 @@ export function TasksList({ initialTasks, currentFilter }: TasksListProps) {
         <EmptyState
           title="No tasks yet"
           description="Create follow-ups from an opportunity detail page."
-          actionHref="/dashboard/opportunities"
+          actionHref={appHome("/opportunities")}
           actionLabel="View opportunities"
         />
       ) : (
@@ -134,7 +135,7 @@ export function TasksList({ initialTasks, currentFilter }: TasksListProps) {
                     <div className="mt-1 flex flex-wrap items-center gap-3 text-sm text-muted-foreground">
                       {task.opportunity ? (
                         <Link
-                          href={`/dashboard/opportunities/${task.opportunity.id}`}
+                          href={appHome(`/opportunities/${task.opportunity.id}`)}
                           className="flex items-center gap-1 hover:underline"
                         >
                           Opportunity · {task.opportunity.stage}
@@ -143,7 +144,7 @@ export function TasksList({ initialTasks, currentFilter }: TasksListProps) {
                       ) : null}
                       {task.contact ? (
                         <Link
-                          href={`/dashboard/contacts/${task.contact.id}`}
+                          href={appHome(`/contacts/${task.contact.id}`)}
                           className="hover:underline"
                         >
                           {task.contact.fullName}
@@ -151,7 +152,7 @@ export function TasksList({ initialTasks, currentFilter }: TasksListProps) {
                       ) : null}
                       {task.company ? (
                         <Link
-                          href={`/dashboard/companies/${task.company.id}`}
+                          href={appHome(`/companies/${task.company.id}`)}
                           className="hover:underline"
                         >
                           {task.company.name}
@@ -159,7 +160,7 @@ export function TasksList({ initialTasks, currentFilter }: TasksListProps) {
                       ) : null}
                       {!task.opportunity && !task.contact && task.lead ? (
                         <Link
-                          href={`/dashboard/leads/${task.lead.id}`}
+                          href={appHome(`/leads/${task.lead.id}`)}
                           className="flex items-center gap-1 hover:underline"
                         >
                           {task.lead.fullName}

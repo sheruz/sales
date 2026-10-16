@@ -1,4 +1,5 @@
 "use client";
+import { appHome } from "@/lib/app-paths";
 
 import Link from "next/link";
 import { toast } from "sonner";
@@ -35,7 +36,7 @@ function displayName(user: AuthUser): {
 
 export function SidebarUserFooter({
   user,
-  settingsHref = "/dashboard/settings?tab=profile",
+  settingsHref = appHome("/settings?tab=profile"),
 }: SidebarUserFooterProps) {
   const { name, needsProfile, initials } = displayName(user);
   const role =

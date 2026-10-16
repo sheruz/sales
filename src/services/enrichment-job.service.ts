@@ -198,7 +198,7 @@ export class EnrichmentJobService {
     };
   }
 
-  async dashboard(organizationId: string) {
+  async dashboard(organizationId: string, userId?: string) {
     const day = startOfUtcDay();
     const config = await this.getConfig(organizationId);
     const [
@@ -294,13 +294,17 @@ export class EnrichmentJobService {
       }),
     ]);
 
+    // Always live from this org's connected Hunter key (each tenant's own plan).
     let creditsRemaining: number | null = null;
+    let hunterCreditsUsed: number | null = null;
     try {
-      const provider = await hunterService.getProvider(organizationId);
+      const provider = await hunterService.getProvider(organizationId, userId);
       const credits = await provider.getCredits();
       creditsRemaining = credits.available;
+      hunterCreditsUsed = credits.used;
     } catch {
       creditsRemaining = null;
+      hunterCreditsUsed = null;
     }
 
     return {
@@ -312,8 +316,11 @@ export class EnrichmentJobService {
       noContact,
       failed,
       skipped,
+      /** App-side units logged today (daily limit), not Hunter's plan meter */
       creditsUsed,
+      /** Live Hunter account balance for the org's current API key */
       creditsRemaining,
+      hunterCreditsUsed,
       dailyCreditLimit: config.dailyCreditLimit,
       validEmailsToday: validContacts,
       riskyEmailsToday: riskyContacts,

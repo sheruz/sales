@@ -1,4 +1,5 @@
 "use client";
+import { appHome } from "@/lib/app-paths";
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
@@ -167,7 +168,7 @@ export function PipelineBoard() {
                   return (
                     <div key={item.id} className="deal">
                       <div className="deal-name">
-                        <Link href={`/dashboard/opportunities/${item.id}`}>
+                        <Link href={appHome(`/opportunities/${item.id}`)}>
                           {item.company.name}
                         </Link>
                       </div>

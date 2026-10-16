@@ -1,3 +1,4 @@
+import { appHome } from "@/lib/app-paths";
 import Link from "next/link";
 import { Plus } from "lucide-react";
 import prisma from "@/lib/db/prisma";
@@ -41,7 +42,7 @@ export async function LeadsHubHeader({
         {canCreate ? (
           <div className="page-actions">
             <ImportCsvDialog variant="dx" />
-            <Link href="/dashboard/leads/new" className="btn primary">
+            <Link href={appHome("/leads/new")} className="btn primary">
               <Plus />
               Add lead
             </Link>
@@ -50,14 +51,14 @@ export async function LeadsHubHeader({
       </div>
       <div className="tabs">
         <Link
-          href="/dashboard/companies"
+          href={appHome("/companies")}
           className={`tab${active === "companies" ? " active" : ""}`}
         >
           Companies
           {counts ? <span className="n">{counts.companies}</span> : null}
         </Link>
         <Link
-          href="/dashboard/contacts"
+          href={appHome("/contacts")}
           className={`tab${active === "contacts" ? " active" : ""}`}
         >
           Contacts

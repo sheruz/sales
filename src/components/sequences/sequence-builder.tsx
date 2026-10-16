@@ -1,4 +1,5 @@
 "use client";
+import { appHome } from "@/lib/app-paths";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
@@ -246,7 +247,7 @@ export function SequenceBuilder({
       }
 
       if (!sequenceId && saved.id) {
-        router.push(`/dashboard/sequences/${saved.id}`);
+        router.push(appHome(`/sequences/${saved.id}`));
         router.refresh();
         return;
       }

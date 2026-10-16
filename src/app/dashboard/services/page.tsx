@@ -1,3 +1,4 @@
+import { appHome } from "@/lib/app-paths";
 import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth/session";
 import { hasOrgPermission } from "@/lib/tenant/scope";
@@ -6,8 +7,8 @@ import { ServicesPageClient } from "@/components/business-brain/services-page-cl
 
 export default async function ServicesPage() {
   const user = await getCurrentUser();
-  if (!user?.organizationId) redirect("/dashboard");
-  if (!hasOrgPermission(user, "business_brain.manage")) redirect("/dashboard");
+  if (!user?.organizationId) redirect(appHome());
+  if (!hasOrgPermission(user, "business_brain.manage")) redirect(appHome());
 
   const services = await serviceCatalogService.list(user.organizationId, true);
 

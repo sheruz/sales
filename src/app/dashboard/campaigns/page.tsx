@@ -1,3 +1,4 @@
+import { appHome } from "@/lib/app-paths";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { campaignService } from "@/services/campaign.service";
@@ -9,9 +10,9 @@ import { Button } from "@/components/ui/button";
 
 export default async function CampaignsPage() {
   const user = await getCurrentUser();
-  if (!user?.organizationId) redirect("/dashboard");
+  if (!user?.organizationId) redirect(appHome());
   if (!hasAnyOrgPermission(user, ["campaigns.manage", "campaigns.view"])) {
-    redirect("/dashboard");
+    redirect(appHome());
   }
 
   const canManage = hasOrgPermission(user, "campaigns.manage");
@@ -47,7 +48,7 @@ export default async function CampaignsPage() {
           </p>
         </div>
         {canSequences ? (
-          <Link href="/dashboard/sequences">
+          <Link href={appHome("/sequences")}>
             <Button variant="outline" size="sm">
               Sequences
             </Button>

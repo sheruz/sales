@@ -1,3 +1,4 @@
+import { appHome } from "@/lib/app-paths";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
 import type { AutopilotShellStatus } from "@/lib/autopilot/shell-status";
@@ -24,7 +25,7 @@ export function AutopilotStatusPill({
 }) {
   return (
     <Link
-      href="/dashboard/autopilot"
+      href={appHome("/autopilot")}
       className="flex items-center gap-2 rounded-lg border border-sidebar-border bg-sidebar-accent/60 px-2.5 py-2.5 text-[12.5px] transition-colors hover:bg-sidebar-accent"
       title={status.lastRunAt ? `Last run ${status.lastRunAt}` : undefined}
     >

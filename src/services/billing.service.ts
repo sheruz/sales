@@ -1,4 +1,5 @@
 import Stripe from "stripe";
+import { appHome } from "@/lib/app-paths";
 import prisma from "@/lib/db/prisma";
 import { SubscriptionStatus } from "@prisma/client";
 import { env } from "@/lib/config/env";

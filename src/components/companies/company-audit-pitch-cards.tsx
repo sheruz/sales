@@ -1,4 +1,5 @@
 "use client";
+import { appHome } from "@/lib/app-paths";
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
@@ -224,7 +225,7 @@ export function CompanyAuditPitchCards({
                   ? "For manual leads: click Use client details (needs website + contact email), then Audit now. Or run Hunter enrichment."
                   : "Ready — click Audit now (or Autopilot → Audit)."
               }
-              actionHref="/dashboard/autopilot?tab=audit"
+              actionHref={appHome("/autopilot?tab=audit")}
               actionLabel="Open Audit"
             />
           ) : (

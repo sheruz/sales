@@ -1,3 +1,4 @@
+import { appHome } from "@/lib/app-paths";
 import { Suspense } from "react";
 import { redirect } from "next/navigation";
 import { leadService } from "@/services/lead.service";
@@ -19,12 +20,12 @@ interface PageProps {
 
 export default async function LeadsPage({ searchParams }: PageProps) {
   const user = await getCurrentUser();
-  if (!user?.organizationId) redirect("/dashboard");
-  if (!hasOrgPermission(user, "leads.view")) redirect("/dashboard");
+  if (!user?.organizationId) redirect(appHome());
+  if (!hasOrgPermission(user, "leads.view")) redirect(appHome());
 
   const flags = await getFeatureFlags(user.organizationId);
   if (!flags.legacy_enabled) {
-    redirect("/dashboard/companies");
+    redirect(appHome("/companies"));
   }
 
   const params = await searchParams;

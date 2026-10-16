@@ -1,4 +1,5 @@
 "use client";
+import { appHome } from "@/lib/app-paths";
 
 import { useState } from "react";
 import Link from "next/link";
@@ -94,7 +95,7 @@ export function CampaignsList({
       if (!data.success) throw new Error(data.error?.message);
       toast.success("Campaign created");
       setOpen(false);
-      router.push(`/dashboard/campaigns/${data.data.id}`);
+      router.push(appHome(`/campaigns/${data.data.id}`));
       router.refresh();
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Failed to create campaign");
@@ -182,7 +183,7 @@ export function CampaignsList({
       ) : (
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
           {initialCampaigns.map((campaign) => (
-            <Link key={campaign.id} href={`/dashboard/campaigns/${campaign.id}`}>
+            <Link key={campaign.id} href={appHome(`/campaigns/${campaign.id}`)}>
               <Card className="hover:border-primary/50 transition-colors cursor-pointer h-full">
                 <CardHeader className="pb-2">
                   <div className="flex items-start justify-between">

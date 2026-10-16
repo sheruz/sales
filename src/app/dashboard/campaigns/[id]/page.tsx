@@ -1,3 +1,4 @@
+import { appHome } from "@/lib/app-paths";
 import { notFound, redirect } from "next/navigation";
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
@@ -22,9 +23,9 @@ interface PageProps {
 
 export default async function CampaignDetailPage({ params }: PageProps) {
   const user = await getCurrentUser();
-  if (!user?.organizationId) redirect("/dashboard");
+  if (!user?.organizationId) redirect(appHome());
   if (!hasAnyOrgPermission(user, ["campaigns.manage", "campaigns.view"])) {
-    redirect("/dashboard");
+    redirect(appHome());
   }
 
   const { id } = await params;
@@ -92,7 +93,7 @@ export default async function CampaignDetailPage({ params }: PageProps) {
   return (
     <div className="space-y-6">
       <div className="flex items-center gap-4">
-        <Link href="/dashboard/campaigns">
+        <Link href={appHome("/campaigns")}>
           <Button variant="ghost" size="sm">
             <ArrowLeft className="mr-2 h-4 w-4" />
             Back

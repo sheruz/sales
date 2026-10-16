@@ -1,5 +1,6 @@
+import { appHome } from "@/lib/app-paths";
 import { redirect } from "next/navigation";
 
 export default function OpportunitiesRedirectPage() {
-  redirect("/dashboard/opportunities");
+  redirect(appHome("/opportunities"));
 }

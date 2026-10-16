@@ -1,3 +1,4 @@
+import { appOps } from "@/lib/app-paths";
 import Link from "next/link";
 import prisma from "@/lib/db/prisma";
 import { getCurrentUser } from "@/lib/auth/session";
@@ -67,13 +68,13 @@ export default async function PlatformOverviewPage() {
       label: "Organizations",
       value: organizationCount,
       icon: Building2,
-      href: "/platform/companies",
+      href: appOps("/companies"),
     },
     {
       label: "Customer users",
       value: totalUsers,
       icon: Users,
-      href: "/platform/users",
+      href: appOps("/users"),
       sub: `${activeUsers} active`,
     },
     { label: "Leads (platform)", value: totalLeads, icon: Target },
@@ -130,17 +131,17 @@ export default async function PlatformOverviewPage() {
             <CardDescription>Platform operations</CardDescription>
           </CardHeader>
           <CardContent className="flex flex-wrap gap-2">
-            <Link href="/platform/companies">
+            <Link href={appOps("/companies")}>
               <Button variant="outline" size="sm">
                 Manage organizations
               </Button>
             </Link>
-            <Link href="/platform/users">
+            <Link href={appOps("/users")}>
               <Button variant="outline" size="sm">
                 All users
               </Button>
             </Link>
-            <Link href="/platform/activity">
+            <Link href={appOps("/activity")}>
               <Button variant="outline" size="sm">
                 View activity
               </Button>
@@ -166,7 +167,7 @@ export default async function PlatformOverviewPage() {
                 >
                   <div className="min-w-0">
                     <Link
-                      href={`/platform/companies/${org.id}`}
+                      href={appOps(`/companies/${org.id}`)}
                       className="font-medium truncate hover:underline block"
                     >
                       {org.name}

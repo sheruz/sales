@@ -1,3 +1,4 @@
+import { appHome } from "@/lib/app-paths";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import {
@@ -342,10 +343,10 @@ export default async function DashboardPage() {
   const primaryCta = incomplete
     ? { href: incomplete.href, label: incomplete.label }
     : canInbox
-      ? { href: "/dashboard/conversations", label: "Review inbox" }
+      ? { href: appHome("/conversations"), label: "Review inbox" }
       : canOpps
-        ? { href: "/dashboard/opportunities", label: "Work opportunities" }
-        : { href: "/dashboard/autopilot", label: "Open Autopilot" };
+        ? { href: appHome("/opportunities"), label: "Work opportunities" }
+        : { href: appHome("/autopilot"), label: "Open Autopilot" };
 
   // ── Subtitle ──
   const subtitleParts: string[] = [];
@@ -384,47 +385,47 @@ export default async function DashboardPage() {
     {
       label: "Found",
       value: overviewFunnel.get("found")?.count ?? 0,
-      href: "/dashboard/companies",
+      href: appHome("/companies"),
     },
     {
       label: "Enriched",
       value: overviewFunnel.get("enriched")?.count ?? 0,
-      href: "/dashboard/companies?funnel=enriched",
+      href: appHome("/companies?funnel=enriched"),
     },
     {
       label: "Audited",
       value: overviewFunnel.get("audited")?.count ?? 0,
-      href: "/dashboard/companies?funnel=audited",
+      href: appHome("/companies?funnel=audited"),
     },
     {
       label: "Contacted",
       value: mf?.Contacted ?? 0,
-      href: "/dashboard/opportunities?filter=contacted",
+      href: appHome("/opportunities?filter=contacted"),
     },
     {
       label: "Replied",
       value: mf?.Replied ?? 0,
-      href: "/dashboard/opportunities?filter=replied",
+      href: appHome("/opportunities?filter=replied"),
     },
     {
       label: "Positive",
       value: mf?.Positive ?? 0,
-      href: "/dashboard/opportunities?filter=positive",
+      href: appHome("/opportunities?filter=positive"),
     },
     {
       label: "Meeting",
       value: mf?.Meeting ?? 0,
-      href: "/dashboard/opportunities?filter=meeting",
+      href: appHome("/opportunities?filter=meeting"),
     },
     {
       label: "Proposal",
       value: mf?.Proposal ?? 0,
-      href: "/dashboard/proposals",
+      href: appHome("/proposals"),
     },
     {
       label: "Won",
       value: mf?.Won ?? 0,
-      href: "/dashboard/opportunities?filter=won",
+      href: appHome("/opportunities?filter=won"),
     },
   ];
 
@@ -525,7 +526,7 @@ export default async function DashboardPage() {
       ) : null}
 
       <div className="grid g4">
-        <Link href="/dashboard/revenue-goals" className="card kpi block">
+        <Link href={appHome("/revenue-goals")} className="card kpi block">
           <div className="kpi-label">Revenue this month</div>
           <div className="kpi-value">{fmt(monthRevenueValue)}</div>
           <div className="progress">
@@ -537,7 +538,7 @@ export default async function DashboardPage() {
               : "No active revenue goal"}
           </div>
         </Link>
-        <Link href="/dashboard/pipeline" className="card kpi block">
+        <Link href={appHome("/pipeline")} className="card kpi block">
           <div className="kpi-label">Open pipeline</div>
           <div className="kpi-value">{fmt(metrics?.pipelineValue ?? 0)}</div>
           <div className="kpi-delta muted">
@@ -546,7 +547,7 @@ export default async function DashboardPage() {
               : "No pipeline data yet"}
           </div>
         </Link>
-        <Link href="/dashboard/meetings" className="card kpi block">
+        <Link href={appHome("/meetings")} className="card kpi block">
           <div className="kpi-label">Meetings booked</div>
           <div className="kpi-value">{metrics?.meetings ?? 0}</div>
           <div
@@ -557,7 +558,7 @@ export default async function DashboardPage() {
               : "None this week"}
           </div>
         </Link>
-        <Link href="/dashboard/conversations" className="card kpi block">
+        <Link href={appHome("/conversations")} className="card kpi block">
           <div className="kpi-label">Reply rate</div>
           <div className="kpi-value">
             {(metrics?.outreachReplyRate ?? 0).toFixed(1)}%
@@ -622,7 +623,7 @@ export default async function DashboardPage() {
                   </div>
                 </div>
                 <Link
-                  href="/dashboard/conversations"
+                  href={appHome("/conversations")}
                   className="btn primary"
                 >
                   Review
@@ -645,7 +646,7 @@ export default async function DashboardPage() {
                   Approve to start sending in the next window
                 </div>
               </div>
-              <Link href="/dashboard/outreach?tab=pitch" className="btn">
+              <Link href={appHome("/outreach?tab=pitch")} className="btn">
                 Review
               </Link>
             </div>
@@ -668,7 +669,7 @@ export default async function DashboardPage() {
                   {m.location ?? (m.meetingLink ? "Online" : "Today")}
                 </div>
               </div>
-              <Link href="/dashboard/meetings" className="btn">
+              <Link href={appHome("/meetings")} className="btn">
                 Prep
               </Link>
             </div>
@@ -690,7 +691,7 @@ export default async function DashboardPage() {
                     : ""}
                 </div>
               </div>
-              <Link href="/dashboard/tasks" className="btn">
+              <Link href={appHome("/tasks")} className="btn">
                 Open
               </Link>
             </div>

@@ -20,7 +20,8 @@ export async function GET() {
     await requireAnyOrgPermission([...SOURCING_PERMS]);
     const user = await requireOrganizationContext();
     const [data, lastTick] = await Promise.all([
-      enrichmentJobService.dashboard(user.organizationId),
+      // Live Hunter balance for this org's key (no cache)
+      enrichmentJobService.dashboard(user.organizationId, user.id),
       cronTickService.lastTick(),
     ]);
     return NextResponse.json(
@@ -38,7 +39,12 @@ export async function GET() {
               stale: cronTickService.isStale(lastTick),
             }
           : null,
-      })
+      }),
+      {
+        headers: {
+          "Cache-Control": "no-store, max-age=0",
+        },
+      }
     );
   } catch (error) {
     return handleApiError(error);

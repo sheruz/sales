@@ -1,3 +1,4 @@
+import { appHome } from "@/lib/app-paths";
 import Link from "next/link";
 import { Plus } from "lucide-react";
 import { PipelineBoard } from "@/components/crm/pipeline-board";
@@ -11,14 +12,14 @@ export default async function PipelinePage() {
   if (
     !hasAnyOrgPermission(user, ["deals.manage", "opportunities.view"])
   ) {
-    redirect("/dashboard");
+    redirect(appHome());
   }
 
   const canOpps = hasOrgPermission(user, "opportunities.view");
   const canProposals = hasOrgPermission(user, "deals.manage");
   const newDealHref = canOpps
-    ? "/dashboard/opportunities"
-    : "/dashboard/proposals";
+    ? appHome("/opportunities")
+    : appHome("/proposals");
 
   return (
     <div className="dx">
@@ -31,16 +32,16 @@ export default async function PipelinePage() {
             </p>
           </div>
           <div className="page-actions">
-            <Link href="/dashboard/pipeline" className="btn active">
+            <Link href={appHome("/pipeline")} className="btn active">
               Board
             </Link>
             {canOpps ? (
-              <Link href="/dashboard/opportunities" className="btn">
+              <Link href={appHome("/opportunities")} className="btn">
                 Opportunities
               </Link>
             ) : null}
             {canProposals ? (
-              <Link href="/dashboard/proposals" className="btn">
+              <Link href={appHome("/proposals")} className="btn">
                 Proposals
               </Link>
             ) : null}

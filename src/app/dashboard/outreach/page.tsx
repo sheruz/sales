@@ -1,3 +1,4 @@
+import { appHome } from "@/lib/app-paths";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { format } from "date-fns";
@@ -176,7 +177,7 @@ function renderTab(
                     <>
                       {" "}
                       <Link
-                        href="/dashboard/sequences/new"
+                        href={appHome("/sequences/new")}
                         className="cell-main"
                       >
                         Create one
@@ -190,7 +191,7 @@ function renderTab(
                 <tr key={s.id}>
                   <td>
                     <Link
-                      href={`/dashboard/sequences/${s.id}`}
+                      href={appHome(`/sequences/${s.id}`)}
                       className="cell-main"
                     >
                       {s.name}
@@ -272,7 +273,7 @@ function renderTab(
                     <td>
                       <div className="cell-main">
                         {r.company ? (
-                          <Link href={`/dashboard/companies/${r.company.id}`}>
+                          <Link href={appHome(`/companies/${r.company.id}`)}>
                             {r.company.name}
                           </Link>
                         ) : (
@@ -335,7 +336,7 @@ function renderTab(
                   No mailboxes in the sending pool yet. Add one below, or
                   connect an account in{" "}
                   <Link
-                    href="/dashboard/settings?tab=integrations"
+                    href={appHome("/settings?tab=integrations")}
                     className="cell-main"
                   >
                     Settings
@@ -393,7 +394,7 @@ export default async function OutreachPage({
 }) {
   const user = await getCurrentUser();
   if (!user) redirect("/login");
-  if (!user.organizationId) redirect("/dashboard");
+  if (!user.organizationId) redirect(appHome());
   const organizationId = user.organizationId;
 
   const canSequences = hasAnyOrgPermission(user, [
@@ -405,7 +406,7 @@ export default async function OutreachPage({
     "campaigns.manage",
     "business_brain.manage",
   ]);
-  if (!canSequences && !canOutbound) redirect("/dashboard");
+  if (!canSequences && !canOutbound) redirect(appHome());
   const canManageSequences = hasOrgPermission(user, "sequences.manage");
 
   const params = await searchParams;
@@ -472,7 +473,7 @@ export default async function OutreachPage({
           </div>
           {canManageSequences ? (
             <div className="page-actions">
-              <Link href="/dashboard/sequences/new" className="btn primary">
+              <Link href={appHome("/sequences/new")} className="btn primary">
                 <Plus />
                 New sequence
               </Link>
@@ -484,7 +485,7 @@ export default async function OutreachPage({
           {visibleTabs.map((t) => (
             <Link
               key={t.key}
-              href={`/dashboard/outreach?tab=${t.key}`}
+              href={appHome(`/outreach?tab=${t.key}`)}
               className={`tab${t.key === activeTab ? " active" : ""}`}
             >
               {t.label}

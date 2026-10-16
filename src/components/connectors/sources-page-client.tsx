@@ -1,4 +1,5 @@
 "use client";
+import { appHome } from "@/lib/app-paths";
 
 import { useState } from "react";
 import Link from "next/link";
@@ -208,7 +209,7 @@ export function SourcesPageClient({
         <p className="text-sm text-muted-foreground">
           Opportunity Engine only receives{" "}
           <Link
-            href="/dashboard/opportunities"
+            href={appHome("/opportunities")}
             className="underline underline-offset-2"
           >
             normalized signals

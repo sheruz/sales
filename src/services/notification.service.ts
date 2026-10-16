@@ -1,3 +1,4 @@
+import { appHome } from "@/lib/app-paths";
 import prisma from "@/lib/db/prisma";
 import {
   AiReplyStatus,
@@ -35,8 +36,8 @@ function appUrl(path: string): string {
 
 function conversationHref(conversationId?: string | null): string {
   return conversationId
-    ? `/dashboard/conversations?conversationId=${encodeURIComponent(conversationId)}`
-    : "/dashboard/conversations";
+    ? appHome(`/conversations?conversationId=${encodeURIComponent(conversationId)}`)
+    : appHome("/conversations");
 }
 
 function who(contactName?: string | null, companyName?: string | null): string {
@@ -330,7 +331,7 @@ export class NotificationService {
       title,
       body,
       href: input.referralContactId
-        ? `/dashboard/contacts/${encodeURIComponent(input.referralContactId)}`
+        ? appHome(`/contacts/${encodeURIComponent(input.referralContactId)}`)
         : conversationHref(input.conversationId),
       metadata: {
         conversationId: input.conversationId ?? null,
@@ -454,7 +455,7 @@ export class NotificationService {
         title,
         body,
         html,
-        href: "/dashboard/conversations",
+        href: appHome("/conversations"),
         metadata: {
           draftIds: shown.map((r) => r.id),
           total: rows.length,

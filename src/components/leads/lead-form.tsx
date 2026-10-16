@@ -1,4 +1,5 @@
 "use client";
+import { appHome } from "@/lib/app-paths";
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
@@ -99,7 +100,7 @@ export function LeadForm({ initialData, leadId, onSuccess }: LeadFormProps) {
       if (onSuccess) {
         onSuccess(data.data.id);
       } else {
-        router.push(`/dashboard/leads/${data.data.id}`);
+        router.push(appHome(`/leads/${data.data.id}`));
         router.refresh();
       }
     } catch (err) {
