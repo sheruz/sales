@@ -1170,7 +1170,8 @@ export class OutboundJobService {
       return { id: outboxId, status: "cancelled", reason: "suppressed" };
     }
 
-    // If step 1 was queued as plain text before the BRANDED fix, rebuild HTML now.
+    // Step 1 / BRANDED: always rebuild HTML at send time so the designed
+    // template ships even if the row was queued as plain or before a deploy.
     let bodyText = item.bodyText;
     let bodyHtml = item.bodyHtml;
     const metaEarly =
@@ -1184,9 +1185,7 @@ export class OutboundJobService {
       typeof bodyHtml === "string" &&
       (bodyHtml.includes("WHAT WE NOTICED") ||
         bodyHtml.includes("SOFTWARE STUDIO"));
-    const missingTrackPixel =
-      typeof bodyHtml !== "string" || !bodyHtml.includes("/t/o/");
-    if (wantsBranded && (!htmlLooksBranded || missingTrackPixel)) {
+    if (wantsBranded) {
       try {
         const rebuilt = await this.reRenderBrandedOutbox(organizationId, item);
         if (rebuilt) {
@@ -1207,13 +1206,62 @@ export class OutboundJobService {
               } as Prisma.InputJsonValue,
             },
           });
+        } else if (!htmlLooksBranded) {
+          await prisma.emailOutbox.update({
+            where: { id: outboxId },
+            data: {
+              status: EmailOutboxStatus.HELD,
+              heldReason: "render_failed",
+              lastError: "branded re-render returned null (missing pitch?)",
+            },
+          });
+          return {
+            id: outboxId,
+            status: "held",
+            reason: "render_failed",
+          };
         }
       } catch (err) {
         console.error(
           "[outbound] branded re-render failed",
           err instanceof Error ? err.message : err
         );
+        if (!htmlLooksBranded) {
+          await prisma.emailOutbox.update({
+            where: { id: outboxId },
+            data: {
+              status: EmailOutboxStatus.HELD,
+              heldReason: "render_failed",
+              lastError: (
+                err instanceof Error ? err.message : "branded render failed"
+              ).slice(0, 500),
+            },
+          });
+          return {
+            id: outboxId,
+            status: "held",
+            reason: "render_failed",
+          };
+        }
       }
+    }
+
+    // Never send step-1 as plain-looking HTML when we expected BRANDED.
+    if (
+      wantsBranded &&
+      (typeof bodyHtml !== "string" ||
+        (!bodyHtml.includes("WHAT WE NOTICED") &&
+          !bodyHtml.includes("SOFTWARE STUDIO")))
+    ) {
+      await prisma.emailOutbox.update({
+        where: { id: outboxId },
+        data: {
+          status: EmailOutboxStatus.HELD,
+          heldReason: "render_failed",
+          lastError: "refusing to send non-branded HTML for step 1",
+        },
+      });
+      return { id: outboxId, status: "held", reason: "render_failed" };
     }
 
     if (cfg.shadowMode || item.shadowMode) {

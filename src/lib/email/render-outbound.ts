@@ -1,5 +1,3 @@
-import { readFileSync } from "fs";
-import { join } from "path";
 import type { EmailStyle } from "@prisma/client";
 import { env } from "@/lib/config/env";
 import { buildGreeting } from "@/lib/email/greeting";
@@ -10,21 +8,13 @@ import {
   openPixelUrl,
   withEmailUtm,
 } from "@/lib/email/track-token";
+import { BRANDED_OUTBOUND_HTML } from "@/lib/email/templates/branded-outbound.template";
 
 const MAX_HTML_BYTES = 100 * 1024;
 
-let cachedTemplate: string | null = null;
-
 function loadBrandedTemplate(): string {
-  if (cachedTemplate && process.env.NODE_ENV === "production") {
-    return cachedTemplate;
-  }
-  const path = join(
-    process.cwd(),
-    "src/lib/email/templates/branded-outbound.html"
-  );
-  cachedTemplate = readFileSync(path, "utf8");
-  return cachedTemplate;
+  // Bundled constant — never depends on fs / cwd in production.
+  return BRANDED_OUTBOUND_HTML;
 }
 
 function appBase(): string {
