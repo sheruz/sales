@@ -64,6 +64,10 @@ import { emailSafetyService } from "@/services/email-safety.service";
 import { entitlementService } from "@/services/entitlement.service";
 import { outboundConfigService } from "@/services/outbound-config.service";
 import { sequenceEnrollmentService } from "@/services/sequence-enrollment.service";
+import { companyService } from "@/services/company.service";
+import { normalizeEmail } from "@/services/contact.service";
+import { contactEmailMatchWhere } from "@/lib/email/inbound-sync";
+import { randomUUID } from "crypto";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Types
@@ -611,10 +615,10 @@ export class AiReplyService {
     }
     if (!contact && input.message.fromEmail) {
       contact = await prisma.contact.findFirst({
-        where: {
-          organizationId: input.organizationId,
-          normalizedEmail: input.message.fromEmail.trim().toLowerCase(),
-        },
+        where: contactEmailMatchWhere(
+          input.organizationId,
+          input.message.fromEmail
+        ),
       });
     }
 
@@ -1882,6 +1886,86 @@ export class AiReplyService {
     return `${text.trim()}\n\n${signature}`;
   }
 
+  /**
+   * Outbox requires contactId. Inbound threads sometimes have no linked Contact
+   * (e.g. reply matched by thread only). Find-or-create from From: address.
+   */
+  private async ensureContactForReply(ctx: Ctx): Promise<Contact | null> {
+    if (ctx.contact) return ctx.contact;
+
+    const toEmail = (ctx.message.fromEmail || "").trim().toLowerCase();
+    if (!toEmail || !EMAIL_RE.test(toEmail)) return null;
+
+    let contact = await prisma.contact.findFirst({
+      where: contactEmailMatchWhere(ctx.organizationId, toEmail),
+    });
+
+    if (!contact) {
+      const domain = toEmail.split("@")[1]?.toLowerCase() || "unknown";
+      let companyId = ctx.conversation.companyId ?? ctx.company?.id ?? null;
+      if (!companyId) {
+        const company = await companyService.findOrCreate(
+          ctx.organizationId,
+          domain,
+          { domain, website: `https://${domain}` }
+        );
+        companyId = company.id;
+      }
+
+      const local = toEmail.split("@")[0] || "Prospect";
+      const parts = local.replace(/[._+-]+/g, " ").trim().split(/\s+/);
+      const firstName = (parts[0] || "Prospect").slice(0, 80);
+      const lastName = (parts.slice(1).join(" ") || "Reply").slice(0, 80);
+      const normalized = normalizeEmail(toEmail);
+
+      try {
+        contact = await prisma.contact.create({
+          data: {
+            id: randomUUID(),
+            organizationId: ctx.organizationId,
+            companyId,
+            firstName,
+            lastName,
+            fullName: `${firstName} ${lastName}`.trim(),
+            email: toEmail,
+            normalizedEmail: normalized,
+            source: "inbound_reply",
+            status: ContactStatus.ACTIVE,
+          },
+        });
+      } catch {
+        // Race / unique: another request created the same email
+        contact = await prisma.contact.findFirst({
+          where: contactEmailMatchWhere(ctx.organizationId, toEmail),
+        });
+      }
+    }
+
+    if (!contact) return null;
+
+    // Persist link so future sends / UI don't hit no_contact again
+    if (
+      !ctx.conversation.contactId ||
+      (!ctx.conversation.companyId && contact.companyId)
+    ) {
+      await prisma.inboxConversation.update({
+        where: { id: ctx.conversation.id },
+        data: {
+          contactId: ctx.conversation.contactId ?? contact.id,
+          companyId: ctx.conversation.companyId ?? contact.companyId,
+        },
+      });
+      ctx.conversation = {
+        ...ctx.conversation,
+        contactId: ctx.conversation.contactId ?? contact.id,
+        companyId: ctx.conversation.companyId ?? contact.companyId,
+      };
+    }
+
+    ctx.contact = contact;
+    return contact;
+  }
+
   /** l. Queue (or re-queue) the single AI_REPLY outbox row for an inbound message. */
   private async queueOutbox(
     ctx: Ctx,
@@ -1889,7 +1973,7 @@ export class AiReplyService {
     text: string,
     opts: { immediate: boolean }
   ): Promise<{ ok: true; outbox: EmailOutbox } | { ok: false; reason: string }> {
-    const contact = ctx.contact;
+    const contact = await this.ensureContactForReply(ctx);
     if (!contact) return { ok: false, reason: "no_contact" };
 
     const toEmail = (ctx.message.fromEmail || contact.email || "").trim().toLowerCase();
