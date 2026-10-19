@@ -446,9 +446,17 @@ export class CreditLedgerService {
             creditRolloverCap: true,
           },
         },
+        planVersion: {
+          select: {
+            monthlyCredits: true,
+            creditRolloverEnabled: true,
+            creditRolloverCapMonths: true,
+          },
+        },
       },
     });
-    const monthly = sub?.plan.monthlyCredits;
+    const monthly =
+      sub?.planVersion?.monthlyCredits ?? sub?.plan.monthlyCredits ?? null;
     if (monthly == null || monthly <= 0) {
       return { granted: 0, skipped: true, reason: "no_monthly_credits" };
     }
@@ -464,8 +472,13 @@ export class CreditLedgerService {
     }
 
     const balance = await this.getBalance(organizationId);
-    const plan = sub!.plan;
-    const rollover = plan.creditRolloverEnabled === true;
+    const rollover =
+      sub!.planVersion?.creditRolloverEnabled ??
+      sub!.plan.creditRolloverEnabled === true;
+    const rolloverCap =
+      sub!.planVersion?.creditRolloverCapMonths != null
+        ? monthly * sub!.planVersion.creditRolloverCapMonths
+        : sub!.plan.creditRolloverCap;
     if (!rollover && balance > 0) {
       await this.grant({
         organizationId,
@@ -474,8 +487,8 @@ export class CreditLedgerService {
         idempotencyKey: `expire_unused:${organizationId}:${start.toISOString().slice(0, 10)}`,
         reason: "monthly_expire_unused",
       });
-    } else if (rollover && plan.creditRolloverCap != null) {
-      const cap = plan.creditRolloverCap;
+    } else if (rollover && rolloverCap != null) {
+      const cap = rolloverCap;
       if (balance > cap) {
         await this.grant({
           organizationId,
@@ -499,6 +512,82 @@ export class CreditLedgerService {
       granted: result.alreadyExists ? 0 : monthly,
       skipped: result.alreadyExists,
       reason: result.alreadyExists ? "already_granted" : undefined,
+    };
+  }
+
+  /**
+   * B1/B3: after Super Admin assign or upgrade — grant full monthly on first
+   * package, or the positive difference when moving to a higher package.
+   */
+  async grantOnPlanChange(input: {
+    organizationId: string;
+    fromPlanVersionId: string | null;
+    toPlanVersionId: string;
+    actorUserId?: string;
+  }): Promise<{ granted: number; reason: string }> {
+    if (isPlatformOwnerOrgId(input.organizationId)) {
+      return { granted: 0, reason: "platform_owner" };
+    }
+
+    const toVer = await prisma.planVersion.findUnique({
+      where: { id: input.toPlanVersionId },
+      select: { monthlyCredits: true, planId: true },
+    });
+    const newMonthly = toVer?.monthlyCredits ?? 0;
+    if (newMonthly <= 0) {
+      return { granted: 0, reason: "no_monthly_credits" };
+    }
+
+    let oldMonthly = 0;
+    if (input.fromPlanVersionId) {
+      const fromVer = await prisma.planVersion.findUnique({
+        where: { id: input.fromPlanVersionId },
+        select: { monthlyCredits: true },
+      });
+      oldMonthly = fromVer?.monthlyCredits ?? 0;
+    }
+
+    const period = periodStartUtc().toISOString().slice(0, 10);
+    const balance = await this.getBalance(input.organizationId);
+
+    // First activation (NONE → plan) or zero balance with no prior version credits
+    if (!input.fromPlanVersionId || oldMonthly <= 0) {
+      if (balance >= newMonthly) {
+        return { granted: 0, reason: "already_funded" };
+      }
+      const need = newMonthly - Math.max(0, balance);
+      const idempotencyKey = `plan_activate:${input.organizationId}:${input.toPlanVersionId}:${period}`;
+      const result = await this.grant({
+        organizationId: input.organizationId,
+        amount: need,
+        type: "GRANT_PLAN",
+        idempotencyKey,
+        reason: `plan_activate_${period}`,
+        actorUserId: input.actorUserId,
+      });
+      return {
+        granted: result.alreadyExists ? 0 : need,
+        reason: result.alreadyExists ? "already_granted" : "activated",
+      };
+    }
+
+    // Upgrade: grant difference only (spec §7)
+    const diff = newMonthly - oldMonthly;
+    if (diff <= 0) {
+      return { granted: 0, reason: "downgrade_or_same_no_grant" };
+    }
+    const idempotencyKey = `plan_upgrade:${input.organizationId}:${input.fromPlanVersionId}:${input.toPlanVersionId}:${period}`;
+    const result = await this.grant({
+      organizationId: input.organizationId,
+      amount: diff,
+      type: "GRANT_PLAN",
+      idempotencyKey,
+      reason: `plan_upgrade_diff_${oldMonthly}_to_${newMonthly}`,
+      actorUserId: input.actorUserId,
+    });
+    return {
+      granted: result.alreadyExists ? 0 : diff,
+      reason: result.alreadyExists ? "already_granted" : "upgrade_diff",
     };
   }
 

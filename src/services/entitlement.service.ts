@@ -195,6 +195,22 @@ export class EntitlementService {
     const existing = await prisma.subscription.findUnique({
       where: { organizationId: input.organizationId },
     });
+    const fromPlanVersionId = existing?.planVersionId ?? null;
+
+    // Keep legacy Plan.monthlyCredits in sync for older readers
+    if (version.monthlyCredits != null) {
+      await prisma.plan.update({
+        where: { id: version.planId },
+        data: {
+          monthlyCredits: version.monthlyCredits,
+          creditRolloverEnabled: version.creditRolloverEnabled,
+          creditRolloverCap:
+            version.creditRolloverCapMonths != null && version.monthlyCredits
+              ? version.monthlyCredits * version.creditRolloverCapMonths
+              : null,
+        },
+      });
+    }
 
     const data = {
       planId: version.planId,
@@ -214,23 +230,45 @@ export class EntitlementService {
       readOnlyUntil: null as Date | null,
     };
 
-    if (existing) {
-      return prisma.subscription.update({
-        where: { organizationId: input.organizationId },
-        data,
-        include: {
-          plan: true,
-          planVersion: { include: { features: true } },
-        },
-      });
+    const sub = existing
+      ? await prisma.subscription.update({
+          where: { organizationId: input.organizationId },
+          data,
+          include: {
+            plan: true,
+            planVersion: { include: { features: true } },
+          },
+        })
+      : await prisma.subscription.create({
+          data: { organizationId: input.organizationId, ...data },
+          include: {
+            plan: true,
+            planVersion: { include: { features: true } },
+          },
+        });
+
+    // Grant credits on activate / upgrade (idempotent)
+    if (
+      input.status === SubscriptionStatus.ACTIVE ||
+      input.status === SubscriptionStatus.TRIALING
+    ) {
+      try {
+        const { creditLedgerService } = await import(
+          "@/services/credit-ledger.service"
+        );
+        await creditLedgerService.grantOnPlanChange({
+          organizationId: input.organizationId,
+          fromPlanVersionId:
+            fromPlanVersionId === version.id ? null : fromPlanVersionId,
+          toPlanVersionId: version.id,
+          actorUserId: input.actorUserId,
+        });
+      } catch (err) {
+        console.error("[entitlement] credit grant on plan assign failed", err);
+      }
     }
-    return prisma.subscription.create({
-      data: { organizationId: input.organizationId, ...data },
-      include: {
-        plan: true,
-        planVersion: { include: { features: true } },
-      },
-    });
+
+    return sub;
   }
 
   getFeature(features: PlanFeature[], key: FeatureKey): PlanFeature | null {
