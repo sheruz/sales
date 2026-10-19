@@ -73,6 +73,11 @@ export class BillingService {
       where: { id: input.planId, active: true },
     });
     if (!plan) throw new NotFoundError("Plan not found");
+    if (plan.code === "OWNER" || plan.name === "OWNER") {
+      throw new ValidationError(
+        "OWNER plan cannot be assigned to tenant workspaces"
+      );
+    }
     if (Number(plan.price) <= 0) {
       throw new ValidationError("Use the Free plan without checkout");
     }
@@ -185,6 +190,16 @@ export class BillingService {
       where: { id: input.planId, active: true },
     });
     if (!plan) throw new NotFoundError("Plan not found");
+
+    // S2.5: OWNER plan is internal only — never assignable to tenants
+    if (plan.code === "OWNER" || plan.name === "OWNER") {
+      const { env } = await import("@/lib/config/env");
+      if (input.organizationId !== env.PLATFORM_OWNER_ORG_ID) {
+        throw new ValidationError(
+          "OWNER plan cannot be assigned to tenant workspaces"
+        );
+      }
+    }
 
     if (Number(plan.price) <= 0) {
       const updated = await this.switchToFreePlan(input.organizationId);

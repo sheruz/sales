@@ -44,17 +44,18 @@ async function lockOrg(tx: Tx, organizationId: string): Promise<OrgLockRow> {
   return rows[0];
 }
 
-function isOwnerPlan(row: OrgLockRow): boolean {
-  return (
-    row.plan_code === "OWNER" ||
-    row.plan_name === "OWNER" ||
-    row.plan_name === "Internal Owner"
-  );
+function isPlatformOwnerOrgId(organizationId: string): boolean {
+  const id = env.PLATFORM_OWNER_ORG_ID;
+  return Boolean(id && organizationId === id);
 }
 
-/** Per-org enforcement only. Global BILLING_ENFORCEMENT stays false in S2. Never OWNER. */
-function enforcementActive(row: OrgLockRow): boolean {
-  if (isOwnerPlan(row)) return false;
+/**
+ * S2.5: only PLATFORM_OWNER_ORG_ID is exempt from credit consume / enforcement.
+ * OWNER plan is internal visibility only — not an exemption signal.
+ */
+function enforcementActive(row: OrgLockRow, organizationId: string): boolean {
+  if (isPlatformOwnerOrgId(organizationId)) return false;
+  if (env.BILLING_ENFORCEMENT_ENABLED !== true) return false;
   return row.billing_enforcement_enabled === true;
 }
 
@@ -82,20 +83,14 @@ export class CreditLedgerService {
     return org?.creditBalanceCached ?? 0;
   }
 
+  /** @deprecated Prefer billingGateway.isPlatformOwner — kept for API compat */
   async isOwnerOrg(organizationId: string): Promise<boolean> {
-    const sub = await prisma.subscription.findUnique({
-      where: { organizationId },
-      include: { plan: { select: { code: true, name: true } } },
-    });
-    return (
-      sub?.plan.code === "OWNER" ||
-      sub?.plan.name === "OWNER" ||
-      sub?.plan.name === "Internal Owner"
-    );
+    return isPlatformOwnerOrgId(organizationId);
   }
 
   async isEnforcementOn(organizationId: string): Promise<boolean> {
-    if (await this.isOwnerOrg(organizationId)) return false;
+    if (isPlatformOwnerOrgId(organizationId)) return false;
+    if (env.BILLING_ENFORCEMENT_ENABLED !== true) return false;
     const org = await prisma.organization.findUnique({
       where: { id: organizationId },
       select: { billingEnforcementEnabled: true },
@@ -154,7 +149,7 @@ export class CreditLedgerService {
       }
 
       const org = await lockOrg(tx, input.organizationId);
-      if (isOwnerPlan(org)) {
+      if (isPlatformOwnerOrgId(input.organizationId)) {
         return {
           reserved: true,
           credits: 0,
@@ -164,10 +159,15 @@ export class CreditLedgerService {
         };
       }
 
-      const enforce = enforcementActive(org);
-      if (enforce && org.credit_balance_cached < price) {
+      const enforce = enforcementActive(org, input.organizationId);
+      if (
+        enforce &&
+        (org.credit_balance_cached < price || org.credit_balance_cached < 0)
+      ) {
         throw new ForbiddenError(
-          "Out of credits. Top up or upgrade — see Settings → Plan & Usage."
+          org.credit_balance_cached < 0
+            ? "Credit balance is negative. Contact support for an adjustment before credit actions can run."
+            : "Out of credits. Top up or upgrade — see Settings → Plan & Usage."
         );
       }
 
@@ -395,7 +395,7 @@ export class CreditLedgerService {
 
       const org = await lockOrg(tx, input.organizationId);
       const balanceAfter = org.credit_balance_cached + input.amount;
-      if (balanceAfter < 0 && enforcementActive(org)) {
+      if (balanceAfter < 0 && enforcementActive(org, input.organizationId)) {
         throw new ForbiddenError("Adjust would make balance negative");
       }
 
@@ -432,8 +432,8 @@ export class CreditLedgerService {
     organizationId: string,
     at = new Date()
   ): Promise<{ granted: number; skipped: boolean; reason?: string }> {
-    if (await this.isOwnerOrg(organizationId)) {
-      return { granted: 0, skipped: true, reason: "owner" };
+    if (isPlatformOwnerOrgId(organizationId)) {
+      return { granted: 0, skipped: true, reason: "platform_owner" };
     }
 
     const sub = await prisma.subscription.findUnique({

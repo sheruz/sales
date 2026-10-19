@@ -135,6 +135,8 @@ export class InboxService {
     headers?: Record<string, string>;
     inReplyTo?: string | null;
     references?: string | null;
+    /** Parent already authorized via billing gateway (e.g. cold outbox). */
+    skipBilling?: boolean;
   }) {
     const account = input.emailAccountId
       ? await emailAccountService.getById(
@@ -274,10 +276,26 @@ export class InboxService {
       throw err;
     }
 
-    await entitlementService.assertAndConsume(
-      input.organizationId,
-      FEATURE_KEYS.EMAILS
-    );
+    let emailReservationId: string | null = null;
+    if (!input.skipBilling) {
+      const { billingGateway } = await import(
+        "@/services/billing-gateway.service"
+      );
+      const { BILLING_ACTIONS } = await import("@/lib/billing/actions");
+      const auth = await billingGateway.authorize({
+        organizationId: input.organizationId,
+        action: BILLING_ACTIONS.EMAIL_SEND_SEQUENCE,
+        idempotencyKey: `email_send:${input.organizationId}:${input.idempotencyKey}`,
+        referenceType: "message_idempotency",
+        referenceId: input.idempotencyKey,
+        actorUserId: input.userId,
+      });
+      if (!auth.allowed) {
+        const { ForbiddenError } = await import("@/lib/api/response");
+        throw new ForbiddenError(auth.message);
+      }
+      emailReservationId = auth.reservationId;
+    }
 
     try {
       const sent = await emailProviderService.send(account, {
@@ -345,8 +363,34 @@ export class InboxService {
         });
       }
 
+      if (emailReservationId) {
+        const { billingGateway } = await import(
+          "@/services/billing-gateway.service"
+        );
+        await billingGateway.commit({
+          organizationId: input.organizationId,
+          reservationId: emailReservationId,
+          actorUserId: input.userId,
+        });
+      }
+
       return { conversationId: conversationId!, message, resumed: false as const };
     } catch (error) {
+      if (emailReservationId) {
+        try {
+          const { billingGateway } = await import(
+            "@/services/billing-gateway.service"
+          );
+          await billingGateway.refund({
+            organizationId: input.organizationId,
+            reservationId: emailReservationId,
+            actorUserId: input.userId,
+            reason: "send_failed",
+          });
+        } catch {
+          // ignore
+        }
+      }
       const errMsg = error instanceof Error ? error.message : "Send failed";
       await prisma.message.update({
         where: { id: draftId },

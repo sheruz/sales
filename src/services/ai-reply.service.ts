@@ -187,7 +187,8 @@ type DeliverStatus =
   | "held"
   | "failed"
   | "retry"
-  | "skipped";
+  | "skipped"
+  | "rescheduled";
 
 type DeliverResult = {
   status: DeliverStatus;
@@ -938,6 +939,9 @@ export class AiReplyService {
       maxTokens?: number;
       /** Per-task model override from aiReply config */
       model?: string;
+      purpose?: string;
+      /** Parent withAuthorized(ai_reply_draft) already metered */
+      billingAuthorized?: boolean;
     }
   ): Promise<AICompletionResult> {
     const run = (userId: string | undefined) =>
@@ -946,6 +950,8 @@ export class AiReplyService {
         operation: args.operation,
         organizationId: ctx.organizationId,
         userId,
+        purpose: args.purpose ?? args.feature,
+        billingAuthorized: args.billingAuthorized,
         jsonMode: true,
         temperature: args.temperature,
         maxTokens: args.maxTokens,
@@ -988,6 +994,7 @@ export class AiReplyService {
       result = await this.callAi(ctx, {
         feature: "inbox_reply_classification",
         operation: "ai_reply_classify",
+        purpose: "inbox_reply_classification",
         system: buildClassifySystemPrompt(),
         user: wrapInboundEmailForAI(ctx.subject, ctx.cleanBody),
         temperature: 0.1,
@@ -1547,6 +1554,8 @@ export class AiReplyService {
       result = await this.callAi(ctx, {
         feature: "ai_reply_draft",
         operation: "ai_reply_draft",
+        purpose: "ai_reply_draft",
+        billingAuthorized: true,
         system: buildDraftSystemPrompt({
           bookingUrl,
           websiteUrl,
@@ -2642,10 +2651,45 @@ export class AiReplyService {
     }
     if (item.emailAccount.status !== "ACTIVE") return hold("mailbox_inactive");
 
-    try {
-      await entitlementService.assertAndConsume(organizationId, FEATURE_KEYS.EMAILS);
-    } catch (err) {
-      return hold(`email_quota: ${errMsg(err)}`.slice(0, 200));
+    const { billingGateway } = await import("@/services/billing-gateway.service");
+    const { BILLING_ACTIONS } = await import("@/lib/billing/actions");
+    const { BILLING_REASONS } = await import("@/lib/billing/reasons");
+    const emailAuth = await billingGateway.authorize({
+      organizationId,
+      action: BILLING_ACTIONS.EMAIL_SEND_AI_REPLY,
+      idempotencyKey: `email_send_ai_reply:${organizationId}:${item.id}`,
+      referenceType: "email_outbox",
+      referenceId: item.id,
+    });
+    if (!emailAuth.allowed) {
+      if (emailAuth.reason === BILLING_REASONS.DAILY_EMAIL_LIMIT) {
+        const next = billingGateway.nextEmailSendWindow();
+        await prisma.emailOutbox.update({
+          where: { id: item.id },
+          data: {
+            status: EmailOutboxStatus.QUEUED,
+            scheduledFor: next,
+            lastError: `Daily email limit — rescheduled to ${next.toISOString()}`,
+          },
+        });
+        return {
+          status: "rescheduled",
+          reason: BILLING_REASONS.DAILY_EMAIL_LIMIT,
+          outboxId: item.id,
+        };
+      }
+      await prisma.emailOutbox.update({
+        where: { id: item.id },
+        data: {
+          status: EmailOutboxStatus.QUEUED,
+          lastError: emailAuth.message.slice(0, 500),
+        },
+      });
+      return hold(
+        emailAuth.reason === BILLING_REASONS.MONTHLY_EMAIL_LIMIT
+          ? "monthly_email_limit"
+          : emailAuth.reason
+      );
     }
 
     try {
@@ -2760,8 +2804,21 @@ export class AiReplyService {
         });
       }
 
+      await billingGateway.commit({
+        organizationId,
+        reservationId: emailAuth.reservationId,
+      });
       return { status: "sent", outboxId, messageId: message.id };
     } catch (err) {
+      try {
+        await billingGateway.refund({
+          organizationId,
+          reservationId: emailAuth.reservationId,
+          reason: "send_failed",
+        });
+      } catch {
+        // ignore
+      }
       const message = errMsg(err).slice(0, 500);
       const attempts = item.attemptCount;
       if (attempts < MAX_SEND_ATTEMPTS && !opts.manual) {

@@ -79,10 +79,18 @@ const envSchema = z.object({
   /** Record usage + shadow would-blocks. Default on for S1. */
   BILLING_METERING_ENABLED: z.coerce.boolean().default(true),
   /**
-   * Global enforcement kill-switch. S2 keeps this FALSE.
-   * Per-org Organization.billingEnforcementEnabled controls real blocking.
+   * S2.5 emergency kill switch. Production MUST set explicitly to "true".
+   * If unset: treated as false + startup warning (see enforcement-flags.ts).
+   * Per-org Organization.billingEnforcementEnabled also required for blocking.
    */
-  BILLING_ENFORCEMENT_ENABLED: z.coerce.boolean().default(false),
+  BILLING_ENFORCEMENT_ENABLED: z
+    .string()
+    .optional()
+    .transform((v) => {
+      if (v === undefined || v.trim() === "") return false;
+      const t = v.trim().toLowerCase();
+      return t === "true" || t === "1" || t === "yes";
+    }),
   /** Minutes before an open RESERVE is auto-refunded. */
   CREDIT_RESERVE_TTL_MINUTES: z.coerce.number().default(15),
   AUTOPILOT_ENABLED: z.coerce.boolean().default(false),

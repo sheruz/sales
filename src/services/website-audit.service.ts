@@ -520,6 +520,7 @@ export class WebsiteAuditService {
         userId,
         feature: "website_audit_pitch",
         operation: "website_audit_pitch",
+        purpose: "website_audit_pitch",
         temperature: 0.3,
         maxTokens: 1800,
         jsonMode: true,

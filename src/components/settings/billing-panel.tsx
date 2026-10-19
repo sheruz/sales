@@ -57,9 +57,11 @@ type BillingSnapshot = {
   meteringEnabled?: boolean;
   enforcementEnabled?: boolean;
   orgBillingEnforcementEnabled?: boolean;
+  enforcementEnvWarning?: string | null;
   credits?: {
     balance: number;
     isOwner: boolean;
+    unlimited?: boolean;
     consumedThisMonth: Array<{ actionType: string; credits: number }>;
     warnings: {
       at20: string | null;
@@ -194,11 +196,18 @@ export function BillingPanel() {
           <CardContent className="space-y-4">
             <div className="flex flex-wrap items-baseline gap-3">
               <span className="text-3xl font-semibold tabular-nums">
-                {credits.balance}
+                {credits.unlimited || credits.isOwner
+                  ? "Unlimited"
+                  : credits.balance}
               </span>
               <span className="text-sm text-muted-foreground">
-                balance
+                {credits.unlimited || credits.isOwner
+                  ? "platform owner"
+                  : "balance"}
               </span>
+              {credits.balance < 0 && !credits.isOwner && (
+                <Badge variant="destructive">Negative balance</Badge>
+              )}
               {credits.warnings.at0 && (
                 <Badge variant="destructive">0 credits</Badge>
               )}

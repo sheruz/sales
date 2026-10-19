@@ -767,11 +767,14 @@ model Organization {
   usageEvents       UsageEvent[]
   platformAuditLogs PlatformAuditLog[]
   creditLedgerEntries CreditLedgerEntry[]
+  billingAuthorizations BillingAuthorization[]
+  entitlementOverrides OrgEntitlementOverride[]
 
   /// S2 cached credit balance (absolute). Reconcile from ledger.
   creditBalanceCached       Int       @default(0) @map("credit_balance_cached")
-  /// Per-org enforcement (global BILLING_ENFORCEMENT_ENABLED stays false).
-  billingEnforcementEnabled Boolean   @default(false) @map("billing_enforcement_enabled")
+  /// S2.5: default ON for tenants; PLATFORM_OWNER_ORG_ID is never enforced.
+  /// Global BILLING_ENFORCEMENT_ENABLED is the emergency kill switch.
+  billingEnforcementEnabled Boolean   @default(true) @map("billing_enforcement_enabled")
   creditsWarnedAt20         DateTime? @map("credits_warned_at_20")
   creditsWarnedAt5          DateTime? @map("credits_warned_at_5")
   creditsWarnedAt0          DateTime? @map("credits_warned_at_0")
@@ -3257,13 +3260,19 @@ enum UsageMetric {
   AI_CALLS
   TOKENS
   EMAILS
+  EMAILS_DAILY
   OPPORTUNITIES
   ENRICHMENT
+  AUDITS
   SOURCE_CALLS
+  CRAWLS
   AUTOMATION_RUNS
+  MEETINGS
   USERS
   SEQUENCES
   INBOX_ACCOUNTS
+  ICPS
+  CAMPAIGNS
 }
 
 model Plan {
@@ -3655,6 +3664,65 @@ model CreditLedgerEntry {
   @@index([reserveIdempotencyKey])
   @@index([referenceType, referenceId])
   @@map("credit_ledger_entries")
+}
+
+enum BillingAuthStatus {
+  AUTHORIZED
+  COMMITTED
+  REFUNDED
+  EXPIRED
+}
+
+/// S2.5 in-flight authorizations (committed usage + open auth must not exceed limits).
+model BillingAuthorization {
+  id                        String            @id @default(uuid())
+  organizationId            String            @map("organization_id")
+  actionType                String            @map("action_type")
+  featureKey                String            @map("feature_key")
+  metric                    String?
+  quantity                  Int               @default(1)
+  credits                   Int               @default(0)
+  status                    BillingAuthStatus @default(AUTHORIZED)
+  /// Links to CreditLedgerEntry RESERVE idempotency key when credits > 0
+  reservationIdempotencyKey String?           @unique @map("reservation_idempotency_key")
+  idempotencyKey            String            @unique @map("idempotency_key")
+  referenceType             String?           @map("reference_type")
+  referenceId               String?           @map("reference_id")
+  periodStart               DateTime          @map("period_start") @db.Date
+  dayStart                  DateTime?         @map("day_start") @db.Date
+  actorUserId               String?           @map("actor_user_id")
+  purpose                   String?
+  expiresAt                 DateTime?         @map("expires_at")
+  metadata                  Json?
+  createdAt                 DateTime          @default(now()) @map("created_at")
+  updatedAt                 DateTime          @updatedAt @map("updated_at")
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId, status, featureKey])
+  @@index([organizationId, status, dayStart])
+  @@index([expiresAt])
+  @@map("billing_authorizations")
+}
+
+/// Per-tenant entitlement overrides (plan ∪ override). UI in S3; script/API now.
+model OrgEntitlementOverride {
+  id             String   @id @default(uuid())
+  organizationId String   @map("organization_id")
+  key            String
+  limitValue     Int?     @map("limit_value")
+  /// null = do not override plan enabled flag
+  enabled        Boolean?
+  reason         String?
+  setByUserId    String?  @map("set_by_user_id")
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@unique([organizationId, key])
+  @@index([organizationId])
+  @@map("org_entitlement_overrides")
 }
 
 /// Every super-admin write is audited here.

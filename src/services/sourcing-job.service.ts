@@ -429,9 +429,21 @@ export class SourcingJobService {
       this.countCompaniesCreatedToday(organizationId),
     ]);
 
+    const { billingGateway } = await import(
+      "@/services/billing-gateway.service"
+    );
+    const { BILLING_ACTIONS } = await import("@/lib/billing/actions");
+    const creditBudget = await billingGateway.remainingBudget(
+      organizationId,
+      BILLING_ACTIONS.GOOGLE_SOURCING_PAGE
+    );
     const queryBudget = Math.max(0, config.queriesPerDay - queriesToday);
     const companyBudget = Math.max(0, config.companiesPerDay - companiesToday);
-    const queriesToRun = Math.min(config.queriesPerTick, queryBudget);
+    const queriesToRun = Math.min(
+      config.queriesPerTick,
+      queryBudget,
+      creditBudget
+    );
 
     const queryResults: unknown[] = [];
     if (queriesToRun > 0 && companyBudget > 0) {
@@ -490,6 +502,19 @@ export class SourcingJobService {
     limit: number,
     companyIds?: string[]
   ) {
+    const { billingGateway } = await import(
+      "@/services/billing-gateway.service"
+    );
+    const { BILLING_ACTIONS } = await import("@/lib/billing/actions");
+    const budget = await billingGateway.remainingBudget(
+      organizationId,
+      BILLING_ACTIONS.CRAWL
+    );
+    const take = Math.max(0, Math.min(Math.max(1, limit), budget));
+    if (take === 0) {
+      return [{ paused: true, reason: "plan_limit_or_credits" }];
+    }
+
     const pending = await prisma.company.findMany({
       where: {
         organizationId,
@@ -503,14 +528,30 @@ export class SourcingJobService {
             }),
       },
       orderBy: { createdAt: "asc" },
-      take: Math.max(1, limit),
+      take,
     });
 
     const results = [];
     for (const company of pending) {
       if (!company.website) continue;
       try {
-        const crawl = await crawlWebsiteForContacts(company.website);
+        const credited = await withCreditReservation({
+          organizationId,
+          actionType: CREDIT_ACTIONS.CRAWL,
+          idempotencyKey: `crawl:${organizationId}:${company.id}:${company.updatedAt?.toISOString?.() ?? "x"}`,
+          referenceType: "company",
+          referenceId: company.id,
+          fn: async () => crawlWebsiteForContacts(company.website!),
+        });
+        if (isOutOfCreditsPause(credited)) {
+          results.push({
+            companyId: company.id,
+            paused: true,
+            reason: credited.reason,
+          });
+          break;
+        }
+        const crawl = credited.result;
         await prisma.company.update({
           where: { id: company.id },
           data: {

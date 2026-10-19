@@ -57,6 +57,7 @@ describe("S2 credits", () => {
         result: null,
         credits: 0,
         skippedOwner: true,
+        reservationId: "test",
       })
     ).toBe(false);
   });

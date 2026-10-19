@@ -5,8 +5,10 @@ import { resolveAiRuntime } from "./resolve-config";
 import { logAIUsage } from "./usage";
 import type { AICompletionOptions, AICompletionResult, AIProvider } from "./types";
 import { entitlementService } from "@/services/entitlement.service";
-import { FEATURE_KEYS } from "@/lib/billing/features";
 import { UsageMetric } from "@prisma/client";
+import { billingGateway } from "@/services/billing-gateway.service";
+import { resolveAiBillingAction } from "@/lib/billing/actions";
+import { ForbiddenError } from "@/lib/api/response";
 
 const openaiProvider = new OpenAIProvider();
 const anthropicProvider = new AnthropicProvider();
@@ -33,6 +35,11 @@ export async function aiComplete(
      * (reply classification, bounce/unsub) are metered for stats but always exempt.
      */
     purpose?: string;
+    /**
+     * Parent already authorized (e.g. ai_reply_draft credit wrap).
+     * Still required: every other aiComplete must go through the gateway.
+     */
+    billingAuthorized?: boolean;
   }
 ): Promise<AICompletionResult> {
   const isPlatformScoped = Boolean(options.isPlatformScoped);
@@ -43,13 +50,22 @@ export async function aiComplete(
   }
 
   const purpose = options.purpose ?? options.feature;
-  if (options.organizationId) {
-    await entitlementService.assertAndConsume(
-      options.organizationId,
-      FEATURE_KEYS.AI_CALLS,
-      1,
-      { purpose }
-    );
+  let reservationId: string | null = null;
+
+  if (options.organizationId && !options.billingAuthorized && !isPlatformScoped) {
+    const action = resolveAiBillingAction(purpose);
+    const auth = await billingGateway.authorize({
+      organizationId: options.organizationId,
+      action,
+      purpose,
+      actorUserId: options.userId,
+      referenceType: "ai_complete",
+      referenceId: options.operation ?? options.feature,
+    });
+    if (!auth.allowed) {
+      throw new ForbiddenError(auth.message);
+    }
+    reservationId = auth.reservationId;
   }
 
   const runtime = await resolveAiRuntime(options.userId, options.feature);
@@ -60,9 +76,16 @@ export async function aiComplete(
     const result = await provider.complete({
       ...options,
       apiKey: runtime.apiKey,
-      // Per-call model override (e.g. Phase 5 classify vs draft) wins over resolved default
       model: options.model?.trim() || runtime.model,
     });
+
+    if (reservationId && options.organizationId) {
+      await billingGateway.commit({
+        organizationId: options.organizationId,
+        reservationId,
+        actorUserId: options.userId,
+      });
+    }
 
     if (options.organizationId && (result.totalTokens ?? 0) > 0) {
       await entitlementService.incrementUsage(
@@ -90,6 +113,18 @@ export async function aiComplete(
 
     return result;
   } catch (error) {
+    if (reservationId && options.organizationId) {
+      try {
+        await billingGateway.refund({
+          organizationId: options.organizationId,
+          reservationId,
+          actorUserId: options.userId,
+          reason: "ai_complete_failed",
+        });
+      } catch {
+        // ignore
+      }
+    }
     await logAIUsage({
       organizationId: options.organizationId,
       isPlatformScoped,

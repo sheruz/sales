@@ -41,6 +41,14 @@ export class IcpService {
 
   async create(organizationId: string, input: IcpInput) {
     if (!input.name.trim()) throw new ValidationError("Name is required");
+    const { entitlementService } = await import(
+      "@/services/entitlement.service"
+    );
+    const { FEATURE_KEYS } = await import("@/lib/billing/features");
+    await entitlementService.assertSeatAvailable(
+      organizationId,
+      FEATURE_KEYS.ICPS
+    );
     return prisma.icp.create({
       data: {
         organizationId,

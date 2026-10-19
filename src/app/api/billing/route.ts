@@ -14,7 +14,10 @@ export async function GET() {
   try {
     await requireOrgPermission("billing.manage");
     const user = await requireOrganizationContext();
-    const [snapshot, shadowWouldBlocks, org, consumed, isOwner] =
+    const { billingGateway } = await import(
+      "@/services/billing-gateway.service"
+    );
+    const [snapshot, shadowWouldBlocks, org, consumed, isPlatformOwner] =
       await Promise.all([
         entitlementService.getUsageSnapshot(user.organizationId),
         entitlementService.getShadowWouldBlocks(user.organizationId),
@@ -29,19 +32,24 @@ export async function GET() {
           },
         }),
         creditLedgerService.consumedThisMonthByAction(user.organizationId),
-        creditLedgerService.isOwnerOrg(user.organizationId),
+        Promise.resolve(billingGateway.isPlatformOwner(user.organizationId)),
       ]);
+    const enforcementWarn = billingGateway.enforcementEnvWarning();
+    const orgEnforced =
+      org?.billingEnforcementEnabled === true && !isPlatformOwner;
     return NextResponse.json(
       apiSuccess({
         ...snapshot,
         shadowWouldBlocks,
         meteringEnabled: process.env.BILLING_METERING_ENABLED !== "false",
-        enforcementEnabled: process.env.BILLING_ENFORCEMENT_ENABLED === "true",
-        orgBillingEnforcementEnabled:
-          org?.billingEnforcementEnabled === true && !isOwner,
+        enforcementEnabled: enforcementWarn.enabled,
+        enforcementEnvExplicit: enforcementWarn.explicit,
+        enforcementEnvWarning: enforcementWarn.message,
+        orgBillingEnforcementEnabled: orgEnforced,
         credits: {
           balance: org?.creditBalanceCached ?? 0,
-          isOwner,
+          isOwner: isPlatformOwner,
+          unlimited: isPlatformOwner,
           consumedThisMonth: consumed,
           warnings: {
             at20: org?.creditsWarnedAt20 ?? null,

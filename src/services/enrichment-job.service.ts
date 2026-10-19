@@ -435,30 +435,45 @@ export class EnrichmentJobService {
       });
     }
 
-    const opp = await prisma.opportunity.create({
-      data: {
-        organizationId,
-        companyId,
-        primaryContactId: contactId,
-        sourceId: source.id,
-        stage: OpportunityStage.SOURCED,
-        status: OpportunityStatus.OPEN,
-        whyNow: "Company sourced and enriched via Autopilot",
-        recommendedAction: "Review contact before outreach enrollment",
+    const { billingGateway } = await import(
+      "@/services/billing-gateway.service"
+    );
+    const { BILLING_ACTIONS } = await import("@/lib/billing/actions");
+    const created = await billingGateway.withAuthorized({
+      organizationId,
+      action: BILLING_ACTIONS.OPPORTUNITY_CREATE,
+      idempotencyKey: `opportunity_create:enrichment:${organizationId}:${companyId}:${contactId}`,
+      referenceType: "company",
+      referenceId: companyId,
+      fn: async () => {
+        const opp = await prisma.opportunity.create({
+          data: {
+            organizationId,
+            companyId,
+            primaryContactId: contactId,
+            sourceId: source.id,
+            stage: OpportunityStage.SOURCED,
+            status: OpportunityStatus.OPEN,
+            whyNow: "Company sourced and enriched via Autopilot",
+            recommendedAction: "Review contact before outreach enrollment",
+          },
+        });
+        await prisma.opportunityEvent.create({
+          data: {
+            organizationId,
+            opportunityId: opp.id,
+            type: OpportunityEventType.CREATED,
+            title: "Sourced opportunity created",
+            description: "Created from Hunter enrichment",
+          },
+        });
+        return opp;
       },
     });
-
-    await prisma.opportunityEvent.create({
-      data: {
-        organizationId,
-        opportunityId: opp.id,
-        type: OpportunityEventType.CREATED,
-        title: "Sourced opportunity created",
-        description: "Created from Hunter enrichment",
-      },
-    });
-
-    return opp;
+    if (!created.ok) {
+      throw new ValidationError(created.message);
+    }
+    return created.result;
   }
 
   /**

@@ -27,12 +27,16 @@ export async function POST(request: NextRequest) {
       user.organizationId,
       limit
     );
-    const done = results.filter((r) => r.status === "DONE").length;
+    const done = results.filter(
+      (r) => "status" in r && r.status === "DONE"
+    ).length;
     const failed = results.filter(
-      (r) => r.status === "FAILED" || r.status === "BLOCKED"
+      (r) =>
+        "status" in r && (r.status === "FAILED" || r.status === "BLOCKED")
     ).length;
     const emails = results.reduce(
-      (sum, r) => sum + (typeof r.emails === "number" ? r.emails : 0),
+      (sum, r) =>
+        sum + ("emails" in r && typeof r.emails === "number" ? r.emails : 0),
       0
     );
     return NextResponse.json(

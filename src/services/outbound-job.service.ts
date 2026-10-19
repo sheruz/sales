@@ -18,6 +18,9 @@ import {
   type Prisma,
 } from "@prisma/client";
 import { ValidationError } from "@/lib/api/response";
+import { billingGateway } from "@/services/billing-gateway.service";
+import { BILLING_ACTIONS } from "@/lib/billing/actions";
+import { BILLING_REASONS } from "@/lib/billing/reasons";
 import {
   outboundConfigService,
   type OutboundConfig,
@@ -1239,6 +1242,63 @@ export class OutboundJobService {
       return { id: outboxId, status: "sent_shadow" };
     }
 
+    // S2.5: gate cold SEQUENCE sends (daily + monthly email limits) before provider.
+    const auth = await billingGateway.authorize({
+      organizationId,
+      action: BILLING_ACTIONS.EMAIL_SEND_SEQUENCE,
+      idempotencyKey: `email_send_sequence:${organizationId}:${outboxId}`,
+      referenceType: "email_outbox",
+      referenceId: outboxId,
+    });
+    if (!auth.allowed) {
+      if (auth.reason === BILLING_REASONS.DAILY_EMAIL_LIMIT) {
+        const next = billingGateway.nextEmailSendWindow();
+        await prisma.emailOutbox.update({
+          where: { id: outboxId },
+          data: {
+            status: EmailOutboxStatus.QUEUED,
+            scheduledFor: next,
+            heldReason: null,
+            lastError: `Daily email limit — rescheduled to ${next.toISOString()}`,
+            metadata: {
+              ...(typeof item.metadata === "object" && item.metadata
+                ? (item.metadata as object)
+                : {}),
+              billingPause: BILLING_REASONS.DAILY_EMAIL_LIMIT,
+              rescheduledAt: new Date().toISOString(),
+            } as Prisma.InputJsonValue,
+          },
+        });
+        return {
+          id: outboxId,
+          status: "rescheduled",
+          reason: BILLING_REASONS.DAILY_EMAIL_LIMIT,
+        };
+      }
+      // Monthly / plan — stay QUEUED, surface pause (never FAILED/CANCELLED)
+      await prisma.emailOutbox.update({
+        where: { id: outboxId },
+        data: {
+          status: EmailOutboxStatus.QUEUED,
+          lastError: auth.message.slice(0, 500),
+          metadata: {
+            ...(typeof item.metadata === "object" && item.metadata
+              ? (item.metadata as object)
+              : {}),
+            billingPause:
+              auth.reason === BILLING_REASONS.MONTHLY_EMAIL_LIMIT
+                ? BILLING_REASONS.MONTHLY_EMAIL_LIMIT
+                : auth.reason,
+          } as Prisma.InputJsonValue,
+        },
+      });
+      return {
+        id: outboxId,
+        status: "paused",
+        reason: auth.reason,
+      };
+    }
+
     try {
       const meta =
         item.metadata && typeof item.metadata === "object"
@@ -1264,6 +1324,12 @@ export class OutboundJobService {
         headers: meta.headers,
         inReplyTo: meta.inReplyTo,
         references: meta.references,
+        skipBilling: true,
+      });
+
+      await billingGateway.commit({
+        organizationId,
+        reservationId: auth.reservationId,
       });
 
       await prisma.emailOutbox.update({
@@ -1277,6 +1343,7 @@ export class OutboundJobService {
             ...meta,
             headers: meta.headers,
             providerThreadId: sent.message.threadId ?? null,
+            billingPause: null,
           } as Prisma.InputJsonValue,
         },
       });
@@ -1306,6 +1373,15 @@ export class OutboundJobService {
       await this.afterSuccessfulSend(item, false);
       return { id: outboxId, status: "sent" };
     } catch (err) {
+      try {
+        await billingGateway.refund({
+          organizationId,
+          reservationId: auth.reservationId,
+          reason: "send_failed",
+        });
+      } catch {
+        // ignore
+      }
       const message = err instanceof Error ? err.message : "send failed";
       await prisma.emailOutbox.update({
         where: { id: outboxId },

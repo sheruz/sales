@@ -67,6 +67,14 @@ export class CampaignService {
     if (input.defaultSequenceId) {
       await this.assertSequenceInOrg(organizationId, input.defaultSequenceId);
     }
+    const { entitlementService } = await import(
+      "@/services/entitlement.service"
+    );
+    const { FEATURE_KEYS } = await import("@/lib/billing/features");
+    await entitlementService.assertSeatAvailable(
+      organizationId,
+      FEATURE_KEYS.CAMPAIGNS
+    );
 
     const campaign = await prisma.campaign.create({
       data: {

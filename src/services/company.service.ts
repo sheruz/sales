@@ -348,7 +348,9 @@ export class CompanyService {
         ids
       );
       for (const id of ids) {
-        const hit = batch.find((b) => b.companyId === id);
+        const hit = batch.find(
+          (b) => "companyId" in b && b.companyId === id
+        );
         results.push({
           id,
           ok: Boolean(hit),

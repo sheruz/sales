@@ -177,6 +177,14 @@ export class EntitlementService {
         return prisma.sourceConnector.count({
           where: { organizationId },
         });
+      case FEATURE_KEYS.ICPS:
+        return prisma.icp.count({
+          where: { organizationId, status: "ACTIVE" },
+        });
+      case FEATURE_KEYS.CAMPAIGNS:
+        return prisma.campaign.count({
+          where: { organizationId, deletedAt: null },
+        });
       default:
         return 0;
     }
@@ -281,26 +289,108 @@ export class EntitlementService {
   }
 
   /**
-   * Server-side entitlement gate. Delegates to S1 entitlementsService
-   * (metering + shadow would-blocks; enforcement behind flag).
+   * Thin wrapper → S2.5 billing gateway (metered features).
+   * Prefer billingGateway.authorize directly for new code.
    */
   async assertFeature(
     organizationId: string,
     featureKey: FeatureKey,
     opts?: { increment?: boolean; amount?: number; purpose?: string; exempt?: boolean }
   ) {
-    const { entitlementsService } = await import("@/lib/billing/entitlements");
-    const result = await entitlementsService.consume(
-      organizationId,
-      featureKey,
-      opts?.amount ?? 1,
-      {
-        purpose: opts?.purpose,
-        exempt: opts?.exempt,
-        increment: opts?.increment === true,
-      }
+    const { billingGateway } = await import(
+      "@/services/billing-gateway.service"
     );
-    return { ok: true as const, plan: result.planName ?? "unknown", shadow: result };
+    const { FEATURE_KEYS: FK } = await import("@/lib/billing/features");
+    const { BILLING_ACTIONS } = await import("@/lib/billing/actions");
+
+    const seatAction =
+      featureKey === FK.USERS
+        ? BILLING_ACTIONS.SEAT_USERS
+        : featureKey === FK.INBOX_ACCOUNTS
+          ? BILLING_ACTIONS.SEAT_INBOX_ACCOUNTS
+          : featureKey === FK.OUTBOUND_MAILBOXES
+            ? BILLING_ACTIONS.SEAT_OUTBOUND_MAILBOXES
+            : featureKey === FK.SEQUENCES
+              ? BILLING_ACTIONS.SEAT_SEQUENCES
+              : featureKey === FK.ICPS
+                ? BILLING_ACTIONS.SEAT_ICPS
+                : featureKey === FK.CAMPAIGNS
+                  ? BILLING_ACTIONS.SEAT_CAMPAIGNS
+                  : featureKey === FK.CONNECTORS
+                    ? BILLING_ACTIONS.SEAT_CONNECTORS
+                    : null;
+
+    const meteredAction =
+      featureKey === FK.OPPORTUNITIES
+        ? BILLING_ACTIONS.OPPORTUNITY_CREATE
+        : featureKey === FK.EMAILS
+          ? BILLING_ACTIONS.EMAIL_SEND_AI_REPLY
+          : featureKey === FK.AI_CALLS
+            ? BILLING_ACTIONS.AI_CALL
+            : featureKey === FK.SOURCES
+              ? BILLING_ACTIONS.GOOGLE_SOURCING_PAGE
+              : featureKey === FK.ENRICHMENT
+                ? BILLING_ACTIONS.ENRICHMENT
+                : featureKey === FK.AUDITS
+                  ? BILLING_ACTIONS.AUDIT_PITCH
+                  : null;
+
+    const action = seatAction ?? meteredAction;
+    if (!action) {
+      // Feature flags (advanced_ai, learning, automation): gateway seat-style check
+      const auth = await billingGateway.authorize({
+        organizationId,
+        action: BILLING_ACTIONS.AI_CALL,
+        qty: opts?.amount ?? 1,
+        purpose: opts?.purpose ?? featureKey,
+        exempt: opts?.exempt,
+      });
+      if (!auth.allowed) {
+        const { ForbiddenError } = await import("@/lib/api/response");
+        throw new ForbiddenError(auth.message);
+      }
+      if (opts?.increment !== false) {
+        await billingGateway.commit({
+          organizationId,
+          reservationId: auth.reservationId,
+        });
+      } else {
+        await billingGateway.refund({
+          organizationId,
+          reservationId: auth.reservationId,
+          reason: "seat_precheck",
+        });
+      }
+      return { ok: true as const, plan: "gateway", shadow: auth };
+    }
+
+    const auth = await billingGateway.authorize({
+      organizationId,
+      action,
+      qty: opts?.amount ?? 1,
+      purpose: opts?.purpose,
+      exempt: opts?.exempt,
+    });
+    if (!auth.allowed) {
+      const { ForbiddenError } = await import("@/lib/api/response");
+      throw new ForbiddenError(auth.message);
+    }
+
+    // Seats: authorize-only (live count); refund auth so it doesn't stay in-flight
+    if (seatAction || opts?.increment === false) {
+      await billingGateway.refund({
+        organizationId,
+        reservationId: auth.reservationId,
+        reason: "seat_precheck",
+      });
+      return { ok: true as const, plan: "gateway", shadow: auth };
+    }
+
+    await billingGateway.commit({
+      organizationId,
+      reservationId: auth.reservationId,
+    });
+    return { ok: true as const, plan: "gateway", shadow: auth };
   }
 
   async assertAndConsume(
