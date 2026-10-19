@@ -60,6 +60,24 @@ async function seedFeatures(prisma) {
 
 async function flipEnforcement(prisma) {
   const platformOwnerId = process.env.PLATFORM_OWNER_ORG_ID || null;
+  // GO APPLY default: proceed — enforce all non-owner orgs (incl. Malick at 0 credits).
+  // Set EXCLUDE_ORG_NAMES=Malick to skip, or GRANT_ORG_CREDITS=Malick:50 to grant then enforce.
+  const excludeNames = new Set(
+    String(process.env.EXCLUDE_ORG_NAMES || "")
+      .split(",")
+      .map((s) => s.trim())
+      .filter(Boolean)
+  );
+  const grantSpecs = String(process.env.GRANT_ORG_CREDITS || "")
+    .split(",")
+    .map((s) => s.trim())
+    .filter(Boolean)
+    .map((pair) => {
+      const [name, n] = pair.split(":");
+      return { name: name?.trim(), credits: Number(n) };
+    })
+    .filter((g) => g.name && Number.isFinite(g.credits) && g.credits > 0);
+
   const owner = await prisma.organization.findFirst({
     where: {
       deletedAt: null,
@@ -77,16 +95,63 @@ async function flipEnforcement(prisma) {
     });
   }
 
-  const result = await prisma.organization.updateMany({
+  for (const g of grantSpecs) {
+    const org = await prisma.organization.findFirst({
+      where: { name: g.name, deletedAt: null },
+    });
+    if (!org) continue;
+    const bal = (org.creditBalanceCached ?? 0) + g.credits;
+    await prisma.organization.update({
+      where: { id: org.id },
+      data: { creditBalanceCached: bal },
+    });
+    const { randomUUID } = require("crypto");
+    await prisma.creditLedgerEntry.create({
+      data: {
+        id: randomUUID(),
+        organizationId: org.id,
+        type: "GRANT_MANUAL",
+        amount: g.credits,
+        balanceAfter: bal,
+        idempotencyKey: `s25_grant:${org.id}:${g.credits}:${new Date().toISOString().slice(0, 10)}`,
+        reason: "s25_apply_grant",
+      },
+    });
+    console.log(`Granted ${g.credits} credits to ${g.name} (balance=${bal})`);
+  }
+
+  const toFlip = await prisma.organization.findMany({
     where: {
       deletedAt: null,
       billingEnforcementEnabled: false,
       ...(owner ? { id: { not: owner.id } } : {}),
     },
-    data: { billingEnforcementEnabled: true },
+    select: { id: true, name: true, creditBalanceCached: true },
   });
 
-  return { ownerId: owner?.id ?? null, flipped: result.count };
+  const flippedNames = [];
+  const skippedNames = [];
+  for (const org of toFlip) {
+    if (excludeNames.has(org.name)) {
+      skippedNames.push(org.name);
+      continue;
+    }
+    await prisma.organization.update({
+      where: { id: org.id },
+      data: { billingEnforcementEnabled: true },
+    });
+    flippedNames.push({
+      name: org.name,
+      creditBalanceCached: org.creditBalanceCached,
+    });
+  }
+
+  return {
+    ownerId: owner?.id ?? null,
+    flipped: flippedNames.length,
+    flippedNames,
+    skippedNames,
+  };
 }
 
 async function main() {
