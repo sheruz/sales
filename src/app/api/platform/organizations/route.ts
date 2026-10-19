@@ -63,36 +63,36 @@ export async function POST(request: NextRequest) {
           }
         : body.access;
 
-    const { org, inviteToken, inviteExpiresAt } =
-      await organizationService.createCompanyTenant({
-        name: body.name,
-        slug: body.slug,
-        country: body.country,
-        timezone: body.timezone,
-        defaultCurrency: body.defaultCurrency,
-        website: body.website || undefined,
-        legalName: body.legalName,
-        internalNotes: body.internalNotes,
-        owner: body.owner,
-        access,
-        invitedById: actor.id,
-      });
+    const created = await organizationService.createCompanyTenant({
+      name: body.name,
+      slug: body.slug,
+      country: body.country,
+      timezone: body.timezone,
+      defaultCurrency: body.defaultCurrency,
+      website: body.website || undefined,
+      legalName: body.legalName,
+      internalNotes: body.internalNotes,
+      owner: body.owner,
+      access,
+      invitedById: actor.id,
+    });
 
     await organizationService.writeAudit({
-      organizationId: org.id,
+      organizationId: created.org.id,
       userId: actor.id,
       action: "organization.create",
       entityType: "organization",
-      entityId: org.id,
-      newValues: { name: org.name, slug: org.slug, access: body.access },
+      entityId: created.org.id,
+      newValues: { name: created.org.name, slug: created.org.slug, access: body.access },
     });
 
     return NextResponse.json(
       apiSuccess({
-        ...org,
-        inviteToken,
-        inviteExpiresAt,
-        inviteLink: `${process.env.APP_URL ?? ""}/invite?token=${inviteToken}`,
+        ...created.org,
+        inviteToken: created.inviteToken,
+        inviteExpiresAt: created.inviteExpiresAt,
+        inviteLink: created.inviteLink,
+        inviteEmailSent: created.inviteEmailSent,
       }),
       { status: 201 }
     );

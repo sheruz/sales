@@ -272,13 +272,26 @@ export class OrganizationService {
       invitedById: input.invitedById,
     });
 
-    await this.sendInviteEmail({
-      to: ownerEmail,
-      firstName: input.owner.firstName,
-      organizationName: org.name,
-      token: invite.token,
-      expiresAt: invite.expiresAt,
-    });
+    // Never fail tenant create on SMTP — return link for Super Admin to copy.
+    let inviteEmailSent = false;
+    let inviteLink = `${env.APP_URL}/invite?token=${invite.token}`;
+    try {
+      const mailed = await this.sendInviteEmail({
+        to: ownerEmail,
+        firstName: input.owner.firstName,
+        organizationName: org.name,
+        token: invite.token,
+        expiresAt: invite.expiresAt,
+      });
+      inviteEmailSent = mailed.sent;
+      inviteLink = mailed.link;
+    } catch (err) {
+      logger.error("Invite email failed after tenant create", {
+        organizationId: org.id,
+        to: ownerEmail,
+        error: err instanceof Error ? err.message : String(err),
+      });
+    }
 
     await this.writePlatformAudit({
       actorUserId: input.invitedById,
@@ -290,10 +303,17 @@ export class OrganizationService {
         name: org.name,
         access: input.access,
         ownerEmail,
+        inviteEmailSent,
       },
     });
 
-    return { org, inviteToken: invite.token, inviteExpiresAt: invite.expiresAt };
+    return {
+      org,
+      inviteToken: invite.token,
+      inviteExpiresAt: invite.expiresAt,
+      inviteLink,
+      inviteEmailSent,
+    };
   }
 
   private async createOwnerInvite(input: {
@@ -380,24 +400,36 @@ If you didn't expect this, ignore this email.`;
       return { sent: false, link };
     }
 
-    await sendEmailWithConfig(
-      {
+    try {
+      await sendEmailWithConfig(
+        {
+          host: env.SMTP_HOST,
+          port: env.SMTP_PORT,
+          secure: env.SMTP_SECURE,
+          user: env.SMTP_USER,
+          password: env.SMTP_PASSWORD,
+          fromName: env.SMTP_FROM_NAME,
+          fromEmail: env.SMTP_FROM_EMAIL,
+        },
+        {
+          to: input.to,
+          subject: `You're invited to ${input.organizationName}`,
+          text,
+          html: text.replace(/\n/g, "<br>"),
+        }
+      );
+      return { sent: true, link };
+    } catch (err) {
+      logger.error("Platform SMTP invite send failed", {
+        to: input.to,
         host: env.SMTP_HOST,
         port: env.SMTP_PORT,
         secure: env.SMTP_SECURE,
-        user: env.SMTP_USER,
-        password: env.SMTP_PASSWORD,
-        fromName: env.SMTP_FROM_NAME,
-        fromEmail: env.SMTP_FROM_EMAIL,
-      },
-      {
-        to: input.to,
-        subject: `You're invited to ${input.organizationName}`,
-        text,
-        html: text.replace(/\n/g, "<br>"),
-      }
-    );
-    return { sent: true, link };
+        error: err instanceof Error ? err.message : String(err),
+      });
+      // Surface link to caller; do not throw (wrong SSL config must not block create)
+      return { sent: false, link };
+    }
   }
 
   async resendInvite(organizationId: string, actorUserId: string) {

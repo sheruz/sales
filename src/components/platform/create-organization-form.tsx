@@ -89,7 +89,13 @@ export function CreateOrganizationForm() {
         throw new Error(data.error?.message ?? "Failed to create organization");
       }
 
-      toast.success(`Company "${data.data.name}" created — invite sent`);
+      if (data.data.inviteEmailSent) {
+        toast.success(`Company "${data.data.name}" created — invite emailed`);
+      } else {
+        toast.success(
+          `Company "${data.data.name}" created — copy invite link (email not sent)`
+        );
+      }
       if (data.data.inviteLink) setLastInviteLink(data.data.inviteLink);
       setForm(emptyForm);
       router.refresh();
