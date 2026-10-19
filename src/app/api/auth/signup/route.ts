@@ -4,10 +4,11 @@ import { organizationService } from "@/services/organization.service";
 import { entitlementService } from "@/services/entitlement.service";
 import { billingService } from "@/services/billing.service";
 import { createSession, setSessionCookie } from "@/lib/auth/session";
-import { apiSuccess, ValidationError } from "@/lib/api/response";
+import { apiSuccess, ForbiddenError, ValidationError } from "@/lib/api/response";
 import { handleApiError } from "@/lib/api/error-handler";
 import prisma from "@/lib/db/prisma";
 import { assertAuthRateLimit } from "@/lib/security/rate-limit";
+import { env } from "@/lib/config/env";
 
 const signupSchema = z.object({
   organizationName: z.string().min(2).max(200),
@@ -20,6 +21,12 @@ const signupSchema = z.object({
 
 export async function POST(request: NextRequest) {
   try {
+    if (!env.SELF_SIGNUP_ENABLED) {
+      throw new ForbiddenError(
+        "Self-signup is disabled. Contact your administrator.",
+        "SELF_SIGNUP_DISABLED"
+      );
+    }
     const body = signupSchema.parse(await request.json());
     const email = body.email.toLowerCase().trim();
     const ip =

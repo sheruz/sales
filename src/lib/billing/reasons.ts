@@ -1,6 +1,10 @@
-/** Structured billing block / pause reasons (S2.5). Provider errors stay separate. */
+/** Structured billing block / pause reasons (S2.5 + B1 lifecycle). Provider errors stay separate. */
 export const BILLING_REASONS = {
   SUBSCRIPTION_INACTIVE: "SUBSCRIPTION_INACTIVE",
+  /** B1 locked workspace (NONE / EXPIRED) — always enforced when TENANT_LIFECYCLE_ENFORCED */
+  NO_ACTIVE_SUBSCRIPTION: "NO_ACTIVE_SUBSCRIPTION",
+  MODULE_LOCKED: "MODULE_LOCKED",
+  READ_ONLY: "READ_ONLY",
   PLAN_FEATURE_DISABLED: "PLAN_FEATURE_DISABLED",
   PLAN_LIMIT_REACHED: "PLAN_LIMIT_REACHED",
   OUT_OF_CREDITS: "OUT_OF_CREDITS",
@@ -21,6 +25,9 @@ export function isBillingPauseReason(reason: string | undefined | null): boolean
     reason === BILLING_REASONS.DAILY_EMAIL_LIMIT ||
     reason === BILLING_REASONS.MONTHLY_EMAIL_LIMIT ||
     reason === BILLING_REASONS.PLAN_FEATURE_DISABLED ||
-    reason === BILLING_REASONS.SUBSCRIPTION_INACTIVE
+    reason === BILLING_REASONS.SUBSCRIPTION_INACTIVE ||
+    reason === BILLING_REASONS.NO_ACTIVE_SUBSCRIPTION ||
+    reason === BILLING_REASONS.MODULE_LOCKED ||
+    reason === BILLING_REASONS.READ_ONLY
   );
 }

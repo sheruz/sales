@@ -13,6 +13,7 @@ import {
   type FeatureKey,
   DEFAULT_PLANS,
 } from "@/lib/billing/features";
+import { env } from "@/lib/config/env";
 
 function periodStart(d = new Date()): Date {
   return new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), 1));
@@ -106,37 +107,130 @@ export class EntitlementService {
     });
   }
 
+  /**
+   * B1: never auto-create Free ACTIVE. Creates NONE on internal UNASSIGNED plan
+   * only when missing (locked until Super Admin / Choose Plan activates).
+   */
   async ensureSubscription(organizationId: string) {
-    const existing = await prisma.subscription.findUnique({
-      where: { organizationId },
-      include: { plan: { include: { features: true } } },
-    });
+    const existing = await this.getSubscriptionOrNone(organizationId);
     if (existing) return existing;
 
-    const plan = await this.getDefaultPlan();
-    if (!plan) throw new ValidationError("No default plan configured");
+    const unassigned = await this.getUnassignedPlan();
+    if (!unassigned) {
+      throw new ValidationError(
+        "No UNASSIGNED plan — run b1-apply to seed packages"
+      );
+    }
 
     return prisma.subscription.create({
       data: {
         organizationId,
-        planId: plan.id,
+        planId: unassigned.id,
+        planVersionId: null,
         provider: "internal",
-        status: SubscriptionStatus.ACTIVE,
-        currentPeriodStart: periodStart(),
-        currentPeriodEnd: new Date(
-          Date.UTC(
-            new Date().getUTCFullYear(),
-            new Date().getUTCMonth() + 1,
-            1
-          )
-        ),
+        accessMode: "none",
+        status: SubscriptionStatus.NONE,
       },
-      include: { plan: { include: { features: true } } },
+      include: {
+        plan: { include: { features: true } },
+        planVersion: { include: { features: true } },
+      },
+    });
+  }
+
+  async getSubscriptionOrNone(organizationId: string) {
+    return prisma.subscription.findUnique({
+      where: { organizationId },
+      include: {
+        plan: { include: { features: true } },
+        planVersion: { include: { features: true } },
+      },
+    });
+  }
+
+  async getUnassignedPlan() {
+    return prisma.plan.findFirst({
+      where: {
+        OR: [{ code: "UNASSIGNED" }, { name: "Unassigned" }],
+        archivedAt: null,
+      },
     });
   }
 
   async getSubscription(organizationId: string) {
     return this.ensureSubscription(organizationId);
+  }
+
+  /** Assign a published plan version (Super Admin / trial / complimentary / manual). */
+  async assignPlanVersion(input: {
+    organizationId: string;
+    planVersionId: string;
+    status: SubscriptionStatus;
+    accessMode: string;
+    trialDays?: number;
+    actorUserId?: string;
+  }) {
+    const version = await prisma.planVersion.findUnique({
+      where: { id: input.planVersionId },
+      include: { plan: true },
+    });
+    if (!version) throw new ValidationError("Plan version not found");
+    if (version.plan.archivedAt) {
+      throw new ValidationError("Plan is archived");
+    }
+
+    const now = new Date();
+    const trialEndsAt =
+      input.status === SubscriptionStatus.TRIALING
+        ? new Date(
+            now.getTime() +
+              Math.max(1, input.trialDays ?? env.BILLING_DEFAULT_TRIAL_DAYS) *
+              86_400_000
+          )
+        : null;
+    const periodEnd = new Date(
+      Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1)
+    );
+
+    const existing = await prisma.subscription.findUnique({
+      where: { organizationId: input.organizationId },
+    });
+
+    const data = {
+      planId: version.planId,
+      planVersionId: version.id,
+      pendingPlanVersionId: null as string | null,
+      pendingApplyAt: null as Date | null,
+      provider: "internal",
+      accessMode: input.accessMode,
+      status: input.status,
+      trialEndsAt,
+      gracePeriodEndsAt: null as Date | null,
+      currentPeriodStart: now,
+      currentPeriodEnd:
+        input.status === SubscriptionStatus.TRIALING ? trialEndsAt : periodEnd,
+      cancelAtPeriodEnd: false,
+      canceledAt: null as Date | null,
+      readOnlyUntil: null as Date | null,
+    };
+
+    if (existing) {
+      return prisma.subscription.update({
+        where: { organizationId: input.organizationId },
+        data,
+        include: {
+          plan: true,
+          planVersion: { include: { features: true } },
+        },
+      });
+    }
+    return prisma.subscription.create({
+      data: { organizationId: input.organizationId, ...data },
+      include: {
+        plan: true,
+        planVersion: { include: { features: true } },
+      },
+    });
   }
 
   getFeature(features: PlanFeature[], key: FeatureKey): PlanFeature | null {

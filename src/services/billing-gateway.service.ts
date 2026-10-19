@@ -155,15 +155,46 @@ export class BillingGatewayService {
     return org?.billingEnforcementEnabled === true;
   }
 
+  /**
+   * effective = pinned PlanVersion features + OrgEntitlementOverride (override wins).
+   * Legacy PlanFeature used only when planVersionId is null (transition).
+   */
   async getEffectiveFeature(
     organizationId: string,
     featureKey: string
   ): Promise<{ enabled: boolean; limitValue: number | null; planName: string }> {
-    const sub = await entitlementService.ensureSubscription(organizationId);
-    const planFeat = sub.plan.features.find((f) => f.featureKey === featureKey);
+    const sub = await entitlementService.getSubscriptionOrNone(organizationId);
+    if (!sub) {
+      return { enabled: false, limitValue: 0, planName: "None" };
+    }
 
-    let enabled = planFeat?.enabled ?? false;
-    let limitValue = planFeat?.limitValue ?? null;
+    let enabled = false;
+    let limitValue: number | null = null;
+    let found = false;
+
+    if (sub.planVersionId) {
+      const vf = await prisma.planVersionFeature.findUnique({
+        where: {
+          planVersionId_featureKey: {
+            planVersionId: sub.planVersionId,
+            featureKey,
+          },
+        },
+      });
+      if (vf) {
+        enabled = vf.enabled;
+        limitValue = vf.limitValue;
+        found = true;
+      }
+    } else {
+      // LEGACY FALLBACK — remove after B1 verify (see docs/b1-legacy-planfeature.md)
+      const planFeat = sub.plan.features.find((f) => f.featureKey === featureKey);
+      if (planFeat) {
+        enabled = planFeat.enabled;
+        limitValue = planFeat.limitValue;
+        found = true;
+      }
+    }
 
     if (await isBillingSchemaReady()) {
       try {
@@ -177,15 +208,19 @@ export class BillingGatewayService {
           if (override.limitValue !== undefined) {
             limitValue = override.limitValue;
           }
+          found = true;
         }
       } catch (err) {
         if (!isMissingRelationError(err)) throw err;
       }
     }
 
-    // Feature keys not yet seeded on plan → treat as enabled with no limit
-    // (avoid blocking tenants before s25-apply seeds audits/crawls/etc.)
-    if (!planFeat) {
+    // Unknown key on versioned plan → disabled (no silent unlimited)
+    if (!found && sub.planVersionId) {
+      enabled = false;
+      limitValue = 0;
+    } else if (!found) {
+      // Pre-B1 legacy: unseeded keys stay open
       enabled = true;
       limitValue = null;
     }
@@ -254,20 +289,62 @@ export class BillingGatewayService {
       }
     }
 
-    const sub = await entitlementService.ensureSubscription(
+    const sub = await entitlementService.getSubscriptionOrNone(
       input.organizationId
     );
     const enforce = await this.isEnforcementActive(input.organizationId);
+    const lifecycleOn = env.TENANT_LIFECYCLE_ENFORCED === true;
     const monthStart = periodStartUtc();
     const dayStart = dayStartUtc();
 
-    // Subscription status (skip for platform owner / inbound exempt)
+    // B1 lifecycle lock — independent of credit kill switch (not for inbound exempt / owner)
+    if (!exempt && lifecycleOn && sub) {
+      const st = sub.status;
+      if (
+        st === SubscriptionStatus.NONE ||
+        st === SubscriptionStatus.EXPIRED
+      ) {
+        await this.recordUsageEvent(input, def.featureKey, qty, {
+          status: "denied",
+          reason: BILLING_REASONS.NO_ACTIVE_SUBSCRIPTION,
+        });
+        return {
+          allowed: false,
+          reason: BILLING_REASONS.NO_ACTIVE_SUBSCRIPTION,
+          message:
+            "No active subscription. Choose a plan to activate your workspace.",
+        };
+      }
+      if (
+        st === SubscriptionStatus.SUSPENDED ||
+        (st === SubscriptionStatus.CANCELED &&
+          sub.currentPeriodEnd &&
+          sub.currentPeriodEnd < new Date())
+      ) {
+        await this.recordUsageEvent(input, def.featureKey, qty, {
+          status: "denied",
+          reason: BILLING_REASONS.READ_ONLY,
+        });
+        return {
+          allowed: false,
+          reason: BILLING_REASONS.READ_ONLY,
+          message:
+            st === SubscriptionStatus.SUSPENDED
+              ? "Account suspended. Update payment to continue."
+              : "Subscription canceled. Workspace is read-only.",
+        };
+      }
+    }
+
+    // Subscription status (credit enforcement path — skip for platform owner / inbound exempt)
     if (
       !exempt &&
+      sub &&
       (sub.status === SubscriptionStatus.CANCELED ||
         sub.status === SubscriptionStatus.UNPAID ||
         sub.status === SubscriptionStatus.INCOMPLETE_EXPIRED ||
-        sub.status === SubscriptionStatus.SUSPENDED)
+        sub.status === SubscriptionStatus.SUSPENDED ||
+        sub.status === SubscriptionStatus.INCOMPLETE)
     ) {
       const message =
         "Subscription is inactive. Please update billing to continue.";
@@ -282,6 +359,15 @@ export class BillingGatewayService {
           message,
         };
       }
+    }
+
+    if (!exempt && lifecycleOn && !sub) {
+      return {
+        allowed: false,
+        reason: BILLING_REASONS.NO_ACTIVE_SUBSCRIPTION,
+        message:
+          "No active subscription. Choose a plan to activate your workspace.",
+      };
     }
 
     const effective = await this.getEffectiveFeature(

@@ -9,6 +9,7 @@ import { outboundJobService } from "@/services/outbound-job.service";
 import { aiReplyService } from "@/services/ai-reply.service";
 import { cronTickService } from "@/services/cron-tick.service";
 import { creditLedgerService } from "@/services/credit-ledger.service";
+import { billingLifecycleService } from "@/services/billing-lifecycle.service";
 import { apiSuccess } from "@/lib/api/response";
 import { handleApiError } from "@/lib/api/error-handler";
 import { assertCronAuthorized } from "@/lib/security/cron-auth";
@@ -50,6 +51,20 @@ export async function POST(request: NextRequest) {
       } catch (e: unknown) {
         errors.push(
           `credits: ${e instanceof Error ? e.message : "credits maintenance failed"}`
+        );
+      }
+
+      let lifecycle = {
+        trialExpired: 0,
+        graceSuspended: 0,
+        cancelReadOnly: 0,
+        pendingVersionsApplied: 0,
+      };
+      try {
+        lifecycle = await billingLifecycleService.runDaily();
+      } catch (e: unknown) {
+        errors.push(
+          `lifecycle: ${e instanceof Error ? e.message : "lifecycle failed"}`
         );
       }
 
@@ -134,6 +149,7 @@ export async function POST(request: NextRequest) {
         aiReplyOrgs: aiReplies.organizations,
         creditSweep,
         monthlyGrants,
+        lifecycle,
         errors: errors.length ? errors : undefined,
       });
 
@@ -149,6 +165,7 @@ export async function POST(request: NextRequest) {
           outbound: true,
           aiReplies: true,
           credits: true,
+          lifecycle: true,
         },
         counts: {
           sequencesClaimed: sequences.claimed,
@@ -161,6 +178,7 @@ export async function POST(request: NextRequest) {
           aiReplyOrgs: aiReplies.organizations,
           creditSweep,
           monthlyGrantsGranted: monthlyGrants.granted,
+          lifecycle,
         },
         errors: errors.length ? errors : null,
       });
@@ -171,6 +189,7 @@ export async function POST(request: NextRequest) {
           automation,
           autopilot,
           credits: { sweep: creditSweep, monthlyGrants },
+          lifecycle,
           sourcing: { orgs: sourcing.orgs },
           enrichment: { orgs: enrichment.orgs },
           audit: { orgs: audit.orgs },

@@ -4,6 +4,7 @@ import { notFound } from "next/navigation";
 import { format } from "date-fns";
 import { organizationService } from "@/services/organization.service";
 import { OrganizationActions } from "@/components/platform/organization-actions";
+import { TenantLifecycleActions } from "@/components/platform/tenant-lifecycle-actions";
 import { NotFoundError } from "@/lib/api/response";
 import {
   Card,
@@ -99,7 +100,10 @@ export default async function OrganizationDetailPage({ params }: PageProps) {
           </CardContent>
         </Card>
 
-        <OrganizationActions organizationId={org.id} status={org.status} />
+        <div className="space-y-4">
+          <OrganizationActions organizationId={org.id} status={org.status} />
+          <TenantLifecycleActions organizationId={org.id} />
+        </div>
       </div>
 
       <Card>

@@ -1098,8 +1098,16 @@ export class EnrichmentJobService {
     const settings = await prisma.organizationSettings.findMany({
       select: { organizationId: true, settings: true },
     });
+    const { tenantAccessService } = await import(
+      "@/services/tenant-access.service"
+    );
     const results = [];
     for (const row of settings) {
+      if (
+        !(await tenantAccessService.canRunJob(row.organizationId, "enrichment"))
+      ) {
+        continue;
+      }
       const cfg = asEnrichmentConfig(row.settings);
       if (!cfg.enabled) continue;
       results.push({

@@ -1,5 +1,5 @@
-import { appOps } from "@/lib/app-paths";
-import { cookies } from "next/headers";
+import { appHome, appOps } from "@/lib/app-paths";
+import { cookies, headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth/session";
 import { SESSION_COOKIE } from "@/lib/auth/permissions";
@@ -9,7 +9,9 @@ import { AppSidebar } from "@/components/dashboard/app-sidebar";
 import { DashboardHeader } from "@/components/dashboard/dashboard-header";
 import { getAutopilotShellStatus } from "@/lib/autopilot/shell-status";
 import { hasOrgPermission } from "@/lib/tenant/scope";
+import { tenantAccessService } from "@/services/tenant-access.service";
 import prisma from "@/lib/db/prisma";
+
 export const dynamic = "force-dynamic";
 
 /** Real badge counts for the sidebar. Failures degrade to no badge. */
@@ -33,6 +35,13 @@ async function getNavCounts(
   return { Inbox: inbox, Outreach: outreach };
 }
 
+function toDashboardRelative(pathname: string): string {
+  if (pathname.startsWith("/dashboard")) {
+    return pathname.slice("/dashboard".length) || "/";
+  }
+  return pathname || "/";
+}
+
 export default async function DashboardLayout({
   children,
 }: {
@@ -50,9 +59,28 @@ export default async function DashboardLayout({
     redirect("/login");
   }
 
-  // S1: platformRole / isPlatformAdmin is source of truth (not legacy UserRole alone)
   if (user.isPlatformAdmin) {
     redirect(appOps());
+  }
+
+  const hdrs = await headers();
+  const pathname = hdrs.get("x-pathname") ?? "";
+  const dashPath = toDashboardRelative(pathname);
+
+  let tenantAccess = null;
+  if (user.organizationId) {
+    tenantAccess = await tenantAccessService.getAccess(user.organizationId);
+    if (
+      tenantAccess.lifecycleEnforced &&
+      !tenantAccess.isPlatformOwner &&
+      tenantAccess.accessMode === "locked"
+    ) {
+      const open =
+        dashPath.startsWith("/billing") || dashPath.startsWith("/settings");
+      if (!open) {
+        redirect(appHome("/billing/choose-plan"));
+      }
+    }
   }
 
   const jar = await cookies();
@@ -86,6 +114,15 @@ export default async function DashboardLayout({
         flags={flags}
         autopilotStatus={autopilotStatus}
         navCounts={navCounts}
+        tenantAccess={
+          tenantAccess
+            ? {
+                accessMode: tenantAccess.accessMode,
+                modules: tenantAccess.modules,
+                planName: tenantAccess.planName,
+              }
+            : null
+        }
       />
       <SidebarInset className="min-h-svh min-w-0 overflow-hidden">
         <DashboardHeader user={user} />

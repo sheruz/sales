@@ -668,8 +668,14 @@ export class SourcingJobService {
     const settings = await prisma.organizationSettings.findMany({
       select: { organizationId: true, settings: true },
     });
+    const { tenantAccessService } = await import(
+      "@/services/tenant-access.service"
+    );
     const results = [];
     for (const row of settings) {
+      if (!(await tenantAccessService.canRunJob(row.organizationId, "sourcing"))) {
+        continue;
+      }
       const cfg = asConfig(row.settings);
       if (!cfg.enabled) {
         if (!cfg.autoCrawl) continue;

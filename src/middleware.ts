@@ -23,13 +23,32 @@ function startsWithPath(pathname: string, base: string): boolean {
   return pathname === base || pathname.startsWith(`${base}/`);
 }
 
+function withPathHeader(request: NextRequest, response: NextResponse) {
+  response.headers.set("x-pathname", request.nextUrl.pathname);
+  return response;
+}
+
+function nextWithPath(request: NextRequest) {
+  const requestHeaders = new Headers(request.headers);
+  requestHeaders.set("x-pathname", request.nextUrl.pathname);
+  return NextResponse.next({ request: { headers: requestHeaders } });
+}
+
+function rewriteWithPath(request: NextRequest, url: URL) {
+  const requestHeaders = new Headers(request.headers);
+  // Internal App Router path after rewrite
+  requestHeaders.set("x-pathname", url.pathname);
+  requestHeaders.set("x-public-pathname", request.nextUrl.pathname);
+  return NextResponse.rewrite(url, { request: { headers: requestHeaders } });
+}
+
 export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
   const sessionToken = request.cookies.get(SESSION_COOKIE)?.value;
 
   const isApiRoute = pathname.startsWith("/api");
   if (isApiRoute) {
-    return NextResponse.next();
+    return nextWithPath(request);
   }
 
   const isPublicPage = publicPages.some(
@@ -39,7 +58,7 @@ export function middleware(request: NextRequest) {
   const isEmailTrack = pathname.startsWith("/t/");
 
   if (isBrandingAsset || isEmailTrack) {
-    return NextResponse.next();
+    return nextWithPath(request);
   }
 
   // Hide legacy obvious URLs
@@ -64,12 +83,12 @@ export function middleware(request: NextRequest) {
     const url = request.nextUrl.clone();
     url.pathname =
       LEGACY_HOME_BASE + pathname.slice(APP_HOME_BASE.length);
-    return NextResponse.rewrite(url);
+    return rewriteWithPath(request, url);
   }
   if (isOpsRoute) {
     const url = request.nextUrl.clone();
     url.pathname = LEGACY_OPS_BASE + pathname.slice(APP_OPS_BASE.length);
-    return NextResponse.rewrite(url);
+    return rewriteWithPath(request, url);
   }
 
   // Do NOT redirect /login → home just because a cookie exists.
@@ -83,10 +102,13 @@ export function middleware(request: NextRequest) {
     !isOpsRoute &&
     !sessionToken
   ) {
-    return NextResponse.redirect(new URL("/login", request.url));
+    return withPathHeader(
+      request,
+      NextResponse.redirect(new URL("/login", request.url))
+    );
   }
 
-  return NextResponse.next();
+  return nextWithPath(request);
 }
 
 export const config = {

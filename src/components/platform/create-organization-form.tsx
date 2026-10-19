@@ -20,12 +20,18 @@ import {
 const emptyForm = {
   name: "",
   slug: "",
+  country: "",
+  timezone: "UTC",
+  defaultCurrency: "USD",
   website: "",
   legalName: "",
-  adminEmail: "",
-  adminPassword: "",
-  adminFirstName: "",
-  adminLastName: "",
+  internalNotes: "",
+  ownerEmail: "",
+  ownerFirstName: "",
+  ownerLastName: "",
+  accessType: "none" as "none" | "trial" | "manual" | "complimentary",
+  planCode: "STARTER",
+  trialDays: "14",
 };
 
 export function CreateOrganizationForm() {
@@ -33,26 +39,48 @@ export function CreateOrganizationForm() {
   const [open, setOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [form, setForm] = useState(emptyForm);
+  const [lastInviteLink, setLastInviteLink] = useState<string | null>(null);
 
   async function handleSubmit(event: React.FormEvent) {
     event.preventDefault();
     setIsSubmitting(true);
+    setLastInviteLink(null);
 
     try {
+      const access =
+        form.accessType === "none"
+          ? { type: "none" as const }
+          : form.accessType === "trial"
+            ? {
+                type: "trial" as const,
+                planCode: form.planCode,
+                trialDays: Number(form.trialDays) || 14,
+              }
+            : form.accessType === "manual"
+              ? { type: "manual" as const, planCode: form.planCode }
+              : {
+                  type: "complimentary" as const,
+                  planCode: form.planCode || "COMPLIMENTARY",
+                };
+
       const response = await fetch("/api/platform/organizations", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           name: form.name,
           slug: form.slug || undefined,
+          country: form.country || undefined,
+          timezone: form.timezone || undefined,
+          defaultCurrency: form.defaultCurrency || undefined,
           website: form.website || undefined,
           legalName: form.legalName || undefined,
-          admin: {
-            email: form.adminEmail,
-            password: form.adminPassword,
-            firstName: form.adminFirstName,
-            lastName: form.adminLastName,
+          internalNotes: form.internalNotes || undefined,
+          owner: {
+            email: form.ownerEmail,
+            firstName: form.ownerFirstName,
+            lastName: form.ownerLastName,
           },
+          access,
         }),
       });
       const data = await response.json();
@@ -61,8 +89,8 @@ export function CreateOrganizationForm() {
         throw new Error(data.error?.message ?? "Failed to create organization");
       }
 
-      toast.success(`Organization "${data.data.name}" created`);
-      setOpen(false);
+      toast.success(`Company "${data.data.name}" created — invite sent`);
+      if (data.data.inviteLink) setLastInviteLink(data.data.inviteLink);
       setForm(emptyForm);
       router.refresh();
     } catch (error) {
@@ -76,17 +104,25 @@ export function CreateOrganizationForm() {
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-            <DialogTrigger render={<Button size="sm"><Plus className="h-4 w-4" />New organization</Button>} />
+      <DialogTrigger
+        render={
+          <Button size="sm">
+            <Plus className="h-4 w-4" />
+            New company
+          </Button>
+        }
+      />
       <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-lg">
         <DialogHeader>
-          <DialogTitle>Create organization</DialogTitle>
+          <DialogTitle>New company</DialogTitle>
           <DialogDescription>
-            Provision a customer tenant and its primary company admin.
+            Create a tenant and invite the owner (no password). They set a
+            password via email link (72h).
           </DialogDescription>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-2">
-            <Label htmlFor="orgName">Name</Label>
+            <Label htmlFor="orgName">Company name</Label>
             <Input
               id="orgName"
               value={form.name}
@@ -96,97 +132,143 @@ export function CreateOrganizationForm() {
               disabled={isSubmitting}
             />
           </div>
-          <div className="space-y-2">
-            <Label htmlFor="orgSlug">Slug (optional)</Label>
-            <Input
-              id="orgSlug"
-              value={form.slug}
-              onChange={(e) => setForm({ ...form, slug: e.target.value })}
-              placeholder="acme-corp"
-              disabled={isSubmitting}
-            />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="orgWebsite">Website</Label>
-            <Input
-              id="orgWebsite"
-              type="url"
-              value={form.website}
-              onChange={(e) => setForm({ ...form, website: e.target.value })}
-              placeholder="https://example.com"
-              disabled={isSubmitting}
-            />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="orgLegalName">Legal name</Label>
-            <Input
-              id="orgLegalName"
-              value={form.legalName}
-              onChange={(e) => setForm({ ...form, legalName: e.target.value })}
-              disabled={isSubmitting}
-            />
-          </div>
-
-          <div className="border-t pt-4 space-y-4">
-            <p className="text-sm font-medium">Primary admin</p>
-            <div className="grid gap-4 sm:grid-cols-2">
-              <div className="space-y-2">
-                <Label htmlFor="adminFirstName">First name</Label>
-                <Input
-                  id="adminFirstName"
-                  value={form.adminFirstName}
-                  onChange={(e) =>
-                    setForm({ ...form, adminFirstName: e.target.value })
-                  }
-                  required
-                  disabled={isSubmitting}
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="adminLastName">Last name</Label>
-                <Input
-                  id="adminLastName"
-                  value={form.adminLastName}
-                  onChange={(e) =>
-                    setForm({ ...form, adminLastName: e.target.value })
-                  }
-                  required
-                  disabled={isSubmitting}
-                />
-              </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-2">
+              <Label htmlFor="orgSlug">Slug (optional)</Label>
+              <Input
+                id="orgSlug"
+                value={form.slug}
+                onChange={(e) => setForm({ ...form, slug: e.target.value })}
+                disabled={isSubmitting}
+              />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="adminEmail">Email</Label>
+              <Label htmlFor="country">Country</Label>
               <Input
-                id="adminEmail"
-                type="email"
-                value={form.adminEmail}
+                id="country"
+                value={form.country}
+                onChange={(e) => setForm({ ...form, country: e.target.value })}
+                placeholder="US"
+                disabled={isSubmitting}
+              />
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-2">
+              <Label htmlFor="timezone">Timezone</Label>
+              <Input
+                id="timezone"
+                value={form.timezone}
+                onChange={(e) => setForm({ ...form, timezone: e.target.value })}
+                disabled={isSubmitting}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="currency">Currency</Label>
+              <Input
+                id="currency"
+                value={form.defaultCurrency}
                 onChange={(e) =>
-                  setForm({ ...form, adminEmail: e.target.value })
+                  setForm({ ...form, defaultCurrency: e.target.value })
+                }
+                disabled={isSubmitting}
+              />
+            </div>
+          </div>
+          <div className="space-y-2 border-t pt-3">
+            <Label>Owner / admin</Label>
+            <div className="grid grid-cols-2 gap-3">
+              <Input
+                placeholder="First name"
+                value={form.ownerFirstName}
+                onChange={(e) =>
+                  setForm({ ...form, ownerFirstName: e.target.value })
+                }
+                required
+                disabled={isSubmitting}
+              />
+              <Input
+                placeholder="Last name"
+                value={form.ownerLastName}
+                onChange={(e) =>
+                  setForm({ ...form, ownerLastName: e.target.value })
                 }
                 required
                 disabled={isSubmitting}
               />
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="adminPassword">Password</Label>
-              <Input
-                id="adminPassword"
-                type="password"
-                value={form.adminPassword}
-                onChange={(e) =>
-                  setForm({ ...form, adminPassword: e.target.value })
-                }
-                required
-                minLength={8}
-                disabled={isSubmitting}
-              />
-            </div>
+            <Input
+              type="email"
+              placeholder="Email"
+              value={form.ownerEmail}
+              onChange={(e) => setForm({ ...form, ownerEmail: e.target.value })}
+              required
+              disabled={isSubmitting}
+            />
           </div>
-
+          <div className="space-y-2 border-t pt-3">
+            <Label htmlFor="accessType">Access</Label>
+            <select
+              id="accessType"
+              className="flex h-9 w-full rounded-md border bg-background px-3 text-sm"
+              value={form.accessType}
+              onChange={(e) =>
+                setForm({
+                  ...form,
+                  accessType: e.target.value as typeof form.accessType,
+                })
+              }
+              disabled={isSubmitting}
+            >
+              <option value="none">No package yet (choose plan on login)</option>
+              <option value="trial">Trial</option>
+              <option value="manual">Manual / invoiced</option>
+              <option value="complimentary">Complimentary</option>
+            </select>
+            {form.accessType !== "none" ? (
+              <div className="grid grid-cols-2 gap-3">
+                <Input
+                  placeholder="Plan code (STARTER…)"
+                  value={form.planCode}
+                  onChange={(e) =>
+                    setForm({ ...form, planCode: e.target.value })
+                  }
+                  disabled={isSubmitting}
+                />
+                {form.accessType === "trial" ? (
+                  <Input
+                    type="number"
+                    min={1}
+                    max={90}
+                    value={form.trialDays}
+                    onChange={(e) =>
+                      setForm({ ...form, trialDays: e.target.value })
+                    }
+                    disabled={isSubmitting}
+                  />
+                ) : null}
+              </div>
+            ) : null}
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="notes">Internal notes</Label>
+            <Input
+              id="notes"
+              value={form.internalNotes}
+              onChange={(e) =>
+                setForm({ ...form, internalNotes: e.target.value })
+              }
+              disabled={isSubmitting}
+            />
+          </div>
+          {lastInviteLink ? (
+            <p className="break-all rounded-md bg-muted p-2 text-xs">
+              Invite link: {lastInviteLink}
+            </p>
+          ) : null}
           <DialogFooter>
             <Button type="submit" disabled={isSubmitting}>
-              {isSubmitting ? "Creating..." : "Create organization"}
+              {isSubmitting ? "Creating…" : "Create & send invite"}
             </Button>
           </DialogFooter>
         </form>

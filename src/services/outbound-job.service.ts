@@ -1575,8 +1575,14 @@ export class OutboundJobService {
     const settings = await prisma.organizationSettings.findMany({
       select: { organizationId: true, settings: true },
     });
+    const { tenantAccessService } = await import(
+      "@/services/tenant-access.service"
+    );
     const results = [];
     for (const row of settings) {
+      if (!(await tenantAccessService.canRunJob(row.organizationId, "outbound"))) {
+        continue;
+      }
       const cfg = await outboundConfigService.getConfig(row.organizationId);
       if (!cfg.enabled) continue;
       results.push({

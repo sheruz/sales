@@ -1,10 +1,14 @@
-/** Feature keys enforced server-side against plan_features.limit_value */
+/**
+ * Feature key registry only — never store limit values here for runtime.
+ * Package limits/modules live in PlanVersionFeature (DB).
+ * DEFAULT_PLANS is legacy seed data for empty DBs / old tests; B1 seeds use scripts/b1-plan-catalog.js.
+ */
+
 export const FEATURE_KEYS = {
   USERS: "users",
   OPPORTUNITIES: "opportunities",
   AI_CALLS: "ai_calls",
   EMAILS: "emails",
-  /** Plan ceiling for daily outbound emails (tenant may only lower via settings) */
   EMAILS_DAILY: "emails_daily",
   SEQUENCES: "sequences",
   SOURCES: "sources",
@@ -13,7 +17,6 @@ export const FEATURE_KEYS = {
   CRAWLS: "crawls",
   MEETINGS: "meetings",
   INBOX_ACCOUNTS: "inbox_accounts",
-  /** Explicit opt-in cold-outbound pool seats (OutboundMailbox rows). */
   OUTBOUND_MAILBOXES: "outbound_mailboxes",
   AUTOMATION: "automation",
   ADVANCED_AI: "advanced_ai",
@@ -21,10 +24,68 @@ export const FEATURE_KEYS = {
   CONNECTORS: "connectors",
   ICPS: "icps",
   CAMPAIGNS: "campaigns",
+  // B1 module keys (also PlanVersionFeature rows)
+  DASHBOARD: "dashboard",
+  LEADS: "leads",
+  AUTOPILOT_SOURCING: "autopilot_sourcing",
+  AUTOPILOT_ENRICHMENT: "autopilot_enrichment",
+  AUTOPILOT_AUDIT: "autopilot_audit",
+  OUTREACH: "outreach",
+  INBOX: "inbox",
+  AI_REPLIES: "ai_replies",
+  AI_AUTO_SEND: "ai_auto_send",
+  DEALS: "deals",
+  META_LEAD_ADS: "meta_lead_ads",
+  LINKEDIN_ASSIST: "linkedin_assist",
+  ANALYTICS_ADVANCED: "analytics_advanced",
+  WHITE_LABEL: "white_label",
+  API_ACCESS: "api_access",
 } as const;
 
 export type FeatureKey = (typeof FEATURE_KEYS)[keyof typeof FEATURE_KEYS];
 
+export const FEATURE_KEY_LABELS: Record<string, string> = {
+  [FEATURE_KEYS.USERS]: "Users",
+  [FEATURE_KEYS.OPPORTUNITIES]: "Opportunities",
+  [FEATURE_KEYS.AI_CALLS]: "AI calls",
+  [FEATURE_KEYS.EMAILS]: "Emails / month",
+  [FEATURE_KEYS.EMAILS_DAILY]: "Emails / day",
+  [FEATURE_KEYS.SEQUENCES]: "Sequences",
+  [FEATURE_KEYS.SOURCES]: "Sources",
+  [FEATURE_KEYS.ENRICHMENT]: "Enrichment",
+  [FEATURE_KEYS.AUDITS]: "Audits",
+  [FEATURE_KEYS.CRAWLS]: "Crawls",
+  [FEATURE_KEYS.MEETINGS]: "Meetings",
+  [FEATURE_KEYS.INBOX_ACCOUNTS]: "Inbox accounts",
+  [FEATURE_KEYS.OUTBOUND_MAILBOXES]: "Sending mailboxes",
+  [FEATURE_KEYS.AUTOMATION]: "Automation",
+  [FEATURE_KEYS.ADVANCED_AI]: "Advanced AI",
+  [FEATURE_KEYS.LEARNING]: "Learning",
+  [FEATURE_KEYS.CONNECTORS]: "Connectors",
+  [FEATURE_KEYS.ICPS]: "ICPs",
+  [FEATURE_KEYS.CAMPAIGNS]: "Campaigns",
+  [FEATURE_KEYS.DASHBOARD]: "Dashboard",
+  [FEATURE_KEYS.LEADS]: "Leads",
+  [FEATURE_KEYS.AUTOPILOT_SOURCING]: "Autopilot sourcing",
+  [FEATURE_KEYS.AUTOPILOT_ENRICHMENT]: "Enrichment",
+  [FEATURE_KEYS.AUTOPILOT_AUDIT]: "Audit + pitch",
+  [FEATURE_KEYS.OUTREACH]: "Outreach",
+  [FEATURE_KEYS.INBOX]: "Inbox",
+  [FEATURE_KEYS.AI_REPLIES]: "AI reply drafts",
+  [FEATURE_KEYS.AI_AUTO_SEND]: "AI auto-send",
+  [FEATURE_KEYS.DEALS]: "Deals",
+  [FEATURE_KEYS.META_LEAD_ADS]: "Meta Lead Ads",
+  [FEATURE_KEYS.LINKEDIN_ASSIST]: "LinkedIn assist",
+  [FEATURE_KEYS.ANALYTICS_ADVANCED]: "Advanced analytics",
+  [FEATURE_KEYS.WHITE_LABEL]: "White-label",
+  [FEATURE_KEYS.API_ACCESS]: "API access",
+};
+
+export function isKnownFeatureKey(key: string): boolean {
+  return Object.values(FEATURE_KEYS).includes(key as FeatureKey);
+}
+
+/** @deprecated Seed-only legacy Free/Growth/Scale. Runtime must not use these limits. */
 type PlanFeatureSeed = {
   featureKey: FeatureKey;
   limitValue: number | null;
@@ -103,7 +164,7 @@ function scaleFeatures(): PlanFeatureSeed[] {
   ];
 }
 
-/** OWNER plan features — unlimited; never assignable to tenants */
+/** OWNER plan features — unlimited; seed scripts only */
 export function ownerPlanFeatures(): PlanFeatureSeed[] {
   return Object.values(FEATURE_KEYS).map((featureKey) => ({
     featureKey,
@@ -112,6 +173,7 @@ export function ownerPlanFeatures(): PlanFeatureSeed[] {
   }));
 }
 
+/** @deprecated Prefer scripts/b1-plan-catalog.js. Kept for entitlement.ensureDefaultPlans empty-DB bootstrap. */
 export const DEFAULT_PLANS = [
   {
     name: "Free",

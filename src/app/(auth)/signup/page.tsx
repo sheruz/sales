@@ -38,6 +38,11 @@ export default function SignupPage() {
   });
 
   useEffect(() => {
+    // B1: self-signup disabled by default — send users to login
+    router.replace("/login");
+  }, [router]);
+
+  useEffect(() => {
     fetch("/api/plans")
       .then((r) => r.json())
       .then((d) => {

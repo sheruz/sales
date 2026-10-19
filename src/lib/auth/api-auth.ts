@@ -7,6 +7,36 @@ import {
   hasAnyOrgPermission,
   hasOrgPermission,
 } from "@/lib/tenant/scope";
+import {
+  tenantAccessService,
+  ACCESS_REASONS,
+} from "@/services/tenant-access.service";
+
+/** Permissions still allowed when subscription is NONE/EXPIRED (locked). */
+const LOCKED_ALLOWED_PERMS = new Set<string>([
+  "billing.manage",
+  "users.view",
+  "users.update",
+  "organization.view",
+  "organization.update",
+]);
+
+async function assertNotLocked(
+  organizationId: string,
+  permission: string
+) {
+  const access = await tenantAccessService.getAccess(organizationId);
+  if (!access.lifecycleEnforced || access.isPlatformOwner) return;
+
+  if (access.accessMode === "locked") {
+    if (!LOCKED_ALLOWED_PERMS.has(permission)) {
+      throw new ForbiddenError(
+        "No active subscription. Choose a plan to activate your workspace.",
+        ACCESS_REASONS.NO_ACTIVE_SUBSCRIPTION
+      );
+    }
+  }
+}
 
 export async function requireUser(): Promise<AuthUser> {
   const user = await getCurrentUser();
@@ -44,6 +74,7 @@ export async function requireOrgPermission(
   if (!hasOrgPermission(user, permission)) {
     throw new ForbiddenError();
   }
+  await assertNotLocked(user.organizationId, permission);
   return user as AuthUser & { organizationId: string };
 }
 
@@ -57,6 +88,19 @@ export async function requireAnyOrgPermission(
   }
   if (!hasAnyOrgPermission(user, permissions)) {
     throw new ForbiddenError();
+  }
+  // Lifecycle: allow if any requested perm is on the locked allow-list
+  const access = await tenantAccessService.getAccess(user.organizationId);
+  if (
+    access.lifecycleEnforced &&
+    !access.isPlatformOwner &&
+    access.accessMode === "locked" &&
+    !permissions.some((p) => LOCKED_ALLOWED_PERMS.has(p))
+  ) {
+    throw new ForbiddenError(
+      "No active subscription. Choose a plan to activate your workspace.",
+      ACCESS_REASONS.NO_ACTIVE_SUBSCRIPTION
+    );
   }
   return user as AuthUser & { organizationId: string };
 }

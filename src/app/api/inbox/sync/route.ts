@@ -22,8 +22,19 @@ export async function POST(request: Request) {
         select: { organizationId: true },
         distinct: ["organizationId"],
       });
+      const { tenantAccessService } = await import(
+        "@/services/tenant-access.service"
+      );
       const results = [];
       for (const org of orgs) {
+        if (
+          !(await tenantAccessService.canRunJob(
+            org.organizationId,
+            "inbox_sync"
+          ))
+        ) {
+          continue;
+        }
         results.push({
           organizationId: org.organizationId,
           runs: await inboxService.syncAllForOrg(org.organizationId),

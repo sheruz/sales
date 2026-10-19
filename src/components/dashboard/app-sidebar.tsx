@@ -10,11 +10,13 @@ import {
   ChevronsUpDown,
   Home,
   Inbox,
+  Lock,
   Rocket,
   Send,
   Settings,
   type LucideIcon,
 } from "lucide-react";
+import { MODULE_KEYS } from "@/lib/billing/modules";
 import {
   Sidebar,
   SidebarContent,
@@ -43,6 +45,7 @@ type NavItem = {
   title: string;
   href: string;
   icon: LucideIcon;
+  moduleKey?: string;
   anyOf?: PermissionKey[];
   match: (ctx: { pathname: string; tab: string | null }) => boolean;
 };
@@ -53,6 +56,11 @@ interface AppSidebarProps {
   autopilotStatus: AutopilotShellStatus;
   /** Real counts keyed by nav title (e.g. Inbox, Outreach). */
   navCounts?: Record<string, number>;
+  tenantAccess?: {
+    accessMode: string;
+    modules: Record<string, boolean>;
+    planName: string | null;
+  } | null;
 }
 
 function canSee(user: AuthUser, anyOf?: PermissionKey[]): boolean {
@@ -65,12 +73,14 @@ const NAV: NavItem[] = [
     title: "Home",
     href: appHome(),
     icon: Home,
+    moduleKey: MODULE_KEYS.DASHBOARD,
     match: ({ pathname }) => pathname === appHome(),
   },
   {
     title: "Autopilot",
     href: appHome("/autopilot"),
     icon: Rocket,
+    moduleKey: MODULE_KEYS.AUTOPILOT_SOURCING,
     match: ({ pathname, tab }) =>
       pathname.startsWith(appHome("/autopilot")) &&
       tab !== "pitch" &&
@@ -81,6 +91,7 @@ const NAV: NavItem[] = [
     title: "Leads",
     href: appHome("/companies"),
     icon: Building2,
+    moduleKey: MODULE_KEYS.LEADS,
     anyOf: ["opportunities.view", "leads.view"],
     match: ({ pathname }) =>
       pathname.startsWith(appHome("/companies")) ||
@@ -91,6 +102,7 @@ const NAV: NavItem[] = [
     title: "Outreach",
     href: appHome("/outreach"),
     icon: Send,
+    moduleKey: MODULE_KEYS.OUTREACH,
     anyOf: [
       "campaigns.manage",
       "campaigns.view",
@@ -108,6 +120,7 @@ const NAV: NavItem[] = [
     title: "Inbox",
     href: appHome("/conversations"),
     icon: Inbox,
+    moduleKey: MODULE_KEYS.INBOX,
     anyOf: ["conversations.view"],
     match: ({ pathname }) => pathname.startsWith(appHome("/conversations")),
   },
@@ -115,6 +128,7 @@ const NAV: NavItem[] = [
     title: "Deals",
     href: appHome("/pipeline"),
     icon: Briefcase,
+    moduleKey: MODULE_KEYS.DEALS,
     anyOf: ["deals.manage", "opportunities.view"],
     match: ({ pathname }) =>
       pathname.startsWith(appHome("/pipeline")) ||
@@ -125,6 +139,7 @@ const NAV: NavItem[] = [
     title: "Meetings",
     href: appHome("/meetings"),
     icon: Calendar,
+    moduleKey: MODULE_KEYS.MEETINGS,
     anyOf: ["opportunities.view", "deals.manage"],
     match: ({ pathname }) => pathname.startsWith(appHome("/meetings")),
   },
@@ -133,33 +148,53 @@ const NAV: NavItem[] = [
 function SidebarNav({
   user,
   navCounts,
+  tenantAccess,
 }: {
   user: AuthUser;
   navCounts?: Record<string, number>;
+  tenantAccess?: AppSidebarProps["tenantAccess"];
 }) {
   const pathname = usePathname();
   const search = useSearchParams();
   const tab = search.get("tab");
+  const lockedWorkspace = tenantAccess?.accessMode === "locked";
 
   return (
     <SidebarMenu>
-      {NAV.filter((item) => canSee(user, item.anyOf)).map((item) => (
-        <SidebarMenuItem key={item.title}>
-          <SidebarMenuButton
-            isActive={item.match({ pathname, tab })}
-            tooltip={item.title}
-            render={<Link href={item.href} />}
-          >
-            <item.icon />
-            <span>{item.title}</span>
-          </SidebarMenuButton>
-          {(navCounts?.[item.title] ?? 0) > 0 ? (
-            <SidebarMenuBadge className="rounded-full bg-primary px-1.5 text-[11px] font-semibold text-primary-foreground">
-              {navCounts![item.title]}
-            </SidebarMenuBadge>
-          ) : null}
-        </SidebarMenuItem>
-      ))}
+      {NAV.filter((item) => canSee(user, item.anyOf)).map((item) => {
+        const moduleLocked =
+          lockedWorkspace ||
+          (item.moduleKey &&
+            tenantAccess &&
+            tenantAccess.modules[item.moduleKey] === false);
+        const href = moduleLocked
+          ? appHome("/billing/choose-plan")
+          : item.href;
+        return (
+          <SidebarMenuItem key={item.title}>
+            <SidebarMenuButton
+              isActive={item.match({ pathname, tab })}
+              tooltip={
+                moduleLocked
+                  ? `${item.title} (locked — choose a plan)`
+                  : item.title
+              }
+              render={<Link href={href} />}
+            >
+              <item.icon />
+              <span>{item.title}</span>
+              {moduleLocked ? (
+                <Lock className="ml-auto size-3.5 opacity-60" />
+              ) : null}
+            </SidebarMenuButton>
+            {!moduleLocked && (navCounts?.[item.title] ?? 0) > 0 ? (
+              <SidebarMenuBadge className="rounded-full bg-primary px-1.5 text-[11px] font-semibold text-primary-foreground">
+                {navCounts![item.title]}
+              </SidebarMenuBadge>
+            ) : null}
+          </SidebarMenuItem>
+        );
+      })}
     </SidebarMenu>
   );
 }
@@ -168,6 +203,7 @@ export function AppSidebar({
   user,
   autopilotStatus,
   navCounts,
+  tenantAccess,
 }: AppSidebarProps) {
   const pathname = usePathname();
   const workspace =
@@ -201,7 +237,11 @@ export function AppSidebar({
         <SidebarGroup className="px-2 py-3">
           <SidebarGroupContent>
             <Suspense fallback={<SidebarMenu />}>
-              <SidebarNav user={user} navCounts={navCounts} />
+              <SidebarNav
+                user={user}
+                navCounts={navCounts}
+                tenantAccess={tenantAccess}
+              />
             </Suspense>
           </SidebarGroupContent>
         </SidebarGroup>

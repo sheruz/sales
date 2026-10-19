@@ -2900,7 +2900,13 @@ export class AiReplyService {
       error?: string;
     }> = [];
 
+    const { tenantAccessService } = await import(
+      "@/services/tenant-access.service"
+    );
     for (const organizationId of orgIds) {
+      if (!(await tenantAccessService.canRunJob(organizationId, "ai_replies"))) {
+        continue;
+      }
       const entry: (typeof results)[number] = { organizationId };
       try {
         const resumed = await sequenceEnrollmentService.resumeDueOooPauses(organizationId, now);

@@ -850,8 +850,14 @@ export class WebsiteAuditService {
     const settings = await prisma.organizationSettings.findMany({
       select: { organizationId: true, settings: true },
     });
+    const { tenantAccessService } = await import(
+      "@/services/tenant-access.service"
+    );
     const results = [];
     for (const row of settings) {
+      if (!(await tenantAccessService.canRunJob(row.organizationId, "audit"))) {
+        continue;
+      }
       const cfg = asAuditConfig(row.settings);
       if (!cfg.enabled) continue;
       results.push({

@@ -88,8 +88,30 @@ const envSchema = z.object({
     const t = String(v).trim().toLowerCase();
     return t === "true" || t === "1" || t === "yes";
   }, z.boolean()),
+  /**
+   * B1: when true, NONE/EXPIRED lock + module/SUSPENDED/CANCELED access rules apply.
+   * Default false so prod can deploy code then flip after Test Tenant verify.
+   * Independent of BILLING_ENFORCEMENT_ENABLED (credits/limits kill switch).
+   */
+  TENANT_LIFECYCLE_ENFORCED: z.preprocess((v) => {
+    if (v === undefined || v === null || v === "") return false;
+    const t = String(v).trim().toLowerCase();
+    return t === "true" || t === "1" || t === "yes";
+  }, z.boolean()),
+  /** B1: self-serve signup. Default false (Super Admin creates companies). */
+  SELF_SIGNUP_ENABLED: z.preprocess((v) => {
+    if (v === undefined || v === null || v === "") return false;
+    const t = String(v).trim().toLowerCase();
+    return t === "true" || t === "1" || t === "yes";
+  }, z.boolean()),
+  /** Contact mailto on Choose Plan CTA until Stripe (B3). */
+  BILLING_CONTACT_EMAIL: z.union([z.string().email(), z.undefined()]).optional(),
   /** Minutes before an open RESERVE is auto-refunded. */
   CREDIT_RESERVE_TTL_MINUTES: z.coerce.number().default(15),
+  /** B1: default grace days after PAST_DUE before SUSPENDED */
+  BILLING_GRACE_DAYS: z.coerce.number().default(7),
+  /** B1: default trial days when Super Admin picks trial */
+  BILLING_DEFAULT_TRIAL_DAYS: z.coerce.number().default(14),
   AUTOPILOT_ENABLED: z.coerce.boolean().default(false),
   CRON_SECRET: z.string().optional(),
   /** Comma-separated: email, linkedin. Default email-only to protect LinkedIn account */
