@@ -17,6 +17,20 @@ function sanitizeEnv(env: NodeJS.ProcessEnv): Record<string, string | undefined>
   return sanitized;
 }
 
+/**
+ * z.coerce.boolean() treats non-empty strings as true, so "false" → true.
+ * Use this for all env flags that are set as true/false in .env files.
+ */
+const envBoolean = (defaultValue: boolean) =>
+  z.preprocess((v) => {
+    if (v === undefined || v === null || v === "") return defaultValue;
+    if (typeof v === "boolean") return v;
+    const t = String(v).trim().toLowerCase();
+    if (t === "true" || t === "1" || t === "yes") return true;
+    if (t === "false" || t === "0" || t === "no") return false;
+    return defaultValue;
+  }, z.boolean());
+
 const envSchema = z.object({
   NODE_ENV: z
     .enum(["development", "production", "test"])
@@ -35,7 +49,7 @@ const envSchema = z.object({
   ANTHROPIC_QUALITY_MODEL: z.string().default("claude-sonnet-4-6"),
   SMTP_HOST: z.string().optional(),
   SMTP_PORT: z.coerce.number().default(587),
-  SMTP_SECURE: z.coerce.boolean().default(false),
+  SMTP_SECURE: envBoolean(false),
   SMTP_USER: z.string().optional(),
   SMTP_PASSWORD: z.string().optional(),
   SMTP_FROM_NAME: z.string().default("Delvix"),
@@ -53,7 +67,7 @@ const envSchema = z.object({
   STRIPE_SUCCESS_URL: z.string().url().optional(),
   STRIPE_CANCEL_URL: z.string().url().optional(),
   REDIS_URL: z.string().optional(),
-  USE_REDIS_QUEUE: z.coerce.boolean().default(false),
+  USE_REDIS_QUEUE: envBoolean(false),
   RATE_LIMIT_MAX: z.coerce.number().default(100),
   RATE_LIMIT_WINDOW_MS: z.coerce.number().default(60000),
   ENCRYPTION_KEY: z.string().optional(),
@@ -67,7 +81,7 @@ const envSchema = z.object({
    * Existing LinkedInAccount SESSION rows are left in DB but unused.
    * Official OAuth is unaffected.
    */
-  LINKEDIN_SESSION_ENABLED: z.coerce.boolean().default(false),
+  LINKEDIN_SESSION_ENABLED: envBoolean(false),
   LINKEDIN_CLIENT_ID: z.string().optional(),
   LINKEDIN_CLIENT_SECRET: z.string().optional(),
   LINKEDIN_REDIRECT_URI: z.string().url().optional(),
@@ -77,33 +91,21 @@ const envSchema = z.object({
    */
   PLATFORM_OWNER_ORG_ID: z.string().uuid().optional(),
   /** Record usage + shadow would-blocks. Default on for S1. */
-  BILLING_METERING_ENABLED: z.coerce.boolean().default(true),
+  BILLING_METERING_ENABLED: envBoolean(true),
   /**
    * S2.5 emergency kill switch. Production MUST set explicitly to "true".
    * If unset: treated as false + startup warning (see enforcement-flags.ts).
    * Per-org Organization.billingEnforcementEnabled also required for blocking.
    */
-  BILLING_ENFORCEMENT_ENABLED: z.preprocess((v) => {
-    if (v === undefined || v === null || v === "") return false;
-    const t = String(v).trim().toLowerCase();
-    return t === "true" || t === "1" || t === "yes";
-  }, z.boolean()),
+  BILLING_ENFORCEMENT_ENABLED: envBoolean(false),
   /**
    * B1: when true, NONE/EXPIRED lock + module/SUSPENDED/CANCELED access rules apply.
    * Default false so prod can deploy code then flip after Test Tenant verify.
    * Independent of BILLING_ENFORCEMENT_ENABLED (credits/limits kill switch).
    */
-  TENANT_LIFECYCLE_ENFORCED: z.preprocess((v) => {
-    if (v === undefined || v === null || v === "") return false;
-    const t = String(v).trim().toLowerCase();
-    return t === "true" || t === "1" || t === "yes";
-  }, z.boolean()),
+  TENANT_LIFECYCLE_ENFORCED: envBoolean(false),
   /** B1: self-serve signup. Default false (Super Admin creates companies). */
-  SELF_SIGNUP_ENABLED: z.preprocess((v) => {
-    if (v === undefined || v === null || v === "") return false;
-    const t = String(v).trim().toLowerCase();
-    return t === "true" || t === "1" || t === "yes";
-  }, z.boolean()),
+  SELF_SIGNUP_ENABLED: envBoolean(false),
   /** Contact mailto on Choose Plan CTA until Stripe (B3). */
   BILLING_CONTACT_EMAIL: z.union([z.string().email(), z.undefined()]).optional(),
   /** Minutes before an open RESERVE is auto-refunded. */
@@ -112,17 +114,17 @@ const envSchema = z.object({
   BILLING_GRACE_DAYS: z.coerce.number().default(7),
   /** B1: default trial days when Super Admin picks trial */
   BILLING_DEFAULT_TRIAL_DAYS: z.coerce.number().default(14),
-  AUTOPILOT_ENABLED: z.coerce.boolean().default(false),
+  AUTOPILOT_ENABLED: envBoolean(false),
   CRON_SECRET: z.string().optional(),
   /** Comma-separated: email, linkedin. Default email-only to protect LinkedIn account */
   OUTREACH_CHANNELS: z.string().default("email"),
   /** job_posts (default) or linkedin */
   AUTOPILOT_DISCOVERY_MODE: z.enum(["job_posts", "linkedin"]).default("job_posts"),
   /** Phase 0 Client Autopilot — feature flag env defaults (org settings can override) */
-  LEGACY_ENABLED: z.coerce.boolean().default(false),
-  SOURCES_ENABLED: z.coerce.boolean().default(false),
-  META_CONNECTOR_ENABLED: z.coerce.boolean().default(false),
-  LINKEDIN_DISCOVERY_UI_ENABLED: z.coerce.boolean().default(false),
+  LEGACY_ENABLED: envBoolean(false),
+  SOURCES_ENABLED: envBoolean(false),
+  META_CONNECTOR_ENABLED: envBoolean(false),
+  LINKEDIN_DISCOVERY_UI_ENABLED: envBoolean(false),
   /** Optional org-wide fallback for Autopilot Google Places sourcing */
   GOOGLE_PLACES_API_KEY: z.string().optional(),
   /** Optional org-wide fallback for Hunter.io enrichment */
