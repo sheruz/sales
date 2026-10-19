@@ -34,6 +34,23 @@ const PLAN_FEATURE_DEFAULTS = {
     icps: 3,
     campaigns: 2,
   },
+  /** Align with Free until Starter limits are edited in admin */
+  Starter: {
+    emails_daily: 50,
+    audits: 25,
+    crawls: 100,
+    meetings: 50,
+    icps: 3,
+    campaigns: 2,
+  },
+  STARTER: {
+    emails_daily: 50,
+    audits: 25,
+    crawls: 100,
+    meetings: 50,
+    icps: 3,
+    campaigns: 2,
+  },
   Growth: {
     emails_daily: 200,
     audits: 1000,
@@ -41,6 +58,22 @@ const PLAN_FEATURE_DEFAULTS = {
     meetings: 500,
     icps: 20,
     campaigns: 20,
+  },
+  Agency: {
+    emails_daily: 500,
+    audits: 2000,
+    crawls: 10000,
+    meetings: 1000,
+    icps: 50,
+    campaigns: 50,
+  },
+  AGENCY: {
+    emails_daily: 500,
+    audits: 2000,
+    crawls: 10000,
+    meetings: 1000,
+    icps: 50,
+    campaigns: 50,
   },
   Scale: {
     emails_daily: 1000,
@@ -51,6 +84,14 @@ const PLAN_FEATURE_DEFAULTS = {
     campaigns: 100,
   },
   OWNER: {
+    emails_daily: null,
+    audits: null,
+    crawls: null,
+    meetings: null,
+    icps: null,
+    campaigns: null,
+  },
+  "Internal Owner": {
     emails_daily: null,
     audits: null,
     crawls: null,

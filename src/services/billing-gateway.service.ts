@@ -16,6 +16,7 @@ import { ForbiddenError, ValidationError } from "@/lib/api/response";
 import {
   getActionDef,
   INBOUND_EXEMPT_PURPOSES,
+  type ActionDef,
   type BillingAction,
 } from "@/lib/billing/actions";
 import { BILLING_REASONS, type BillingReason } from "@/lib/billing/reasons";
@@ -90,6 +91,37 @@ function isPlatformOwnerOrg(organizationId: string): boolean {
   return Boolean(id && organizationId === id);
 }
 
+function isMissingRelationError(err: unknown): boolean {
+  const msg = err instanceof Error ? err.message : String(err);
+  return (
+    /does not exist/i.test(msg) ||
+    /BillingAuthorization/i.test(msg) ||
+    /org_entitlement_overrides/i.test(msg) ||
+    /billing_authorizations/i.test(msg) ||
+    /Unknown arg/i.test(msg)
+  );
+}
+
+let schemaReadyCache: boolean | null = null;
+
+async function isBillingSchemaReady(): Promise<boolean> {
+  if (schemaReadyCache != null) return schemaReadyCache;
+  try {
+    await prisma.billingAuthorization.findFirst({ take: 1 });
+    schemaReadyCache = true;
+  } catch (err) {
+    if (isMissingRelationError(err)) {
+      schemaReadyCache = false;
+      console.warn(
+        "[billing] S2.5 tables missing — gateway in degraded mode until s25-apply"
+      );
+    } else {
+      throw err;
+    }
+  }
+  return schemaReadyCache;
+}
+
 async function lockOrgRow(tx: Tx, organizationId: string) {
   const rows = await tx.$queryRaw<
     Array<{
@@ -129,21 +161,33 @@ export class BillingGatewayService {
   ): Promise<{ enabled: boolean; limitValue: number | null; planName: string }> {
     const sub = await entitlementService.ensureSubscription(organizationId);
     const planFeat = sub.plan.features.find((f) => f.featureKey === featureKey);
-    const override = await prisma.orgEntitlementOverride.findUnique({
-      where: {
-        organizationId_key: { organizationId, key: featureKey },
-      },
-    });
 
     let enabled = planFeat?.enabled ?? false;
     let limitValue = planFeat?.limitValue ?? null;
 
-    if (override) {
-      if (override.enabled != null) enabled = override.enabled;
-      if (override.limitValue !== undefined) {
-        // Override may raise or lower; daily email special-cased elsewhere
-        limitValue = override.limitValue;
+    if (await isBillingSchemaReady()) {
+      try {
+        const override = await prisma.orgEntitlementOverride.findUnique({
+          where: {
+            organizationId_key: { organizationId, key: featureKey },
+          },
+        });
+        if (override) {
+          if (override.enabled != null) enabled = override.enabled;
+          if (override.limitValue !== undefined) {
+            limitValue = override.limitValue;
+          }
+        }
+      } catch (err) {
+        if (!isMissingRelationError(err)) throw err;
       }
+    }
+
+    // Feature keys not yet seeded on plan → treat as enabled with no limit
+    // (avoid blocking tenants before s25-apply seeds audits/crawls/etc.)
+    if (!planFeat) {
+      enabled = true;
+      limitValue = null;
     }
 
     return { enabled, limitValue, planName: sub.plan.name };
@@ -185,21 +229,28 @@ export class BillingGatewayService {
       input.idempotencyKey ??
       `${input.action}:${input.referenceType ?? "x"}:${input.referenceId ?? randomUUID()}:${randomUUID()}`;
 
-    const existing = await prisma.billingAuthorization.findUnique({
-      where: { idempotencyKey },
-    });
-    if (existing) {
-      if (
-        existing.status === BillingAuthStatus.AUTHORIZED ||
-        existing.status === BillingAuthStatus.COMMITTED
-      ) {
-        return {
-          allowed: true,
-          reservationId: existing.id,
-          credits: existing.credits,
-          skippedOwner: isPlatformOwnerOrg(input.organizationId),
-          alreadyExists: true,
-        };
+    const schemaReady = await isBillingSchemaReady();
+    if (schemaReady) {
+      try {
+        const existing = await prisma.billingAuthorization.findUnique({
+          where: { idempotencyKey },
+        });
+        if (existing) {
+          if (
+            existing.status === BillingAuthStatus.AUTHORIZED ||
+            existing.status === BillingAuthStatus.COMMITTED
+          ) {
+            return {
+              allowed: true,
+              reservationId: existing.id,
+              credits: existing.credits,
+              skippedOwner: isPlatformOwnerOrg(input.organizationId),
+              alreadyExists: true,
+            };
+          }
+        }
+      } catch (err) {
+        if (!isMissingRelationError(err)) throw err;
       }
     }
 
@@ -251,6 +302,11 @@ export class BillingGatewayService {
           message,
         };
       }
+    }
+
+    // Pre-apply degraded path: credit reserve only (no BillingAuthorization table).
+    if (!schemaReady) {
+      return this.authorizeDegraded(input, def, qty, purpose, exempt, idempotencyKey);
     }
 
     return prisma.$transaction(async (tx) => {
@@ -474,17 +530,107 @@ export class BillingGatewayService {
     });
   }
 
+  /** Pre-s25-apply: credits only, reservationId is ledger reserve key. */
+  private async authorizeDegraded(
+    input: AuthorizeInput,
+    def: ActionDef,
+    qty: number,
+    purpose: string,
+    exempt: boolean,
+    idempotencyKey: string
+  ): Promise<AuthorizeResult> {
+    const skippedOwner = isPlatformOwnerOrg(input.organizationId);
+    let credits = 0;
+    if (def.creditActionType && !skippedOwner) {
+      credits = await creditLedgerService.getPrice(
+        def.creditActionType,
+        input.keyMode ?? CreditKeyMode.BYOK
+      );
+    }
+    const reserveKey = `gw:deg:${idempotencyKey}`;
+    if (credits > 0 && !skippedOwner) {
+      try {
+        await creditLedgerService.reserve({
+          organizationId: input.organizationId,
+          actionType: def.creditActionType!,
+          idempotencyKey: reserveKey,
+          referenceType: input.referenceType,
+          referenceId: input.referenceId,
+          actorUserId: input.actorUserId,
+          keyMode: input.keyMode,
+          credits,
+        });
+      } catch (err) {
+        if (err instanceof ForbiddenError) {
+          return {
+            allowed: false,
+            reason: BILLING_REASONS.OUT_OF_CREDITS,
+            message: err.message,
+          };
+        }
+        throw err;
+      }
+    }
+    await this.recordUsageEvent(input, def.featureKey, qty, {
+      status: "authorized",
+      reservationId: reserveKey,
+      exempt,
+      degraded: true,
+      purpose,
+    });
+    return {
+      allowed: true,
+      reservationId: reserveKey,
+      credits: skippedOwner ? 0 : credits,
+      skippedOwner,
+      alreadyExists: false,
+    };
+  }
+
   async commit(input: {
     organizationId: string;
     reservationId: string;
     actorUserId?: string;
   }): Promise<{ ok: boolean; alreadyCommitted: boolean }> {
-    const auth = await prisma.billingAuthorization.findFirst({
-      where: {
-        id: input.reservationId,
-        organizationId: input.organizationId,
-      },
-    });
+    // Degraded mode reservationId === ledger reserve key
+    if (input.reservationId.startsWith("gw:deg:")) {
+      try {
+        await creditLedgerService.commit({
+          organizationId: input.organizationId,
+          reserveIdempotencyKey: input.reservationId,
+          actorUserId: input.actorUserId,
+        });
+      } catch (err) {
+        if (
+          err instanceof ValidationError &&
+          /Reservation not found/i.test(err.message)
+        ) {
+          // zero-credit degraded auth — nothing to commit
+          return { ok: true, alreadyCommitted: false };
+        }
+        throw err;
+      }
+      return { ok: true, alreadyCommitted: false };
+    }
+
+    if (!(await isBillingSchemaReady())) {
+      return { ok: true, alreadyCommitted: false };
+    }
+
+    let auth;
+    try {
+      auth = await prisma.billingAuthorization.findFirst({
+        where: {
+          id: input.reservationId,
+          organizationId: input.organizationId,
+        },
+      });
+    } catch (err) {
+      if (isMissingRelationError(err)) {
+        return { ok: true, alreadyCommitted: false };
+      }
+      throw err;
+    }
     if (!auth) throw new ValidationError("Reservation not found");
     if (auth.status === BillingAuthStatus.COMMITTED) {
       return { ok: true, alreadyCommitted: true };
@@ -560,12 +706,38 @@ export class BillingGatewayService {
     actorUserId?: string;
     reason?: string;
   }): Promise<{ ok: boolean; alreadyRefunded: boolean }> {
-    const auth = await prisma.billingAuthorization.findFirst({
-      where: {
-        id: input.reservationId,
-        organizationId: input.organizationId,
-      },
-    });
+    if (input.reservationId.startsWith("gw:deg:")) {
+      try {
+        await creditLedgerService.refund({
+          organizationId: input.organizationId,
+          reserveIdempotencyKey: input.reservationId,
+          actorUserId: input.actorUserId,
+          reason: input.reason ?? "action_failed",
+        });
+      } catch {
+        // zero-credit or already refunded
+      }
+      return { ok: true, alreadyRefunded: false };
+    }
+
+    if (!(await isBillingSchemaReady())) {
+      return { ok: true, alreadyRefunded: false };
+    }
+
+    let auth;
+    try {
+      auth = await prisma.billingAuthorization.findFirst({
+        where: {
+          id: input.reservationId,
+          organizationId: input.organizationId,
+        },
+      });
+    } catch (err) {
+      if (isMissingRelationError(err)) {
+        return { ok: true, alreadyRefunded: false };
+      }
+      throw err;
+    }
     if (!auth) throw new ValidationError("Reservation not found");
     if (auth.status === BillingAuthStatus.REFUNDED) {
       return { ok: true, alreadyRefunded: true };
@@ -692,44 +864,59 @@ export class BillingGatewayService {
     if (!effective.enabled) return 0;
 
     let byLimit = 10_000;
+    const schemaReady = await isBillingSchemaReady();
+
     if (def.period === "monthly" && def.metric && effective.limitValue != null) {
       const monthStart = periodStartUtc();
-      const committed = await this.committedUsage(
-        prisma,
-        organizationId,
-        def.metric,
-        monthStart
-      );
-      const inFlight = await this.inFlightUsage(
-        prisma,
-        organizationId,
-        def.featureKey,
-        "monthly",
-        monthStart
-      );
-      byLimit = Math.max(0, effective.limitValue - committed - inFlight);
+      try {
+        const committed = await this.committedUsage(
+          prisma,
+          organizationId,
+          def.metric,
+          monthStart
+        );
+        const inFlight = schemaReady
+          ? await this.inFlightUsage(
+              prisma,
+              organizationId,
+              def.featureKey,
+              "monthly",
+              monthStart
+            )
+          : 0;
+        byLimit = Math.max(0, effective.limitValue - committed - inFlight);
+      } catch (err) {
+        if (!isMissingRelationError(err)) throw err;
+        // New UsageMetric not in DB yet
+      }
     }
 
     if (def.dailyEmail) {
       const dailyCap = await this.getEffectiveDailyEmailLimit(organizationId);
       const dayStart = dayStartUtc();
-      const committedDaily = await this.committedUsage(
-        prisma,
-        organizationId,
-        "EMAILS_DAILY",
-        dayStart
-      );
-      const inFlightDaily = await this.inFlightUsage(
-        prisma,
-        organizationId,
-        FEATURE_KEYS.EMAILS,
-        "daily",
-        dayStart
-      );
-      byLimit = Math.min(
-        byLimit,
-        Math.max(0, dailyCap - committedDaily - inFlightDaily)
-      );
+      try {
+        const committedDaily = await this.committedUsage(
+          prisma,
+          organizationId,
+          "EMAILS_DAILY",
+          dayStart
+        );
+        const inFlightDaily = schemaReady
+          ? await this.inFlightUsage(
+              prisma,
+              organizationId,
+              FEATURE_KEYS.EMAILS,
+              "daily",
+              dayStart
+            )
+          : 0;
+        byLimit = Math.min(
+          byLimit,
+          Math.max(0, dailyCap - committedDaily - inFlightDaily)
+        );
+      } catch (err) {
+        if (!isMissingRelationError(err)) throw err;
+      }
     }
 
     if (def.creditActionType) {
@@ -829,22 +1016,31 @@ export class BillingGatewayService {
     periodStart: Date,
     qty: number
   ) {
-    await tx.usageRecord.upsert({
-      where: {
-        organizationId_metric_periodStart: {
+    try {
+      await tx.usageRecord.upsert({
+        where: {
+          organizationId_metric_periodStart: {
+            organizationId,
+            metric: metric as UsageMetric,
+            periodStart,
+          },
+        },
+        create: {
           organizationId,
           metric: metric as UsageMetric,
           periodStart,
+          quantity: qty,
         },
-      },
-      create: {
-        organizationId,
-        metric: metric as UsageMetric,
-        periodStart,
-        quantity: qty,
-      },
-      update: { quantity: { increment: qty } },
-    });
+        update: { quantity: { increment: qty } },
+      });
+    } catch (err) {
+      // New enum value not migrated yet — skip meter until s25-apply
+      if (!isMissingRelationError(err) && !/invalid input value for enum/i.test(
+        err instanceof Error ? err.message : ""
+      )) {
+        throw err;
+      }
+    }
   }
 
   private async recordUsageEvent(

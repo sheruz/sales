@@ -83,14 +83,11 @@ const envSchema = z.object({
    * If unset: treated as false + startup warning (see enforcement-flags.ts).
    * Per-org Organization.billingEnforcementEnabled also required for blocking.
    */
-  BILLING_ENFORCEMENT_ENABLED: z
-    .string()
-    .optional()
-    .transform((v) => {
-      if (v === undefined || v.trim() === "") return false;
-      const t = v.trim().toLowerCase();
-      return t === "true" || t === "1" || t === "yes";
-    }),
+  BILLING_ENFORCEMENT_ENABLED: z.preprocess((v) => {
+    if (v === undefined || v === null || v === "") return false;
+    const t = String(v).trim().toLowerCase();
+    return t === "true" || t === "1" || t === "yes";
+  }, z.boolean()),
   /** Minutes before an open RESERVE is auto-refunded. */
   CREDIT_RESERVE_TTL_MINUTES: z.coerce.number().default(15),
   AUTOPILOT_ENABLED: z.coerce.boolean().default(false),

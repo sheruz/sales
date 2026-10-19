@@ -66,7 +66,10 @@ async function main() {
     for (const plan of plans) {
       const defaults =
         PLAN_FEATURE_DEFAULTS[plan.name] ||
-        (plan.code === "OWNER" ? PLAN_FEATURE_DEFAULTS.OWNER : null);
+        (plan.code ? PLAN_FEATURE_DEFAULTS[plan.code] : null) ||
+        (plan.code === "OWNER" || plan.name === "OWNER"
+          ? PLAN_FEATURE_DEFAULTS.OWNER
+          : null);
       const missing = [];
       for (const key of NEW_FEATURE_KEYS) {
         const exists = plan.features.some((f) => f.featureKey === key);
