@@ -464,9 +464,10 @@ export function OutboundPanel({ initial }: Props) {
           <div>
             <CardTitle className="text-base">Outbound email</CardTitle>
             <CardDescription>
-              OFF by default. Only APPROVED pitches, US allow-list. Cron
-              respects Mon–Fri 8–11 prospect TZ; Process outbox sends queued
-              mail immediately. Sticky mailbox + compliance footer.
+              OFF by default. Only APPROVED pitches, US allow-list. Cron and
+              Process outbox only send rows that are due (sequence delay +
+              Mon–Fri 8–11 window). Follow-ups (day 3 / 7) stay queued until
+              then. Sticky mailbox + compliance footer.
             </CardDescription>
           </div>
           <div className="flex flex-wrap gap-2">

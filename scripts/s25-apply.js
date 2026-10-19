@@ -5,6 +5,8 @@
  *
  * Linux: backup → dry-run → GO → APPLY=1 node scripts/s25-apply.js → build → pm2 restart sales
  */
+const fs = require("fs");
+const path = require("path");
 const { execSync } = require("child_process");
 const {
   OWNER_ORG_NAME,
@@ -17,6 +19,13 @@ const {
   tableExists,
   enumHasValue,
 } = require("./s25-lib");
+
+async function applySchemaSql(prisma) {
+  const sqlPath = path.join(__dirname, "s25-schema.sql");
+  const sql = fs.readFileSync(sqlPath, "utf8");
+  // Split on semicolons carefully — our file uses DO $$ blocks with inner ;
+  await prisma.$executeRawUnsafe(sql);
+}
 
 async function ensureEnumValues(prisma) {
   for (const m of NEW_USAGE_METRICS) {
@@ -169,25 +178,34 @@ async function main() {
     process.exit(1);
   }
 
-  console.log("Running prisma db push / migrate for S2.5 schema…");
-  try {
-    execSync("npx prisma db push --skip-generate", {
-      stdio: "inherit",
-      env: process.env,
-    });
-  } catch (e) {
-    console.warn("prisma db push failed — continuing with raw SQL if possible", e.message);
-  }
-
   const prisma = createPrisma();
   try {
+    console.log("Applying S2.5 additive SQL (s25-schema.sql)…");
+    try {
+      await applySchemaSql(prisma);
+    } catch (e) {
+      console.warn("s25-schema.sql partial error (may already exist):", e.message);
+    }
     await ensureEnumValues(prisma);
-    // db push should create tables; verify
+
+    // Optional full push — off by default (hits unrelated index drift on prod).
+    if (process.env.S25_DB_PUSH === "1") {
+      console.log("S25_DB_PUSH=1 — running prisma db push…");
+      try {
+        execSync("npx prisma db push --skip-generate --accept-data-loss", {
+          stdio: "inherit",
+          env: process.env,
+        });
+      } catch (e) {
+        console.warn("prisma db push failed:", e.message);
+      }
+    }
+
     const hasAuth = await tableExists(prisma, "billing_authorizations");
     const hasOv = await tableExists(prisma, "org_entitlement_overrides");
     if (!hasAuth || !hasOv) {
       throw new Error(
-        "billing_authorizations / org_entitlement_overrides missing — run prisma migrate/db push"
+        "billing_authorizations / org_entitlement_overrides missing after s25-schema.sql"
       );
     }
 

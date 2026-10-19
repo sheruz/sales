@@ -34,12 +34,12 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(apiSuccess(result));
     }
     if (body.action === "send") {
-      // Manual Process outbox: send now (bypass Mon–Fri 8–11 window).
-      // Cron/tick still respects scheduledFor.
+      // Manual Process outbox: release fixable holds + send rows that are due.
+      // Always respects scheduledFor (day-3/day-7 delays). Does NOT burn follow-ups early.
       const result = await outboundJobService.processOutboxBatch(
         user.organizationId,
         limit,
-        { bypassSchedule: true }
+        { manual: true }
       );
       return NextResponse.json(apiSuccess(result));
     }

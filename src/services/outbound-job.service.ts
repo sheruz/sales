@@ -875,7 +875,12 @@ export class OutboundJobService {
       }
     }
 
-    const scheduledFor = nextSendWindowUtc(tz);
+    // Sequence delay (e.g. day 3 / day 7) MUST be honored. Then snap to Mon–Fri 8–11.
+    // Process outbox must never ignore this timestamp (see processOutboxBatch).
+    const delayMs = Math.max(0, step.delayMinutes ?? 0) * 60_000;
+    const notBefore = new Date(Date.now() + delayMs);
+    const scheduledFor =
+      nextSendWindowUtc(tz, notBefore) ?? notBefore;
 
     return prisma.emailOutbox.create({
       data: {
@@ -901,6 +906,8 @@ export class OutboundJobService {
           emailStyle,
           timezone: tz,
           timezoneSource: resolvedTz.from,
+          sequenceDelayMinutes: step.delayMinutes ?? 0,
+          notBefore: notBefore.toISOString(),
           tracked: true,
           ...threadMeta,
           headers: {
@@ -959,10 +966,21 @@ export class OutboundJobService {
   async processOutboxBatch(
     organizationId: string,
     limit = 5,
-    opts?: { bypassSchedule?: boolean }
+    opts?: {
+      /**
+       * Manual "Process outbox": release fixable HELD rows and send anything
+       * whose scheduledFor is due. Never ignores future scheduledFor — that
+       * would burn day-3/day-7 follow-ups early (seen in prod 2026-10-19).
+       */
+      manual?: boolean;
+      /** @deprecated use manual — kept so old callers compile */
+      bypassSchedule?: boolean;
+    }
   ) {
+    const manual = Boolean(opts?.manual || opts?.bypassSchedule);
+
     // Manual Process outbox: unblock fixable holds first (timezone / pitch)
-    if (opts?.bypassSchedule) {
+    if (manual) {
       await this.releaseFixableHolds(organizationId, limit);
     }
 
@@ -990,21 +1008,13 @@ export class OutboundJobService {
     const remaining = config.dailyGlobalCap - sentToday;
     const take = Math.min(limit, remaining, config.maxSendPerTick);
 
-    const scheduleFilter = opts?.bypassSchedule
-      ? {}
-      : {
-          OR: [
-            { scheduledFor: null },
-            { scheduledFor: { lte: now } },
-          ],
-        };
-
+    // Always respect scheduledFor (sequence delay + send window).
     const due = await prisma.emailOutbox.findMany({
       where: {
         organizationId,
         purpose: EmailOutboxPurpose.SEQUENCE,
         status: EmailOutboxStatus.QUEUED,
-        ...scheduleFilter,
+        OR: [{ scheduledFor: null }, { scheduledFor: { lte: now } }],
       },
       orderBy: { scheduledFor: "asc" },
       take,
@@ -1016,27 +1026,23 @@ export class OutboundJobService {
       },
     });
 
-    const waitingForWindow = opts?.bypassSchedule
-      ? 0
-      : await prisma.emailOutbox.count({
-          where: {
-            organizationId,
-            status: EmailOutboxStatus.QUEUED,
-            scheduledFor: { gt: now },
-          },
-        });
+    const waitingForWindow = await prisma.emailOutbox.count({
+      where: {
+        organizationId,
+        status: EmailOutboxStatus.QUEUED,
+        scheduledFor: { gt: now },
+      },
+    });
 
-    const nextWaiting = opts?.bypassSchedule
-      ? null
-      : await prisma.emailOutbox.findFirst({
-          where: {
-            organizationId,
-            status: EmailOutboxStatus.QUEUED,
-            scheduledFor: { gt: now },
-          },
-          orderBy: { scheduledFor: "asc" },
-          select: { scheduledFor: true },
-        });
+    const nextWaiting = await prisma.emailOutbox.findFirst({
+      where: {
+        organizationId,
+        status: EmailOutboxStatus.QUEUED,
+        scheduledFor: { gt: now },
+      },
+      orderBy: { scheduledFor: "asc" },
+      select: { scheduledFor: true },
+    });
 
     if (due.length === 0) {
       const stillHeld = await prisma.emailOutbox.count({
