@@ -291,6 +291,11 @@ export class MailboxPoolService {
         reasons.push(`${email}: status is ${m.status}`);
         continue;
       }
+      // B2: plan-limit soft pause — never send
+      if (m.pausedAt) {
+        reasons.push(`${email}: paused (plan limit)`);
+        continue;
+      }
 
       const domain = domainOf(email);
       if (cfg.pausedDomains.includes(domain)) {

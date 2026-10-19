@@ -25,6 +25,7 @@ function mockUser(overrides: Partial<AuthUser> = {}): AuthUser {
     avatarUrl: null,
     platformRole: null,
     isPlatformAdmin: false,
+    isPlatformOperator: false,
     organizationId: "org-a",
     organizationName: "Org A",
     organizationSlug: "org-a",
@@ -46,6 +47,7 @@ function roleUser(
     role: legacyRole,
     platformRole: null,
     isPlatformAdmin: false,
+    isPlatformOperator: false,
   });
 }
 
@@ -73,6 +75,7 @@ describe("Phase 1 — tenant isolation helpers", () => {
         mockUser({
           platformRole: 'SUPER_ADMIN' as const,
     isPlatformAdmin: true,
+    isPlatformOperator: true,
           organizationId: null,
           permissions: ["platform.manage"],
         })
@@ -84,6 +87,7 @@ describe("Phase 1 — tenant isolation helpers", () => {
     const sa = mockUser({
       platformRole: 'SUPER_ADMIN' as const,
     isPlatformAdmin: true,
+    isPlatformOperator: true,
       organizationId: "org-a",
       permissions: ["platform.manage"],
     });

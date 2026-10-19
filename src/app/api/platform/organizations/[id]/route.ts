@@ -2,7 +2,10 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { OrganizationStatus } from "@prisma/client";
 import { organizationService } from "@/services/organization.service";
-import { requireSuperAdmin } from "@/lib/auth/api-auth";
+import {
+  requirePlatformRead,
+  requireSuperAdminWrite,
+} from "@/lib/auth/api-auth";
 import { apiSuccess } from "@/lib/api/response";
 import { handleApiError } from "@/lib/api/error-handler";
 
@@ -12,7 +15,7 @@ interface Params {
 
 export async function GET(_request: NextRequest, { params }: Params) {
   try {
-    await requireSuperAdmin();
+    await requirePlatformRead();
     const { id } = await params;
     const org = await organizationService.getOrganization(id);
     return NextResponse.json(apiSuccess(org));
@@ -32,7 +35,7 @@ const updateSchema = z.object({
 
 export async function PATCH(request: NextRequest, { params }: Params) {
   try {
-    const actor = await requireSuperAdmin();
+    const actor = await requireSuperAdminWrite();
     const { id } = await params;
     const body = updateSchema.parse(await request.json());
     const org = await organizationService.updateOrganization(id, {

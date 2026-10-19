@@ -32,6 +32,7 @@ export const PERMISSION_KEYS = [
   "agent.manage",
   "agent.approve",
   "platform.manage",
+  "platform.view",
 ] as const;
 
 export type PermissionKey = (typeof PERMISSION_KEYS)[number];

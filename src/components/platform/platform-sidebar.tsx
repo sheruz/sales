@@ -10,6 +10,10 @@ import {
   Shield,
   Users,
   Activity,
+  Package,
+  Coins,
+  Gift,
+  ScrollText,
 } from "lucide-react";
 import {
   Sidebar,
@@ -30,6 +34,10 @@ import type { AuthUser } from "@/types/auth";
 const platformNav = [
   { title: "Overview", href: appOps(), icon: LayoutDashboard },
   { title: "Organizations", href: appOps("/companies"), icon: Building2 },
+  { title: "Packages", href: appOps("/packages"), icon: Package },
+  { title: "Credit prices", href: appOps("/credit-prices"), icon: Coins },
+  { title: "Top-ups", href: appOps("/top-ups"), icon: Gift },
+  { title: "Audit", href: appOps("/audit"), icon: ScrollText },
   { title: "All Users", href: appOps("/users"), icon: Users },
   { title: "Activity", href: appOps("/activity"), icon: Activity },
   { title: "Settings", href: appOps("/settings"), icon: Settings },

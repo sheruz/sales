@@ -1,14 +1,17 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { organizationService } from "@/services/organization.service";
-import { requireSuperAdmin } from "@/lib/auth/api-auth";
+import {
+  requirePlatformRead,
+  requireSuperAdminWrite,
+} from "@/lib/auth/api-auth";
 import { apiSuccess } from "@/lib/api/response";
 import { handleApiError } from "@/lib/api/error-handler";
 import { OrganizationStatus } from "@prisma/client";
 
 export async function GET() {
   try {
-    await requireSuperAdmin();
+    await requirePlatformRead();
     const orgs = await organizationService.listOrganizations();
     return NextResponse.json(apiSuccess(orgs));
   } catch (error) {
@@ -50,7 +53,7 @@ const createSchema = z.object({
 
 export async function POST(request: NextRequest) {
   try {
-    const actor = await requireSuperAdmin();
+    const actor = await requireSuperAdminWrite();
     const body = createSchema.parse(await request.json());
     const access =
       body.access.type === "complimentary"

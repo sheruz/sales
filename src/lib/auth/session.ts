@@ -61,6 +61,8 @@ async function buildAuthUser(
     );
     isPlatformAdmin = true;
   }
+  const isPlatformOperator =
+    isPlatformAdmin || platformRole === "PLATFORM_SUPPORT";
 
   let organizationId: string | null = null;
   let organizationName: string | null = null;
@@ -68,9 +70,11 @@ async function buildAuthUser(
   let organizationRoleKey: string | null = null;
   let permissions: AuthUser["permissions"] = [];
 
-  if (isPlatformAdmin) {
-    permissions = ["platform.manage"];
-    // Platform admins may optionally act inside an org for support
+  if (isPlatformOperator) {
+    permissions = isPlatformAdmin
+      ? ["platform.manage"]
+      : ["platform.view"];
+    // Platform operators may optionally act inside an org for support
     if (activeOrganizationId) {
       const org = await prisma.organization.findFirst({
         where: { id: activeOrganizationId, deletedAt: null },
@@ -79,14 +83,20 @@ async function buildAuthUser(
         organizationId = org.id;
         organizationName = org.name;
         organizationSlug = org.slug;
-        organizationRoleKey = "platform_admin";
+        organizationRoleKey = isPlatformAdmin
+          ? "platform_admin"
+          : "platform_support";
       }
     }
   } else {
     let orgId = activeOrganizationId;
     if (!orgId) {
       const primary = await prisma.organizationUser.findFirst({
-        where: { userId: user.id, status: "ACTIVE" },
+        where: {
+          userId: user.id,
+          status: "ACTIVE",
+          pausedAt: null,
+        },
         orderBy: [{ isPrimaryAdmin: "desc" }, { createdAt: "asc" }],
       });
       orgId = primary?.organizationId ?? null;
@@ -95,6 +105,25 @@ async function buildAuthUser(
     if (orgId) {
       const resolved = await resolveMembershipPermissions(user.id, orgId);
       if (resolved) {
+        // B2: plan-paused membership cannot use the org (login blocked at auth)
+        if (resolved.membership.pausedAt) {
+          return {
+            id: user.id,
+            email: user.email,
+            firstName: user.firstName,
+            lastName: user.lastName,
+            role: user.role,
+            platformRole,
+            avatarUrl: user.avatarUrl,
+            isPlatformAdmin,
+            isPlatformOperator,
+            organizationId: null,
+            organizationName: null,
+            organizationSlug: null,
+            organizationRoleKey: null,
+            permissions: [],
+          };
+        }
         organizationId = resolved.membership.organizationId;
         organizationName = resolved.membership.organization.name;
         organizationSlug = resolved.membership.organization.slug;
@@ -118,6 +147,7 @@ async function buildAuthUser(
     platformRole,
     avatarUrl: user.avatarUrl,
     isPlatformAdmin,
+    isPlatformOperator,
     organizationId,
     organizationName,
     organizationSlug,

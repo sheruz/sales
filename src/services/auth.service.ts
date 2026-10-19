@@ -82,18 +82,36 @@ export class AuthService {
 
     clearLoginFailures(normalized, ip);
 
-    const primaryMembership = await prisma.organizationUser.findFirst({
-      where: { userId: user.id, status: "ACTIVE" },
-      orderBy: [{ isPrimaryAdmin: "desc" }, { createdAt: "asc" }],
-    });
-
     const isPlatformAdmin =
       user.platformRole === "SUPER_ADMIN" ||
       user.role === UserRole.SUPER_ADMIN;
+    const isPlatformOperator =
+      isPlatformAdmin || user.platformRole === "PLATFORM_SUPPORT";
+
+    // B2: plan-paused membership cannot log in (data kept; primary admin never paused)
+    const primaryMembership = await prisma.organizationUser.findFirst({
+      where: {
+        userId: user.id,
+        status: "ACTIVE",
+        pausedAt: null,
+      },
+      orderBy: [{ isPrimaryAdmin: "desc" }, { createdAt: "asc" }],
+    });
+
+    if (!isPlatformOperator) {
+      const anyActive = await prisma.organizationUser.findFirst({
+        where: { userId: user.id, status: "ACTIVE" },
+      });
+      if (anyActive && !primaryMembership) {
+        throw new UnauthorizedError(
+          "Your seat is paused due to plan limits. Ask your admin to re-activate you or upgrade the plan."
+        );
+      }
+    }
 
     const token = await createSession(user.id, {
       ...meta,
-      organizationId: isPlatformAdmin
+      organizationId: isPlatformOperator
         ? null
         : primaryMembership?.organizationId ?? null,
     });

@@ -204,11 +204,16 @@ export class BillingGatewayService {
           },
         });
         if (override) {
-          if (override.enabled != null) enabled = override.enabled;
-          if (override.limitValue !== undefined) {
-            limitValue = override.limitValue;
+          // B2: treat past expiresAt as absent (lifecycle also deletes)
+          const expired =
+            override.expiresAt != null && override.expiresAt.getTime() <= Date.now();
+          if (!expired) {
+            if (override.enabled != null) enabled = override.enabled;
+            if (override.limitValue !== undefined) {
+              limitValue = override.limitValue;
+            }
+            found = true;
           }
-          found = true;
         }
       } catch (err) {
         if (!isMissingRelationError(err)) throw err;

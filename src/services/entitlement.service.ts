@@ -276,17 +276,19 @@ export class EntitlementService {
   }
 
   async getSeatCount(organizationId: string, featureKey: FeatureKey) {
+    // B2: plan-paused resources are excluded from seat counts
     switch (featureKey) {
       case FEATURE_KEYS.USERS:
         return prisma.organizationUser.count({
           where: {
             organizationId,
             status: MembershipStatus.ACTIVE,
+            pausedAt: null,
           },
         });
       case FEATURE_KEYS.SEQUENCES:
         return prisma.outreachSequence.count({
-          where: { organizationId },
+          where: { organizationId, pausedAt: null },
         });
       case FEATURE_KEYS.INBOX_ACCOUNTS:
         // Only live connected inboxes — DISCONNECTED / ERROR / DISABLED / PAUSED
@@ -303,19 +305,20 @@ export class EntitlementService {
           where: {
             organizationId,
             status: OutboundMailboxStatus.ACTIVE,
+            pausedAt: null,
           },
         });
       case FEATURE_KEYS.CONNECTORS:
         return prisma.sourceConnector.count({
-          where: { organizationId },
+          where: { organizationId, pausedAt: null },
         });
       case FEATURE_KEYS.ICPS:
         return prisma.icp.count({
-          where: { organizationId, status: "ACTIVE" },
+          where: { organizationId, status: "ACTIVE", pausedAt: null },
         });
       case FEATURE_KEYS.CAMPAIGNS:
         return prisma.campaign.count({
-          where: { organizationId, deletedAt: null },
+          where: { organizationId, deletedAt: null, pausedAt: null },
         });
       default:
         return 0;

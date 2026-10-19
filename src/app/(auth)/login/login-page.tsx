@@ -50,10 +50,13 @@ export default function LoginPage() {
         role?: string;
         platformRole?: string | null;
         isPlatformAdmin?: boolean;
+        isPlatformOperator?: boolean;
       };
       const isPlatform =
         u.isPlatformAdmin === true ||
+        u.isPlatformOperator === true ||
         u.platformRole === "SUPER_ADMIN" ||
+        u.platformRole === "PLATFORM_SUPPORT" ||
         u.role === "SUPER_ADMIN";
       let home = redirect;
       if (isPlatform) {

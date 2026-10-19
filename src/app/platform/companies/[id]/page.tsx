@@ -5,6 +5,8 @@ import { format } from "date-fns";
 import { organizationService } from "@/services/organization.service";
 import { OrganizationActions } from "@/components/platform/organization-actions";
 import { TenantLifecycleActions } from "@/components/platform/tenant-lifecycle-actions";
+import { TenantOverridesClient } from "@/components/platform/tenant-overrides-client";
+import { getCurrentUser } from "@/lib/auth/session";
 import { NotFoundError } from "@/lib/api/response";
 import {
   Card,
@@ -37,6 +39,9 @@ function statusVariant(status: string) {
 
 export default async function OrganizationDetailPage({ params }: PageProps) {
   const { id } = await params;
+  const user = await getCurrentUser();
+  const canWrite =
+    user?.platformRole === "SUPER_ADMIN" || !!user?.isPlatformAdmin;
 
   let org;
   try {
@@ -105,6 +110,8 @@ export default async function OrganizationDetailPage({ params }: PageProps) {
           <TenantLifecycleActions organizationId={org.id} />
         </div>
       </div>
+
+      <TenantOverridesClient organizationId={org.id} canWrite={canWrite} />
 
       <Card>
         <CardHeader>

@@ -82,22 +82,36 @@ type LedgerEntry = {
   createdAt: string;
 };
 
+type TopUpPack = {
+  id: string;
+  name: string;
+  credits: number;
+  price: string | number;
+  currency: string;
+};
+
 export function BillingPanel() {
   const [plans, setPlans] = useState<Plan[]>([]);
   const [billing, setBilling] = useState<BillingSnapshot | null>(null);
   const [ledger, setLedger] = useState<LedgerEntry[]>([]);
+  const [topUpPacks, setTopUpPacks] = useState<TopUpPack[]>([]);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const [plansRes, billingRes, creditsRes] = await Promise.all([
+      const [plansRes, billingRes, creditsRes, packsRes] = await Promise.all([
         fetch("/api/plans"),
         fetch("/api/billing"),
         fetch("/api/billing/credits?take=30"),
+        fetch("/api/billing/top-up-packs"),
       ]);
       const plansJson = await plansRes.json();
+      const packsJson = await packsRes.json();
+      if (packsJson.success) {
+        setTopUpPacks(packsJson.data.packs || []);
+      }
       const billingJson = await billingRes.json();
       const creditsJson = await creditsRes.json();
       if (plansJson.success) setPlans(plansJson.data);
@@ -272,6 +286,43 @@ export function BillingPanel() {
                 </ul>
               </div>
             )}
+          </CardContent>
+        </Card>
+      )}
+
+      {topUpPacks.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">Credit top-up packs</CardTitle>
+            <CardDescription>
+              Contact us to buy — online checkout comes in a later release.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="grid gap-3 sm:grid-cols-3">
+            {topUpPacks.map((p) => (
+              <div
+                key={p.id}
+                className="rounded-md border px-3 py-3 text-sm space-y-2"
+              >
+                <div className="font-medium">{p.name}</div>
+                <div className="text-muted-foreground">
+                  {p.credits.toLocaleString()} credits · {p.currency}{" "}
+                  {String(p.price)}
+                </div>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() =>
+                    toast.message("Contact us to buy this pack", {
+                      description:
+                        "Online top-up checkout is not enabled yet. Ask your Delvix contact or Super Admin.",
+                    })
+                  }
+                >
+                  Contact us to buy
+                </Button>
+              </div>
+            ))}
           </CardContent>
         </Card>
       )}

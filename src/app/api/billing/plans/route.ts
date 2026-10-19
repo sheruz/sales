@@ -3,9 +3,9 @@ import { requireBillingAccess } from "@/lib/auth/require-module";
 import { apiSuccess } from "@/lib/api/response";
 import { handleApiError } from "@/lib/api/error-handler";
 import prisma from "@/lib/db/prisma";
-import { PlanVisibility } from "@prisma/client";
+import { PlanVersionStatus, PlanVisibility } from "@prisma/client";
 
-/** Public catalog for Choose Plan — current published versions only. */
+/** Public catalog for Choose Plan — current published versions only (never drafts). */
 export async function GET() {
   try {
     await requireBillingAccess();
@@ -19,9 +19,7 @@ export async function GET() {
       orderBy: { sortOrder: "asc" },
       include: {
         versions: {
-          where: {
-            // only current published
-          },
+          where: { status: PlanVersionStatus.PUBLISHED },
           include: { features: true },
           orderBy: { version: "desc" },
           take: 5,
@@ -34,7 +32,10 @@ export async function GET() {
         const version =
           p.versions.find((v) => v.id === p.currentVersionId) ??
           p.versions[0];
-        if (!version) return null;
+        // Never expose DRAFT versions on Choose Plan
+        if (!version || version.status !== PlanVersionStatus.PUBLISHED) {
+          return null;
+        }
         return {
           id: p.id,
           code: p.code,

@@ -27,7 +27,7 @@ export default async function PlatformLayout({
     redirect("/login");
   }
 
-  if (!user.isPlatformAdmin) {
+  if (!user.isPlatformOperator && !user.isPlatformAdmin) {
     redirect(appHome());
   }
 

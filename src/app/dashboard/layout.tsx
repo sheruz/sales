@@ -11,6 +11,7 @@ import { getAutopilotShellStatus } from "@/lib/autopilot/shell-status";
 import { hasOrgPermission } from "@/lib/tenant/scope";
 import { tenantAccessService } from "@/services/tenant-access.service";
 import prisma from "@/lib/db/prisma";
+import { PlanLimitNoticeBanner } from "@/components/billing/plan-limit-notice-banner";
 
 export const dynamic = "force-dynamic";
 
@@ -59,7 +60,7 @@ export default async function DashboardLayout({
     redirect("/login");
   }
 
-  if (user.isPlatformAdmin) {
+  if (user.isPlatformAdmin || user.isPlatformOperator) {
     redirect(appOps());
   }
 
@@ -126,6 +127,7 @@ export default async function DashboardLayout({
       />
       <SidebarInset className="min-h-svh min-w-0 overflow-hidden">
         <DashboardHeader user={user} />
+        <PlanLimitNoticeBanner />
         <div className="dx w-full min-w-0 flex-1 overflow-x-hidden overflow-y-auto">
           {children}
         </div>

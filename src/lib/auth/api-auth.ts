@@ -127,6 +127,43 @@ export async function requireSuperAdmin(): Promise<AuthUser> {
   throw new ForbiddenError();
 }
 
+/**
+ * B2: SUPER_ADMIN or PLATFORM_SUPPORT may read Platform Packages / prices / top-ups / tenants / audit.
+ */
+export async function requirePlatformRead(): Promise<AuthUser> {
+  const user = await requireUser();
+  if (
+    user.platformRole === "SUPER_ADMIN" ||
+    user.platformRole === "PLATFORM_SUPPORT" ||
+    user.isPlatformAdmin ||
+    user.isPlatformOperator
+  ) {
+    return user;
+  }
+  throw new ForbiddenError();
+}
+
+/**
+ * B2: only SUPER_ADMIN may mutate platform billing/package state.
+ * PLATFORM_SUPPORT → 403.
+ */
+export async function requireSuperAdminWrite(): Promise<AuthUser> {
+  const user = await requireUser();
+  if (user.platformRole === "SUPER_ADMIN" || user.isPlatformAdmin) {
+    if (user.platformRole !== "SUPER_ADMIN" && user.role === "SUPER_ADMIN") {
+      console.warn(
+        "[auth] requireSuperAdminWrite legacy fallback (UserRole.SUPER_ADMIN)",
+        { userId: user.id }
+      );
+    }
+    return user;
+  }
+  if (user.platformRole === "PLATFORM_SUPPORT") {
+    throw new ForbiddenError("PLATFORM_SUPPORT is read-only");
+  }
+  throw new ForbiddenError();
+}
+
 export async function requireOrganizationContext(): Promise<
   AuthUser & { organizationId: string }
 > {

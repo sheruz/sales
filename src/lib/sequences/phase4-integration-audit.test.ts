@@ -28,6 +28,7 @@ function mockUser(overrides: Partial<AuthUser> = {}): AuthUser {
     avatarUrl: null,
     platformRole: null,
     isPlatformAdmin: false,
+    isPlatformOperator: false,
     organizationId: "org-a",
     organizationName: "Org A",
     organizationSlug: "org-a",
@@ -114,6 +115,7 @@ describe("Phase 4 audit — permission matrix vs frontend intent", () => {
     const platform = mockUser({
       platformRole: 'SUPER_ADMIN' as const,
     isPlatformAdmin: true,
+    isPlatformOperator: true,
       role: UserRole.SUPER_ADMIN,
       organizationRoleKey: ROLE_KEYS.VIEWER,
       permissions: ROLE_PERMISSION_MAP.viewer,

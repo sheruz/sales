@@ -13,6 +13,8 @@ export interface AuthUser {
   avatarUrl: string | null;
   /** True when platformRole is SUPER_ADMIN (legacy UserRole.SUPER_ADMIN during transition) */
   isPlatformAdmin: boolean;
+  /** B2: SUPER_ADMIN or PLATFORM_SUPPORT — may enter /platform (writes still SUPER_ADMIN only) */
+  isPlatformOperator: boolean;
   /** Active organization for this session (null for platform-only) */
   organizationId: string | null;
   organizationName: string | null;

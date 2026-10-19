@@ -1104,13 +1104,54 @@ export class OutboundJobService {
     const item = await prisma.emailOutbox.findFirst({
       where: { id: outboxId, organizationId },
       include: {
-        enrollment: true,
+        enrollment: {
+          include: {
+            sequence: { select: { id: true, pausedAt: true, status: true } },
+            campaign: { select: { id: true, pausedAt: true, status: true } },
+          },
+        },
         contact: true,
         company: true,
         emailAccount: true,
+        outboundMailbox: { select: { id: true, pausedAt: true, status: true } },
       },
     });
     if (!item) return { id: outboxId, status: "error", reason: "missing" };
+
+    // B2: plan-paused mailbox / campaign / sequence never sends
+    if (item.outboundMailbox?.pausedAt) {
+      await prisma.emailOutbox.update({
+        where: { id: outboxId },
+        data: {
+          status: EmailOutboxStatus.HELD,
+          heldReason: "mailbox_paused",
+          lastError: "Mailbox paused due to plan limits",
+        },
+      });
+      return { id: outboxId, status: "held", reason: "mailbox_paused" };
+    }
+    if (item.enrollment?.sequence?.pausedAt) {
+      await prisma.emailOutbox.update({
+        where: { id: outboxId },
+        data: {
+          status: EmailOutboxStatus.HELD,
+          heldReason: "sequence_paused",
+          lastError: "Sequence paused due to plan limits",
+        },
+      });
+      return { id: outboxId, status: "held", reason: "sequence_paused" };
+    }
+    if (item.enrollment?.campaign?.pausedAt) {
+      await prisma.emailOutbox.update({
+        where: { id: outboxId },
+        data: {
+          status: EmailOutboxStatus.HELD,
+          heldReason: "campaign_paused",
+          lastError: "Campaign paused due to plan limits",
+        },
+      });
+      return { id: outboxId, status: "held", reason: "campaign_paused" };
+    }
 
     // Re-check country + suppression at send
     if (!isCountryAllowed(item.company?.country, cfg.countryAllowList)) {

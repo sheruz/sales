@@ -777,6 +777,7 @@ model Organization {
   creditLedgerEntries CreditLedgerEntry[]
   billingAuthorizations BillingAuthorization[]
   entitlementOverrides OrgEntitlementOverride[]
+  planLimitNotices     PlanLimitNotice[]
 
   /// S2 cached credit balance (absolute). Reconcile from ledger.
   creditBalanceCached       Int       @default(0) @map("credit_balance_cached")
@@ -864,6 +865,10 @@ model OrganizationUser {
   invitedAt        DateTime?        @map("invited_at")
   joinedAt         DateTime?        @map("joined_at")
   lastActiveAt     DateTime?        @map("last_active_at")
+  /// B2 plan-limit pause (soft). Never set on primary company_admin.
+  pausedAt         DateTime?        @map("paused_at")
+  pauseReason      String?          @map("pause_reason")
+  pauseNoticeAt    DateTime?        @map("pause_notice_at")
   createdAt        DateTime         @default(now()) @map("created_at")
   updatedAt        DateTime         @updatedAt @map("updated_at")
 
@@ -875,6 +880,7 @@ model OrganizationUser {
   @@index([userId])
   @@index([roleId])
   @@index([status])
+  @@index([pausedAt])
   @@map("organization_users")
 }
 
@@ -1335,6 +1341,10 @@ model SourceConnector {
   configuration         Json?
   lastSyncAt            DateTime?             @map("last_sync_at")
   lastError             String?               @map("last_error")
+  /// B2 plan-limit pause (soft)
+  pausedAt              DateTime?             @map("paused_at")
+  pauseReason           String?               @map("pause_reason")
+  pauseNoticeAt         DateTime?             @map("pause_notice_at")
   createdAt             DateTime              @default(now()) @map("created_at")
   updatedAt             DateTime              @updatedAt @map("updated_at")
 
@@ -1345,6 +1355,7 @@ model SourceConnector {
   @@index([organizationId])
   @@index([type])
   @@index([status])
+  @@index([pausedAt])
   @@unique([organizationId, type, provider, name])
   @@map("source_connectors")
 }
@@ -1659,6 +1670,10 @@ model Campaign {
   aiInstructions    String?        @map("ai_instructions")
   dailyOutreachLimit Int           @default(50) @map("daily_outreach_limit")
   status            CampaignStatus @default(DRAFT)
+  /// B2 plan-limit pause (soft) — paused campaigns never send
+  pausedAt          DateTime?      @map("paused_at")
+  pauseReason       String?        @map("pause_reason")
+  pauseNoticeAt     DateTime?      @map("pause_notice_at")
   createdAt         DateTime       @default(now()) @map("created_at")
   updatedAt         DateTime       @updatedAt @map("updated_at")
   deletedAt         DateTime?      @map("deleted_at")
@@ -1679,6 +1694,7 @@ model Campaign {
   @@index([organizationId])
   @@index([status])
   @@index([defaultSequenceId])
+  @@index([pausedAt])
   @@map("campaigns")
 }
 
@@ -1955,6 +1971,10 @@ model OutboundMailbox {
   senderPhotoPath  String?               @map("sender_photo_path")
   /// Allow gmail.com / outlook.com / yahoo.com as From domain (default blocked)
   allowFreeMailProvider Boolean          @default(false) @map("allow_free_mail_provider")
+  /// B2 plan-limit pause (soft) — paused mailboxes never send
+  pausedAt         DateTime?             @map("paused_at")
+  pauseReason      String?               @map("pause_reason")
+  pauseNoticeAt    DateTime?             @map("pause_notice_at")
   createdAt        DateTime              @default(now()) @map("created_at")
   updatedAt        DateTime              @updatedAt @map("updated_at")
 
@@ -1963,6 +1983,7 @@ model OutboundMailbox {
   outboxItems  EmailOutbox[]
 
   @@index([organizationId, status])
+  @@index([pausedAt])
   @@map("outbound_mailboxes")
 }
 
@@ -2255,6 +2276,10 @@ model OutreachSequence {
   stopOnUnsubscribe Boolean                @default(true) @map("stop_on_unsubscribe")
   /// Phase 4 — default Cold outreach sequence for autopilot enroll
   isAutopilotDefault Boolean               @default(false) @map("is_autopilot_default")
+  /// B2 plan-limit pause (soft) — paused sequences never send
+  pausedAt          DateTime?              @map("paused_at")
+  pauseReason       String?                @map("pause_reason")
+  pauseNoticeAt     DateTime?              @map("pause_notice_at")
   createdAt         DateTime               @default(now()) @map("created_at")
   updatedAt         DateTime               @updatedAt @map("updated_at")
 
@@ -2266,6 +2291,7 @@ model OutreachSequence {
   @@index([organizationId])
   @@index([status])
   @@index([organizationId, isAutopilotDefault])
+  @@index([pausedAt])
   @@map("outreach_sequences")
 }
 
@@ -2891,6 +2917,10 @@ model Icp {
   exclusions           String[]          @default([])
   priority             Int               @default(0)
   status               CatalogItemStatus @default(ACTIVE)
+  /// B2 plan-limit pause (soft)
+  pausedAt             DateTime?         @map("paused_at")
+  pauseReason          String?           @map("pause_reason")
+  pauseNoticeAt        DateTime?         @map("pause_notice_at")
   createdAt            DateTime          @default(now()) @map("created_at")
   updatedAt            DateTime          @updatedAt @map("updated_at")
 
@@ -2898,6 +2928,7 @@ model Icp {
 
   @@index([organizationId])
   @@index([status])
+  @@index([pausedAt])
   @@map("icps")
 }
 
@@ -3251,6 +3282,19 @@ enum PlanVisibility {
   DRAFT
 }
 
+/// B2: draft PlanVersion rows are editor-only; published are immutable.
+enum PlanVersionStatus {
+  DRAFT
+  PUBLISHED
+}
+
+/// B2: seat-limit reduction notice window.
+enum PlanLimitNoticeStatus {
+  PENDING
+  RESOLVED
+  APPLIED
+}
+
 enum TenantIntegrationStatus {
   CONNECTED
   NEEDS_RECONNECT
@@ -3327,31 +3371,42 @@ model Plan {
   @@map("plans")
 }
 
-/// Immutable package snapshot (B1). Subscriptions pin a version for grandfathering.
+/// Package snapshot (B1). Published versions are immutable; drafts are editable (B2).
 model PlanVersion {
-  id                      String   @id @default(uuid())
-  planId                  String   @map("plan_id")
+  id                      String            @id @default(uuid())
+  planId                  String            @map("plan_id")
   version                 Int
-  priceMonthly            Decimal  @map("price_monthly") @db.Decimal(12, 2)
-  priceYearly             Decimal  @map("price_yearly") @db.Decimal(12, 2)
-  currency                String   @default("USD")
-  monthlyCredits          Int?     @map("monthly_credits")
-  creditRolloverEnabled   Boolean  @default(false) @map("credit_rollover_enabled")
+  /// B2: DRAFT = editor working copy; PUBLISHED = immutable history
+  status                  PlanVersionStatus @default(PUBLISHED)
+  /// B2 optimistic lock for draft saves
+  editorRevision          Int               @default(0) @map("editor_revision")
+  priceMonthly            Decimal           @map("price_monthly") @db.Decimal(12, 2)
+  priceYearly             Decimal           @map("price_yearly") @db.Decimal(12, 2)
+  currency                String            @default("USD")
+  monthlyCredits          Int?              @map("monthly_credits")
+  creditRolloverEnabled   Boolean           @default(false) @map("credit_rollover_enabled")
   /// Max months of unused credits that may roll (null = none / N/A)
-  creditRolloverCapMonths Int?     @map("credit_rollover_cap_months")
-  stripePriceIdMonthly    String?  @map("stripe_price_id_monthly")
-  stripePriceIdYearly     String?  @map("stripe_price_id_yearly")
+  creditRolloverCapMonths Int?              @map("credit_rollover_cap_months")
+  stripePriceIdMonthly    String?           @map("stripe_price_id_monthly")
+  stripePriceIdYearly     String?           @map("stripe_price_id_yearly")
   notes                   String?
-  createdByUserId         String?  @map("created_by_user_id")
-  createdAt               DateTime @default(now()) @map("created_at")
+  createdByUserId         String?           @map("created_by_user_id")
+  publishedAt             DateTime?         @map("published_at")
+  publishedByUserId       String?           @map("published_by_user_id")
+  /// now | renewal | new_subscribers_only
+  applyMode               String?           @map("apply_mode")
+  createdAt               DateTime          @default(now()) @map("created_at")
+  updatedAt               DateTime          @updatedAt @map("updated_at")
 
   plan                   Plan                    @relation(fields: [planId], references: [id], onDelete: Cascade)
   features               PlanVersionFeature[]
   subscriptions          Subscription[]          @relation("SubPlanVersion")
   pendingSubscriptions   Subscription[]          @relation("SubPendingPlanVersion")
+  limitNotices           PlanLimitNotice[]
 
   @@unique([planId, version])
   @@index([planId])
+  @@index([status])
   @@map("plan_versions")
 }
 
@@ -3787,24 +3842,72 @@ model BillingAuthorization {
   @@map("billing_authorizations")
 }
 
-/// Per-tenant entitlement overrides (plan ∪ override). UI in S3; script/API now.
+/// Per-tenant entitlement overrides (plan ∪ override). UI in B2.
 model OrgEntitlementOverride {
-  id             String   @id @default(uuid())
-  organizationId String   @map("organization_id")
+  id             String    @id @default(uuid())
+  organizationId String    @map("organization_id")
   key            String
-  limitValue     Int?     @map("limit_value")
+  limitValue     Int?      @map("limit_value")
   /// null = do not override plan enabled flag
   enabled        Boolean?
   reason         String?
-  setByUserId    String?  @map("set_by_user_id")
-  createdAt      DateTime @default(now()) @map("created_at")
-  updatedAt      DateTime @updatedAt @map("updated_at")
+  setByUserId    String?   @map("set_by_user_id")
+  /// B2: optional expiry — lifecycle job removes when past
+  expiresAt      DateTime? @map("expires_at")
+  createdAt      DateTime  @default(now()) @map("created_at")
+  updatedAt      DateTime  @updatedAt @map("updated_at")
 
   organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
 
   @@unique([organizationId, key])
   @@index([organizationId])
+  @@index([expiresAt])
   @@map("org_entitlement_overrides")
+}
+
+/// B2: credit top-up packs (purchase in B3; SA grant + "Contact us" in B2).
+model TopUpPack {
+  id          String    @id @default(uuid())
+  name        String
+  credits     Int
+  price       Decimal   @db.Decimal(12, 2)
+  currency    String    @default("USD")
+  active      Boolean   @default(true)
+  sortOrder   Int       @default(0) @map("sort_order")
+  archivedAt  DateTime? @map("archived_at")
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+
+  @@index([active])
+  @@index([archivedAt])
+  @@map("top_up_packs")
+}
+
+/// B2: when limits drop below usage, tenant gets a notice window to choose what stays.
+model PlanLimitNotice {
+  id              String                @id @default(uuid())
+  organizationId  String                @map("organization_id")
+  featureKey      String                @map("feature_key")
+  allowedCount    Int                   @map("allowed_count")
+  planVersionId   String?               @map("plan_version_id")
+  status          PlanLimitNoticeStatus @default(PENDING)
+  noticeAt        DateTime              @map("notice_at")
+  deadlineAt      DateTime              @map("deadline_at")
+  /// Resource ids the tenant chose to keep active
+  selectedIds     String[]              @default([]) @map("selected_ids")
+  resolvedAt      DateTime?             @map("resolved_at")
+  appliedAt       DateTime?             @map("applied_at")
+  emailStubSentAt DateTime?             @map("email_stub_sent_at")
+  createdAt       DateTime              @default(now()) @map("created_at")
+  updatedAt       DateTime              @updatedAt @map("updated_at")
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  planVersion  PlanVersion? @relation(fields: [planVersionId], references: [id], onDelete: SetNull)
+
+  @@index([organizationId, status])
+  @@index([deadlineAt])
+  @@index([featureKey])
+  @@map("plan_limit_notices")
 }
 
 /// Every super-admin write is audited here.

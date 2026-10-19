@@ -59,6 +59,8 @@ export async function POST(request: NextRequest) {
         graceSuspended: 0,
         cancelReadOnly: 0,
         pendingVersionsApplied: 0,
+        overridesExpired: 0,
+        pauseNoticesApplied: 0,
       };
       try {
         lifecycle = await billingLifecycleService.runDaily();
