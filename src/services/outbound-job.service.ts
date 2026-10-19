@@ -31,11 +31,7 @@ import { isEnrollableVerification } from "@/lib/enrichment/verification";
 import type { EmailVerificationStatus } from "@/lib/enrichment/types";
 import { isCountryAllowed } from "@/lib/outbound/country-allowlist";
 import { isInboundSourceKey } from "@/lib/inbound/constants";
-import {
-  appendComplianceFooter,
-  buildListUnsubscribeHeaders,
-  countHttpLinks,
-} from "@/lib/outbound/compliance";
+import { buildListUnsubscribeHeaders } from "@/lib/outbound/compliance";
 import {
   COLD_OUTREACH_NAME,
   COLD_OUTREACH_STEPS,
@@ -674,7 +670,7 @@ export class OutboundJobService {
     });
 
     // Always BRANDED HTML template — never queue/send plain-text outreach.
-    const emailStyle: "BRANDED" | "PLAIN" = "BRANDED";
+    const emailStyle = "BRANDED" as const;
 
     const vars = buildSequenceTemplateVars({
       contact: enrollment.contact,
@@ -844,36 +840,10 @@ export class OutboundJobService {
       });
     }
 
-    // PLAIN: keep link budget; BRANDED has CTAs by design
-    if (
-      emailStyle === "PLAIN" &&
-      countHttpLinks(rendered.text) > 3
-    ) {
-      return prisma.emailOutbox.create({
-        data: {
-          ...heldBase,
-          bodyText: rendered.text,
-          bodyHtml: rendered.html,
-          heldReason: "too_many_links",
-          outboundMailboxId: pool?.id ?? null,
-        },
-      });
-    }
+    // BRANDED only — compliance/unsub live in the HTML template
+    const bodyText = rendered.text;
 
-    const bodyText =
-      emailStyle === "PLAIN"
-        ? appendComplianceFooter(rendered.text, {
-            businessName:
-              sender.companyLegalName ||
-              cfg.businessName ||
-              enrollment.organization.name,
-            physicalAddress:
-              sender.businessAddress || cfg.physicalAddress,
-            unsubscribeUrl: unsub,
-          })
-        : rendered.text;
-
-    // Thread follow-ups (PLAIN) to prior sent message
+    // Thread follow-ups to prior sent message
     let threadMeta: Record<string, unknown> = {};
     if (step.stepOrder > 1) {
       const prior = await prisma.emailOutbox.findFirst({
