@@ -673,15 +673,38 @@ export class EnrichmentJobService {
     config: EnrichmentConfig,
     userId?: string
   ) {
-    const domain = (
-      await prisma.company.findFirst({
-        where: { id: company.id, organizationId },
-        select: { normalizedDomain: true, domain: true },
-      })
-    );
-    const domainStr = (domain?.normalizedDomain || domain?.domain || "")
+    // Always reload company + crawl emails at enrich time (post-crawl freshness).
+    const fresh = await prisma.company.findFirst({
+      where: { id: company.id, organizationId, deletedAt: null },
+      select: {
+        id: true,
+        normalizedDomain: true,
+        domain: true,
+        crawlStatus: true,
+        crawledAt: true,
+        enrichmentAttempts: true,
+        emails: {
+          orderBy: { createdAt: "desc" },
+          select: { email: true, type: true },
+        },
+      },
+    });
+    if (!fresh) throw new ValidationError("Company not found");
+    if (
+      fresh.crawlStatus !== CompanyCrawlStatus.DONE &&
+      fresh.crawlStatus !== CompanyCrawlStatus.BLOCKED
+    ) {
+      throw new ValidationError(
+        "crawl_not_ready: Crawl not finished — enrich after crawl completes"
+      );
+    }
+
+    const domainStr = (fresh.normalizedDomain || fresh.domain || "")
       .toLowerCase()
       .replace(/^www\./, "");
+    const crawlEmails = fresh.emails;
+    const enrichmentAttempts =
+      fresh.enrichmentAttempts ?? company.enrichmentAttempts ?? 0;
 
     const provider = await hunterService.getProvider(organizationId, userId);
 
@@ -749,7 +772,7 @@ export class EnrichmentJobService {
 
       if (!person) {
         const generic = pickBestGenericEmail(
-          company.emails.map((e) => ({
+          crawlEmails.map((e) => ({
             email: e.email,
             type: e.type ?? undefined,
           }))
@@ -885,7 +908,7 @@ export class EnrichmentJobService {
         const planLimit = isHunterPlanLimit(message);
         const attempts = planLimit
           ? config.maxAttempts
-          : Number(company.enrichmentAttempts ?? 0) + 1;
+          : Number(enrichmentAttempts) + 1;
         await prisma.company.update({
           where: { id: company.id },
           data: {
@@ -918,6 +941,25 @@ export class EnrichmentJobService {
       );
     }
 
+    // Drain pending crawls first so Enrich now always sees latest website emails.
+    let crawlDrained = 0;
+    try {
+      const { sourcingJobService } = await import(
+        "@/services/sourcing-job.service"
+      );
+      const crawlCfg = await sourcingJobService.getConfig(organizationId);
+      const crawlBatch = await sourcingJobService.processCrawlBatch(
+        organizationId,
+        Math.max(crawlCfg.crawlsPerTick, limit)
+      );
+      crawlDrained = Array.isArray(crawlBatch) ? crawlBatch.length : 0;
+    } catch (err) {
+      console.warn(
+        "[enrichment] pre-enrich crawl drain failed",
+        err instanceof Error ? err.message : err
+      );
+    }
+
     let creditsRemaining: number | null = null;
     try {
       const provider = await hunterService.getProvider(organizationId, userId);
@@ -934,12 +976,16 @@ export class EnrichmentJobService {
     }
 
     const take = Math.min(25, Math.max(1, limit));
-    // Newest sourced companies first so a fresh ICP run is enriched before old backlog
+    // Prefer most recently crawled companies so post-crawl Enrich now uses fresh data
     const companies = await prisma.company.findMany({
       where: this.pendingEnrichmentWhere(organizationId, config),
-      orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+      orderBy: [
+        { crawledAt: "desc" },
+        { createdAt: "desc" },
+        { id: "desc" },
+      ],
       take,
-      select: { id: true, domain: true, enrichmentStatus: true },
+      select: { id: true, domain: true, enrichmentStatus: true, crawledAt: true },
     });
 
     const results: Array<{
@@ -986,10 +1032,20 @@ export class EnrichmentJobService {
         });
         if (one.status === "PAUSED") break; // resume next cron tick
       } catch (err) {
+        const msg = err instanceof Error ? err.message : "failed";
+        if (/crawl_not_ready/i.test(msg)) {
+          results.push({
+            companyId: c.id,
+            status: "SKIPPED",
+            skippedReason: "crawl_not_ready",
+            error: msg,
+          });
+          continue;
+        }
         results.push({
           companyId: c.id,
           status: "FAILED",
-          error: err instanceof Error ? err.message : "failed",
+          error: msg,
         });
         if (
           err instanceof ValidationError &&
@@ -1000,7 +1056,12 @@ export class EnrichmentJobService {
       }
     }
 
-    return { processed: results.length, results, creditsRemaining };
+    return {
+      processed: results.length,
+      results,
+      creditsRemaining,
+      crawlDrained,
+    };
   }
 
   async processTickForOrg(organizationId: string) {
