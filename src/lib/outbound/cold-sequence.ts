@@ -22,7 +22,8 @@ export const COLD_OUTREACH_STEPS = [
   {
     stepOrder: 2,
     delayMinutes: 3 * 24 * 60,
-    emailStyle: "PLAIN" as const,
+    // Always BRANDED HTML template — never plain text
+    emailStyle: "BRANDED" as const,
     subjectTemplate: `Re: {{company_name}} - quick idea`,
     bodyTemplate: `{{greeting}}
 
@@ -35,7 +36,7 @@ Happy to share a short example of {{recommended_service}} if useful.`,
   {
     stepOrder: 3,
     delayMinutes: 7 * 24 * 60,
-    emailStyle: "PLAIN" as const,
+    emailStyle: "BRANDED" as const,
     subjectTemplate: `Re: {{company_name}} - quick idea`,
     bodyTemplate: `{{greeting}}
 

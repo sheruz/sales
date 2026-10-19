@@ -65,7 +65,7 @@ function newStep(order: number, key?: string): BuilderStep {
     channel: "EMAIL",
     subjectTemplate: "",
     bodyTemplate: "",
-    emailStyle: order <= 1 ? "BRANDED" : "PLAIN",
+    emailStyle: "BRANDED",
     isActive: true,
   };
 }
@@ -100,7 +100,7 @@ export function SequenceBuilder({
               : "EMAIL",
           subjectTemplate: s.subjectTemplate ?? "",
           bodyTemplate: s.bodyTemplate,
-          emailStyle: s.emailStyle === "BRANDED" ? "BRANDED" : "PLAIN",
+          emailStyle: "BRANDED",
           isActive: s.isActive,
         }))
       : [newStep(0)]
@@ -213,7 +213,7 @@ export function SequenceBuilder({
           channel: s.channel,
           subjectTemplate: s.subjectTemplate || null,
           bodyTemplate: s.bodyTemplate,
-          emailStyle: s.emailStyle,
+          emailStyle: "BRANDED",
           isActive: s.isActive,
         })),
       };
@@ -466,34 +466,9 @@ export function SequenceBuilder({
                 <div className="flex flex-wrap gap-2 items-end">
                   <div className="space-y-1">
                     <Label>Email style</Label>
-                    <div className="flex gap-2">
-                      <Button
-                        type="button"
-                        size="sm"
-                        variant={
-                          step.emailStyle === "BRANDED" ? "default" : "outline"
-                        }
-                        disabled={readOnly || saving}
-                        onClick={() =>
-                          updateStep(step.key, { emailStyle: "BRANDED" })
-                        }
-                      >
-                        BRANDED
-                      </Button>
-                      <Button
-                        type="button"
-                        size="sm"
-                        variant={
-                          step.emailStyle === "PLAIN" ? "default" : "outline"
-                        }
-                        disabled={readOnly || saving}
-                        onClick={() =>
-                          updateStep(step.key, { emailStyle: "PLAIN" })
-                        }
-                      >
-                        PLAIN
-                      </Button>
-                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      BRANDED HTML only — plain text sends are disabled.
+                    </p>
                   </div>
                 </div>
                 <div>

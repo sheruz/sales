@@ -256,7 +256,7 @@ export class OutreachSequenceService {
       channel: s.channel ?? ConversationChannel.EMAIL,
       subjectTemplate: s.subjectTemplate ?? null,
       bodyTemplate: s.bodyTemplate,
-      emailStyle: s.emailStyle ?? EmailStyle.PLAIN,
+      emailStyle: EmailStyle.BRANDED,
       condition: (s.condition ?? undefined) as Prisma.InputJsonValue | undefined,
       isActive: s.isActive ?? true,
     };

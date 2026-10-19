@@ -74,7 +74,8 @@ export function snapshotSteps(
     subjectTemplate: s.subjectTemplate,
     bodyTemplate: s.bodyTemplate,
     isActive: s.isActive,
-    emailStyle: s.emailStyle === "BRANDED" ? "BRANDED" : "PLAIN",
+    // Always BRANDED — plain-text outreach is disabled
+    emailStyle: "BRANDED",
   }));
 }
 

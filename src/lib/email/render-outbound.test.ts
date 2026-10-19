@@ -78,8 +78,8 @@ describe("WhatsApp link format", () => {
 describe("style selection per step", () => {
   it("defaults cold step 1 BRANDED and 2–3 PLAIN", () => {
     expect(COLD_OUTREACH_STEPS[0].emailStyle).toBe("BRANDED");
-    expect(COLD_OUTREACH_STEPS[1].emailStyle).toBe("PLAIN");
-    expect(COLD_OUTREACH_STEPS[2].emailStyle).toBe("PLAIN");
+    expect(COLD_OUTREACH_STEPS[1].emailStyle).toBe("BRANDED");
+    expect(COLD_OUTREACH_STEPS[2].emailStyle).toBe("BRANDED");
     expect(COLD_OUTREACH_STEPS[1].subjectTemplate.startsWith("Re:")).toBe(true);
   });
 });

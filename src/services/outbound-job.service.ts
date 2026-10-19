@@ -87,14 +87,12 @@ export class OutboundJobService {
           data: { status: OutreachSequenceStatus.ACTIVE },
         });
       }
-      // Sync cold step styles (1 BRANDED, 2–3 PLAIN)
+      // Sync cold step styles — always BRANDED (no plain-text sends)
       for (const s of existing.steps) {
-        const want =
-          s.stepOrder === 1 ? EmailStyle.BRANDED : EmailStyle.PLAIN;
-        if (s.emailStyle !== want) {
+        if (s.emailStyle !== EmailStyle.BRANDED) {
           await prisma.outreachSequenceStep.update({
             where: { id: s.id },
-            data: { emailStyle: want },
+            data: { emailStyle: EmailStyle.BRANDED },
           });
         }
       }
@@ -110,12 +108,10 @@ export class OutboundJobService {
     });
     if (byName) {
       for (const s of byName.steps) {
-        const want =
-          s.stepOrder === 1 ? EmailStyle.BRANDED : EmailStyle.PLAIN;
-        if (s.emailStyle !== want) {
+        if (s.emailStyle !== EmailStyle.BRANDED) {
           await prisma.outreachSequenceStep.update({
             where: { id: s.id },
-            data: { emailStyle: want },
+            data: { emailStyle: EmailStyle.BRANDED },
           });
         }
       }
@@ -148,10 +144,7 @@ export class OutboundJobService {
             channel: ConversationChannel.EMAIL,
             subjectTemplate: s.subjectTemplate,
             bodyTemplate: s.bodyTemplate,
-            emailStyle:
-              s.emailStyle === "BRANDED"
-                ? EmailStyle.BRANDED
-                : EmailStyle.PLAIN,
+            emailStyle: EmailStyle.BRANDED,
             isActive: true,
           })),
         },
@@ -680,14 +673,8 @@ export class OutboundJobService {
       orderBy: [{ approvedAt: "desc" }, { updatedAt: "desc" }],
     });
 
-    // Step 1 is always BRANDED (our designed HTML template). Never trust a
-    // stale PLAIN flag on step 1 from older sequence rows.
-    const emailStyle: "BRANDED" | "PLAIN" =
-      step.stepOrder === 1 ||
-      step.emailStyle === "BRANDED" ||
-      enrollment.sequence?.name === INBOUND_OUTREACH_NAME
-        ? "BRANDED"
-        : "PLAIN";
+    // Always BRANDED HTML template — never queue/send plain-text outreach.
+    const emailStyle: "BRANDED" | "PLAIN" = "BRANDED";
 
     const vars = buildSequenceTemplateVars({
       contact: enrollment.contact,
@@ -1170,17 +1157,14 @@ export class OutboundJobService {
       return { id: outboxId, status: "cancelled", reason: "suppressed" };
     }
 
-    // Step 1 / BRANDED: always rebuild HTML at send time so the designed
-    // template ships even if the row was queued as plain or before a deploy.
+    // Always rebuild BRANDED HTML at send time so the designed template ships
+    // even if the row was queued as plain (legacy) or before a deploy.
     let bodyText = item.bodyText;
     let bodyHtml = item.bodyHtml;
-    const metaEarly =
-      item.metadata && typeof item.metadata === "object"
-        ? (item.metadata as { emailStyle?: string })
-        : {};
-    const wantsBranded =
-      (item.stepOrder != null && item.stepOrder <= 1) ||
-      metaEarly.emailStyle === "BRANDED";
+    const isSequence =
+      item.purpose === EmailOutboxPurpose.SEQUENCE ||
+      item.enrollmentId != null;
+    const wantsBranded = isSequence;
     const htmlLooksBranded =
       typeof bodyHtml === "string" &&
       (bodyHtml.includes("WHAT WE NOTICED") ||
@@ -1246,7 +1230,7 @@ export class OutboundJobService {
       }
     }
 
-    // Never send step-1 as plain-looking HTML when we expected BRANDED.
+    // Never send sequence mail as plain-looking HTML.
     if (
       wantsBranded &&
       (typeof bodyHtml !== "string" ||
@@ -1258,7 +1242,7 @@ export class OutboundJobService {
         data: {
           status: EmailOutboxStatus.HELD,
           heldReason: "render_failed",
-          lastError: "refusing to send non-branded HTML for step 1",
+          lastError: "refusing to send non-branded HTML for sequence email",
         },
       });
       return { id: outboxId, status: "held", reason: "render_failed" };
