@@ -12,6 +12,7 @@ type PlanCard = {
   name: string;
   description: string | null;
   mostPopular: boolean;
+  sortOrder: number;
   versionId: string;
   priceMonthly: number;
   priceYearly: number;
@@ -20,6 +21,14 @@ type PlanCard = {
   creditRolloverEnabled: boolean;
   creditRolloverCapMonths: number | null;
   features: { key: string; enabled: boolean; limitValue: number | null }[];
+};
+
+type CurrentSub = {
+  status: string;
+  planId: string | null;
+  planCode: string | null;
+  planName: string | null;
+  trialEndsAt: string | null;
 };
 
 const COMPARE_KEYS = [
@@ -33,6 +42,62 @@ const COMPARE_KEYS = [
   ...Object.values(MODULE_KEYS),
 ] as const;
 
+/** Modules that differentiate tiers (shown in “plus” lists). */
+const TIER_PLUS_MODULES = [
+  MODULE_KEYS.AI_AUTO_SEND,
+  MODULE_KEYS.MEETINGS,
+  MODULE_KEYS.META_LEAD_ADS,
+  MODULE_KEYS.LINKEDIN_ASSIST,
+  MODULE_KEYS.ANALYTICS_ADVANCED,
+  MODULE_KEYS.WHITE_LABEL,
+  MODULE_KEYS.API_ACCESS,
+] as const;
+
+function featLimit(
+  plan: PlanCard,
+  key: string
+): number | null | undefined {
+  const f = plan.features.find((x) => x.key === key);
+  if (!f?.enabled) return undefined;
+  return f.limitValue;
+}
+
+function enabledModules(plan: PlanCard): Set<string> {
+  return new Set(
+    plan.features
+      .filter((f) => f.enabled && Object.values(MODULE_KEYS).includes(f.key as never))
+      .map((f) => f.key)
+  );
+}
+
+function plusOverPrevious(plan: PlanCard, previous: PlanCard | null): string[] {
+  const mine = enabledModules(plan);
+  const prev = previous ? enabledModules(previous) : new Set<string>();
+  const labels: string[] = [];
+  for (const key of TIER_PLUS_MODULES) {
+    if (mine.has(key) && !prev.has(key)) {
+      labels.push(FEATURE_KEY_LABELS[key] ?? key);
+    }
+  }
+  // Starter: show core modules (not dashboard — always on)
+  if (!previous) {
+    const core = [
+      MODULE_KEYS.LEADS,
+      MODULE_KEYS.AUTOPILOT_SOURCING,
+      MODULE_KEYS.AUTOPILOT_ENRICHMENT,
+      MODULE_KEYS.AUTOPILOT_AUDIT,
+      MODULE_KEYS.OUTREACH,
+      MODULE_KEYS.INBOX,
+      MODULE_KEYS.AI_REPLIES,
+      MODULE_KEYS.DEALS,
+    ];
+    return core
+      .filter((k) => mine.has(k))
+      .map((k) => FEATURE_KEY_LABELS[k] ?? k);
+  }
+  return labels;
+}
+
 export function ChoosePlanClient(props: {
   companyName: string;
   plans: PlanCard[];
@@ -40,8 +105,23 @@ export function ChoosePlanClient(props: {
   contactEmail: string;
   accessMode: string;
   homeHref: string;
+  current: CurrentSub | null;
 }) {
   const [yearly, setYearly] = useState(false);
+  const locked =
+    props.accessMode === "locked" ||
+    props.current?.status === "NONE" ||
+    props.current?.status === "EXPIRED" ||
+    !props.current?.planId;
+  const activeLike =
+    props.current?.status === "ACTIVE" ||
+    props.current?.status === "TRIALING" ||
+    props.current?.status === "PAST_DUE";
+
+  const sorted = useMemo(
+    () => [...props.plans].sort((a, b) => a.sortOrder - b.sortOrder),
+    [props.plans]
+  );
 
   const mailto = useMemo(() => {
     if (!props.contactEmail) return null;
@@ -51,15 +131,27 @@ export function ChoosePlanClient(props: {
     return `mailto:${props.contactEmail}?subject=${subject}`;
   }, [props.contactEmail, props.companyName]);
 
+  const trialDaysLeft = useMemo(() => {
+    if (props.current?.status !== "TRIALING" || !props.current.trialEndsAt) {
+      return null;
+    }
+    const ms = new Date(props.current.trialEndsAt).getTime() - Date.now();
+    return Math.max(0, Math.ceil(ms / 86_400_000));
+  }, [props.current]);
+
   if (!props.canManageBilling) {
     return (
       <div className="mx-auto max-w-lg px-6 py-16 text-center">
         <Lock className="mx-auto mb-4 h-10 w-10 text-muted-foreground" />
         <h1 className="text-2xl font-semibold tracking-tight">
-          Workspace not active yet
+          {locked
+            ? "Workspace not active yet"
+            : `Your plan: ${props.current?.planName ?? "Active"}`}
         </h1>
         <p className="mt-3 text-muted-foreground">
-          Ask your admin to choose a plan to unlock {props.companyName}.
+          {locked
+            ? `Ask your admin to choose a plan to unlock ${props.companyName}.`
+            : "Ask your admin to change billing or upgrade."}
         </p>
       </div>
     );
@@ -69,13 +161,16 @@ export function ChoosePlanClient(props: {
     <div className="mx-auto max-w-6xl px-4 py-10 sm:px-6">
       <header className="mb-10 max-w-2xl">
         <h1 className="text-3xl font-semibold tracking-tight">
-          Welcome, {props.companyName}
+          {locked
+            ? `Welcome, ${props.companyName}`
+            : `Your plan: ${props.current?.planName ?? "Active"}`}
         </h1>
         <p className="mt-2 text-muted-foreground">
-          Choose a plan to activate your workspace.
-          {props.accessMode === "locked"
-            ? " Modules stay locked until a plan is active."
-            : null}
+          {locked
+            ? "Choose a plan to activate your workspace. Modules stay locked until a plan is active."
+            : props.current?.status === "TRIALING" && trialDaysLeft != null
+              ? `Trial ends in ${trialDaysLeft} day${trialDaysLeft === 1 ? "" : "s"}. Upgrade anytime.`
+              : "Manage your package or contact us to change plans."}
         </p>
         <div className="mt-6 inline-flex rounded-lg border p-1 text-sm">
           <button
@@ -97,22 +192,57 @@ export function ChoosePlanClient(props: {
       </header>
 
       <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-4">
-        {props.plans.map((plan) => {
+        {sorted.map((plan, idx) => {
+          const previous = idx > 0 ? sorted[idx - 1]! : null;
           const price = yearly ? plan.priceYearly : plan.priceMonthly;
-          const modulesOn = plan.features.filter(
-            (f) =>
-              Object.values(MODULE_KEYS).includes(
-                f.key as (typeof MODULE_KEYS)[keyof typeof MODULE_KEYS]
-              ) && f.enabled
+          const isCurrent =
+            activeLike &&
+            (plan.id === props.current?.planId ||
+              (plan.code != null &&
+                plan.code === props.current?.planCode));
+          const currentIdx = sorted.findIndex(
+            (p) =>
+              p.id === props.current?.planId ||
+              (p.code != null && p.code === props.current?.planCode)
           );
+          let ctaKind: "subscribe" | "current" | "upgrade" | "downgrade" =
+            "subscribe";
+          if (activeLike && currentIdx >= 0) {
+            if (isCurrent) ctaKind = "current";
+            else if (idx > currentIdx) ctaKind = "upgrade";
+            else ctaKind = "downgrade";
+          }
+
+          const users = featLimit(plan, "users");
+          const mailboxes = featLimit(plan, "outbound_mailboxes");
+          const emailsDay = featLimit(plan, "emails_daily");
+          const plus = plusOverPrevious(plan, previous);
+
+          const ctaLabel =
+            ctaKind === "current"
+              ? "Current plan"
+              : ctaKind === "upgrade"
+                ? "Upgrade"
+                : ctaKind === "downgrade"
+                  ? "Downgrade"
+                  : "Contact us to subscribe";
+
           return (
             <article
               key={plan.id}
               className={`relative flex flex-col rounded-xl border p-5 ${
-                plan.mostPopular ? "border-foreground shadow-sm" : ""
+                isCurrent
+                  ? "border-primary ring-1 ring-primary/30"
+                  : plan.mostPopular
+                    ? "border-foreground shadow-sm"
+                    : ""
               }`}
             >
-              {plan.mostPopular ? (
+              {isCurrent ? (
+                <span className="absolute -top-3 left-4 rounded-full bg-primary px-2 py-0.5 text-xs text-primary-foreground">
+                  Current plan
+                </span>
+              ) : plan.mostPopular ? (
                 <span className="absolute -top-3 left-4 rounded-full bg-foreground px-2 py-0.5 text-xs text-background">
                   Most popular
                 </span>
@@ -127,30 +257,57 @@ export function ChoosePlanClient(props: {
                   /{yearly ? "yr" : "mo"}
                 </span>
               </p>
-              <p className="mt-1 text-sm text-muted-foreground">
-                {plan.monthlyCredits?.toLocaleString() ?? "—"} credits/mo
-                {plan.creditRolloverEnabled
-                  ? ` · rollover ${plan.creditRolloverCapMonths ?? 1} mo`
-                  : " · no rollover"}
-              </p>
-              <ul className="mt-4 flex-1 space-y-1.5 text-sm">
-                {modulesOn.slice(0, 8).map((f) => (
-                  <li key={f.key} className="flex gap-2">
-                    <Check className="mt-0.5 h-4 w-4 shrink-0" />
-                    {FEATURE_KEY_LABELS[f.key] ?? f.key}
-                  </li>
-                ))}
+              <ul className="mt-3 space-y-1 text-sm text-muted-foreground">
+                <li>
+                  {(plan.monthlyCredits ?? 0).toLocaleString()} credits/mo
+                  {plan.creditRolloverEnabled
+                    ? ` · ${plan.creditRolloverCapMonths ?? 1} mo rollover`
+                    : " · no rollover"}
+                </li>
+                <li>
+                  {users == null ? "Unlimited" : users} user
+                  {users === 1 ? "" : "s"} ·{" "}
+                  {mailboxes == null ? "Unlimited" : mailboxes} mailbox
+                  {mailboxes === 1 ? "" : "es"}
+                </li>
+                <li>
+                  {emailsDay == null ? "Unlimited" : emailsDay} emails/day
+                </li>
               </ul>
-              {mailto ? (
+              <div className="mt-4 flex-1 text-sm">
+                {previous ? (
+                  <p className="mb-2 font-medium text-foreground">
+                    Everything in {previous.name}, plus:
+                  </p>
+                ) : (
+                  <p className="mb-2 font-medium text-foreground">Includes:</p>
+                )}
+                <ul className="space-y-1.5">
+                  {plus.map((label) => (
+                    <li key={label} className="flex gap-2">
+                      <Check className="mt-0.5 h-4 w-4 shrink-0" />
+                      {label}
+                    </li>
+                  ))}
+                  {plus.length === 0 ? (
+                    <li className="text-muted-foreground">Higher limits</li>
+                  ) : null}
+                </ul>
+              </div>
+              {ctaKind === "current" ? (
+                <Button className="mt-6 w-full whitespace-nowrap" disabled>
+                  {ctaLabel}
+                </Button>
+              ) : mailto ? (
                 <a
                   href={mailto}
-                  className="mt-6 inline-flex h-9 w-full items-center justify-center rounded-lg bg-primary px-3 text-sm font-medium text-primary-foreground hover:bg-primary/80"
+                  className="mt-6 inline-flex h-9 w-full items-center justify-center whitespace-nowrap rounded-lg bg-primary px-3 text-sm font-medium text-primary-foreground hover:bg-primary/80"
                 >
-                  Online payment coming soon — contact us
+                  {ctaLabel}
                 </a>
               ) : (
-                <Button className="mt-6 w-full" disabled>
-                  Online payment coming soon — contact us
+                <Button className="mt-6 w-full whitespace-nowrap" disabled>
+                  {ctaLabel}
                 </Button>
               )}
             </article>
@@ -158,14 +315,14 @@ export function ChoosePlanClient(props: {
         })}
       </div>
 
-      {props.plans.length > 0 ? (
+      {sorted.length > 0 ? (
         <section className="mt-14 overflow-x-auto">
           <h3 className="mb-4 text-lg font-semibold">Compare plans</h3>
           <table className="w-full min-w-[640px] border-collapse text-sm">
             <thead>
               <tr className="border-b text-left">
                 <th className="py-2 pr-4 font-medium">Feature</th>
-                {props.plans.map((p) => (
+                {sorted.map((p) => (
                   <th key={p.id} className="px-2 py-2 font-medium">
                     {p.name}
                   </th>
@@ -180,7 +337,7 @@ export function ChoosePlanClient(props: {
                       ? "Credits / month"
                       : (FEATURE_KEY_LABELS[key] ?? key)}
                   </td>
-                  {props.plans.map((p) => {
+                  {sorted.map((p) => {
                     if (key === "monthlyCredits") {
                       return (
                         <td key={p.id} className="px-2 py-2">
@@ -207,13 +364,7 @@ export function ChoosePlanClient(props: {
             </tbody>
           </table>
         </section>
-      ) : (
-        <p className="mt-8 text-muted-foreground">
-          Plans are not seeded yet. Super Admin: run{" "}
-          <code className="text-xs">node scripts/b1-apply.js</code> after dry-run
-          GO.
-        </p>
-      )}
+      ) : null}
 
       {mailto ? (
         <p className="mt-8 text-sm text-muted-foreground">

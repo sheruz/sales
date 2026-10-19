@@ -4,6 +4,9 @@ import { cn } from "@/lib/utils";
 import type { AutopilotShellStatus } from "@/lib/autopilot/shell-status";
 
 function lastRunLabel(status: AutopilotShellStatus): string {
+  if (status.neverConfigured || status.label === "not_setup") {
+    return "Start setup";
+  }
   if (status.minutesAgo == null) return "No run yet";
   if (status.minutesAgo < 1) return "Last run just now";
   if (status.minutesAgo < 60) return `Last run ${status.minutesAgo} min ago`;
@@ -13,6 +16,9 @@ function lastRunLabel(status: AutopilotShellStatus): string {
 }
 
 function title(status: AutopilotShellStatus): string {
+  if (status.neverConfigured || status.label === "not_setup") {
+    return "Autopilot not set up";
+  }
   if (status.tone === "ok") return "Autopilot running";
   if (status.tone === "warn") return "Autopilot paused";
   return "Autopilot not running";
@@ -23,11 +29,22 @@ export function AutopilotStatusPill({
 }: {
   status: AutopilotShellStatus;
 }) {
+  const href =
+    status.neverConfigured || status.label === "not_setup"
+      ? appHome("/autopilot")
+      : appHome("/autopilot");
+
   return (
     <Link
-      href={appHome("/autopilot")}
+      href={href}
       className="flex items-center gap-2 rounded-lg border border-sidebar-border bg-sidebar-accent/60 px-2.5 py-2.5 text-[12.5px] transition-colors hover:bg-sidebar-accent"
-      title={status.lastRunAt ? `Last run ${status.lastRunAt}` : undefined}
+      title={
+        status.neverConfigured
+          ? "Open Autopilot setup"
+          : status.lastRunAt
+            ? `Last run ${status.lastRunAt}`
+            : undefined
+      }
     >
       <span
         className={cn(

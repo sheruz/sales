@@ -9,6 +9,8 @@ export type AutopilotShellStatus = {
   label: string;
   lastRunAt: string | null;
   minutesAgo: number | null;
+  /** True when no pipeline has ever been turned on for this org */
+  neverConfigured?: boolean;
 };
 
 function formatAgo(ms: number): string {
@@ -60,11 +62,13 @@ export async function getAutopilotShellStatus(
   const stale = cronTickService.isStale(lastTick);
 
   if (!anyOn) {
+    // Brand-new orgs: no master toggles on → setup, not "paused"
     return {
       tone: "warn",
-      label: "Paused",
+      label: "not_setup",
       lastRunAt: lastAt?.toISOString() ?? null,
       minutesAgo,
+      neverConfigured: true,
     };
   }
 

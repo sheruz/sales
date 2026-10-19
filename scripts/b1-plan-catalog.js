@@ -265,7 +265,7 @@ const B1_PLAN_CATALOG = [
   {
     code: "STARTER",
     name: "Starter",
-    description: "Core outbound workspace — ~150 leads/month",
+    description: "For freelancers starting outbound",
     visibility: "PUBLIC",
     mostPopular: false,
     sortOrder: 10,
@@ -281,7 +281,7 @@ const B1_PLAN_CATALOG = [
   {
     code: "GROWTH",
     name: "Growth",
-    description: "Most popular — AI auto-send, meetings, Meta & LinkedIn",
+    description: "Autopilot that replies and books meetings",
     visibility: "PUBLIC",
     mostPopular: true,
     sortOrder: 20,
@@ -297,7 +297,7 @@ const B1_PLAN_CATALOG = [
   {
     code: "PRO",
     name: "Pro",
-    description: "Higher limits for scaling teams (priority support N/A as feature key)",
+    description: "For growing agencies with higher volume",
     visibility: "PUBLIC",
     mostPopular: false,
     sortOrder: 30,
@@ -313,7 +313,7 @@ const B1_PLAN_CATALOG = [
   {
     code: "AGENCY",
     name: "Agency",
-    description: "Full platform — white-label + API, unlimited ICPs/campaigns",
+    description: "White-label + API for agencies serving clients",
     visibility: "PUBLIC",
     mostPopular: false,
     sortOrder: 40,

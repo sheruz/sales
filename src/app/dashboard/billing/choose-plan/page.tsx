@@ -17,10 +17,21 @@ export default async function ChoosePlanPage() {
   const access = await tenantAccessService.getAccess(user.organizationId);
   const canManageBilling = hasOrgPermission(user, "billing.manage");
 
-  const org = await prisma.organization.findUnique({
-    where: { id: user.organizationId },
-    select: { name: true },
-  });
+  const [org, sub] = await Promise.all([
+    prisma.organization.findUnique({
+      where: { id: user.organizationId },
+      select: { name: true },
+    }),
+    prisma.subscription.findUnique({
+      where: { organizationId: user.organizationId },
+      select: {
+        status: true,
+        planId: true,
+        trialEndsAt: true,
+        plan: { select: { id: true, code: true, name: true } },
+      },
+    }),
+  ]);
 
   const plans = await prisma.plan.findMany({
     where: {
@@ -46,6 +57,7 @@ export default async function ChoosePlanPage() {
         name: p.name,
         description: p.description,
         mostPopular: p.mostPopular,
+        sortOrder: p.sortOrder,
         versionId: version.id,
         priceMonthly: Number(version.priceMonthly),
         priceYearly: Number(version.priceYearly),
@@ -73,6 +85,17 @@ export default async function ChoosePlanPage() {
       contactEmail={contact}
       accessMode={access.accessMode}
       homeHref={appHome()}
+      current={
+        sub
+          ? {
+              status: sub.status,
+              planId: sub.planId,
+              planCode: sub.plan.code,
+              planName: sub.plan.name,
+              trialEndsAt: sub.trialEndsAt?.toISOString() ?? null,
+            }
+          : null
+      }
     />
   );
 }

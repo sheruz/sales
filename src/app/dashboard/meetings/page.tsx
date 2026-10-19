@@ -11,6 +11,9 @@ import {
   CopyBookingLinkButton,
   MeetingRow,
 } from "@/components/meetings/meeting-actions";
+import { tenantAccessService } from "@/services/tenant-access.service";
+import { MODULE_KEYS } from "@/lib/billing/modules";
+import { ModuleUpgradeCard } from "@/components/billing/module-upgrade-card";
 
 function prepToText(value: unknown): string | null {
   if (value == null) return null;
@@ -44,6 +47,15 @@ export default async function MeetingsPage() {
     !hasAnyOrgPermission(user, ["opportunities.view", "deals.manage"])
   ) {
     redirect(appHome());
+  }
+
+  const access = await tenantAccessService.getAccess(user.organizationId);
+  if (
+    access.lifecycleEnforced &&
+    !access.isPlatformOwner &&
+    !access.modules[MODULE_KEYS.MEETINGS]
+  ) {
+    return <ModuleUpgradeCard moduleKey={MODULE_KEYS.MEETINGS} />;
   }
 
   const [meetings, branding] = await Promise.all([

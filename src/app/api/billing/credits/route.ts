@@ -28,9 +28,24 @@ export async function GET(request: NextRequest) {
       creditLedgerService.isOwnerOrg(user.organizationId),
       prisma.subscription.findUnique({
         where: { organizationId: user.organizationId },
-        select: { plan: { select: { monthlyCredits: true } } },
+        select: {
+          currentPeriodEnd: true,
+          plan: { select: { monthlyCredits: true } },
+          planVersion: { select: { monthlyCredits: true } },
+        },
       }),
     ]);
+
+    const monthlyCredits =
+      sub?.planVersion?.monthlyCredits ?? sub?.plan.monthlyCredits ?? null;
+    const nextGrantAt =
+      sub?.currentPeriodEnd?.toISOString() ??
+      (() => {
+        const n = new Date();
+        return new Date(
+          Date.UTC(n.getUTCFullYear(), n.getUTCMonth() + 1, 1)
+        ).toISOString();
+      })();
 
     if (!canManage) {
       return NextResponse.json(
@@ -38,7 +53,8 @@ export async function GET(request: NextRequest) {
           balance: org?.creditBalanceCached ?? 0,
           billingEnforcementEnabled: org?.billingEnforcementEnabled ?? false,
           isOwner,
-          monthlyCredits: sub?.plan.monthlyCredits ?? null,
+          monthlyCredits,
+          nextGrantAt,
           warnings: {},
           consumedThisMonth: [],
           ledger: [],
@@ -60,7 +76,8 @@ export async function GET(request: NextRequest) {
         balance: org?.creditBalanceCached ?? 0,
         billingEnforcementEnabled: org?.billingEnforcementEnabled ?? false,
         isOwner,
-        monthlyCredits: sub?.plan.monthlyCredits ?? null,
+        monthlyCredits,
+        nextGrantAt,
         warnings: {
           at20: org?.creditsWarnedAt20 ?? null,
           at5: org?.creditsWarnedAt5 ?? null,

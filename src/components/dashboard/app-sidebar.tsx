@@ -253,6 +253,15 @@ export function AppSidebar({
         <SidebarMenu>
           <SidebarMenuItem>
             <SidebarMenuButton
+              isActive={pathname.startsWith(appHome("/billing"))}
+              tooltip="Plan & Billing"
+              render={<Link href={appHome("/billing/choose-plan")} />}
+            >
+              <span className="text-[13px] font-medium">Plan & Billing</span>
+            </SidebarMenuButton>
+          </SidebarMenuItem>
+          <SidebarMenuItem>
+            <SidebarMenuButton
               isActive={pathname.startsWith(appHome("/settings"))}
               tooltip="Settings"
               render={<Link href={appHome("/settings")} />}
