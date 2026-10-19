@@ -81,4 +81,5 @@ module.exports = {
   tableExists,
   columnExists,
   enumExists,
+  enumHasValue,
 };
