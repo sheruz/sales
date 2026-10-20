@@ -1,5 +1,6 @@
 /**
  * B3.2: Tenant billing emails + Super Admin seller alerts.
+ * Tenant emails use Super Admin platform email branding (not plain text).
  */
 
 import prisma from "@/lib/db/prisma";
@@ -8,9 +9,11 @@ import { logger } from "@/lib/logger";
 import { sendEmailWithConfig } from "@/lib/email/send-mail";
 import { NotificationType, UserRole } from "@prisma/client";
 import { paymentConfigService } from "@/services/billing/payment-config.service";
-import { appOps } from "@/lib/app-paths";
+import { platformEmailBrandingService } from "@/services/platform-email-branding.service";
+import { renderPlatformTransactionalEmail } from "@/lib/email/render-platform-transactional";
+import { appOps, appHome } from "@/lib/app-paths";
 
-function platformSmtp() {
+function platformSmtp(fromName?: string) {
   if (!env.SMTP_HOST || !env.SMTP_USER || !env.SMTP_PASSWORD) return null;
   return {
     host: env.SMTP_HOST,
@@ -18,22 +21,45 @@ function platformSmtp() {
     secure: env.SMTP_SECURE,
     user: env.SMTP_USER,
     password: env.SMTP_PASSWORD,
-    fromName: env.SMTP_FROM_NAME || "Delvix",
+    fromName: fromName || env.SMTP_FROM_NAME || "Delvix",
     fromEmail: env.SMTP_FROM_EMAIL ?? env.SMTP_USER,
   };
 }
 
-async function sendPlatformMail(to: string[], subject: string, body: string) {
-  const cfg = platformSmtp();
-  if (!cfg || to.length === 0) return;
-  const unique = [...new Set(to.map((e) => e.trim().toLowerCase()).filter(Boolean))];
+async function sendBrandedPlatformMail(input: {
+  to: string[];
+  subject: string;
+  body: string;
+  orgName?: string | null;
+  ctaUrl?: string;
+  ctaLabel?: string;
+}) {
+  const unique = [
+    ...new Set(
+      input.to.map((e) => e.trim().toLowerCase()).filter(Boolean)
+    ),
+  ];
+  if (unique.length === 0) return;
+
+  const branding = await platformEmailBrandingService.get();
+  const rendered = renderPlatformTransactionalEmail({
+    branding,
+    subject: input.subject,
+    body: input.body,
+    orgName: input.orgName,
+    ctaUrl: input.ctaUrl,
+    ctaLabel: input.ctaLabel,
+  });
+  const cfg = platformSmtp(rendered.fromName);
+  if (!cfg) return;
+
   for (const addr of unique) {
     try {
       await sendEmailWithConfig(cfg, {
         to: addr,
-        subject,
-        text: body,
-        html: `<div style="font-family:system-ui,sans-serif;line-height:1.5"><p>${body.replace(/\n/g, "<br/>")}</p><p style="color:#666;font-size:12px">— Delvix Platform</p></div>`,
+        subject: rendered.subject,
+        text: rendered.text,
+        html: rendered.html,
       });
     } catch (err) {
       logger.warn("billing notify email failed", {
@@ -45,12 +71,34 @@ async function sendPlatformMail(to: string[], subject: string, body: string) {
 }
 
 export class BillingNotifyService {
+  /** Send branded platform mail to explicit addresses (invoices, one-offs). */
+  async sendBrandedTo(input: {
+    to: string | string[];
+    subject: string;
+    body: string;
+    orgName?: string | null;
+    ctaUrl?: string;
+    ctaLabel?: string;
+  }) {
+    const list = Array.isArray(input.to) ? input.to : [input.to];
+    await sendBrandedPlatformMail({
+      to: list,
+      subject: input.subject,
+      body: input.body,
+      orgName: input.orgName,
+      ctaUrl: input.ctaUrl,
+      ctaLabel: input.ctaLabel,
+    });
+  }
+
   /** Invoice/receipt/payment-failed/renewal/low-credits/welcome → billingEmail + org admins */
   async emailTenantBilling(
     organizationId: string,
     subject: string,
-    body: string
+    body: string,
+    opts?: { ctaUrl?: string; ctaLabel?: string }
   ) {
+    if (!organizationId) return;
     const org = await prisma.organization.findUnique({
       where: { id: organizationId },
       select: { billingEmail: true, name: true },
@@ -70,11 +118,21 @@ export class BillingNotifyService {
       org?.billingEmail,
       ...admins.map((a) => a.user.email),
     ].filter((e): e is string => Boolean(e?.trim()));
-    await sendPlatformMail(emails, subject, body);
+
+    await sendBrandedPlatformMail({
+      to: emails,
+      subject,
+      body,
+      orgName: org?.name,
+      ctaUrl:
+        opts?.ctaUrl ||
+        `${env.APP_URL.replace(/\/$/, "")}${appHome("/settings")}?tab=billing`,
+      ctaLabel: opts?.ctaLabel || "Open billing",
+    });
   }
 
   /**
-   * Seller alerts: in-app for SUPER_ADMIN users + email to PaymentSettings.sellerAdminEmails.
+   * Seller alerts: in-app for SUPER_ADMIN users + branded email to sellerAdminEmails.
    */
   async notifySellers(input: {
     type:
@@ -109,18 +167,21 @@ export class BillingNotifyService {
       ...configured,
       ...superAdmins.map((u) => u.email),
     ];
-    await sendPlatformMail(
-      emailTargets,
-      `[Billing] ${input.subject}`,
-      input.body
-    );
+    const href =
+      input.href ||
+      (input.organizationId
+        ? `${env.APP_URL.replace(/\/$/, "")}${appOps(`/companies/${input.organizationId}`)}`
+        : `${env.APP_URL.replace(/\/$/, "")}${appOps("/revenue")}`);
+
+    await sendBrandedPlatformMail({
+      to: emailTargets,
+      subject: `[Billing] ${input.subject}`,
+      body: input.body,
+      ctaUrl: href,
+      ctaLabel: "Open platform",
+    });
 
     if (ownerOrgId) {
-      const href =
-        input.href ||
-        (input.organizationId
-          ? appOps(`/companies/${input.organizationId}`)
-          : appOps("/revenue"));
       for (const admin of superAdmins) {
         try {
           await prisma.notification.create({
@@ -130,7 +191,11 @@ export class BillingNotifyService {
               type: NotificationType.BILLING_SELLER_ALERT,
               title: input.subject,
               body: input.body,
-              href,
+              href:
+                input.href ||
+                (input.organizationId
+                  ? appOps(`/companies/${input.organizationId}`)
+                  : appOps("/revenue")),
               metadata: {
                 alertType: input.type,
                 organizationId: input.organizationId ?? null,

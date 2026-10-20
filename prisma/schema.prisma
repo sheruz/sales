@@ -3689,6 +3689,8 @@ model PaymentSettings {
   manualInstructions     Json     @default("{}") @map("manual_instructions")
   /// B3.2: Super Admin emails for seller alerts (new sub, fail, cancel, refund, chargeback)
   sellerAdminEmails      Json     @default("[]") @map("seller_admin_emails")
+  /// B3.2: platform system-email branding (same shape as org EmailBranding)
+  emailBranding          Json     @default("{}") @map("email_branding")
   createdAt              DateTime @default(now()) @map("created_at")
   updatedAt              DateTime @updatedAt @map("updated_at")
 

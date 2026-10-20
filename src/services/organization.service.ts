@@ -408,23 +408,17 @@ If you didn't expect this, ignore this email.`;
     }
 
     try {
-      await sendEmailWithConfig(
-        {
-          host: env.SMTP_HOST,
-          port: env.SMTP_PORT,
-          secure: env.SMTP_SECURE,
-          user: env.SMTP_USER,
-          password: env.SMTP_PASSWORD,
-          fromName: env.SMTP_FROM_NAME,
-          fromEmail: env.SMTP_FROM_EMAIL,
-        },
-        {
-          to: input.to,
-          subject: `You're invited to ${input.organizationName}`,
-          text,
-          html: text.replace(/\n/g, "<br>"),
-        }
+      const { billingNotifyService } = await import(
+        "@/services/billing/billing-notify.service"
       );
+      await billingNotifyService.sendBrandedTo({
+        to: input.to,
+        subject: `You're invited to ${input.organizationName}`,
+        body: `You've been invited to ${input.organizationName}.\n\nSet your password (link expires in 72 hours). If you didn't expect this, ignore this email.`,
+        orgName: input.organizationName,
+        ctaUrl: link,
+        ctaLabel: "Set password",
+      });
       return { sent: true, link };
     } catch (err) {
       logger.error("Platform SMTP invite send failed", {

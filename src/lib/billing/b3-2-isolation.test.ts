@@ -3,6 +3,7 @@ import {
   DEFAULT_EMAIL_BRANDING,
   resolveSenderBranding,
 } from "@/lib/email/branding";
+import { renderPlatformTransactionalEmail } from "@/lib/email/render-platform-transactional";
 
 describe("B3.2 Paddle customer isolation", () => {
   it("never allows two orgs to keep the same paddleCustomerId in one env", () => {
@@ -103,5 +104,26 @@ describe("B3.2 tenant branding isolation", () => {
     const used = canSend ? tenantConfig : null;
     expect(used).toBeNull();
     expect(ownerConfig.businessName).toContain("Delvix");
+  });
+});
+
+describe("B3.2 platform transactional branding", () => {
+  it("renders branded HTML with legal name and CTA", () => {
+    const out = renderPlatformTransactionalEmail({
+      branding: {
+        ...DEFAULT_EMAIL_BRANDING,
+        legalCompanyName: "Delvix Studio",
+        senderName: "Delvix Billing",
+        businessAddress: "123 Platform St",
+        websiteUrl: "https://delvixstudio.com",
+      },
+      subject: "Welcome",
+      body: "Your workspace is active.",
+      orgName: "Beenish",
+    });
+    expect(out.html).toContain("Delvix Studio");
+    expect(out.html).toContain("Beenish");
+    expect(out.html).toContain("Your workspace is active.");
+    expect(out.fromName).toBe("Delvix Billing");
   });
 });

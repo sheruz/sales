@@ -18,6 +18,7 @@ const SCHEMA_CHECKS = {
     { table: "organizations", column: "billing_country" },
     { table: "organizations", column: "billing_tax_id" },
     { table: "payment_settings", column: "seller_admin_emails" },
+    { table: "payment_settings", column: "email_branding" },
   ],
   tables: ["billing_transactions"],
 };

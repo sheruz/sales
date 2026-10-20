@@ -30,13 +30,20 @@ type Branding = {
   businessAddress: string;
 };
 
-export function EmailBrandingPanel() {
+export function EmailBrandingPanel({
+  apiBase = "/api/settings/email-branding",
+  mode = "tenant",
+}: {
+  /** Tenant: /api/settings/email-branding · Platform SA: /api/platform/email-branding */
+  apiBase?: string;
+  mode?: "tenant" | "platform";
+}) {
   const [branding, setBranding] = useState<Branding | null>(null);
   const [previewHtml, setPreviewHtml] = useState("");
   const [busy, setBusy] = useState(false);
 
   async function load() {
-    const res = await fetch("/api/settings/email-branding");
+    const res = await fetch(apiBase);
     const json = await res.json();
     if (!json.success) throw new Error(json.error?.message);
     setBranding(json.data.branding);
@@ -45,13 +52,13 @@ export function EmailBrandingPanel() {
 
   useEffect(() => {
     load().catch((e) => toast.error(e.message));
-  }, []);
+  }, [apiBase]);
 
   async function save() {
     if (!branding) return;
     setBusy(true);
     try {
-      const res = await fetch("/api/settings/email-branding", {
+      const res = await fetch(apiBase, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(branding),
@@ -72,7 +79,7 @@ export function EmailBrandingPanel() {
     const fd = new FormData();
     fd.set("kind", kind);
     fd.set("file", file);
-    const res = await fetch("/api/settings/email-branding/upload", {
+    const res = await fetch(`${apiBase}/upload`, {
       method: "POST",
       body: fd,
     });
@@ -115,12 +122,15 @@ export function EmailBrandingPanel() {
     <div className="grid gap-6 lg:grid-cols-2">
       <Card>
         <CardHeader>
-          <CardTitle className="text-base">Email branding</CardTitle>
+          <CardTitle className="text-base">
+            {mode === "platform"
+              ? "Platform email branding"
+              : "Email branding"}
+          </CardTitle>
           <CardDescription>
-            Org-level sender identity for BRANDED outbound. Images are resized
-            to 96×96 PNG and served from your domain. CTA, WhatsApp, and website
-            links are tracked (opens + clicks). Set GA4_MEASUREMENT_ID and
-            GA4_API_SECRET in .env to mirror events into Google Analytics.
+            {mode === "platform"
+              ? "Used for system emails to tenants: welcome, invoices, payment failed, renewals, low credits. Same fields as company branding. Paddle’s own receipts still go to the Paddle customer email."
+              : "Org-level sender identity for BRANDED outbound. Images are resized to 96×96 PNG and served from your domain. CTA, WhatsApp, and website links are tracked (opens + clicks)."}
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-3 text-sm">
@@ -174,7 +184,11 @@ export function EmailBrandingPanel() {
       <Card>
         <CardHeader>
           <CardTitle className="text-base">Live preview</CardTitle>
-          <CardDescription>Sample BRANDED email with your branding.</CardDescription>
+          <CardDescription>
+            {mode === "platform"
+              ? "Sample billing / system email with platform branding."
+              : "Sample BRANDED outbound email with your branding."}
+          </CardDescription>
         </CardHeader>
         <CardContent>
           <iframe

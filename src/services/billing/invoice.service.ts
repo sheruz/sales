@@ -9,7 +9,6 @@ import { ConflictError, NotFoundError, ValidationError } from "@/lib/api/respons
 import { organizationService } from "@/services/organization.service";
 import { entitlementService } from "@/services/entitlement.service";
 import { creditLedgerService } from "@/services/credit-ledger.service";
-import { sendEmailWithConfig } from "@/lib/email/send-mail";
 import { logger } from "@/lib/logger";
 import { env as appEnv } from "@/lib/config/env";
 
@@ -89,7 +88,8 @@ export class InvoiceService {
     void this.emailStub(
       input.billingEmail || org.billingEmail,
       `Invoice ${invoice.number} issued`,
-      `Your invoice ${invoice.number} for ${amount} ${invoice.currency} is ready. Taxes may apply depending on your location.`
+      `Your invoice ${invoice.number} for ${amount} ${invoice.currency} is ready.`,
+      org.name
     );
 
     return invoice;
@@ -176,7 +176,8 @@ export class InvoiceService {
     void this.emailStub(
       invoice.billingEmail,
       `Payment link for ${invoice.number}`,
-      `A payment link was added for invoice ${invoice.number}.`
+      `A payment link was added for invoice ${invoice.number}.`,
+      null
     );
     return invoice;
   }
@@ -275,7 +276,8 @@ export class InvoiceService {
     void this.emailStub(
       result.invoice.billingEmail,
       `Payment received — ${result.invoice.number}`,
-      `We received payment for invoice ${result.invoice.number}. Thank you.`
+      `We received payment for invoice ${result.invoice.number}. Thank you.`,
+      null
     );
 
     return result;
@@ -392,29 +394,21 @@ export class InvoiceService {
   private async emailStub(
     to: string | null | undefined,
     subject: string,
-    body: string
+    body: string,
+    orgName?: string | null
   ) {
-    if (!to || !appEnv.SMTP_HOST || !appEnv.SMTP_USER || !appEnv.SMTP_PASSWORD) {
-      return;
-    }
+    if (!to) return;
     try {
-      await sendEmailWithConfig(
-        {
-          host: appEnv.SMTP_HOST,
-          port: appEnv.SMTP_PORT,
-          secure: appEnv.SMTP_SECURE,
-          user: appEnv.SMTP_USER,
-          password: appEnv.SMTP_PASSWORD,
-          fromName: appEnv.SMTP_FROM_NAME,
-          fromEmail: appEnv.SMTP_FROM_EMAIL ?? appEnv.SMTP_USER,
-        },
-        {
-          to,
-          subject,
-          text: body,
-          html: `<p>${body}</p><p style="color:#666;font-size:12px">Taxes may apply depending on your location.</p>`,
-        }
+      const { billingNotifyService } = await import(
+        "@/services/billing/billing-notify.service"
       );
+      await billingNotifyService.sendBrandedTo({
+        to,
+        subject,
+        body: `${body}\n\nTaxes may apply depending on your location.`,
+        orgName,
+        ctaLabel: "View billing",
+      });
     } catch (err) {
       logger.warn("billing email stub failed", {
         error: err instanceof Error ? err.message : String(err),

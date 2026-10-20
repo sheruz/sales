@@ -81,6 +81,13 @@ async function applySchema(prisma, log) {
       `"seller_admin_emails" JSONB NOT NULL DEFAULT '[]'`,
       log
     );
+    await ensureColumn(
+      prisma,
+      "payment_settings",
+      "email_branding",
+      `"email_branding" JSONB NOT NULL DEFAULT '{}'`,
+      log
+    );
   }
 
   await ensureEnumValue(prisma, "NotificationType", "BILLING_SELLER_ALERT", log);
