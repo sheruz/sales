@@ -5,6 +5,14 @@
 import { paymentConfigService } from "@/services/billing/payment-config.service";
 import type { ProviderEnvironment } from "@/services/billing/provider-types";
 
+/** Strip accidental Bearer/quotes/whitespace from pasted secrets. */
+export function normalizePaddleApiKey(raw: string): string {
+  let key = raw.trim().replace(/^["']|["']$/g, "");
+  // User sometimes pastes "Bearer pdl_..." into the apiKey field
+  key = key.replace(/^Bearer\s+/i, "").trim();
+  return key;
+}
+
 export async function getPaddleRuntime(): Promise<{
   environment: ProviderEnvironment;
   apiKey: string;
@@ -16,14 +24,24 @@ export async function getPaddleRuntime(): Promise<{
   if (!cfg?.credentials.apiKey) {
     throw new Error("Paddle is not configured (missing API key in Super Admin → Payments)");
   }
+  const apiKey = normalizePaddleApiKey(cfg.credentials.apiKey);
+  if (!/^pdl_(sdbx|live)_apikey_/.test(apiKey)) {
+    throw new Error(
+      "Paddle apiKey looks wrong. Use an API key from Authentication → API keys (starts with pdl_sdbx_apikey_ or pdl_live_apikey_). Do not paste a client-side token or webhook secret here."
+    );
+  }
   const environment = cfg.environment;
+  // Prefer key prefix over config mode if they disagree
+  const keyEnv: ProviderEnvironment = apiKey.includes("_sdbx_")
+    ? "sandbox"
+    : "production";
   return {
-    environment,
-    apiKey: cfg.credentials.apiKey,
-    clientToken: cfg.credentials.clientToken || "",
-    webhookSecret: cfg.credentials.webhookSecret || "",
+    environment: keyEnv || environment,
+    apiKey,
+    clientToken: (cfg.credentials.clientToken || "").trim(),
+    webhookSecret: (cfg.credentials.webhookSecret || "").trim(),
     apiBase:
-      environment === "production"
+      keyEnv === "production"
         ? "https://api.paddle.com"
         : "https://sandbox-api.paddle.com",
   };

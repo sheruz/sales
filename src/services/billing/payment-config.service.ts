@@ -347,7 +347,12 @@ export class PaymentConfigService {
       }
       const cleaned: Record<string, string> = {};
       for (const [k, v] of Object.entries(input.credentials)) {
-        if (v && !v.includes("••••")) cleaned[k] = v;
+        if (!v || v.includes("••••")) continue;
+        let val = v.trim().replace(/^["']|["']$/g, "");
+        if (k === "apiKey" || k === "secretKey") {
+          val = val.replace(/^Bearer\s+/i, "").trim();
+        }
+        cleaned[k] = val;
       }
       if (Object.keys(cleaned).length > 0) {
         const targetMode =
