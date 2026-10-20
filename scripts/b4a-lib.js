@@ -43,9 +43,59 @@ function parsePaddleMoney(payload) {
   return { amount, tax, fee, net, currency };
 }
 
+/** Platform / catalog noise — never needs org routing */
+const SKIP_EVENT_TYPES = new Set([
+  "transaction.created",
+  "transaction.updated",
+  "transaction.ready",
+  "transaction.paid",
+  "customer.created",
+  "customer.updated",
+  "address.created",
+  "address.updated",
+  "business.created",
+  "business.updated",
+  "subscription.trialing",
+  "subscription.activated",
+  "price.created",
+  "price.updated",
+  "price.imported",
+  "product.created",
+  "product.updated",
+  "product.imported",
+  "api_key.created",
+  "api_key.updated",
+  "api_key.revoked",
+  "client_token.created",
+  "client_token.updated",
+  "client_token.revoked",
+  "discount.created",
+  "discount.updated",
+  "discount.imported",
+  "notification_setting.updated",
+  "report.created",
+  "report.updated",
+]);
+
+const SKIP_EVENT_PREFIXES = [
+  "price.",
+  "product.",
+  "api_key.",
+  "client_token.",
+  "discount.",
+  "notification_setting.",
+  "report.",
+];
+
+function isNoiseEventType(pe) {
+  if (!pe) return false;
+  if (SKIP_EVENT_TYPES.has(pe)) return true;
+  return SKIP_EVENT_PREFIXES.some((p) => pe.startsWith(p));
+}
+
 function classifyWebhookRow(row) {
   const err = (row.error || "").toLowerCase();
-  const eventType = row.event_type || "";
+  const eventType = row.event_type || row.eventType || "";
   const payload = row.payload || {};
   const pe = payload.event_type || eventType;
 
@@ -55,32 +105,19 @@ function classifyWebhookRow(row) {
   if (err.startsWith("unhandled event") || /unhandled event/i.test(err)) {
     return { to: "skipped", reason: row.error || `unhandled ${pe}` };
   }
-  // Known noise event types often stored as unmatched
-  const skipTypes = [
-    "transaction.created",
-    "transaction.updated",
-    "transaction.ready",
-    "transaction.paid",
-    "customer.created",
-    "customer.updated",
-    "address.created",
-    "address.updated",
-    "business.created",
-    "business.updated",
-    "subscription.trialing",
-    "subscription.activated",
-  ];
+  // Catalog / auth noise — skip even when stored as "missing organizationId"
   if (
     (row.status === "unmatched" || row.status === "error") &&
-    skipTypes.some((t) => pe === t || err.includes(t))
+    isNoiseEventType(pe)
   ) {
     return { to: "skipped", reason: `noise event ${pe}` };
   }
+  // adjustment.* without org can stay unmatched (may need linking)
   if (row.status === "unmatched" && err.includes("missing organizationid")) {
-    return { to: "unmatched", reason: row.error }; // keep — real
+    return { to: "unmatched", reason: row.error };
   }
   if (row.status === "error") {
-    return { to: "error", reason: row.error }; // keep
+    return { to: "error", reason: row.error };
   }
   if (row.status === "unmatched") {
     return { to: "unmatched", reason: row.error };
@@ -97,4 +134,6 @@ module.exports = {
   parsePaddleMoney,
   minorToMajor,
   classifyWebhookRow,
+  isNoiseEventType,
+  SKIP_EVENT_TYPES,
 };

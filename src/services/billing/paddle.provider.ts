@@ -20,6 +20,37 @@ import type {
 import { logger } from "@/lib/logger";
 import { parsePaddleMoney } from "@/lib/billing/paddle-amounts";
 
+/** Catalog / seller-account noise — never route to a tenant */
+const PADDLE_NOISE_PREFIXES = [
+  "price.",
+  "product.",
+  "api_key.",
+  "client_token.",
+  "discount.",
+  "notification_setting.",
+  "report.",
+];
+const PADDLE_NOISE_EXACT = new Set([
+  "transaction.created",
+  "transaction.updated",
+  "transaction.ready",
+  "transaction.paid",
+  "customer.created",
+  "customer.updated",
+  "address.created",
+  "address.updated",
+  "business.created",
+  "business.updated",
+  "subscription.trialing",
+  "subscription.activated",
+]);
+
+function isPaddleNoiseEvent(eventType: string): boolean {
+  if (!eventType) return false;
+  if (PADDLE_NOISE_EXACT.has(eventType)) return true;
+  return PADDLE_NOISE_PREFIXES.some((p) => eventType.startsWith(p));
+}
+
 type PaddleData<T> = { data: T };
 
 export class PaddleProvider implements PaymentProvider {
@@ -815,6 +846,11 @@ export class PaddleProvider implements PaymentProvider {
       ? new Date(body.occurred_at)
       : new Date();
     const eventType = body.event_type || "";
+
+    // Skip catalog/auth noise before org routing (avoids false "unmatched" pile-up)
+    if (isPaddleNoiseEvent(eventType)) {
+      return { type: "skipped", reason: `noise event ${eventType}` };
+    }
 
     if (!organizationId) {
       return { type: "unmatched", reason: "missing organizationId in custom_data" };

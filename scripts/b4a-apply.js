@@ -2,6 +2,8 @@
 /**
  * B4a apply — schema columns, txn amount backfill, webhook reclass, plan visibility fix,
  * mark SUPER_ADMIN for 2FA enrollment prompt. Requires APPLY=1.
+ *
+ * Uses raw SQL for new columns so it works before `prisma generate`.
  */
 const {
   createPrisma,
@@ -67,57 +69,78 @@ async function main() {
       log
     );
 
-    // Fix internal plans PUBLIC → INTERNAL
-    const fixedPlans = await prisma.plan.updateMany({
-      where: {
-        OR: [
-          { code: { in: ["OWNER", "COMPLIMENTARY"] } },
-          { name: { contains: "Internal Owner", mode: "insensitive" } },
-        ],
-        visibility: "PUBLIC",
-      },
-      data: { visibility: "INTERNAL" },
-    });
-    log.push(`plans visibility INTERNAL: ${fixedPlans.count}`);
+    // Fix internal plans PUBLIC → INTERNAL (raw — works regardless of client)
+    const fixedPlans = await prisma.$executeRawUnsafe(`
+      UPDATE plans
+      SET visibility = 'INTERNAL', updated_at = CURRENT_TIMESTAMP
+      WHERE visibility = 'PUBLIC'
+        AND (
+          UPPER(COALESCE(code, '')) IN ('OWNER', 'COMPLIMENTARY')
+          OR name ILIKE '%Internal Owner%'
+        )
+    `);
+    log.push(`plans visibility INTERNAL: ${fixedPlans}`);
 
-    // Prompt SUPER_ADMIN to enroll 2FA (do not force before enroll)
-    const sa = await prisma.user.updateMany({
-      where: {
-        OR: [{ role: "SUPER_ADMIN" }, { platformRole: "SUPER_ADMIN" }],
-        totpEnabledAt: null,
-      },
-      data: { totpEnrollmentRequired: true },
-    });
-    log.push(`super admins marked enrollment required: ${sa.count}`);
+    // Prompt SUPER_ADMIN to enroll 2FA (raw SQL — client may not know new columns yet)
+    const sa = await prisma.$executeRawUnsafe(`
+      UPDATE users
+      SET totp_enrollment_required = true, updated_at = CURRENT_TIMESTAMP
+      WHERE deleted_at IS NULL
+        AND totp_enabled_at IS NULL
+        AND (
+          role = 'SUPER_ADMIN'
+          OR platform_role = 'SUPER_ADMIN'
+        )
+    `);
+    log.push(`super admins marked enrollment required: ${sa}`);
 
-    // Backfill amounts
-    const zeroTxns = await prisma.billingTransaction.findMany({
-      where: { amount: 0 },
-      take: 500,
-    });
+    // Backfill amounts via raw SQL
+    const zeroTxns = await prisma.$queryRawUnsafe(`
+      SELECT id, external_id AS "externalId", amount::text AS amount
+      FROM billing_transactions
+      WHERE amount = 0
+      LIMIT 500
+    `);
     let backfilled = 0;
     for (const t of zeroTxns) {
       if (!t.externalId) continue;
-      const rows = await prisma.$queryRawUnsafe(
-        `SELECT payload FROM billing_webhook_events
-         WHERE payload::text LIKE $1
-         ORDER BY created_at DESC LIMIT 1`,
-        `%${t.externalId}%`
-      );
+      let rows = [];
+      try {
+        rows = await prisma.$queryRawUnsafe(
+          `SELECT payload FROM billing_webhook_events
+           WHERE payload::text LIKE $1
+           ORDER BY COALESCE(occurred_at, processed_at) DESC NULLS LAST
+           LIMIT 1`,
+          `%${t.externalId}%`
+        );
+      } catch {
+        rows = await prisma.$queryRawUnsafe(
+          `SELECT payload FROM billing_webhook_events
+           WHERE payload::text LIKE $1
+           LIMIT 1`,
+          `%${t.externalId}%`
+        );
+      }
       const payload = rows[0]?.payload;
       if (!payload) continue;
       const money = parsePaddleMoney(payload);
       if (!money.amount || money.amount === 0) continue;
-      await prisma.billingTransaction.update({
-        where: { id: t.id },
-        data: {
-          amount: money.amount,
-          currency: money.currency,
-          taxAmount: money.tax,
-          feeAmount: money.fee,
-          netAmount: money.net,
-        },
-      });
+      await prisma.$executeRawUnsafe(
+        `UPDATE billing_transactions
+         SET amount = $1,
+             currency = $2,
+             tax_amount = $3,
+             fee_amount = $4,
+             net_amount = $5,
+             updated_at = CURRENT_TIMESTAMP
+         WHERE id = $6`,
+        money.amount,
+        money.currency,
+        money.tax,
+        money.fee,
+        money.net,
+        t.id
+      );
       backfilled++;
       log.push(
         `txn ${t.id} ${t.externalId}: 0 → ${money.amount} ${money.currency}`
@@ -125,11 +148,14 @@ async function main() {
     }
     log.push(`backfilled transactions: ${backfilled}`);
 
-    // Reclassify webhooks
-    const attention = await prisma.billingWebhookEvent.findMany({
-      where: { status: { in: ["error", "unmatched"] } },
-      take: 500,
-    });
+    // Reclassify webhooks (raw)
+    const attention = await prisma.$queryRawUnsafe(`
+      SELECT id, event_id AS "eventId", event_type AS "eventType",
+             status, error, payload
+      FROM billing_webhook_events
+      WHERE status IN ('error', 'unmatched')
+      LIMIT 500
+    `);
     let skipped = 0;
     for (const r of attention) {
       const proposed = classifyWebhookRow({
@@ -139,18 +165,23 @@ async function main() {
         payload: r.payload,
       });
       if (proposed.to === "skipped" && r.status !== "skipped") {
-        await prisma.billingWebhookEvent.update({
-          where: { id: r.id },
-          data: { status: "skipped", error: proposed.reason },
-        });
+        await prisma.$executeRawUnsafe(
+          `UPDATE billing_webhook_events
+           SET status = 'skipped', error = $1
+           WHERE id = $2`,
+          proposed.reason || "skipped",
+          r.id
+        );
         skipped++;
       }
     }
     log.push(`webhooks reclassified to skipped: ${skipped}`);
 
-    const remaining = await prisma.billingWebhookEvent.count({
-      where: { status: { in: ["error", "unmatched"] } },
-    });
+    const remainingRows = await prisma.$queryRawUnsafe(`
+      SELECT COUNT(*)::int AS n FROM billing_webhook_events
+      WHERE status IN ('error', 'unmatched')
+    `);
+    const remaining = remainingRows[0]?.n ?? -1;
 
     console.log(
       JSON.stringify(
@@ -159,7 +190,7 @@ async function main() {
           mode: "apply",
           log,
           webhookAttentionRemaining: remaining,
-          note: "Free plan migration NOT applied — see dry-run report; await approval",
+          note: "Free plan migration NOT applied — none found in dry-run. Then: npx prisma generate && npm run build && pm2 restart sales",
           next: "npx prisma generate && npm run build && pm2 restart sales",
         },
         null,
