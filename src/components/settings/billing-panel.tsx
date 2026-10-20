@@ -175,6 +175,102 @@ export function BillingPanel() {
     }
   }
 
+  async function cancelAtPeriodEnd() {
+    setBusy("cancel");
+    try {
+      const res = await fetch("/api/billing/subscription", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "cancel", atPeriodEnd: true }),
+      });
+      const json = await res.json();
+      if (!json.success) {
+        toast.error(json.error?.message ?? "Cancel failed");
+        return;
+      }
+      toast.success("Cancellation scheduled at period end");
+      await load();
+    } catch {
+      toast.error("Cancel failed");
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function resumeSubscription() {
+    setBusy("resume");
+    try {
+      const res = await fetch("/api/billing/subscription", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "resume" }),
+      });
+      const json = await res.json();
+      if (!json.success) {
+        toast.error(json.error?.message ?? "Resume failed");
+        return;
+      }
+      toast.success("Cancellation cleared");
+      await load();
+    } catch {
+      toast.error("Resume failed");
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function buyTopUp(packId: string) {
+    setBusy(packId);
+    try {
+      const res = await fetch("/api/billing/top-up/checkout", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ topUpPackId: packId }),
+      });
+      const json = await res.json();
+      if (!json.success) {
+        toast.error(json.error?.message ?? "Top-up checkout failed");
+        return;
+      }
+      if (json.data.mode === "manual_invoice") {
+        toast.success("Invoice created — check Billing / contact Delvix");
+        await load();
+        return;
+      }
+      const { transactionId, clientToken } = json.data;
+      const w = window as unknown as {
+        Paddle?: {
+          Environment: { set: (e: string) => void };
+          Initialize: (o: { token: string }) => void;
+          Checkout: { open: (o: Record<string, unknown>) => void };
+        };
+      };
+      if (!w.Paddle) {
+        await new Promise<void>((resolve, reject) => {
+          const s = document.createElement("script");
+          s.src = "https://cdn.paddle.com/paddle/v2/paddle.js";
+          s.onload = () => resolve();
+          s.onerror = () => reject(new Error("Failed to load Paddle.js"));
+          document.body.appendChild(s);
+        });
+      }
+      w.Paddle!.Environment.set(
+        process.env.NEXT_PUBLIC_PADDLE_ENV === "production"
+          ? "production"
+          : "sandbox"
+      );
+      w.Paddle!.Initialize({ token: clientToken });
+      w.Paddle!.Checkout.open({
+        transactionId,
+        settings: { locale: "en" },
+      });
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Top-up failed");
+    } finally {
+      setBusy(null);
+    }
+  }
+
   if (loading) {
     return <p className="text-sm text-muted-foreground">Loading billing…</p>;
   }
@@ -295,7 +391,8 @@ export function BillingPanel() {
           <CardHeader>
             <CardTitle className="text-base">Credit top-up packs</CardTitle>
             <CardDescription>
-              Contact us to buy — online checkout comes in a later release.
+              Buy credits via Paddle (when payments are enabled) or request a
+              manual invoice.
             </CardDescription>
           </CardHeader>
           <CardContent className="grid gap-3 sm:grid-cols-3">
@@ -312,14 +409,10 @@ export function BillingPanel() {
                 <Button
                   size="sm"
                   variant="outline"
-                  onClick={() =>
-                    toast.message("Contact us to buy this pack", {
-                      description:
-                        "Online top-up checkout is not enabled yet. Ask your Delvix contact or Super Admin.",
-                    })
-                  }
+                  disabled={busy === p.id}
+                  onClick={() => void buyTopUp(p.id)}
                 >
-                  Contact us to buy
+                  {busy === p.id ? "…" : "Buy"}
                 </Button>
               </div>
             ))}
@@ -400,15 +493,34 @@ export function BillingPanel() {
                 </div>
               )}
 
-            {billing.stripeConfigured &&
-              billing.subscription.provider === "stripe" && (
-                <Button
-                  variant="outline"
-                  onClick={() => void openPortal()}
-                  disabled={busy === "portal"}
-                >
-                  Manage billing in Stripe
-                </Button>
+            {billing.subscription.provider === "PADDLE" &&
+              billing.subscription.status === "ACTIVE" && (
+                <div className="flex flex-wrap gap-2">
+                  <Button
+                    variant="outline"
+                    onClick={() => void openPortal()}
+                    disabled={busy === "portal"}
+                  >
+                    Manage payment method
+                  </Button>
+                  {billing.subscription.cancelAtPeriodEnd ? (
+                    <Button
+                      variant="outline"
+                      onClick={() => void resumeSubscription()}
+                      disabled={busy === "resume"}
+                    >
+                      Resume subscription
+                    </Button>
+                  ) : (
+                    <Button
+                      variant="ghost"
+                      onClick={() => void cancelAtPeriodEnd()}
+                      disabled={busy === "cancel"}
+                    >
+                      Cancel at period end
+                    </Button>
+                  )}
+                </div>
               )}
           </CardContent>
         </Card>

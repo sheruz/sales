@@ -20,7 +20,7 @@ export default async function ChoosePlanPage() {
   const [org, sub] = await Promise.all([
     prisma.organization.findUnique({
       where: { id: user.organizationId },
-      select: { name: true },
+      select: { name: true, billingProvider: true },
     }),
     prisma.subscription.findUnique({
       where: { organizationId: user.organizationId },
@@ -85,6 +85,10 @@ export default async function ChoosePlanPage() {
       contactEmail={contact}
       accessMode={access.accessMode}
       homeHref={appHome()}
+      paymentsEnabled={env.PAYMENTS_ENABLED}
+      billingProvider={org?.billingProvider ?? "PADDLE"}
+      paddleClientToken={env.PADDLE_CLIENT_TOKEN ?? null}
+      paddleEnv={env.PADDLE_ENV}
       current={
         sub
           ? {

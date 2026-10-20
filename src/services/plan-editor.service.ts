@@ -22,7 +22,7 @@ import {
 } from "@/lib/billing/modules";
 import { organizationService } from "@/services/organization.service";
 import { planPauseService } from "@/services/plan-pause.service";
-import { paymentProviderStub } from "@/services/payment-provider.stub";
+import { syncProductAndPrices } from "@/services/billing/provider-registry";
 import type { ApplyMode } from "@/services/payment-provider.stub";
 
 export type FeatureDraft = {
@@ -537,12 +537,16 @@ export class PlanEditorService {
       },
     });
 
-    // Provider sync stub (B3)
-    await paymentProviderStub.syncProductAndPrices({
-      planId: plan.id,
-      planVersionId: published.id,
-      reason: input.reason,
-    });
+    // B3: Paddle product/price sync (no-op if not configured / internal plan)
+    try {
+      await syncProductAndPrices({
+        planId: plan.id,
+        planVersionId: published.id,
+        reason: input.reason,
+      });
+    } catch (err) {
+      console.error("[plan-editor] provider sync failed", err);
+    }
 
     let appliedNow = 0;
     let scheduledRenewal = 0;

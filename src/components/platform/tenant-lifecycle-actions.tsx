@@ -9,14 +9,20 @@ import { Input } from "@/components/ui/input";
 /** Super Admin invite + manual activation controls on tenant detail. */
 export function TenantLifecycleActions({
   organizationId,
+  billingProvider: initialProvider = "PADDLE",
+  billingEmail: initialEmail = "",
 }: {
   organizationId: string;
+  billingProvider?: string;
+  billingEmail?: string | null;
 }) {
   const router = useRouter();
   const [busy, setBusy] = useState(false);
   const [email, setEmail] = useState("");
   const [planCode, setPlanCode] = useState("STARTER");
   const [inviteLink, setInviteLink] = useState<string | null>(null);
+  const [billingProvider, setBillingProvider] = useState(initialProvider);
+  const [billingEmail, setBillingEmail] = useState(initialEmail || "");
 
   async function inviteAction(action: string) {
     setBusy(true);
@@ -77,9 +83,62 @@ export function TenantLifecycleActions({
     }
   }
 
+  async function saveBilling() {
+    setBusy(true);
+    try {
+      const res = await fetch(
+        `/api/platform/organizations/${organizationId}/billing`,
+        {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            billingProvider,
+            billingEmail: billingEmail || null,
+            reason: "Update tenant billing method",
+          }),
+        }
+      );
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        throw new Error(data.error?.message ?? "Billing update failed");
+      }
+      toast.success("Billing settings saved");
+      router.refresh();
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Failed");
+    } finally {
+      setBusy(false);
+    }
+  }
+
   return (
     <div className="space-y-4 rounded-lg border p-4">
       <h3 className="text-sm font-semibold">B1 lifecycle</h3>
+      <div className="flex flex-wrap items-end gap-2 border-b pb-3">
+        <div className="space-y-1">
+          <label className="text-xs text-muted-foreground">Billing method</label>
+          <select
+            className="border rounded-md h-9 px-2 text-sm"
+            value={billingProvider}
+            disabled={busy}
+            onChange={(e) => setBillingProvider(e.target.value)}
+          >
+            <option value="PADDLE">Paddle</option>
+            <option value="MANUAL_PAYONEER">Manual Payoneer</option>
+            <option value="MANUAL_BANK">Manual bank</option>
+          </select>
+        </div>
+        <Input
+          className="max-w-xs"
+          placeholder="Billing email"
+          value={billingEmail}
+          disabled={busy}
+          onChange={(e) => setBillingEmail(e.target.value)}
+        />
+        <Button size="sm" variant="outline" disabled={busy} onClick={() => void saveBilling()}>
+          Save billing
+        </Button>
+      </div>
       <div className="flex flex-wrap gap-2">
         <Button
           size="sm"

@@ -12,7 +12,18 @@ import {
 } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Building2, Users, Target, MessageSquare, Zap } from "lucide-react";
+import {
+  Building2,
+  Users,
+  Target,
+  MessageSquare,
+  Zap,
+  DollarSign,
+  AlertTriangle,
+  FileWarning,
+} from "lucide-react";
+import { SubscriptionStatus } from "@prisma/client";
+import { env } from "@/lib/config/env";
 
 function statusVariant(status: string) {
   if (status === "ACTIVE") return "default" as const;
@@ -24,6 +35,7 @@ export default async function PlatformOverviewPage() {
   const user = await getCurrentUser();
   if (!user) return null;
 
+  const ownerId = env.PLATFORM_OWNER_ORG_ID || null;
   const [
     organizationCount,
     totalUsers,
@@ -32,6 +44,10 @@ export default async function PlatformOverviewPage() {
     totalCampaigns,
     connectedIntegrations,
     autopilotEnabled,
+    activeSubs,
+    pastDueCount,
+    outstandingInvoices,
+    failedWebhooks,
   ] = await Promise.all([
     prisma.organization.count({ where: { deletedAt: null } }),
     prisma.user.count({
@@ -48,7 +64,42 @@ export default async function PlatformOverviewPage() {
     prisma.campaign.count({ where: { deletedAt: null } }),
     prisma.userIntegration.count({ where: { isConnected: true } }),
     prisma.autopilotConfig.count({ where: { isEnabled: true } }),
+    prisma.subscription.findMany({
+      where: {
+        status: SubscriptionStatus.ACTIVE,
+        ...(ownerId ? { organizationId: { not: ownerId } } : {}),
+      },
+      include: {
+        planVersion: {
+          select: { priceMonthly: true, priceYearly: true, currency: true },
+        },
+      },
+    }),
+    prisma.subscription.count({
+      where: {
+        status: SubscriptionStatus.PAST_DUE,
+        ...(ownerId ? { organizationId: { not: ownerId } } : {}),
+      },
+    }),
+    prisma.invoice.count({
+      where: {
+        status: { in: ["OPEN", "OVERDUE"] },
+        ...(ownerId ? { organizationId: { not: ownerId } } : {}),
+      },
+    }),
+    prisma.billingWebhookEvent.count({
+      where: { status: { in: ["error", "unmatched"] } },
+    }),
   ]);
+
+  const mrr = activeSubs.reduce((sum, s) => {
+    const v = s.planVersion;
+    if (!v) return sum;
+    if (s.billingInterval === "YEARLY") {
+      return sum + Number(v.priceYearly) / 12;
+    }
+    return sum + Number(v.priceMonthly);
+  }, 0);
 
   const recentOrgs = await prisma.organization.findMany({
     where: { deletedAt: null },
@@ -64,6 +115,27 @@ export default async function PlatformOverviewPage() {
   });
 
   const stats = [
+    {
+      label: "MRR (est.)",
+      value: `$${mrr.toFixed(0)}`,
+      icon: DollarSign,
+      href: appOps("/payments"),
+      sub: `${activeSubs.length} active · Delvix excluded`,
+    },
+    {
+      label: "Outstanding invoices",
+      value: outstandingInvoices,
+      icon: FileWarning,
+      href: appOps("/invoices"),
+      sub: "OPEN + OVERDUE",
+    },
+    {
+      label: "Failed / unmatched",
+      value: failedWebhooks,
+      icon: AlertTriangle,
+      href: appOps("/payments"),
+      sub: `${pastDueCount} past due subs`,
+    },
     {
       label: "Organizations",
       value: organizationCount,
@@ -108,7 +180,7 @@ export default async function PlatformOverviewPage() {
               <stat.icon className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{stat.value}</div>
+              <div className="text-2xl font-bold">{String(stat.value)}</div>
               {stat.sub && (
                 <p className="text-xs text-muted-foreground">{stat.sub}</p>
               )}

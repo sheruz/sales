@@ -1,10 +1,12 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 import { Check, Lock } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { FEATURE_KEY_LABELS } from "@/lib/billing/features";
 import { MODULE_KEYS } from "@/lib/billing/modules";
+import { appHome } from "@/lib/app-paths";
 
 type PlanCard = {
   id: string;
@@ -106,8 +108,120 @@ export function ChoosePlanClient(props: {
   accessMode: string;
   homeHref: string;
   current: CurrentSub | null;
+  paymentsEnabled?: boolean;
+  billingProvider?: string;
+  paddleClientToken?: string | null;
+  paddleEnv?: string;
 }) {
+  const router = useRouter();
   const [yearly, setYearly] = useState(false);
+  const [busy, setBusy] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  const paddleLive =
+    !!props.paymentsEnabled &&
+    props.billingProvider === "PADDLE" &&
+    !!props.paddleClientToken;
+
+  async function changePlan(plan: PlanCard) {
+    setError(null);
+    setBusy(plan.id);
+    try {
+      const res = await fetch("/api/billing/subscription", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "change",
+          planVersionId: plan.versionId,
+          interval: yearly ? "YEARLY" : "MONTHLY",
+        }),
+      });
+      const json = await res.json();
+      if (!json.success) {
+        setError(json.error?.message || "Plan change failed");
+        return;
+      }
+      router.push(appHome("/settings") + "?tab=billing");
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function startCheckout(plan: PlanCard) {
+    setError(null);
+    setBusy(plan.id);
+    try {
+      const res = await fetch("/api/billing/checkout/paddle", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          planVersionId: plan.versionId,
+          interval: yearly ? "YEARLY" : "MONTHLY",
+        }),
+      });
+      const json = await res.json();
+      if (!json.success) {
+        setError(json.error?.message || "Checkout failed");
+        return;
+      }
+      const { transactionId, clientToken } = json.data;
+      // Load Paddle.js if needed
+      const w = window as unknown as {
+        Paddle?: {
+          Environment: { set: (e: string) => void };
+          Initialize: (o: { token: string }) => void;
+          Checkout: { open: (o: Record<string, unknown>) => void };
+        };
+      };
+      if (!w.Paddle) {
+        await new Promise<void>((resolve, reject) => {
+          const s = document.createElement("script");
+          s.src = "https://cdn.paddle.com/paddle/v2/paddle.js";
+          s.onload = () => resolve();
+          s.onerror = () => reject(new Error("Failed to load Paddle.js"));
+          document.body.appendChild(s);
+        });
+      }
+      w.Paddle!.Environment.set(
+        props.paddleEnv === "production" ? "production" : "sandbox"
+      );
+      w.Paddle!.Initialize({ token: clientToken || props.paddleClientToken! });
+      w.Paddle!.Checkout.open({
+        transactionId,
+        settings: {
+          successUrl: `${window.location.origin}${appHome("/billing/activating")}`,
+          locale: "en",
+        },
+      });
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Checkout failed");
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function requestInvoice(plan: PlanCard) {
+    setBusy(plan.id);
+    setError(null);
+    try {
+      const res = await fetch("/api/billing/invoices", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          planVersionId: plan.versionId,
+          interval: yearly ? "YEARLY" : "MONTHLY",
+        }),
+      });
+      const json = await res.json();
+      if (!json.success) {
+        setError(json.error?.message || "Invoice request failed");
+        return;
+      }
+      router.push(appHome("/settings") + "?tab=billing");
+    } finally {
+      setBusy(null);
+    }
+  }
   const locked =
     props.accessMode === "locked" ||
     props.current?.status === "NONE" ||
@@ -225,7 +339,11 @@ export function ChoosePlanClient(props: {
                 ? "Upgrade"
                 : ctaKind === "downgrade"
                   ? "Downgrade"
-                  : "Contact us to subscribe";
+                  : paddleLive
+                    ? `Choose ${plan.name}`
+                    : props.billingProvider?.startsWith("MANUAL")
+                      ? "Request invoice"
+                      : "Contact us to subscribe";
 
           return (
             <article
@@ -256,6 +374,9 @@ export function ChoosePlanClient(props: {
                 <span className="text-sm font-normal text-muted-foreground">
                   /{yearly ? "yr" : "mo"}
                 </span>
+              </p>
+              <p className="text-xs text-muted-foreground mt-1">
+                Taxes may apply depending on your location
               </p>
               <ul className="mt-3 space-y-1 text-sm text-muted-foreground">
                 <li>
@@ -298,6 +419,26 @@ export function ChoosePlanClient(props: {
                 <Button className="mt-6 w-full whitespace-nowrap" disabled>
                   {ctaLabel}
                 </Button>
+              ) : paddleLive ? (
+                <Button
+                  className="mt-6 w-full whitespace-nowrap"
+                  disabled={busy === plan.id}
+                  onClick={() =>
+                    void (ctaKind === "upgrade" || ctaKind === "downgrade"
+                      ? changePlan(plan)
+                      : startCheckout(plan))
+                  }
+                >
+                  {busy === plan.id ? "…" : ctaLabel}
+                </Button>
+              ) : props.billingProvider?.startsWith("MANUAL") ? (
+                <Button
+                  className="mt-6 w-full whitespace-nowrap"
+                  disabled={busy === plan.id}
+                  onClick={() => void requestInvoice(plan)}
+                >
+                  {ctaLabel}
+                </Button>
               ) : mailto ? (
                 <a
                   href={mailto}
@@ -314,6 +455,12 @@ export function ChoosePlanClient(props: {
           );
         })}
       </div>
+
+      {error && (
+        <p className="mt-6 text-sm text-destructive" role="alert">
+          {error}
+        </p>
+      )}
 
       {sorted.length > 0 ? (
         <section className="mt-14 overflow-x-auto">

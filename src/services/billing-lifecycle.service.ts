@@ -11,6 +11,8 @@ import { planPauseService } from "@/services/plan-pause.service";
 import { overrideAdminService } from "@/services/override-admin.service";
 import { FEATURE_KEYS } from "@/lib/billing/features";
 import { billingGateway } from "@/services/billing-gateway.service";
+import { invoiceService } from "@/services/billing/invoice.service";
+import { webhookProcessorService } from "@/services/billing/webhook-processor.service";
 
 export class BillingLifecycleService {
   async runDaily(): Promise<{
@@ -20,6 +22,9 @@ export class BillingLifecycleService {
     pendingVersionsApplied: number;
     overridesExpired: number;
     pauseNoticesApplied: number;
+    renewalInvoices: number;
+    overdueInvoices: number;
+    webhooksRetried: number;
   }> {
     const now = new Date();
     const ownerId = env.PLATFORM_OWNER_ORG_ID;
@@ -30,6 +35,9 @@ export class BillingLifecycleService {
 
     const overridesExpired = await overrideAdminService.expireDue(now);
     const pauseNoticesApplied = await planPauseService.applyDueNotices(now);
+    const renewalInvoices = await invoiceService.createDueRenewalInvoices(now);
+    const overdueInvoices = await invoiceService.markOverdue(now);
+    const webhooksRetried = await webhookProcessorService.retryDue(now);
 
     const subs = await prisma.subscription.findMany({
       where: ownerId
@@ -170,6 +178,9 @@ export class BillingLifecycleService {
       pendingVersionsApplied,
       overridesExpired,
       pauseNoticesApplied,
+      renewalInvoices,
+      overdueInvoices,
+      webhooksRetried,
     };
   }
 }

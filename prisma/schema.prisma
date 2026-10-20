@@ -703,6 +703,13 @@ model Organization {
   defaultCurrency String             @default("USD") @map("default_currency")
   /// Super Admin internal notes (B1)
   internalNotes   String?            @map("internal_notes") @db.Text
+  /// B3: method Super Admin chose for this tenant (default PADDLE)
+  billingProvider String             @default("PADDLE") @map("billing_provider")
+  /// B3: email used for checkout / invoices
+  billingEmail    String?            @map("billing_email")
+  /// B3: Paddle customer id for current PADDLE_ENV (never cross env)
+  paddleCustomerId String?           @map("paddle_customer_id")
+  paddleCustomerEnv String?          @map("paddle_customer_env")
   createdAt       DateTime           @default(now()) @map("created_at")
   updatedAt       DateTime           @updatedAt @map("updated_at")
   deletedAt       DateTime?          @map("deleted_at")
@@ -778,6 +785,7 @@ model Organization {
   billingAuthorizations BillingAuthorization[]
   entitlementOverrides OrgEntitlementOverride[]
   planLimitNotices     PlanLimitNotice[]
+  invoices             Invoice[]
 
   /// S2 cached credit balance (absolute). Reconcile from ledger.
   creditBalanceCached       Int       @default(0) @map("credit_balance_cached")
@@ -3403,6 +3411,7 @@ model PlanVersion {
   subscriptions          Subscription[]          @relation("SubPlanVersion")
   pendingSubscriptions   Subscription[]          @relation("SubPendingPlanVersion")
   limitNotices           PlanLimitNotice[]
+  providerPriceMaps      ProviderPriceMap[]
 
   @@unique([planId, version])
   @@index([planId])
@@ -3449,11 +3458,15 @@ model Subscription {
   /// B1: apply at renewal
   pendingPlanVersionId   String?            @map("pending_plan_version_id")
   pendingApplyAt         DateTime?          @map("pending_apply_at")
-  provider               String             @default("stripe")
-  /// none | trial | manual | complimentary | stripe
+  /// B3: provider the active subscription actually uses (PADDLE | MANUAL_* | internal | stripe stub)
+  provider               String             @default("PADDLE")
+  /// none | trial | manual | complimentary | paddle
   accessMode             String?            @map("access_mode")
   externalCustomerId     String?            @map("external_customer_id")
   externalSubscriptionId String?            @map("external_subscription_id")
+  /// B3: sandbox | production — never reuse across envs
+  providerEnvironment    String?            @map("provider_environment")
+  billingInterval        String?            @map("billing_interval")
   status                 SubscriptionStatus @default(NONE)
   currentPeriodStart     DateTime?          @map("current_period_start")
   currentPeriodEnd       DateTime?          @map("current_period_end")
@@ -3463,6 +3476,8 @@ model Subscription {
   readOnlyUntil          DateTime?          @map("read_only_until")
   cancelAtPeriodEnd      Boolean            @default(false) @map("cancel_at_period_end")
   canceledAt             DateTime?          @map("canceled_at")
+  /// B3: last failed payment notice day (0/3/6)
+  lastPaymentFailedNoticeDay Int?           @map("last_payment_failed_notice_day")
   createdAt              DateTime           @default(now()) @map("created_at")
   updatedAt              DateTime           @updatedAt @map("updated_at")
 
@@ -3500,20 +3515,126 @@ model UsageRecord {
   @@map("usage_records")
 }
 
-/// Idempotent Stripe (or other) webhook event store
+/// Idempotent provider webhook event store (B3: Paddle primary)
 model BillingWebhookEvent {
-  id          String   @id @default(uuid())
-  provider    String   @default("stripe")
-  eventId     String   @unique @map("event_id")
-  eventType   String   @map("event_type")
-  payload     Json?
-  processedAt DateTime @default(now()) @map("processed_at")
-  status      String   @default("processed")
-  error       String?
+  id                     String    @id @default(uuid())
+  provider               String    @default("paddle")
+  environment            String?   // sandbox | production
+  eventId                String    @unique @map("event_id")
+  eventType              String    @map("event_type")
+  payload                Json?
+  occurredAt             DateTime? @map("occurred_at")
+  organizationId         String?   @map("organization_id")
+  externalSubscriptionId String?   @map("external_subscription_id")
+  /// received | processing | processed | error | unmatched
+  status                 String    @default("received")
+  error                  String?
+  attemptCount           Int       @default(0) @map("attempt_count")
+  nextRetryAt            DateTime? @map("next_retry_at")
+  processedAt            DateTime? @map("processed_at")
+  createdAt              DateTime  @default(now()) @map("created_at")
+  updatedAt              DateTime  @updatedAt @map("updated_at")
 
   @@index([eventType])
   @@index([processedAt])
+  @@index([status, nextRetryAt])
+  @@index([organizationId])
   @@map("billing_webhook_events")
+}
+
+/// B3: provider product/price ids per environment (never cross sandbox↔production)
+model ProviderPriceMap {
+  id                String   @id @default(uuid())
+  provider          String   // PADDLE
+  environment       String   // sandbox | production
+  /// MONTHLY | YEARLY | ONE_TIME
+  interval          String
+  planVersionId     String?  @map("plan_version_id")
+  topUpPackId       String?  @map("top_up_pack_id")
+  externalProductId String   @map("external_product_id")
+  externalPriceId   String   @map("external_price_id")
+  active            Boolean  @default(true)
+  createdAt         DateTime @default(now()) @map("created_at")
+  updatedAt         DateTime @updatedAt @map("updated_at")
+
+  planVersion PlanVersion? @relation(fields: [planVersionId], references: [id], onDelete: Cascade)
+  topUpPack   TopUpPack?   @relation(fields: [topUpPackId], references: [id], onDelete: Cascade)
+
+  @@index([provider, environment, externalPriceId])
+  @@index([planVersionId])
+  @@index([topUpPackId])
+  @@index([provider, environment, planVersionId, interval])
+  @@index([provider, environment, topUpPackId, interval])
+  @@map("provider_price_maps")
+}
+
+enum InvoiceStatus {
+  DRAFT
+  OPEN
+  PAID
+  VOID
+  OVERDUE
+}
+
+model Invoice {
+  id             String        @id @default(uuid())
+  number         String        @unique
+  organizationId String        @map("organization_id")
+  status         InvoiceStatus @default(DRAFT)
+  provider       String
+  currency       String        @default("USD")
+  subtotal       Decimal       @db.Decimal(12, 2)
+  total          Decimal       @db.Decimal(12, 2)
+  dueDate        DateTime?     @map("due_date")
+  paidAt         DateTime?     @map("paid_at")
+  periodStart    DateTime?     @map("period_start")
+  periodEnd      DateTime?     @map("period_end")
+  lineItems      Json          @map("line_items")
+  paymentUrl     String?       @map("payment_url")
+  pdfPath        String?       @map("pdf_path")
+  billingName    String?       @map("billing_name")
+  billingEmail   String?       @map("billing_email")
+  billingAddress String?       @map("billing_address") @db.Text
+  notes          String?       @db.Text
+  paddleTransactionId String?  @map("paddle_transaction_id")
+  planVersionId  String?       @map("plan_version_id")
+  createdByUserId String?      @map("created_by_user_id")
+  createdAt      DateTime      @default(now()) @map("created_at")
+  updatedAt      DateTime      @updatedAt @map("updated_at")
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  payments     Payment[]
+
+  @@index([organizationId, status])
+  @@index([status, dueDate])
+  @@index([provider])
+  @@map("invoices")
+}
+
+model Payment {
+  id              String   @id @default(uuid())
+  invoiceId       String   @map("invoice_id")
+  amount          Decimal  @db.Decimal(12, 2)
+  method          String
+  reference       String?
+  receivedAt      DateTime @map("received_at")
+  recordedByUserId String? @map("recorded_by_user_id")
+  notes           String?  @db.Text
+  proofPath       String?  @map("proof_path")
+  createdAt       DateTime @default(now()) @map("created_at")
+
+  invoice Invoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+
+  @@index([invoiceId])
+  @@map("payments")
+}
+
+/// Concurrency-safe invoice numbering DLX-YYYY-NNNN
+model InvoiceSequence {
+  year       Int @id
+  lastNumber Int @default(0) @map("last_number")
+
+  @@map("invoice_sequences")
 }
 
 // ─── Autonomous AI Revenue Agent (Phase 12) ─────────────────────────────────
@@ -3877,6 +3998,8 @@ model TopUpPack {
   archivedAt  DateTime? @map("archived_at")
   createdAt   DateTime  @default(now()) @map("created_at")
   updatedAt   DateTime  @updatedAt @map("updated_at")
+
+  providerPriceMaps ProviderPriceMap[]
 
   @@index([active])
   @@index([archivedAt])

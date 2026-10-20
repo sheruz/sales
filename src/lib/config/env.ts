@@ -66,6 +66,13 @@ const envSchema = z.object({
   STRIPE_WEBHOOK_SECRET: z.string().optional(),
   STRIPE_SUCCESS_URL: z.string().url().optional(),
   STRIPE_CANCEL_URL: z.string().url().optional(),
+  /** B3: master switch — false keeps Choose Plan as mailto */
+  PAYMENTS_ENABLED: envBoolean(false),
+  /** B3: sandbox | production — selects Paddle API base + ProviderPriceMap env */
+  PADDLE_ENV: z.enum(["sandbox", "production"]).default("sandbox"),
+  PADDLE_API_KEY: z.string().optional(),
+  PADDLE_CLIENT_TOKEN: z.string().optional(),
+  PADDLE_WEBHOOK_SECRET: z.string().optional(),
   REDIS_URL: z.string().optional(),
   USE_REDIS_QUEUE: envBoolean(false),
   RATE_LIMIT_MAX: z.coerce.number().default(100),

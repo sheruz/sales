@@ -14,6 +14,8 @@ import {
   Coins,
   Gift,
   ScrollText,
+  CreditCard,
+  FileText,
 } from "lucide-react";
 import {
   Sidebar,
@@ -37,6 +39,8 @@ const platformNav = [
   { title: "Packages", href: appOps("/packages"), icon: Package },
   { title: "Credit prices", href: appOps("/credit-prices"), icon: Coins },
   { title: "Top-ups", href: appOps("/top-ups"), icon: Gift },
+  { title: "Payments", href: appOps("/payments"), icon: CreditCard },
+  { title: "Invoices", href: appOps("/invoices"), icon: FileText },
   { title: "Audit", href: appOps("/audit"), icon: ScrollText },
   { title: "All Users", href: appOps("/users"), icon: Users },
   { title: "Activity", href: appOps("/activity"), icon: Activity },
