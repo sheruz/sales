@@ -238,29 +238,15 @@ export function BillingPanel() {
         return;
       }
       const { transactionId, clientToken } = json.data;
-      const w = window as unknown as {
-        Paddle?: {
-          Environment: { set: (e: string) => void };
-          Initialize: (o: { token: string }) => void;
-          Checkout: { open: (o: Record<string, unknown>) => void };
-        };
-      };
-      if (!w.Paddle) {
-        await new Promise<void>((resolve, reject) => {
-          const s = document.createElement("script");
-          s.src = "https://cdn.paddle.com/paddle/v2/paddle.js";
-          s.onload = () => resolve();
-          s.onerror = () => reject(new Error("Failed to load Paddle.js"));
-          document.body.appendChild(s);
-        });
-      }
-      w.Paddle!.Environment.set(
+      const { loadPaddleJs } = await import("@/lib/billing/load-paddle-js");
+      const Paddle = await loadPaddleJs();
+      Paddle.Environment.set(
         process.env.NEXT_PUBLIC_PADDLE_ENV === "production"
           ? "production"
           : "sandbox"
       );
-      w.Paddle!.Initialize({ token: clientToken });
-      w.Paddle!.Checkout.open({
+      Paddle.Initialize({ token: clientToken });
+      Paddle.Checkout.open({
         transactionId,
         settings: { locale: "en" },
       });

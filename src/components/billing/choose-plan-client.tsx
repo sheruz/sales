@@ -222,28 +222,13 @@ export function ChoosePlanClient(props: {
         return;
       }
       const { transactionId, clientToken } = json.data;
-      // Load Paddle.js if needed
-      const w = window as unknown as {
-        Paddle?: {
-          Environment: { set: (e: string) => void };
-          Initialize: (o: { token: string }) => void;
-          Checkout: { open: (o: Record<string, unknown>) => void };
-        };
-      };
-      if (!w.Paddle) {
-        await new Promise<void>((resolve, reject) => {
-          const s = document.createElement("script");
-          s.src = "https://cdn.paddle.com/paddle/v2/paddle.js";
-          s.onload = () => resolve();
-          s.onerror = () => reject(new Error("Failed to load Paddle.js"));
-          document.body.appendChild(s);
-        });
-      }
-      w.Paddle!.Environment.set(
+      const { loadPaddleJs } = await import("@/lib/billing/load-paddle-js");
+      const Paddle = await loadPaddleJs();
+      Paddle.Environment.set(
         props.paddleEnv === "production" ? "production" : "sandbox"
       );
-      w.Paddle!.Initialize({ token: clientToken || props.paddleClientToken! });
-      w.Paddle!.Checkout.open({
+      Paddle.Initialize({ token: clientToken || props.paddleClientToken! });
+      Paddle.Checkout.open({
         transactionId,
         settings: {
           successUrl: `${window.location.origin}${appHome("/billing/activating")}`,

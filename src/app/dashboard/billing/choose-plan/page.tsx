@@ -1,3 +1,4 @@
+import Script from "next/script";
 import { getCurrentUser } from "@/lib/auth/session";
 import { redirect } from "next/navigation";
 import { appHome } from "@/lib/app-paths";
@@ -9,7 +10,7 @@ import { env } from "@/lib/config/env";
 import { tenantAccessService } from "@/services/tenant-access.service";
 import { paymentConfigService } from "@/services/billing/payment-config.service";
 import { getPaddleRuntime } from "@/services/billing/paddle-client";
-// getPaddleRuntime kept as fallback if credentials helper fails
+import { PADDLE_JS } from "@/lib/billing/load-paddle-js";
 
 export const dynamic = "force-dynamic";
 
@@ -104,29 +105,36 @@ export default async function ChoosePlanPage() {
     env.BILLING_CONTACT_EMAIL ?? env.NOTIFY_EMAIL ?? env.SMTP_FROM_EMAIL ?? "";
 
   return (
-    <ChoosePlanClient
-      companyName={org?.name ?? "your company"}
-      plans={cards as NonNullable<(typeof cards)[number]>[]}
-      canManageBilling={canManageBilling}
-      contactEmail={contact}
-      accessMode={access.accessMode}
-      homeHref={appHome()}
-      paymentsEnabled={paymentsLive}
-      billingProvider={provider}
-      checkoutMethods={checkoutMethods}
-      paddleClientToken={paddleClientToken}
-      paddleEnv={paddleEnv}
-      current={
-        sub
-          ? {
-              status: sub.status,
-              planId: sub.planId,
-              planCode: sub.plan.code,
-              planName: sub.plan.name,
-              trialEndsAt: sub.trialEndsAt?.toISOString() ?? null,
-            }
-          : null
-      }
-    />
+    <>
+      <Script
+        src={PADDLE_JS}
+        strategy="afterInteractive"
+        data-delvix-paddle="1"
+      />
+      <ChoosePlanClient
+        companyName={org?.name ?? "your company"}
+        plans={cards as NonNullable<(typeof cards)[number]>[]}
+        canManageBilling={canManageBilling}
+        contactEmail={contact}
+        accessMode={access.accessMode}
+        homeHref={appHome()}
+        paymentsEnabled={paymentsLive}
+        billingProvider={provider}
+        checkoutMethods={checkoutMethods}
+        paddleClientToken={paddleClientToken}
+        paddleEnv={paddleEnv}
+        current={
+          sub
+            ? {
+                status: sub.status,
+                planId: sub.planId,
+                planCode: sub.plan.code,
+                planName: sub.plan.name,
+                trialEndsAt: sub.trialEndsAt?.toISOString() ?? null,
+              }
+            : null
+        }
+      />
+    </>
   );
 }

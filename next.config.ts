@@ -17,12 +17,12 @@ const securityHeaders = [
     value: [
       "default-src 'self'",
       // Paddle.js checkout overlay (cdn + sandbox/live buy frames)
-      "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://www.googletagmanager.com https://www.google-analytics.com https://cdn.paddle.com",
-      "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdn.paddle.com",
+      "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://www.googletagmanager.com https://www.google-analytics.com https://cdn.paddle.com https://*.paddle.com",
+      "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdn.paddle.com https://*.paddle.com",
       "img-src 'self' data: https: blob:",
-      "font-src 'self' data: https://fonts.gstatic.com https://cdn.paddle.com",
-      "connect-src 'self' https: https://www.google-analytics.com https://analytics.google.com https://www.googletagmanager.com https://api.paddle.com https://sandbox-api.paddle.com https://cdn.paddle.com",
-      "frame-src 'self' https://buy.paddle.com https://sandbox-buy.paddle.com https://checkout.paddle.com https://sandbox-checkout.paddle.com https://cdn.paddle.com",
+      "font-src 'self' data: https://fonts.gstatic.com https://cdn.paddle.com https://*.paddle.com",
+      "connect-src 'self' https: https://www.google-analytics.com https://analytics.google.com https://www.googletagmanager.com https://*.paddle.com",
+      "frame-src 'self' https://*.paddle.com https://cdn.paddle.com",
       "frame-ancestors 'none'",
       "base-uri 'self'",
       "form-action 'self'",
