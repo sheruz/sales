@@ -109,7 +109,7 @@ export default async function OrganizationDetailPage({ params }: PageProps) {
           <OrganizationActions organizationId={org.id} status={org.status} />
           <TenantLifecycleActions
             organizationId={org.id}
-            billingProvider={org.billingProvider}
+            billingProvider={org.billingProvider ?? "DEFAULT"}
             billingEmail={org.billingEmail}
           />
         </div>

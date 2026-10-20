@@ -7,6 +7,8 @@ import prisma from "@/lib/db/prisma";
 import { PlanVisibility } from "@prisma/client";
 import { env } from "@/lib/config/env";
 import { tenantAccessService } from "@/services/tenant-access.service";
+import { paymentConfigService } from "@/services/billing/payment-config.service";
+import { getPaddleRuntime } from "@/services/billing/paddle-client";
 
 export const dynamic = "force-dynamic";
 
@@ -17,21 +19,37 @@ export default async function ChoosePlanPage() {
   const access = await tenantAccessService.getAccess(user.organizationId);
   const canManageBilling = hasOrgPermission(user, "billing.manage");
 
-  const [org, sub] = await Promise.all([
-    prisma.organization.findUnique({
-      where: { id: user.organizationId },
-      select: { name: true, billingProvider: true },
-    }),
-    prisma.subscription.findUnique({
-      where: { organizationId: user.organizationId },
-      select: {
-        status: true,
-        planId: true,
-        trialEndsAt: true,
-        plan: { select: { id: true, code: true, name: true } },
-      },
-    }),
-  ]);
+  const [org, sub, paymentsLive, checkoutMethods, provider] =
+    await Promise.all([
+      prisma.organization.findUnique({
+        where: { id: user.organizationId },
+        select: { name: true, billingProvider: true },
+      }),
+      prisma.subscription.findUnique({
+        where: { organizationId: user.organizationId },
+        select: {
+          status: true,
+          planId: true,
+          trialEndsAt: true,
+          plan: { select: { id: true, code: true, name: true } },
+        },
+      }),
+      paymentConfigService.isPaymentsLive(),
+      paymentConfigService.resolveCheckoutMethods(user.organizationId),
+      paymentConfigService.resolveOrgProvider(user.organizationId),
+    ]);
+
+  let paddleClientToken: string | null = null;
+  let paddleEnv = "sandbox";
+  if (checkoutMethods.includes("CARD_PADDLE")) {
+    try {
+      const rt = await getPaddleRuntime();
+      paddleClientToken = rt.clientToken || null;
+      paddleEnv = rt.environment;
+    } catch {
+      /* not configured */
+    }
+  }
 
   const plans = await prisma.plan.findMany({
     where: {
@@ -85,10 +103,11 @@ export default async function ChoosePlanPage() {
       contactEmail={contact}
       accessMode={access.accessMode}
       homeHref={appHome()}
-      paymentsEnabled={env.PAYMENTS_ENABLED}
-      billingProvider={org?.billingProvider ?? "PADDLE"}
-      paddleClientToken={env.PADDLE_CLIENT_TOKEN ?? null}
-      paddleEnv={env.PADDLE_ENV}
+      paymentsEnabled={paymentsLive}
+      billingProvider={provider}
+      checkoutMethods={checkoutMethods}
+      paddleClientToken={paddleClientToken}
+      paddleEnv={paddleEnv}
       current={
         sub
           ? {

@@ -703,13 +703,18 @@ model Organization {
   defaultCurrency String             @default("USD") @map("default_currency")
   /// Super Admin internal notes (B1)
   internalNotes   String?            @map("internal_notes") @db.Text
-  /// B3: method Super Admin chose for this tenant (default PADDLE)
-  billingProvider String             @default("PADDLE") @map("billing_provider")
+  /// B3.1: null = use PaymentSettings.defaultProvider
+  billingProvider String?            @map("billing_provider")
+  /// B3.1: null = inherit global checkoutMethods
+  allowedCheckoutMethods Json?       @map("allowed_checkout_methods")
   /// B3: email used for checkout / invoices
   billingEmail    String?            @map("billing_email")
-  /// B3: Paddle customer id for current PADDLE_ENV (never cross env)
+  /// B3: Paddle customer id for current provider mode (never cross env)
   paddleCustomerId String?           @map("paddle_customer_id")
   paddleCustomerEnv String?          @map("paddle_customer_env")
+  /// B3.1: Stripe customer id for current mode (never cross env)
+  stripeCustomerId String?           @map("stripe_customer_id")
+  stripeCustomerEnv String?          @map("stripe_customer_env")
   createdAt       DateTime           @default(now()) @map("created_at")
   updatedAt       DateTime           @updatedAt @map("updated_at")
   deletedAt       DateTime?          @map("deleted_at")
@@ -3635,6 +3640,46 @@ model InvoiceSequence {
   lastNumber Int @default(0) @map("last_number")
 
   @@map("invoice_sequences")
+}
+
+/// B3.1: per-provider config (credentials encrypted separately for sandbox/live)
+model PaymentProviderConfig {
+  provider               String   @id
+  enabled                Boolean  @default(false)
+  /// SANDBOX | LIVE
+  mode                   String   @default("SANDBOX")
+  displayName            String   @map("display_name")
+  sortOrder              Int      @default(0) @map("sort_order")
+  sandboxCredentialsEnc  String?  @map("sandbox_credentials_enc") @db.Text
+  liveCredentialsEnc     String?  @map("live_credentials_enc") @db.Text
+  /// Mask hint for UI without decrypt (e.g. ••••1a2b)
+  sandboxHint            String?  @map("sandbox_hint")
+  liveHint               String?  @map("live_hint")
+  lastTestAt             DateTime? @map("last_test_at")
+  lastTestResult         Json?    @map("last_test_result")
+  lastWebhookAt          DateTime? @map("last_webhook_at")
+  createdAt              DateTime @default(now()) @map("created_at")
+  updatedAt              DateTime @updatedAt @map("updated_at")
+
+  @@map("payment_provider_configs")
+}
+
+/// B3.1: singleton global payment settings (id always "default")
+model PaymentSettings {
+  id                     String   @id @default("default")
+  paymentsEnabled        Boolean  @default(false) @map("payments_enabled")
+  defaultProvider        String   @default("PADDLE") @map("default_provider")
+  /// e.g. ["CARD_PADDLE","CARD_STRIPE","INVOICE_PAYONEER","INVOICE_BANK"]
+  checkoutMethods        Json     @default("[]") @map("checkout_methods")
+  currency               String   @default("USD")
+  graceDays              Int      @default(7) @map("grace_days")
+  manualRenewalLeadDays  Int      @default(7) @map("manual_renewal_lead_days")
+  business               Json     @default("{}")
+  manualInstructions     Json     @default("{}") @map("manual_instructions")
+  createdAt              DateTime @default(now()) @map("created_at")
+  updatedAt              DateTime @updatedAt @map("updated_at")
+
+  @@map("payment_settings")
 }
 
 // ─── Autonomous AI Revenue Agent (Phase 12) ─────────────────────────────────

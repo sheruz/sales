@@ -428,10 +428,17 @@ export class InvoiceService {
       where: { id: invoiceId },
       include: { organization: true },
     });
-    const settings = await prisma.settings.findUnique({
-      where: { key: "platform_billing" },
+    const paySettings = await prisma.paymentSettings.findUnique({
+      where: { id: "default" },
     });
-    const biz = (settings?.value as Record<string, string> | null) || {};
+    const biz =
+      (paySettings?.business as Record<string, string> | null) ||
+      ((
+        await prisma.settings.findUnique({
+          where: { key: "platform_billing" },
+        })
+      )?.value as Record<string, string> | null) ||
+      {};
     const items = invoice.lineItems as Array<{ description: string; amount: number }>;
     const lines = items
       .map(

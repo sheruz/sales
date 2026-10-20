@@ -19,8 +19,14 @@ export async function POST(request: NextRequest) {
     const org = await prisma.organization.findUniqueOrThrow({
       where: { id: user.organizationId },
     });
-    const isManual = org.billingProvider.startsWith("MANUAL");
-    if (!env.PAYMENTS_ENABLED && !isManual) {
+    const { paymentConfigService } = await import(
+      "@/services/billing/payment-config.service"
+    );
+    const providerId = await paymentConfigService.resolveOrgProvider(
+      user.organizationId
+    );
+    const isManual = providerId.startsWith("MANUAL");
+    if (!(await paymentConfigService.isPaymentsLive()) && !isManual) {
       throw new ValidationError("Payments are not enabled yet");
     }
     const admin = await prisma.organizationUser.findFirst({

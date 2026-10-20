@@ -7,11 +7,12 @@ import { env } from "@/lib/config/env";
 import { ValidationError } from "@/lib/api/response";
 import { PlanVisibility, PlanVersionStatus } from "@prisma/client";
 import {
+  getPaddleRuntime,
   isPaddleConfigured,
-  paddleEnvironment,
   paddleFetch,
   verifyPaddleSignature,
 } from "@/services/billing/paddle-client";
+import { paymentConfigService } from "@/services/billing/payment-config.service";
 import type {
   MappedBillingEvent,
   PaymentProvider,
@@ -23,10 +24,15 @@ type PaddleData<T> = { data: T };
 export class PaddleProvider implements PaymentProvider {
   readonly id = "PADDLE" as const;
 
-  private assertConfigured() {
-    if (!isPaddleConfigured()) {
+  private async assertConfigured() {
+    if (!(await isPaddleConfigured())) {
       throw new ValidationError("Paddle is not configured");
     }
+  }
+
+  private async envName() {
+    const rt = await getPaddleRuntime();
+    return rt.environment;
   }
 
   async createCustomer(input: {
@@ -34,11 +40,11 @@ export class PaddleProvider implements PaymentProvider {
     email: string;
     name: string;
   }) {
-    this.assertConfigured();
+    await this.assertConfigured();
     const org = await prisma.organization.findUniqueOrThrow({
       where: { id: input.organizationId },
     });
-    const envName = paddleEnvironment();
+    const envName = await this.envName();
     if (org.paddleCustomerId && org.paddleCustomerEnv === envName) {
       return { externalCustomerId: org.paddleCustomerId };
     }
@@ -69,7 +75,7 @@ export class PaddleProvider implements PaymentProvider {
     planVersionId: string;
     reason?: string;
   }) {
-    this.assertConfigured();
+    await this.assertConfigured();
     const version = await prisma.planVersion.findUnique({
       where: { id: input.planVersionId },
       include: { plan: true },
@@ -89,7 +95,7 @@ export class PaddleProvider implements PaymentProvider {
       return { ok: true };
     }
 
-    const envName = paddleEnvironment();
+    const envName = await this.envName();
     // Reuse product if we already have a map for this plan's any version
     let productId: string | null = null;
     const existing = await prisma.providerPriceMap.findFirst({
@@ -193,12 +199,12 @@ export class PaddleProvider implements PaymentProvider {
   }
 
   async syncTopUpPack(input: { topUpPackId: string }) {
-    this.assertConfigured();
+    await this.assertConfigured();
     const pack = await prisma.topUpPack.findUnique({
       where: { id: input.topUpPackId },
     });
     if (!pack || pack.archivedAt) throw new ValidationError("Pack not found");
-    const envName = paddleEnvironment();
+    const envName = await this.envName();
 
     let productId: string | null = null;
     const existing = await prisma.providerPriceMap.findFirst({
@@ -265,7 +271,7 @@ export class PaddleProvider implements PaymentProvider {
     const map = await prisma.providerPriceMap.findFirst({
       where: {
         provider: "PADDLE",
-        environment: paddleEnvironment(),
+        environment: await this.envName(),
         planVersionId,
         interval,
         active: true,
@@ -287,8 +293,8 @@ export class PaddleProvider implements PaymentProvider {
     successUrl: string;
     cancelUrl: string;
   }) {
-    this.assertConfigured();
-    if (!env.PAYMENTS_ENABLED) {
+    await this.assertConfigured();
+    if (!(await paymentConfigService.isPaymentsLive())) {
       throw new ValidationError("Payments are not enabled yet");
     }
     if (env.PLATFORM_OWNER_ORG_ID === input.organizationId) {
@@ -331,7 +337,7 @@ export class PaddleProvider implements PaymentProvider {
           planVersionId: version.id,
           interval: input.interval,
           kind: "subscription",
-          paddleEnv: paddleEnvironment(),
+          paddleEnv: await this.envName(),
         },
         checkout: {
           url: input.successUrl,
@@ -342,7 +348,7 @@ export class PaddleProvider implements PaymentProvider {
     return {
       mode: "paddle_overlay" as const,
       transactionId: tx.data.id,
-      clientToken: env.PADDLE_CLIENT_TOKEN!,
+      clientToken: (await getPaddleRuntime()).clientToken,
     };
   }
 
@@ -353,14 +359,14 @@ export class PaddleProvider implements PaymentProvider {
     successUrl: string;
     cancelUrl: string;
   }) {
-    this.assertConfigured();
-    if (!env.PAYMENTS_ENABLED) {
+    await this.assertConfigured();
+    if (!(await paymentConfigService.isPaymentsLive())) {
       throw new ValidationError("Payments are not enabled yet");
     }
     const map = await prisma.providerPriceMap.findFirst({
       where: {
         provider: "PADDLE",
-        environment: paddleEnvironment(),
+        environment: await this.envName(),
         topUpPackId: input.topUpPackId,
         interval: "ONE_TIME",
         active: true,
@@ -372,7 +378,7 @@ export class PaddleProvider implements PaymentProvider {
     const price = await prisma.providerPriceMap.findFirstOrThrow({
       where: {
         provider: "PADDLE",
-        environment: paddleEnvironment(),
+        environment: await this.envName(),
         topUpPackId: input.topUpPackId,
         interval: "ONE_TIME",
         active: true,
@@ -402,7 +408,7 @@ export class PaddleProvider implements PaymentProvider {
           topUpPackId: pack.id,
           kind: "topup",
           credits: pack.credits,
-          paddleEnv: paddleEnvironment(),
+          paddleEnv: await this.envName(),
         },
         checkout: { url: input.successUrl },
       },
@@ -411,7 +417,7 @@ export class PaddleProvider implements PaymentProvider {
     return {
       mode: "paddle_overlay" as const,
       transactionId: tx.data.id,
-      clientToken: env.PADDLE_CLIENT_TOKEN!,
+      clientToken: (await getPaddleRuntime()).clientToken,
     };
   }
 
@@ -419,11 +425,11 @@ export class PaddleProvider implements PaymentProvider {
     organizationId: string;
     returnUrl: string;
   }) {
-    this.assertConfigured();
+    await this.assertConfigured();
     const org = await prisma.organization.findUniqueOrThrow({
       where: { id: input.organizationId },
     });
-    if (!org.paddleCustomerId || org.paddleCustomerEnv !== paddleEnvironment()) {
+    if (!org.paddleCustomerId || org.paddleCustomerEnv !== await this.envName()) {
       throw new ValidationError("No Paddle customer for this environment");
     }
     // Paddle Billing customer portal session
@@ -447,7 +453,7 @@ export class PaddleProvider implements PaymentProvider {
     proration: boolean;
     effective: "immediate" | "period_end";
   }) {
-    this.assertConfigured();
+    await this.assertConfigured();
     const sub = await prisma.subscription.findUniqueOrThrow({
       where: { organizationId: input.organizationId },
     });
@@ -480,7 +486,7 @@ export class PaddleProvider implements PaymentProvider {
     organizationId: string;
     atPeriodEnd: boolean;
   }) {
-    this.assertConfigured();
+    await this.assertConfigured();
     const sub = await prisma.subscription.findUniqueOrThrow({
       where: { organizationId: input.organizationId },
     });
@@ -504,7 +510,7 @@ export class PaddleProvider implements PaymentProvider {
   }
 
   async resumeSubscription(input: { organizationId: string }) {
-    this.assertConfigured();
+    await this.assertConfigured();
     const sub = await prisma.subscription.findUniqueOrThrow({
       where: { organizationId: input.organizationId },
     });
@@ -522,8 +528,9 @@ export class PaddleProvider implements PaymentProvider {
     rawBody: string;
     signatureHeader: string | null;
   }) {
-    const secret = env.PADDLE_WEBHOOK_SECRET;
-    if (!secret) throw new ValidationError("PADDLE_WEBHOOK_SECRET missing");
+    const rt = await getPaddleRuntime();
+    const secret = rt.webhookSecret;
+    if (!secret) throw new ValidationError("Paddle webhook secret missing");
     const ok = await verifyPaddleSignature(
       input.rawBody,
       input.signatureHeader,
@@ -600,7 +607,7 @@ export class PaddleProvider implements PaymentProvider {
         const map = await prisma.providerPriceMap.findFirst({
           where: {
             provider: "PADDLE",
-            environment: paddleEnvironment(),
+            environment: await this.envName(),
             externalPriceId: priceId,
             active: true,
           },
@@ -734,11 +741,11 @@ export class PaddleProvider implements PaymentProvider {
 
   async testConnection() {
     try {
-      this.assertConfigured();
+      await this.assertConfigured();
       await paddleFetch("/event-types");
       return {
         ok: true,
-        message: `Paddle ${paddleEnvironment()} OK`,
+        message: `Paddle ${await this.envName()} OK`,
       };
     } catch (err) {
       return {

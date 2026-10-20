@@ -119,11 +119,13 @@ export function TenantLifecycleActions({
           <label className="text-xs text-muted-foreground">Billing method</label>
           <select
             className="border rounded-md h-9 px-2 text-sm"
-            value={billingProvider}
+            value={billingProvider || "DEFAULT"}
             disabled={busy}
             onChange={(e) => setBillingProvider(e.target.value)}
           >
+            <option value="DEFAULT">Use platform default</option>
             <option value="PADDLE">Paddle</option>
+            <option value="STRIPE">Stripe</option>
             <option value="MANUAL_PAYONEER">Manual Payoneer</option>
             <option value="MANUAL_BANK">Manual bank</option>
           </select>

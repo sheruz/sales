@@ -110,6 +110,7 @@ export function ChoosePlanClient(props: {
   current: CurrentSub | null;
   paymentsEnabled?: boolean;
   billingProvider?: string;
+  checkoutMethods?: string[];
   paddleClientToken?: string | null;
   paddleEnv?: string;
 }) {
@@ -117,11 +118,23 @@ export function ChoosePlanClient(props: {
   const [yearly, setYearly] = useState(false);
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [methodChoice, setMethodChoice] = useState<string | null>(null);
 
-  const paddleLive =
+  const methods = props.checkoutMethods || [];
+  const hasPaddle =
     !!props.paymentsEnabled &&
-    props.billingProvider === "PADDLE" &&
+    methods.includes("CARD_PADDLE") &&
     !!props.paddleClientToken;
+  const hasStripe =
+    !!props.paymentsEnabled && methods.includes("CARD_STRIPE");
+  const hasInvoice =
+    methods.includes("INVOICE_PAYONEER") ||
+    methods.includes("INVOICE_BANK");
+  const cardMethods = [
+    ...(hasPaddle ? ["CARD_PADDLE"] : []),
+    ...(hasStripe ? ["CARD_STRIPE"] : []),
+  ];
+  const paddleLive = hasPaddle;
 
   async function changePlan(plan: PlanCard) {
     setError(null);
@@ -147,7 +160,51 @@ export function ChoosePlanClient(props: {
     }
   }
 
-  async function startCheckout(plan: PlanCard) {
+  async function startStripeCheckout(plan: PlanCard) {
+    setError(null);
+    setBusy(plan.id);
+    try {
+      const res = await fetch("/api/billing/checkout/stripe", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          planVersionId: plan.versionId,
+          interval: yearly ? "YEARLY" : "MONTHLY",
+        }),
+      });
+      const json = await res.json();
+      if (!json.success) {
+        setError(json.error?.message || "Checkout failed");
+        return;
+      }
+      if (json.data.checkoutUrl) {
+        window.location.href = json.data.checkoutUrl;
+      }
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function startCheckout(plan: PlanCard, method?: string) {
+    const chosen =
+      method ||
+      methodChoice ||
+      (cardMethods.length === 1 ? cardMethods[0] : null) ||
+      (hasInvoice && !hasPaddle && !hasStripe ? "INVOICE" : null);
+
+    if (!chosen && (cardMethods.length > 1 || (cardMethods.length > 0 && hasInvoice))) {
+      setMethodChoice("__pick__");
+      setBusy(null);
+      return;
+    }
+
+    if (chosen === "CARD_STRIPE") {
+      return startStripeCheckout(plan);
+    }
+    if (chosen === "INVOICE" || chosen?.startsWith("INVOICE_")) {
+      return requestInvoice(plan);
+    }
+
     setError(null);
     setBusy(plan.id);
     try {
@@ -339,9 +396,9 @@ export function ChoosePlanClient(props: {
                 ? "Upgrade"
                 : ctaKind === "downgrade"
                   ? "Downgrade"
-                  : paddleLive
+                  : hasPaddle || hasStripe
                     ? `Choose ${plan.name}`
-                    : props.billingProvider?.startsWith("MANUAL")
+                    : hasInvoice
                       ? "Request invoice"
                       : "Contact us to subscribe";
 
@@ -419,26 +476,62 @@ export function ChoosePlanClient(props: {
                 <Button className="mt-6 w-full whitespace-nowrap" disabled>
                   {ctaLabel}
                 </Button>
-              ) : paddleLive ? (
-                <Button
-                  className="mt-6 w-full whitespace-nowrap"
-                  disabled={busy === plan.id}
-                  onClick={() =>
-                    void (ctaKind === "upgrade" || ctaKind === "downgrade"
-                      ? changePlan(plan)
-                      : startCheckout(plan))
-                  }
-                >
-                  {busy === plan.id ? "…" : ctaLabel}
-                </Button>
-              ) : props.billingProvider?.startsWith("MANUAL") ? (
-                <Button
-                  className="mt-6 w-full whitespace-nowrap"
-                  disabled={busy === plan.id}
-                  onClick={() => void requestInvoice(plan)}
-                >
-                  {ctaLabel}
-                </Button>
+              ) : hasPaddle || hasStripe || hasInvoice ? (
+                <div className="mt-6 space-y-2">
+                  {(cardMethods.length > 1 ||
+                    (cardMethods.length > 0 && hasInvoice)) &&
+                    methodChoice === "__pick__" &&
+                    busy === null && (
+                      <div className="flex flex-col gap-2">
+                        {hasPaddle && (
+                          <Button
+                            className="w-full"
+                            onClick={() =>
+                              void startCheckout(plan, "CARD_PADDLE")
+                            }
+                          >
+                            Pay by card (Paddle)
+                          </Button>
+                        )}
+                        {hasStripe && (
+                          <Button
+                            className="w-full"
+                            variant="outline"
+                            onClick={() =>
+                              void startCheckout(plan, "CARD_STRIPE")
+                            }
+                          >
+                            Pay by card (Stripe)
+                          </Button>
+                        )}
+                        {hasInvoice && (
+                          <Button
+                            className="w-full"
+                            variant="outline"
+                            onClick={() => void requestInvoice(plan)}
+                          >
+                            Pay by invoice
+                          </Button>
+                        )}
+                      </div>
+                    )}
+                  {(methodChoice !== "__pick__" ||
+                    (cardMethods.length <= 1 && !hasInvoice) ||
+                    (cardMethods.length === 0 && hasInvoice) ||
+                    (cardMethods.length === 1 && !hasInvoice)) && (
+                    <Button
+                      className="w-full whitespace-nowrap"
+                      disabled={busy === plan.id}
+                      onClick={() =>
+                        void (ctaKind === "upgrade" || ctaKind === "downgrade"
+                          ? changePlan(plan)
+                          : startCheckout(plan))
+                      }
+                    >
+                      {busy === plan.id ? "…" : ctaLabel}
+                    </Button>
+                  )}
+                </div>
               ) : mailto ? (
                 <a
                   href={mailto}

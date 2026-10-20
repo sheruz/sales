@@ -61,18 +61,24 @@ const envSchema = z.object({
   MICROSOFT_CLIENT_SECRET: z.string().optional(),
   MICROSOFT_TENANT_ID: z.string().default("common"),
   MICROSOFT_REDIRECT_URI: z.string().url().optional(),
+  /** Legacy — B3.1 imports once into DB then ignored at runtime */
   STRIPE_SECRET_KEY: z.string().optional(),
   STRIPE_PUBLISHABLE_KEY: z.string().optional(),
   STRIPE_WEBHOOK_SECRET: z.string().optional(),
   STRIPE_SUCCESS_URL: z.string().url().optional(),
   STRIPE_CANCEL_URL: z.string().url().optional(),
-  /** B3: master switch — false keeps Choose Plan as mailto */
+  /** Legacy — use PaymentSettings.paymentsEnabled in Super Admin */
   PAYMENTS_ENABLED: envBoolean(false),
-  /** B3: sandbox | production — selects Paddle API base + ProviderPriceMap env */
+  /** Legacy — use PaymentProviderConfig.mode */
   PADDLE_ENV: z.enum(["sandbox", "production"]).default("sandbox"),
   PADDLE_API_KEY: z.string().optional(),
   PADDLE_CLIENT_TOKEN: z.string().optional(),
   PADDLE_WEBHOOK_SECRET: z.string().optional(),
+  /**
+   * B3.1 emergency kill switch — overrides Super Admin master switch.
+   * When true, all card checkouts disabled; red banner in SA Payments.
+   */
+  PAYMENTS_EMERGENCY_DISABLE: envBoolean(false),
   REDIS_URL: z.string().optional(),
   USE_REDIS_QUEUE: envBoolean(false),
   RATE_LIMIT_MAX: z.coerce.number().default(100),

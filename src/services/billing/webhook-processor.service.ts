@@ -6,7 +6,9 @@ import prisma from "@/lib/db/prisma";
 import { env } from "@/lib/config/env";
 import { SubscriptionStatus, PlanVersionStatus, PlanVisibility } from "@prisma/client";
 import { paddleProvider } from "@/services/billing/paddle.provider";
+import { stripeProvider } from "@/services/billing/stripe.provider";
 import { paddleEnvironment } from "@/services/billing/paddle-client";
+import { paymentConfigService } from "@/services/billing/payment-config.service";
 import { entitlementService } from "@/services/entitlement.service";
 import { creditLedgerService } from "@/services/credit-ledger.service";
 import { organizationService } from "@/services/organization.service";
@@ -17,27 +19,21 @@ import { sendEmailWithConfig } from "@/lib/email/send-mail";
 import { logger } from "@/lib/logger";
 
 export class WebhookProcessorService {
-  /** Verify → store → return quickly. Processing is separate. */
-  async receivePaddleWebhook(rawBody: string, signatureHeader: string | null) {
-    const verified = await paddleProvider.verifyWebhook({
-      rawBody,
-      signatureHeader,
-    });
-
-    // Reject wrong-env events if payload carries environment hint
-    const payload = verified.payload as {
-      data?: { custom_data?: Record<string, unknown> };
-    };
-    const envHint = payload?.data?.custom_data?.paddleEnv as string | undefined;
-    if (envHint && envHint !== paddleEnvironment()) {
-      throw new Error("Paddle event from wrong environment");
-    }
-
+  private async storeAndProcess(
+    provider: "paddle" | "stripe",
+    verified: {
+      eventId: string;
+      eventType: string;
+      payload: unknown;
+      occurredAt: Date;
+    },
+    environment: string
+  ) {
     try {
       await prisma.billingWebhookEvent.create({
         data: {
-          provider: "paddle",
-          environment: paddleEnvironment(),
+          provider,
+          environment,
           eventId: verified.eventId,
           eventType: verified.eventType,
           payload: verified.payload as object,
@@ -46,7 +42,6 @@ export class WebhookProcessorService {
         },
       });
     } catch (err) {
-      // unique eventId → duplicate
       const msg = err instanceof Error ? err.message : String(err);
       if (/unique|duplicate/i.test(msg)) {
         return { ok: true, duplicate: true };
@@ -54,7 +49,10 @@ export class WebhookProcessorService {
       throw err;
     }
 
-    // Fire-and-forget process (still awaited briefly for serverless reliability)
+    void paymentConfigService
+      .touchWebhook(provider === "paddle" ? "PADDLE" : "STRIPE")
+      .catch(() => {});
+
     void this.processEventById(verified.eventId).catch((e) =>
       logger.error("webhook process failed", {
         eventId: verified.eventId,
@@ -63,6 +61,42 @@ export class WebhookProcessorService {
     );
 
     return { ok: true, duplicate: false };
+  }
+
+  /** Verify → store → return quickly. Processing is separate. */
+  async receivePaddleWebhook(rawBody: string, signatureHeader: string | null) {
+    const verified = await paddleProvider.verifyWebhook({
+      rawBody,
+      signatureHeader,
+    });
+
+    const payload = verified.payload as {
+      data?: { custom_data?: Record<string, unknown> };
+    };
+    const envName = await paddleEnvironment();
+    const envHint = payload?.data?.custom_data?.paddleEnv as string | undefined;
+    if (envHint && envHint !== envName) {
+      throw new Error("Paddle event from wrong environment");
+    }
+
+    return this.storeAndProcess("paddle", verified, envName);
+  }
+
+  async receiveStripeWebhook(rawBody: string, signatureHeader: string | null) {
+    const verified = await stripeProvider.verifyWebhook({
+      rawBody,
+      signatureHeader,
+    });
+    const cfg = await paymentConfigService.getProviderCredentials("STRIPE");
+    const environment = cfg?.environment || "sandbox";
+    const payload = verified.payload as {
+      data?: { object?: { metadata?: { stripeEnv?: string } } };
+    };
+    const envHint = payload?.data?.object?.metadata?.stripeEnv;
+    if (envHint && envHint !== environment) {
+      throw new Error("Stripe event from wrong environment");
+    }
+    return this.storeAndProcess("stripe", verified, environment);
   }
 
   async processEventById(eventId: string) {
@@ -82,7 +116,9 @@ export class WebhookProcessorService {
 
     try {
       // Ordered: ignore if we already processed a newer event for same sub
-      const mapped = await paddleProvider.mapEvent(row.payload);
+      const mapper =
+        row.provider === "stripe" ? stripeProvider : paddleProvider;
+      const mapped = await mapper.mapEvent(row.payload);
 
       if (mapped.type === "unmatched") {
         await prisma.billingWebhookEvent.update({
@@ -155,7 +191,7 @@ export class WebhookProcessorService {
         }
       }
 
-      await this.applyMapped(mapped, row.id);
+      await this.applyMapped(mapped, row.id, row.provider);
 
       await prisma.billingWebhookEvent.update({
         where: { id: row.id },
@@ -186,7 +222,8 @@ export class WebhookProcessorService {
 
   private async applyMapped(
     mapped: Awaited<ReturnType<typeof paddleProvider.mapEvent>>,
-    _eventRowId: string
+    _eventRowId: string,
+    webhookProvider: string
   ) {
     switch (mapped.type) {
       case "subscription_activated": {
@@ -203,18 +240,28 @@ export class WebhookProcessorService {
           throw new Error("planVersion not public/published");
         }
 
-        // assignPlanVersion grants credits once (upgrade/first-package rules)
+        const providerLabel =
+          webhookProvider === "stripe" ? "STRIPE" : "PADDLE";
+        const accessMode =
+          providerLabel === "STRIPE" ? "stripe" : "paddle";
+        const providerEnv =
+          providerLabel === "STRIPE"
+            ? (
+                await paymentConfigService.getProviderCredentials("STRIPE")
+              )?.environment || "sandbox"
+            : await paddleEnvironment();
+
         await entitlementService.assignPlanVersion({
           organizationId: mapped.organizationId,
           planVersionId: mapped.planVersionId,
           status: SubscriptionStatus.ACTIVE,
-          accessMode: "paddle",
+          accessMode,
         });
         await prisma.subscription.update({
           where: { organizationId: mapped.organizationId },
           data: {
-            provider: "PADDLE",
-            providerEnvironment: paddleEnvironment(),
+            provider: providerLabel,
+            providerEnvironment: providerEnv,
             externalCustomerId: mapped.externalCustomerId || undefined,
             externalSubscriptionId: mapped.externalSubscriptionId || undefined,
             billingInterval: mapped.interval,
@@ -278,7 +325,8 @@ export class WebhookProcessorService {
         break;
       }
       case "payment_failed": {
-        const graceDays = env.BILLING_GRACE_DAYS;
+        const settings = await paymentConfigService.getSettings();
+        const graceDays = settings.graceDays || env.BILLING_GRACE_DAYS;
         const grace = new Date(
           mapped.occurredAt.getTime() + graceDays * 86_400_000
         );

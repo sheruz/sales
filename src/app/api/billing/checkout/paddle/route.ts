@@ -6,8 +6,12 @@ import { handleApiError } from "@/lib/api/error-handler";
 import { env } from "@/lib/config/env";
 import { appHome } from "@/lib/app-paths";
 import prisma from "@/lib/db/prisma";
-import { getProviderForOrganization } from "@/services/billing/provider-registry";
-import { paddleEnvironment, isPaddleConfigured } from "@/services/billing/paddle-client";
+import { paddleProvider } from "@/services/billing/paddle.provider";
+import {
+  isPaddleConfigured,
+  paddleEnvironment,
+} from "@/services/billing/paddle-client";
+import { paymentConfigService } from "@/services/billing/payment-config.service";
 
 const schema = z.object({
   planVersionId: z.string().uuid(),
@@ -17,24 +21,23 @@ const schema = z.object({
 export async function POST(request: NextRequest) {
   try {
     const user = await requireOrgPermission("billing.manage");
-    if (!env.PAYMENTS_ENABLED) {
+    if (!(await paymentConfigService.isPaymentsLive())) {
       throw new ValidationError("Payments are not enabled yet");
     }
-    const org = await prisma.organization.findUniqueOrThrow({
-      where: { id: user.organizationId },
-    });
-    if (org.billingProvider !== "PADDLE") {
-      throw new ValidationError(
-        "This workspace uses manual billing — request an invoice instead"
-      );
+    const methods = await paymentConfigService.resolveCheckoutMethods(
+      user.organizationId
+    );
+    if (!methods.includes("CARD_PADDLE")) {
+      throw new ValidationError("Paddle checkout is not available for this org");
     }
-    if (!isPaddleConfigured()) {
+    if (!(await isPaddleConfigured())) {
       throw new ValidationError("Paddle is not configured");
     }
 
     const body = schema.parse(await request.json());
-    const provider = await getProviderForOrganization(user.organizationId);
-
+    const org = await prisma.organization.findUniqueOrThrow({
+      where: { id: user.organizationId },
+    });
     const admin = await prisma.organizationUser.findFirst({
       where: {
         organizationId: user.organizationId,
@@ -42,10 +45,9 @@ export async function POST(request: NextRequest) {
       },
       include: { user: true },
     });
-    const email =
-      org.billingEmail || admin?.user.email || user.email;
+    const email = org.billingEmail || admin?.user.email || user.email;
 
-    const result = await provider.createCheckout({
+    const result = await paddleProvider.createCheckout({
       organizationId: user.organizationId,
       planVersionId: body.planVersionId,
       interval: body.interval,
@@ -57,7 +59,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json(
       apiSuccess({
         ...result,
-        environment: paddleEnvironment(),
+        environment: await paddleEnvironment(),
         taxNote: "Taxes may apply depending on your location",
       })
     );

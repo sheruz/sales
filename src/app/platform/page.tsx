@@ -168,6 +168,11 @@ export default async function PlatformOverviewPage() {
           Platform control center — manage organizations and monitor SaaS usage.
           This is separate from each company&apos;s sales dashboard.
         </p>
+        {env.PAYMENTS_EMERGENCY_DISABLE && (
+          <div className="mt-3 rounded-md border border-red-500/50 bg-red-500/10 px-3 py-2 text-sm text-red-700 dark:text-red-300">
+            Payments emergency disable is ON — card checkout forced off.
+          </div>
+        )}
       </div>
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">

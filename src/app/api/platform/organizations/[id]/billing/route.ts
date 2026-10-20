@@ -4,13 +4,17 @@ import { requireSuperAdminWrite } from "@/lib/auth/api-auth";
 import { apiSuccess, ValidationError } from "@/lib/api/response";
 import { handleApiError } from "@/lib/api/error-handler";
 import { organizationService } from "@/services/organization.service";
+import { Prisma } from "@prisma/client";
 import prisma from "@/lib/db/prisma";
 import { env } from "@/lib/config/env";
 
 const schema = z.object({
+  /** null / "DEFAULT" = use PaymentSettings.defaultProvider */
   billingProvider: z
-    .enum(["PADDLE", "MANUAL_PAYONEER", "MANUAL_BANK"])
+    .enum(["PADDLE", "STRIPE", "MANUAL_PAYONEER", "MANUAL_BANK", "DEFAULT"])
+    .nullable()
     .optional(),
+  allowedCheckoutMethods: z.array(z.string()).nullable().optional(),
   billingEmail: z.string().email().nullable().optional().or(z.literal("")),
   reason: z.string().min(1),
 });
@@ -28,26 +32,43 @@ export async function PATCH(
     const body = schema.parse(await request.json());
     const before = await prisma.organization.findUnique({
       where: { id: organizationId },
-      select: { billingProvider: true, billingEmail: true },
+      select: {
+        billingProvider: true,
+        billingEmail: true,
+        allowedCheckoutMethods: true,
+      },
     });
     if (!before) throw new ValidationError("Organization not found");
 
+    const data: Prisma.OrganizationUpdateInput = {};
+    if (body.billingProvider !== undefined) {
+      data.billingProvider =
+        body.billingProvider === null || body.billingProvider === "DEFAULT"
+          ? null
+          : body.billingProvider;
+    }
+    if (body.allowedCheckoutMethods !== undefined) {
+      data.allowedCheckoutMethods =
+        body.allowedCheckoutMethods === null
+          ? Prisma.DbNull
+          : body.allowedCheckoutMethods;
+    }
+    if (body.billingEmail !== undefined) {
+      data.billingEmail =
+        body.billingEmail === "" || body.billingEmail === null
+          ? null
+          : body.billingEmail;
+    }
+
     const updated = await prisma.organization.update({
       where: { id: organizationId },
-      data: {
-        ...(body.billingProvider
-          ? { billingProvider: body.billingProvider }
-          : {}),
-        ...(body.billingEmail !== undefined
-          ? {
-              billingEmail:
-                body.billingEmail === "" || body.billingEmail === null
-                  ? null
-                  : body.billingEmail,
-            }
-          : {}),
+      data,
+      select: {
+        id: true,
+        billingProvider: true,
+        billingEmail: true,
+        allowedCheckoutMethods: true,
       },
-      select: { id: true, billingProvider: true, billingEmail: true },
     });
 
     await organizationService.writePlatformAudit({

@@ -1,38 +1,63 @@
 /**
- * Thin Paddle Billing API client. Keys never logged.
+ * Thin Paddle Billing API client. Credentials from PaymentProviderConfig (never logged).
  */
 
-import { env } from "@/lib/config/env";
+import { paymentConfigService } from "@/services/billing/payment-config.service";
 import type { ProviderEnvironment } from "@/services/billing/provider-types";
 
-export function paddleEnvironment(): ProviderEnvironment {
-  return env.PADDLE_ENV === "production" ? "production" : "sandbox";
+export async function getPaddleRuntime(): Promise<{
+  environment: ProviderEnvironment;
+  apiKey: string;
+  clientToken: string;
+  webhookSecret: string;
+  apiBase: string;
+}> {
+  const cfg = await paymentConfigService.getProviderCredentials("PADDLE");
+  if (!cfg?.credentials.apiKey) {
+    throw new Error("Paddle is not configured (missing API key in Super Admin → Payments)");
+  }
+  const environment = cfg.environment;
+  return {
+    environment,
+    apiKey: cfg.credentials.apiKey,
+    clientToken: cfg.credentials.clientToken || "",
+    webhookSecret: cfg.credentials.webhookSecret || "",
+    apiBase:
+      environment === "production"
+        ? "https://api.paddle.com"
+        : "https://sandbox-api.paddle.com",
+  };
 }
 
-export function paddleApiBase(): string {
-  return paddleEnvironment() === "production"
-    ? "https://api.paddle.com"
-    : "https://sandbox-api.paddle.com";
+export async function paddleEnvironment(): Promise<ProviderEnvironment> {
+  try {
+    const rt = await getPaddleRuntime();
+    return rt.environment;
+  } catch {
+    return "sandbox";
+  }
 }
 
-export function isPaddleConfigured(): boolean {
-  return Boolean(env.PADDLE_API_KEY && env.PADDLE_CLIENT_TOKEN && env.PADDLE_WEBHOOK_SECRET);
+export async function isPaddleConfigured(): Promise<boolean> {
+  const row = await paymentConfigService.getProviderConfig("PADDLE");
+  if (!row?.enabled) return false;
+  const creds = paymentConfigService.getCredentials(row);
+  return Boolean(creds?.apiKey && creds?.clientToken && creds?.webhookSecret);
 }
 
 export async function paddleFetch<T = unknown>(
   path: string,
   init?: RequestInit & { json?: unknown }
 ): Promise<T> {
-  const key = env.PADDLE_API_KEY;
-  if (!key) throw new Error("PADDLE_API_KEY is not configured");
+  const rt = await getPaddleRuntime();
 
   const headers: Record<string, string> = {
-    Authorization: `Bearer ${key}`,
+    Authorization: `Bearer ${rt.apiKey}`,
     "Content-Type": "application/json",
     ...(init?.headers as Record<string, string> | undefined),
   };
 
-  const res = await fetch(`${paddleApiBase()}${path}`, {
+  const res = await fetch(`${rt.apiBase}${path}`, {
     ...init,
     headers,
     body:

@@ -31,9 +31,15 @@ export async function POST(request: NextRequest) {
     const org = await prisma.organization.findUniqueOrThrow({
       where: { id: user.organizationId },
     });
+    const { paymentConfigService } = await import(
+      "@/services/billing/payment-config.service"
+    );
+    const providerId = await paymentConfigService.resolveOrgProvider(
+      user.organizationId
+    );
     if (
-      org.billingProvider !== "MANUAL_PAYONEER" &&
-      org.billingProvider !== "MANUAL_BANK"
+      providerId !== "MANUAL_PAYONEER" &&
+      providerId !== "MANUAL_BANK"
     ) {
       throw new ValidationError("Invoice request is for manual billing tenants");
     }
