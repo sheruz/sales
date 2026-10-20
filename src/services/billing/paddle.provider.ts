@@ -35,6 +35,76 @@ export class PaddleProvider implements PaymentProvider {
     return rt.environment;
   }
 
+  /**
+   * Bind an existing Paddle customer id to this org (same env).
+   * Rejects if another org already owns that id.
+   */
+  private async adoptCustomerId(input: {
+    organizationId: string;
+    customerId: string;
+    email: string;
+    name: string;
+    envName: string;
+  }) {
+    const taken = await prisma.organization.findFirst({
+      where: {
+        paddleCustomerId: input.customerId,
+        paddleCustomerEnv: input.envName,
+        id: { not: input.organizationId },
+      },
+      select: { id: true, name: true },
+    });
+    if (taken) {
+      throw new ValidationError(
+        `This billing email is already linked to another workspace (${taken.name}). Use a different billing email.`
+      );
+    }
+
+    await this.patchCustomer(input.customerId, {
+      email: input.email,
+      name: input.name,
+      organizationId: input.organizationId,
+    });
+
+    await prisma.organization.update({
+      where: { id: input.organizationId },
+      data: {
+        paddleCustomerId: input.customerId,
+        paddleCustomerEnv: input.envName,
+        billingEmail: input.email,
+      },
+    });
+
+    return { externalCustomerId: input.customerId };
+  }
+
+  /** Look up Paddle customer by email (list API). */
+  private async findCustomerIdByEmail(email: string): Promise<string | null> {
+    try {
+      const res = await paddleFetch<{
+        data: Array<{ id: string; email?: string }>;
+      }>(`/customers?email=${encodeURIComponent(email)}`);
+      const match = res.data?.find(
+        (c) => (c.email || "").toLowerCase() === email.toLowerCase()
+      );
+      return match?.id || res.data?.[0]?.id || null;
+    } catch (err) {
+      logger.warn("paddle customer email lookup failed", {
+        error: err instanceof Error ? err.message : String(err),
+      });
+      return null;
+    }
+  }
+
+  private parseExistingCustomerIdFromError(err: unknown): string | null {
+    const msg = err instanceof Error ? err.message : String(err);
+    // detail: "customer email conflicts with customer of id ctm_..."
+    const m = msg.match(/customer of id\s+(ctm_[a-z0-9]+)/i);
+    if (m?.[1]) return m[1];
+    const m2 = msg.match(/(ctm_[a-z0-9]+)/i);
+    return m2?.[1] || null;
+  }
+
   async createCustomer(input: {
     organizationId: string;
     email: string;
@@ -50,7 +120,7 @@ export class PaddleProvider implements PaymentProvider {
     });
     const envName = await this.envName();
 
-    // Never reuse another org's customer id
+    // Already linked in this env → reuse (never create a second Paddle customer)
     if (org.paddleCustomerId && org.paddleCustomerEnv === envName) {
       const clash = await prisma.organization.findFirst({
         where: {
@@ -71,7 +141,6 @@ export class PaddleProvider implements PaymentProvider {
           data: { paddleCustomerId: null, paddleCustomerEnv: null },
         });
       } else {
-        // Keep email in sync on Paddle
         await this.patchCustomer(org.paddleCustomerId, {
           email,
           name: input.name,
@@ -87,42 +156,56 @@ export class PaddleProvider implements PaymentProvider {
       }
     }
 
-    const res = await paddleFetch<
-      PaddleData<{ id: string; email?: string }>
-    >("/customers", {
-      method: "POST",
-      json: {
+    // Org lost its stored id (or first checkout after Beenish paid): email already on Paddle
+    const existingId = await this.findCustomerIdByEmail(email);
+    if (existingId) {
+      return this.adoptCustomerId({
+        organizationId: input.organizationId,
+        customerId: existingId,
         email,
         name: input.name,
-        custom_data: { organizationId: input.organizationId },
-      },
-    });
-
-    // Guard: another org must never already own this id
-    const taken = await prisma.organization.findFirst({
-      where: {
-        paddleCustomerId: res.data.id,
-        paddleCustomerEnv: envName,
-        id: { not: input.organizationId },
-      },
-      select: { id: true },
-    });
-    if (taken) {
-      throw new ValidationError(
-        "Paddle customer id collision — contact support (tenant isolation)"
-      );
+        envName,
+      });
     }
 
-    await prisma.organization.update({
-      where: { id: input.organizationId },
-      data: {
-        paddleCustomerId: res.data.id,
-        paddleCustomerEnv: envName,
-        billingEmail: email,
-      },
-    });
+    try {
+      const res = await paddleFetch<
+        PaddleData<{ id: string; email?: string }>
+      >("/customers", {
+        method: "POST",
+        json: {
+          email,
+          name: input.name,
+          custom_data: { organizationId: input.organizationId },
+        },
+      });
 
-    return { externalCustomerId: res.data.id };
+      return this.adoptCustomerId({
+        organizationId: input.organizationId,
+        customerId: res.data.id,
+        email,
+        name: input.name,
+        envName,
+      });
+    } catch (err) {
+      // Race / list miss: Paddle 409 customer_already_exists → adopt that id
+      const conflictId = this.parseExistingCustomerIdFromError(err);
+      if (conflictId) {
+        logger.info("paddle customer_already_exists — adopting", {
+          organizationId: input.organizationId,
+          customerId: conflictId,
+          email,
+        });
+        return this.adoptCustomerId({
+          organizationId: input.organizationId,
+          customerId: conflictId,
+          email,
+          name: input.name,
+          envName,
+        });
+      }
+      throw err;
+    }
   }
 
   async getCustomer(customerId: string) {

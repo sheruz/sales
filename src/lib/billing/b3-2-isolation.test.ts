@@ -57,6 +57,13 @@ describe("B3.2 Paddle customer isolation", () => {
     expect(created.billingEmail).toBe(ownerEmail);
     expect(created.billingEmail).not.toContain("delvixstudio.com");
   });
+
+  it("parses Paddle customer_already_exists conflict id", () => {
+    const detail =
+      'customer email conflicts with customer of id ctm_01m5cf9abtkjb1p1rx9f33b9xj';
+    const m = detail.match(/customer of id\s+(ctm_[a-z0-9]+)/i);
+    expect(m?.[1]).toBe("ctm_01m5cf9abtkjb1p1rx9f33b9xj");
+  });
 });
 
 describe("B3.2 tenant branding isolation", () => {
