@@ -240,6 +240,7 @@ export class PaymentConfigService {
       manualRenewalLeadDays?: number;
       business?: Record<string, string>;
       manualInstructions?: Record<string, string>;
+      sellerAdminEmails?: string[];
       password?: string;
       reason: string;
     },
@@ -279,6 +280,13 @@ export class PaymentConfigService {
         ...(input.manualInstructions
           ? { manualInstructions: input.manualInstructions }
           : {}),
+        ...(input.sellerAdminEmails
+          ? {
+              sellerAdminEmails: input.sellerAdminEmails.map((e) =>
+                e.trim().toLowerCase()
+              ),
+            }
+          : {}),
       },
     });
 
@@ -293,6 +301,7 @@ export class PaymentConfigService {
         checkoutMethods: before.checkoutMethods,
         currency: before.currency,
         graceDays: before.graceDays,
+        sellerAdminEmails: before.sellerAdminEmails,
       },
       after: {
         paymentsEnabled: updated.paymentsEnabled,
@@ -300,6 +309,7 @@ export class PaymentConfigService {
         checkoutMethods: updated.checkoutMethods,
         currency: updated.currency,
         graceDays: updated.graceDays,
+        sellerAdminEmails: updated.sellerAdminEmails,
       },
       reason: input.reason,
     });

@@ -5,13 +5,13 @@ import { apiSuccess, ValidationError } from "@/lib/api/response";
 import { handleApiError } from "@/lib/api/error-handler";
 import { env } from "@/lib/config/env";
 import { appHome } from "@/lib/app-paths";
-import prisma from "@/lib/db/prisma";
 import { paddleProvider } from "@/services/billing/paddle.provider";
 import {
   isPaddleConfigured,
   paddleEnvironment,
 } from "@/services/billing/paddle-client";
 import { paymentConfigService } from "@/services/billing/payment-config.service";
+import { billingContactService } from "@/services/billing/billing-contact.service";
 
 const schema = z.object({
   planVersionId: z.string().uuid(),
@@ -35,17 +35,9 @@ export async function POST(request: NextRequest) {
     }
 
     const body = schema.parse(await request.json());
-    const org = await prisma.organization.findUniqueOrThrow({
-      where: { id: user.organizationId },
-    });
-    const admin = await prisma.organizationUser.findFirst({
-      where: {
-        organizationId: user.organizationId,
-        isPrimaryAdmin: true,
-      },
-      include: { user: true },
-    });
-    const email = org.billingEmail || admin?.user.email || user.email;
+    const email = await billingContactService.resolveBillingEmail(
+      user.organizationId
+    );
 
     const result = await paddleProvider.createCheckout({
       organizationId: user.organizationId,

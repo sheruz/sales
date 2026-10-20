@@ -94,7 +94,7 @@ export const BRANDED_OUTBOUND_HTML = `<!DOCTYPE html>
             </td>
             <td valign="middle" style="font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;">
               <div style="font-size:15px;font-weight:bold;color:#1d2033;line-height:1.4;">{{sender_name}}</div>
-              <div style="font-size:13px;color:#7a7f99;line-height:1.5;">{{sender_title}} &middot; Delvix Studio</div>
+              <div style="font-size:13px;color:#7a7f99;line-height:1.5;">{{sender_title}} &middot; {{company_legal_name}}</div>
               <div style="font-size:13px;line-height:1.6;padding-top:2px;">
                 <a href="{{website_url}}" style="color:#5b63f5;text-decoration:none;font-weight:bold;">{{website_label}}</a>
                 <span style="color:#c5c8d8;">&nbsp;|&nbsp;</span>

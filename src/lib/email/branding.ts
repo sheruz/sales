@@ -21,19 +21,19 @@ export type EmailBranding = {
   businessAddress: string;
 };
 
+/** Neutral blanks — never Delvix/owner defaults. Tenants must fill setup. */
 export const DEFAULT_EMAIL_BRANDING: EmailBranding = {
   logoPath: null,
   senderPhotoPath: null,
   senderName: "",
-  senderTitle: "Founder",
-  websiteUrl: "https://delvix.studio",
-  websiteLabel: "delvix.studio",
+  senderTitle: "",
+  websiteUrl: "",
+  websiteLabel: "",
   whatsappE164: "",
   bookingUrl: "",
   ctaLabel: "Book a call",
-  footerServices:
-    "Web apps · Mobile apps · ERP & CRM systems · AI integrations",
-  availabilityLine: "TAKING NEW PROJECTS  ·  US · UK · EU · GULF HOURS",
+  footerServices: "",
+  availabilityLine: "",
   legalCompanyName: "",
   businessAddress: "",
 };
@@ -145,8 +145,8 @@ export function resolveSenderBranding(input: {
       mb?.senderName?.trim() ||
       b.senderName.trim() ||
       input.orgFallbackName?.trim() ||
-      "Delvix Studio",
-    senderTitle: mb?.senderTitle?.trim() || b.senderTitle.trim() || "Founder",
+      "",
+    senderTitle: mb?.senderTitle?.trim() || b.senderTitle.trim() || "",
     senderPhotoUrl:
       brandingFileUrlFromPath(
         input.organizationId,
@@ -154,21 +154,16 @@ export function resolveSenderBranding(input: {
       ) ?? null,
     logoUrl:
       brandingFileUrlFromPath(input.organizationId, b.logoPath) ?? null,
-    websiteUrl: b.websiteUrl.trim() || DEFAULT_EMAIL_BRANDING.websiteUrl,
-    websiteLabel:
-      b.websiteLabel.trim() || DEFAULT_EMAIL_BRANDING.websiteLabel,
+    websiteUrl: b.websiteUrl.trim(),
+    websiteLabel: b.websiteLabel.trim(),
     whatsappDigits: digits,
     whatsappDisplay: formatWhatsappDisplay(b.whatsappE164),
     ctaUrl: b.bookingUrl.trim() || b.websiteUrl.trim() || "#",
     ctaLabel: b.ctaLabel.trim() || DEFAULT_EMAIL_BRANDING.ctaLabel,
-    footerServices:
-      b.footerServices.trim() || DEFAULT_EMAIL_BRANDING.footerServices,
-    availabilityLine:
-      b.availabilityLine.trim() || DEFAULT_EMAIL_BRANDING.availabilityLine,
+    footerServices: b.footerServices.trim(),
+    availabilityLine: b.availabilityLine.trim(),
     companyLegalName:
-      b.legalCompanyName.trim() ||
-      input.orgFallbackName?.trim() ||
-      "Delvix Studio",
+      b.legalCompanyName.trim() || input.orgFallbackName?.trim() || "",
     businessAddress: b.businessAddress.trim(),
   };
 }

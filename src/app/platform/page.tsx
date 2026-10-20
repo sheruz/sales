@@ -119,7 +119,7 @@ export default async function PlatformOverviewPage() {
       label: "MRR (est.)",
       value: `$${mrr.toFixed(0)}`,
       icon: DollarSign,
-      href: appOps("/payments"),
+      href: appOps("/revenue"),
       sub: `${activeSubs.length} active · Delvix excluded`,
     },
     {
@@ -133,7 +133,7 @@ export default async function PlatformOverviewPage() {
       label: "Failed / unmatched",
       value: failedWebhooks,
       icon: AlertTriangle,
-      href: appOps("/payments"),
+      href: appOps("/transactions"),
       sub: `${pastDueCount} past due subs`,
     },
     {

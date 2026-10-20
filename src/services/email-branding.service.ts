@@ -145,13 +145,13 @@ export class EmailBrandingService {
       outboundConfigService.getConfig(organizationId).catch(() => null),
     ]);
 
-    // Prefer real brand names over placeholder org names like "Default Workspace".
+    // Tenant-only names — never fall back to Delvix / platform owner branding.
     const orgName = org?.name?.trim() || "";
     const outboundBiz = outbound?.businessName?.trim() || "";
     const fallbackName =
       (orgName && !/^default\s+workspace$/i.test(orgName) ? orgName : "") ||
       outboundBiz ||
-      "Delvix Studio";
+      "";
 
     let mailbox = null;
     if (mailboxId) {
@@ -169,12 +169,10 @@ export class EmailBrandingService {
       branding.legalCompanyName.trim() ||
       outboundBiz ||
       (orgName && !/^default\s+workspace$/i.test(orgName) ? orgName : "") ||
-      "Delvix Studio";
+      "";
 
     const senderName =
-      branding.senderName.trim() ||
-      outboundBiz ||
-      fallbackName;
+      branding.senderName.trim() || outboundBiz || fallbackName;
 
     return resolveSenderBranding({
       organizationId,

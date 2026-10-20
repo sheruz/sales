@@ -16,6 +16,8 @@ import {
   ScrollText,
   CreditCard,
   FileText,
+  TrendingUp,
+  Receipt,
 } from "lucide-react";
 import {
   Sidebar,
@@ -40,6 +42,8 @@ const platformNav = [
   { title: "Credit prices", href: appOps("/credit-prices"), icon: Coins },
   { title: "Top-ups", href: appOps("/top-ups"), icon: Gift },
   { title: "Payments", href: appOps("/payments"), icon: CreditCard },
+  { title: "Revenue", href: appOps("/revenue"), icon: TrendingUp },
+  { title: "Transactions", href: appOps("/transactions"), icon: Receipt },
   { title: "Invoices", href: appOps("/invoices"), icon: FileText },
   { title: "Audit", href: appOps("/audit"), icon: ScrollText },
   { title: "All Users", href: appOps("/users"), icon: Users },

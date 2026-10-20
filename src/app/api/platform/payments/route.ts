@@ -103,6 +103,9 @@ export async function GET(request: NextRequest) {
           manualRenewalLeadDays: settings.manualRenewalLeadDays,
           business: settings.business,
           manualInstructions: settings.manualInstructions,
+          sellerAdminEmails: Array.isArray(settings.sellerAdminEmails)
+            ? (settings.sellerAdminEmails as string[])
+            : [],
         },
         allCheckoutMethods: ALL_CHECKOUT_METHODS,
         providers: providers.map((p) => ({
@@ -134,6 +137,7 @@ const settingsSchema = z.object({
   manualRenewalLeadDays: z.number().int().min(0).max(90).optional(),
   business: z.record(z.string(), z.string()).optional(),
   manualInstructions: z.record(z.string(), z.string()).optional(),
+  sellerAdminEmails: z.array(z.string().email()).optional(),
   password: z.string().optional(),
   reason: z.string().min(1),
 });

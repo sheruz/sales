@@ -1118,6 +1118,20 @@ export class OutboundJobService {
     });
     if (!item) return { id: outboxId, status: "error", reason: "missing" };
 
+    // Tenant compliance: never send without business name + physical address (no Delvix fallback)
+    if (!cfg.physicalAddress.trim() || !cfg.businessName.trim()) {
+      await prisma.emailOutbox.update({
+        where: { id: outboxId },
+        data: {
+          status: EmailOutboxStatus.HELD,
+          heldReason: "compliance_setup",
+          lastError:
+            "Set business name + physical address in Outbound / Email branding before sending",
+        },
+      });
+      return { id: outboxId, status: "held", reason: "compliance_setup" };
+    }
+
     // B2: plan-paused mailbox / campaign / sequence never sends
     if (item.outboundMailbox?.pausedAt) {
       await prisma.emailOutbox.update({

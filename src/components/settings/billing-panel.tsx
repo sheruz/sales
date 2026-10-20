@@ -3,6 +3,8 @@
 import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import {
   Card,
   CardContent,
@@ -90,23 +92,40 @@ type TopUpPack = {
   currency: string;
 };
 
+type BillingContact = {
+  billingEmail: string | null;
+  billingContactName: string | null;
+  billingAddress: string | null;
+  billingCountry: string | null;
+  billingTaxId: string | null;
+};
+
 export function BillingPanel() {
   const [plans, setPlans] = useState<Plan[]>([]);
   const [billing, setBilling] = useState<BillingSnapshot | null>(null);
   const [ledger, setLedger] = useState<LedgerEntry[]>([]);
   const [topUpPacks, setTopUpPacks] = useState<TopUpPack[]>([]);
+  const [contact, setContact] = useState<BillingContact>({
+    billingEmail: "",
+    billingContactName: "",
+    billingAddress: "",
+    billingCountry: "",
+    billingTaxId: "",
+  });
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const [plansRes, billingRes, creditsRes, packsRes] = await Promise.all([
-        fetch("/api/plans"),
-        fetch("/api/billing"),
-        fetch("/api/billing/credits?take=30"),
-        fetch("/api/billing/top-up-packs"),
-      ]);
+      const [plansRes, billingRes, creditsRes, packsRes, contactRes] =
+        await Promise.all([
+          fetch("/api/plans"),
+          fetch("/api/billing"),
+          fetch("/api/billing/credits?take=30"),
+          fetch("/api/billing/top-up-packs"),
+          fetch("/api/billing/contact"),
+        ]);
       const plansJson = await plansRes.json();
       const packsJson = await packsRes.json();
       if (packsJson.success) {
@@ -114,9 +133,19 @@ export function BillingPanel() {
       }
       const billingJson = await billingRes.json();
       const creditsJson = await creditsRes.json();
+      const contactJson = await contactRes.json();
       if (plansJson.success) setPlans(plansJson.data);
       if (billingJson.success) setBilling(billingJson.data);
       if (creditsJson.success) setLedger(creditsJson.data.ledger ?? []);
+      if (contactJson.success) {
+        setContact({
+          billingEmail: contactJson.data.billingEmail || "",
+          billingContactName: contactJson.data.billingContactName || "",
+          billingAddress: contactJson.data.billingAddress || "",
+          billingCountry: contactJson.data.billingCountry || "",
+          billingTaxId: contactJson.data.billingTaxId || "",
+        });
+      }
     } catch {
       toast.error("Failed to load billing");
     } finally {
@@ -268,6 +297,31 @@ export function BillingPanel() {
     !credits.isOwner &&
     credits.balance <= 0;
 
+  async function saveBillingContact() {
+    setBusy("contact");
+    try {
+      const res = await fetch("/api/billing/contact", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(contact),
+      });
+      const json = await res.json();
+      if (!json.success) throw new Error(json.error?.message || "Save failed");
+      setContact({
+        billingEmail: json.data.billingEmail || "",
+        billingContactName: json.data.billingContactName || "",
+        billingAddress: json.data.billingAddress || "",
+        billingCountry: json.data.billingCountry || "",
+        billingTaxId: json.data.billingTaxId || "",
+      });
+      toast.success("Billing contact saved (synced to payment provider)");
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Save failed");
+    } finally {
+      setBusy(null);
+    }
+  }
+
   return (
     <div className="space-y-6">
       {outOfCredits && (
@@ -276,6 +330,82 @@ export function BillingPanel() {
           add credits. Inbound replies are still processed and held for you.
         </div>
       )}
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">Billing contact</CardTitle>
+          <CardDescription>
+            Invoices, receipts, and payment notices go here. This email is used
+            for your Paddle customer — not the platform seller email.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="grid gap-3 sm:grid-cols-2">
+          <label className="space-y-1 text-sm sm:col-span-2">
+            <span className="text-muted-foreground">Billing email</span>
+            <Input
+              type="email"
+              value={contact.billingEmail || ""}
+              onChange={(e) =>
+                setContact((c) => ({ ...c, billingEmail: e.target.value }))
+              }
+            />
+          </label>
+          <label className="space-y-1 text-sm">
+            <span className="text-muted-foreground">Contact name</span>
+            <Input
+              value={contact.billingContactName || ""}
+              onChange={(e) =>
+                setContact((c) => ({
+                  ...c,
+                  billingContactName: e.target.value,
+                }))
+              }
+            />
+          </label>
+          <label className="space-y-1 text-sm">
+            <span className="text-muted-foreground">Country (ISO)</span>
+            <Input
+              maxLength={2}
+              placeholder="US"
+              value={contact.billingCountry || ""}
+              onChange={(e) =>
+                setContact((c) => ({
+                  ...c,
+                  billingCountry: e.target.value.toUpperCase(),
+                }))
+              }
+            />
+          </label>
+          <label className="space-y-1 text-sm sm:col-span-2">
+            <span className="text-muted-foreground">Billing address</span>
+            <Textarea
+              rows={3}
+              value={contact.billingAddress || ""}
+              onChange={(e) =>
+                setContact((c) => ({ ...c, billingAddress: e.target.value }))
+              }
+            />
+          </label>
+          <label className="space-y-1 text-sm sm:col-span-2">
+            <span className="text-muted-foreground">Tax / VAT ID</span>
+            <Input
+              value={contact.billingTaxId || ""}
+              onChange={(e) =>
+                setContact((c) => ({ ...c, billingTaxId: e.target.value }))
+              }
+            />
+          </label>
+          <div className="sm:col-span-2">
+            <Button
+              size="sm"
+              disabled={busy === "contact"}
+              onClick={() => void saveBillingContact()}
+            >
+              {busy === "contact" ? "Saving…" : "Save billing details"}
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
 
       {billing && credits && (
         <Card>

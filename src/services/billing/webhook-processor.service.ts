@@ -15,8 +15,9 @@ import { organizationService } from "@/services/organization.service";
 import { planPauseService } from "@/services/plan-pause.service";
 import { FEATURE_KEYS } from "@/lib/billing/features";
 import { billingGateway } from "@/services/billing-gateway.service";
-import { sendEmailWithConfig } from "@/lib/email/send-mail";
 import { logger } from "@/lib/logger";
+import { billingNotifyService } from "@/services/billing/billing-notify.service";
+import { billingTransactionService } from "@/services/billing/billing-transaction.service";
 
 export class WebhookProcessorService {
   private async storeAndProcess(
@@ -272,11 +273,29 @@ export class WebhookProcessorService {
             cancelAtPeriodEnd: false,
           },
         });
-        await this.emailOrgAdmin(
+        await billingNotifyService.emailTenantBilling(
           mapped.organizationId,
           "Welcome — your workspace is active",
-          "Your payment was received and your Delvix workspace is now active."
+          "Your payment was received and your workspace is now active."
         );
+        await billingTransactionService.record({
+          organizationId: mapped.organizationId,
+          provider: providerLabel,
+          environment: providerEnv,
+          kind: "subscription",
+          status: "completed",
+          amount: 0,
+          externalId: mapped.transactionId || mapped.externalSubscriptionId,
+          planVersionId: mapped.planVersionId,
+          occurredAt: new Date(),
+          description: "Subscription activated",
+        });
+        await billingNotifyService.notifySellers({
+          type: "new_subscription",
+          organizationId: mapped.organizationId,
+          subject: "New subscription",
+          body: `Organization ${mapped.organizationId} activated via ${providerLabel} (${providerEnv}).`,
+        });
         break;
       }
       case "renewal_paid": {
@@ -317,11 +336,32 @@ export class WebhookProcessorService {
           idempotencyKey: `paddle_tx:${mapped.transactionId}`,
           reason: "Paddle top-up",
         });
-        await this.emailOrgAdmin(
+        await billingNotifyService.emailTenantBilling(
           mapped.organizationId,
           "Credits added",
           `${mapped.credits} credits were added to your account.`
         );
+        {
+          const envName =
+            webhookProvider === "stripe"
+              ? (
+                  await paymentConfigService.getProviderCredentials("STRIPE")
+                )?.environment || "sandbox"
+              : await paddleEnvironment();
+          await billingTransactionService.record({
+            organizationId: mapped.organizationId,
+            provider: webhookProvider === "stripe" ? "STRIPE" : "PADDLE",
+            environment: envName,
+            kind: "topup",
+            status: "completed",
+            amount: 0,
+            externalId: mapped.transactionId,
+            topUpPackId: mapped.topUpPackId,
+            occurredAt: mapped.occurredAt,
+            description: `Top-up ${mapped.credits} credits`,
+            metadata: { credits: mapped.credits },
+          });
+        }
         break;
       }
       case "payment_failed": {
@@ -338,11 +378,17 @@ export class WebhookProcessorService {
             lastPaymentFailedNoticeDay: 0,
           },
         });
-        await this.emailOrgAdmin(
+        await billingNotifyService.emailTenantBilling(
           mapped.organizationId,
           "Payment failed",
           "Your payment failed. Please update your payment method to avoid suspension."
         );
+        await billingNotifyService.notifySellers({
+          type: "payment_failed",
+          organizationId: mapped.organizationId,
+          subject: "Payment failed",
+          body: `Payment failed for organization ${mapped.organizationId}.`,
+        });
         break;
       }
       case "subscription_updated": {
@@ -425,11 +471,17 @@ export class WebhookProcessorService {
             cancelAtPeriodEnd: false,
           },
         });
-        await this.emailOrgAdmin(
+        await billingNotifyService.emailTenantBilling(
           mapped.organizationId,
           "Subscription canceled",
           "Your subscription has been canceled."
         );
+        await billingNotifyService.notifySellers({
+          type: "cancellation",
+          organizationId: mapped.organizationId,
+          subject: "Subscription canceled",
+          body: `Subscription canceled for organization ${mapped.organizationId}.`,
+        });
         break;
       }
       case "refund_or_chargeback": {
@@ -445,6 +497,31 @@ export class WebhookProcessorService {
           await prisma.subscription.update({
             where: { organizationId: mapped.organizationId },
             data: { status: SubscriptionStatus.SUSPENDED },
+          });
+        }
+        if (mapped.organizationId) {
+          const envName =
+            webhookProvider === "stripe"
+              ? (
+                  await paymentConfigService.getProviderCredentials("STRIPE")
+                )?.environment || "sandbox"
+              : await paddleEnvironment();
+          await billingTransactionService.record({
+            organizationId: mapped.organizationId,
+            provider: webhookProvider === "stripe" ? "STRIPE" : "PADDLE",
+            environment: envName,
+            kind: mapped.isChargeback ? "chargeback" : "refund",
+            status: "completed",
+            amount: 0,
+            externalId: mapped.transactionId || undefined,
+            occurredAt: mapped.occurredAt,
+            description: mapped.isChargeback ? "Chargeback" : "Refund",
+          });
+          await billingNotifyService.notifySellers({
+            type: mapped.isChargeback ? "chargeback" : "refund",
+            organizationId: mapped.organizationId,
+            subject: mapped.isChargeback ? "Chargeback" : "Refund",
+            body: `${mapped.isChargeback ? "Chargeback" : "Refund"} for organization ${mapped.organizationId}.`,
           });
         }
         break;
@@ -519,41 +596,6 @@ export class WebhookProcessorService {
     return n;
   }
 
-  private async emailOrgAdmin(
-    organizationId: string,
-    subject: string,
-    body: string
-  ) {
-    const admin = await prisma.organizationUser.findFirst({
-      where: {
-        organizationId,
-        isPrimaryAdmin: true,
-        status: "ACTIVE",
-      },
-      include: { user: true },
-    });
-    const to = admin?.user.email;
-    if (!to) return;
-    if (!env.SMTP_HOST || !env.SMTP_USER || !env.SMTP_PASSWORD) return;
-    try {
-      await sendEmailWithConfig(
-        {
-          host: env.SMTP_HOST,
-          port: env.SMTP_PORT,
-          secure: env.SMTP_SECURE,
-          user: env.SMTP_USER,
-          password: env.SMTP_PASSWORD,
-          fromName: env.SMTP_FROM_NAME,
-          fromEmail: env.SMTP_FROM_EMAIL ?? env.SMTP_USER,
-        },
-        { to, subject, text: body, html: `<p>${body}</p>` }
-      );
-    } catch (err) {
-      logger.warn("billing webhook email failed", {
-        error: err instanceof Error ? err.message : String(err),
-      });
-    }
-  }
 }
 
 export const webhookProcessorService = new WebhookProcessorService();

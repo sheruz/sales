@@ -119,6 +119,8 @@ enum NotificationType {
   INTERESTED_REPLY
   REFERRAL_CREATED
   DAILY_HELD_DIGEST
+  /// B3.2: seller alerts to Super Admins (new sub, failed payment, cancel, refund, chargeback)
+  BILLING_SELLER_ALERT
 }
 
 /// BRANDED = Delvix HTML template; PLAIN = personal text in-thread reply
@@ -707,9 +709,17 @@ model Organization {
   billingProvider String?            @map("billing_provider")
   /// B3.1: null = inherit global checkoutMethods
   allowedCheckoutMethods Json?       @map("allowed_checkout_methods")
-  /// B3: email used for checkout / invoices
+  /// B3: email used for checkout / invoices (defaults to owner email at create)
   billingEmail    String?            @map("billing_email")
-  /// B3: Paddle customer id for current provider mode (never cross env)
+  /// B3.2: billing contact display name (synced to Paddle customer)
+  billingContactName String?         @map("billing_contact_name")
+  /// B3.2: company billing address lines
+  billingAddress  String?            @map("billing_address") @db.Text
+  /// B3.2: ISO country for tax / Paddle address
+  billingCountry  String?            @map("billing_country")
+  /// B3.2: VAT / tax id
+  billingTaxId    String?            @map("billing_tax_id")
+  /// B3: Paddle customer id for current provider mode (never cross env; never shared across orgs)
   paddleCustomerId String?           @map("paddle_customer_id")
   paddleCustomerEnv String?          @map("paddle_customer_env")
   /// B3.1: Stripe customer id for current mode (never cross env)
@@ -791,6 +801,7 @@ model Organization {
   entitlementOverrides OrgEntitlementOverride[]
   planLimitNotices     PlanLimitNotice[]
   invoices             Invoice[]
+  billingTransactions  BillingTransaction[]
 
   /// S2 cached credit balance (absolute). Reconcile from ledger.
   creditBalanceCached       Int       @default(0) @map("credit_balance_cached")
@@ -3676,10 +3687,46 @@ model PaymentSettings {
   manualRenewalLeadDays  Int      @default(7) @map("manual_renewal_lead_days")
   business               Json     @default("{}")
   manualInstructions     Json     @default("{}") @map("manual_instructions")
+  /// B3.2: Super Admin emails for seller alerts (new sub, fail, cancel, refund, chargeback)
+  sellerAdminEmails      Json     @default("[]") @map("seller_admin_emails")
   createdAt              DateTime @default(now()) @map("created_at")
   updatedAt              DateTime @updatedAt @map("updated_at")
 
   @@map("payment_settings")
+}
+
+/// B3.2: synced provider + manual money movements for SA Transactions / revenue
+model BillingTransaction {
+  id                   String   @id @default(uuid())
+  organizationId       String   @map("organization_id")
+  provider             String
+  /// sandbox | production
+  environment          String   @default("sandbox")
+  /// subscription | topup | renewal | refund | chargeback | manual
+  kind                 String
+  status               String
+  amount               Decimal  @db.Decimal(12, 2)
+  currency             String   @default("USD")
+  feeAmount            Decimal? @map("fee_amount") @db.Decimal(12, 2)
+  netAmount            Decimal? @map("net_amount") @db.Decimal(12, 2)
+  externalId           String?  @map("external_id")
+  externalInvoiceId    String?  @map("external_invoice_id")
+  planVersionId        String?  @map("plan_version_id")
+  topUpPackId          String?  @map("top_up_pack_id")
+  description          String?
+  occurredAt           DateTime @map("occurred_at")
+  metadata             Json     @default("{}")
+  createdAt            DateTime @default(now()) @map("created_at")
+  updatedAt            DateTime @updatedAt @map("updated_at")
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, environment, externalId])
+  @@index([organizationId, occurredAt])
+  @@index([environment, occurredAt])
+  @@index([status, occurredAt])
+  @@index([kind, occurredAt])
+  @@map("billing_transactions")
 }
 
 // ─── Autonomous AI Revenue Agent (Phase 12) ─────────────────────────────────

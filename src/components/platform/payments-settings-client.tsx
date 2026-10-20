@@ -60,6 +60,7 @@ type PaymentsData = {
     manualRenewalLeadDays: number;
     business: Record<string, string>;
     manualInstructions: Record<string, string>;
+    sellerAdminEmails: string[];
   };
   allCheckoutMethods: string[];
   providers: ProviderRow[];
@@ -549,6 +550,26 @@ export function PaymentsSettingsClient({ canWrite }: { canWrite: boolean }) {
                   }
                 />
               </div>
+            </div>
+            <div>
+              <label className="text-xs text-muted-foreground">
+                Seller alert emails (new sub, failed payment, cancel, refund,
+                chargeback) — comma-separated
+              </label>
+              <Input
+                disabled={!canWrite}
+                defaultValue={(data.settings.sellerAdminEmails || []).join(
+                  ", "
+                )}
+                placeholder="you@delvixstudio.com"
+                onBlur={(e) => {
+                  const emails = e.target.value
+                    .split(/[,;\s]+/)
+                    .map((s) => s.trim().toLowerCase())
+                    .filter((s) => s.includes("@"));
+                  void saveSettings({ sellerAdminEmails: emails });
+                }}
+              />
             </div>
           </CardContent>
         </Card>

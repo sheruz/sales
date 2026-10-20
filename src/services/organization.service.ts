@@ -200,6 +200,13 @@ export class OrganizationService {
         defaultCurrency: input.defaultCurrency ?? "USD",
         internalNotes: input.internalNotes,
         status: OrganizationStatus.INVITED,
+        // B3.2: billing contact defaults to owner — never Delvix seller email
+        billingEmail: ownerEmail,
+        billingContactName: [input.owner.firstName, input.owner.lastName]
+          .filter(Boolean)
+          .join(" ")
+          .trim() || null,
+        billingCountry: input.country?.trim().toUpperCase() || null,
         settings: {
           create: {
             timezone: input.timezone ?? "UTC",

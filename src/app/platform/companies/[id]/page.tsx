@@ -6,6 +6,7 @@ import { organizationService } from "@/services/organization.service";
 import { OrganizationActions } from "@/components/platform/organization-actions";
 import { TenantLifecycleActions } from "@/components/platform/tenant-lifecycle-actions";
 import { TenantOverridesClient } from "@/components/platform/tenant-overrides-client";
+import { TenantBillingTab } from "@/components/platform/tenant-billing-tab";
 import { getCurrentUser } from "@/lib/auth/session";
 import { NotFoundError } from "@/lib/api/response";
 import {
@@ -116,6 +117,18 @@ export default async function OrganizationDetailPage({ params }: PageProps) {
       </div>
 
       <TenantOverridesClient organizationId={org.id} canWrite={canWrite} />
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Billing</CardTitle>
+          <CardDescription>
+            Subscription, Paddle IDs, transactions, invoices, credits
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <TenantBillingTab organizationId={org.id} canWrite={canWrite} />
+        </CardContent>
+      </Card>
 
       <Card>
         <CardHeader>

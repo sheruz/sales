@@ -318,9 +318,7 @@ function renderBranded(input: RenderOutboundInput): RenderOutboundResult {
     links.whatsappUrl ? `WhatsApp: ${links.whatsappUrl}` : "",
     "",
     s.senderName,
-    s.senderTitle
-      ? `${s.senderTitle} · ${s.companyLegalName || "Delvix Studio"}`
-      : s.companyLegalName || "Delvix Studio",
+    [s.senderTitle, s.companyLegalName].filter(Boolean).join(" · "),
     links.websiteUrl,
     "",
     [s.companyLegalName, s.businessAddress].filter(Boolean).join(" · "),

@@ -41,33 +41,181 @@ export class PaddleProvider implements PaymentProvider {
     name: string;
   }) {
     await this.assertConfigured();
+    const email = input.email.trim().toLowerCase();
+    if (!email) {
+      throw new ValidationError("Billing email is required for Paddle customer");
+    }
     const org = await prisma.organization.findUniqueOrThrow({
       where: { id: input.organizationId },
     });
     const envName = await this.envName();
+
+    // Never reuse another org's customer id
     if (org.paddleCustomerId && org.paddleCustomerEnv === envName) {
-      return { externalCustomerId: org.paddleCustomerId };
+      const clash = await prisma.organization.findFirst({
+        where: {
+          id: { not: input.organizationId },
+          paddleCustomerId: org.paddleCustomerId,
+          paddleCustomerEnv: envName,
+        },
+        select: { id: true, name: true },
+      });
+      if (clash) {
+        logger.error("paddle customer shared across orgs — clearing", {
+          organizationId: input.organizationId,
+          clashOrgId: clash.id,
+          customerId: org.paddleCustomerId,
+        });
+        await prisma.organization.update({
+          where: { id: input.organizationId },
+          data: { paddleCustomerId: null, paddleCustomerEnv: null },
+        });
+      } else {
+        // Keep email in sync on Paddle
+        await this.patchCustomer(org.paddleCustomerId, {
+          email,
+          name: input.name,
+          organizationId: input.organizationId,
+        });
+        if (org.billingEmail !== email) {
+          await prisma.organization.update({
+            where: { id: input.organizationId },
+            data: { billingEmail: email },
+          });
+        }
+        return { externalCustomerId: org.paddleCustomerId };
+      }
     }
 
-    const res = await paddleFetch<PaddleData<{ id: string }>>("/customers", {
+    const res = await paddleFetch<
+      PaddleData<{ id: string; email?: string }>
+    >("/customers", {
       method: "POST",
       json: {
-        email: input.email,
+        email,
         name: input.name,
         custom_data: { organizationId: input.organizationId },
       },
     });
+
+    // Guard: another org must never already own this id
+    const taken = await prisma.organization.findFirst({
+      where: {
+        paddleCustomerId: res.data.id,
+        paddleCustomerEnv: envName,
+        id: { not: input.organizationId },
+      },
+      select: { id: true },
+    });
+    if (taken) {
+      throw new ValidationError(
+        "Paddle customer id collision — contact support (tenant isolation)"
+      );
+    }
 
     await prisma.organization.update({
       where: { id: input.organizationId },
       data: {
         paddleCustomerId: res.data.id,
         paddleCustomerEnv: envName,
-        billingEmail: input.email,
+        billingEmail: email,
       },
     });
 
     return { externalCustomerId: res.data.id };
+  }
+
+  async getCustomer(customerId: string) {
+    await this.assertConfigured();
+    const res = await paddleFetch<
+      PaddleData<{ id: string; email: string; name?: string | null; custom_data?: Record<string, unknown> }>
+    >(`/customers/${customerId}`);
+    return res.data;
+  }
+
+  private async patchCustomer(
+    customerId: string,
+    input: { email: string; name: string; organizationId: string }
+  ) {
+    try {
+      await paddleFetch(`/customers/${customerId}`, {
+        method: "PATCH",
+        json: {
+          email: input.email,
+          name: input.name,
+          custom_data: { organizationId: input.organizationId },
+        },
+      });
+    } catch (err) {
+      logger.warn("paddle customer patch failed", {
+        customerId,
+        error: err instanceof Error ? err.message : String(err),
+      });
+    }
+  }
+
+  /**
+   * Sync org billing contact fields onto the Paddle customer (create if missing).
+   */
+  async syncCustomerDetails(input: {
+    organizationId: string;
+    email: string;
+    name: string;
+    address?: string | null;
+    country?: string | null;
+    taxId?: string | null;
+  }) {
+    await this.assertConfigured();
+    const customer = await this.createCustomer({
+      organizationId: input.organizationId,
+      email: input.email,
+      name: input.name,
+    });
+
+    // Paddle business tax identifiers / address via customer address API when country set
+    if (input.country?.trim()) {
+      try {
+        const lines = (input.address || "")
+          .split(/\n/)
+          .map((l) => l.trim())
+          .filter(Boolean);
+        await paddleFetch(
+          `/customers/${customer.externalCustomerId}/addresses`,
+          {
+            method: "POST",
+            json: {
+              country_code: input.country.trim().toUpperCase(),
+              first_line: lines[0] || "—",
+              second_line: lines[1] || undefined,
+              city: lines[2] || undefined,
+              postal_code: lines[3] || undefined,
+            },
+          }
+        ).catch(() => null);
+      } catch {
+        // non-fatal — email/name already synced
+      }
+    }
+
+    if (input.taxId?.trim()) {
+      try {
+        await paddleFetch(
+          `/customers/${customer.externalCustomerId}/businesses`,
+          {
+            method: "POST",
+            json: {
+              name: input.name,
+              tax_identifier: input.taxId.trim(),
+              contacts: [{ email: input.email }],
+            },
+          }
+        ).catch(() => null);
+      } catch {
+        // non-fatal
+      }
+    }
+
+    return customer;
   }
 
   async syncProductAndPrices(input: {
@@ -316,11 +464,17 @@ export class PaddleProvider implements PaymentProvider {
 
     const org = await prisma.organization.findUniqueOrThrow({
       where: { id: input.organizationId },
+      select: {
+        name: true,
+        billingContactName: true,
+      },
     });
+    const customerName =
+      org.billingContactName?.trim() || org.name;
     const customer = await this.createCustomer({
       organizationId: input.organizationId,
       email: input.customerEmail,
-      name: org.name,
+      name: customerName,
     });
     const price = await this.resolvePriceId(input.planVersionId, input.interval);
 

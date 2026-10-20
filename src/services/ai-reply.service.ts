@@ -2526,6 +2526,11 @@ export class AiReplyService {
       summary.cancelled = await this.cancelAllQueued(organizationId, "mode_not_auto_send", AiReplyStatus.DRAFT);
       return summary;
     }
+    // Tenant compliance — never send AI replies without org address (no Delvix fallback)
+    if (!outbound.physicalAddress?.trim() || !outbound.businessName?.trim()) {
+      summary.blocked = "compliance_setup";
+      return summary;
+    }
 
     const due = await prisma.emailOutbox.findMany({
       where: {
