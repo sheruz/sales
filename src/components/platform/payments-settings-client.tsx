@@ -102,6 +102,7 @@ export function PaymentsSettingsClient({ canWrite }: { canWrite: boolean }) {
   const [reason, setReason] = useState("");
   const [drawer, setDrawer] = useState<ProviderRow | null>(null);
   const [credMode, setCredMode] = useState<"SANDBOX" | "LIVE">("SANDBOX");
+  const [activeMode, setActiveMode] = useState<"SANDBOX" | "LIVE">("SANDBOX");
   const [creds, setCreds] = useState<Record<string, string>>({});
   const [confirm, setConfirm] = useState<{
     title: string;
@@ -149,19 +150,30 @@ export function PaymentsSettingsClient({ canWrite }: { canWrite: boolean }) {
   }
 
   async function updateProvider(body: Record<string, unknown>) {
+    const pwd =
+      typeof body.password === "string" ? body.password : password;
+    if (!pwd || !String(pwd).trim()) {
+      toast.error("Enter your Super Admin login password to save");
+      return false;
+    }
     const res = await fetch("/api/platform/payments", {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         action: "update_provider",
-        password,
         reason: reason || "Update provider",
         ...body,
+        password: String(pwd).trim(),
       }),
     });
     const json = await res.json();
     if (!json.success) {
-      toast.error(json.error?.message || "Update failed");
+      const detail = json.error?.details?.password?.[0];
+      toast.error(
+        detail
+          ? "Password required — type your login password, then Save"
+          : json.error?.message || "Update failed"
+      );
       return false;
     }
     toast.success("Provider updated");
@@ -372,9 +384,10 @@ export function PaymentsSettingsClient({ canWrite }: { canWrite: boolean }) {
                           variant="outline"
                           onClick={() => {
                             setDrawer(p);
-                            setCredMode(
-                              (p.mode as "SANDBOX" | "LIVE") || "SANDBOX"
-                            );
+                            const m =
+                              (p.mode as "SANDBOX" | "LIVE") || "SANDBOX";
+                            setCredMode(m);
+                            setActiveMode(m);
                             setCreds({});
                           }}
                         >
@@ -414,27 +427,25 @@ export function PaymentsSettingsClient({ canWrite }: { canWrite: boolean }) {
                           size="sm"
                           variant={p.enabled ? "destructive" : "default"}
                           onClick={() => {
-                            if (
-                              p.enabled &&
-                              p.activeSubscriptions > 0
-                            ) {
-                              setConfirm({
-                                title: `Disable ${p.displayName}?`,
-                                body: `${p.activeSubscriptions} active subscription(s) will keep running and receiving webhooks. New checkouts via this provider stop.`,
-                                onConfirm: () => {
-                                  void updateProvider({
-                                    provider: p.provider,
-                                    enabled: false,
-                                  });
-                                  setConfirm(null);
-                                },
-                              });
-                            } else {
-                              void updateProvider({
-                                provider: p.provider,
-                                enabled: !p.enabled,
-                              });
-                            }
+                            const next = !p.enabled;
+                            setConfirm({
+                              title: next
+                                ? `Enable ${p.displayName}?`
+                                : `Disable ${p.displayName}?`,
+                              body: next
+                                ? "Requires your login password. New checkouts can use this provider when Payments is ON."
+                                : p.activeSubscriptions > 0
+                                  ? `${p.activeSubscriptions} active subscription(s) keep running and receiving webhooks. New checkouts stop.`
+                                  : "Requires your login password.",
+                              onConfirm: () => {
+                                void updateProvider({
+                                  provider: p.provider,
+                                  enabled: next,
+                                  password: password.trim(),
+                                });
+                                setConfirm(null);
+                              },
+                            });
                           }}
                         >
                           {p.enabled ? "Disable" : "Enable"}
@@ -837,17 +848,17 @@ export function PaymentsSettingsClient({ canWrite }: { canWrite: boolean }) {
               </div>
               <select
                 className="border rounded-md h-9 px-2 text-sm w-full"
-                value={drawer.mode}
+                value={activeMode}
                 onChange={(e) =>
-                  void updateProvider({
-                    provider: drawer.provider,
-                    mode: e.target.value,
-                  })
+                  setActiveMode(e.target.value as "SANDBOX" | "LIVE")
                 }
               >
                 <option value="SANDBOX">Active mode: SANDBOX</option>
                 <option value="LIVE">Active mode: LIVE</option>
               </select>
+              <p className="text-xs text-muted-foreground">
+                Mode and keys are saved together when you click Save below.
+              </p>
               {(drawer.provider === "PADDLE"
                 ? ["apiKey", "clientToken", "webhookSecret"]
                 : drawer.provider === "STRIPE"
@@ -896,17 +907,20 @@ export function PaymentsSettingsClient({ canWrite }: { canWrite: boolean }) {
                 />
                 <Button
                   className="w-full"
-                  disabled={!password}
+                  disabled={!password.trim()}
                   onClick={() => {
-                    if (!password) {
-                      toast.error("Enter your login password to save");
-                      return;
-                    }
                     void updateProvider({
                       provider: drawer.provider,
+                      mode: activeMode,
                       credentialsMode: credMode,
                       credentials: creds,
-                    }).then((ok) => ok && setDrawer(null));
+                      password: password.trim(),
+                    }).then((ok) => {
+                      if (ok) {
+                        setDrawer(null);
+                        void load();
+                      }
+                    });
                   }}
                 >
                   Save
