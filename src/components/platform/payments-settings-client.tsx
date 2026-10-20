@@ -877,18 +877,46 @@ export function PaymentsSettingsClient({ canWrite }: { canWrite: boolean }) {
                   tab). No API keys.
                 </p>
               )}
-              <Button
-                disabled={!password}
-                onClick={() =>
-                  void updateProvider({
-                    provider: drawer.provider,
-                    credentialsMode: credMode,
-                    credentials: creds,
-                  }).then((ok) => ok && setDrawer(null))
-                }
-              >
-                Save with password confirm
-              </Button>
+              <div className="border-t pt-3 space-y-2">
+                <p className="text-xs text-muted-foreground">
+                  Enter your Super Admin login password to save (required for
+                  security).
+                </p>
+                <Input
+                  type="password"
+                  autoComplete="current-password"
+                  placeholder="Your login password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                />
+                <Input
+                  placeholder="Reason (optional)"
+                  value={reason}
+                  onChange={(e) => setReason(e.target.value)}
+                />
+                <Button
+                  className="w-full"
+                  disabled={!password}
+                  onClick={() => {
+                    if (!password) {
+                      toast.error("Enter your login password to save");
+                      return;
+                    }
+                    void updateProvider({
+                      provider: drawer.provider,
+                      credentialsMode: credMode,
+                      credentials: creds,
+                    }).then((ok) => ok && setDrawer(null));
+                  }}
+                >
+                  Save
+                </Button>
+                {!password && (
+                  <p className="text-xs text-amber-600 dark:text-amber-400">
+                    Save stays disabled until you type your password above.
+                  </p>
+                )}
+              </div>
             </div>
           )}
         </SheetContent>
