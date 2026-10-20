@@ -36,13 +36,13 @@ export async function countConnectedByProvider(opts?: {
     where.organizationId = { not: env.PLATFORM_OWNER_ORG_ID };
   }
   const rows = await prisma.tenantIntegration.groupBy({
-    by: ["provider"],
+    by: ["providerId"],
     where,
-    _count: { _all: true },
+    _count: { id: true },
   });
   const out: Record<string, number> = {};
   for (const r of rows) {
-    out[r.provider] = r._count._all;
+    out[r.providerId] = r._count.id;
   }
   return out;
 }

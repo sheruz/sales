@@ -97,8 +97,14 @@ export class RevenueMetricsService {
         provider: s.provider,
         organizationId: s.organizationId,
         planCode,
-        priceMonthly: s.planVersion?.priceMonthly,
-        priceYearly: s.planVersion?.priceYearly,
+        priceMonthly:
+          s.planVersion?.priceMonthly != null
+            ? Number(s.planVersion.priceMonthly)
+            : null,
+        priceYearly:
+          s.planVersion?.priceYearly != null
+            ? Number(s.planVersion.priceYearly)
+            : null,
         manualPaid: paidOrgs.has(s.organizationId)
           ? true
           : s.accessMode === "manual" ||

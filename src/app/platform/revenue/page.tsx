@@ -131,7 +131,9 @@ function MetricsBlock({
       </div>
       <p className="text-xs text-muted-foreground">
         Trial→paid rate (active / active+trialing):{" "}
-        {(data.trialToPaidRate * 100).toFixed(0)}%. {data.movement.note}
+        {(data.trialToPaidRate * 100).toFixed(0)}%. Active eligible:{" "}
+        {data.activeSubscriptions}. Webhooks needing attention:{" "}
+        {data.webhooks.needingAttention} ({data.webhooks.skipped} skipped).
       </p>
     </div>
   );
