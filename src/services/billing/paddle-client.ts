@@ -25,9 +25,14 @@ export async function getPaddleRuntime(): Promise<{
     throw new Error("Paddle is not configured (missing API key in Super Admin → Payments)");
   }
   const apiKey = normalizePaddleApiKey(cfg.credentials.apiKey);
-  if (!/^pdl_(sdbx|live)_apikey_/.test(apiKey)) {
+  // Full format: pdl_sdbx_apikey_<26>_<22>_<3> (~69 chars). Truncated keys → authentication_malformed.
+  const fullKey =
+    /^pdl_(sdbx|live)_apikey_[a-z\d]{26}_[a-zA-Z\d]{22}_[a-zA-Z\d]{3}$/.test(
+      apiKey
+    );
+  if (!fullKey) {
     throw new Error(
-      "Paddle apiKey looks wrong. Use an API key from Authentication → API keys (starts with pdl_sdbx_apikey_ or pdl_live_apikey_). Do not paste a client-side token or webhook secret here."
+      "Paddle apiKey is incomplete or invalid. Copy the FULL key when you create it (Authentication → API keys → New). It looks like pdl_sdbx_apikey_xxxx_yyyy_zzz (~69 characters, three parts after apikey_). The UI list often shows only a short prefix — that is not enough."
     );
   }
   const environment = cfg.environment;

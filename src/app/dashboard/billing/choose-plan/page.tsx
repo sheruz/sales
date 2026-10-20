@@ -9,6 +9,7 @@ import { env } from "@/lib/config/env";
 import { tenantAccessService } from "@/services/tenant-access.service";
 import { paymentConfigService } from "@/services/billing/payment-config.service";
 import { getPaddleRuntime } from "@/services/billing/paddle-client";
+// getPaddleRuntime kept as fallback if credentials helper fails
 
 export const dynamic = "force-dynamic";
 
@@ -43,11 +44,18 @@ export default async function ChoosePlanPage() {
   let paddleEnv = "sandbox";
   if (checkoutMethods.includes("CARD_PADDLE")) {
     try {
-      const rt = await getPaddleRuntime();
-      paddleClientToken = rt.clientToken || null;
-      paddleEnv = rt.environment;
+      // Prefer lightweight creds read so a bad apiKey doesn't hide the CTA
+      const cfg = await paymentConfigService.getProviderCredentials("PADDLE");
+      paddleClientToken = cfg?.credentials.clientToken?.trim() || null;
+      paddleEnv = cfg?.environment || "sandbox";
     } catch {
-      /* not configured */
+      try {
+        const rt = await getPaddleRuntime();
+        paddleClientToken = rt.clientToken || null;
+        paddleEnv = rt.environment;
+      } catch {
+        /* not configured */
+      }
     }
   }
 
