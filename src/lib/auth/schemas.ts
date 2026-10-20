@@ -4,6 +4,8 @@ import { UserRole } from "@prisma/client";
 export const loginSchema = z.object({
   email: z.string().email("Invalid email address"),
   password: z.string().min(1, "Password is required"),
+  /** B4a: TOTP or recovery code when Super Admin 2FA is enrolled */
+  totpCode: z.string().min(6).max(64).optional(),
 });
 
 export const createUserSchema = z.object({

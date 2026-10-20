@@ -13,6 +13,7 @@ export type RecordBillingTxnInput = {
   status: string;
   amount: number;
   currency?: string;
+  taxAmount?: number | null;
   feeAmount?: number | null;
   netAmount?: number | null;
   externalId?: string | null;
@@ -42,6 +43,11 @@ export class BillingTransactionService {
           data: {
             status: input.status,
             amount: new Prisma.Decimal(input.amount),
+            currency: input.currency || undefined,
+            taxAmount:
+              input.taxAmount != null
+                ? new Prisma.Decimal(input.taxAmount)
+                : undefined,
             feeAmount:
               input.feeAmount != null
                 ? new Prisma.Decimal(input.feeAmount)
@@ -65,6 +71,10 @@ export class BillingTransactionService {
         status: input.status,
         amount: new Prisma.Decimal(input.amount),
         currency: input.currency || "USD",
+        taxAmount:
+          input.taxAmount != null
+            ? new Prisma.Decimal(input.taxAmount)
+            : null,
         feeAmount:
           input.feeAmount != null
             ? new Prisma.Decimal(input.feeAmount)

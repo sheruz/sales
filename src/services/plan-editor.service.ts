@@ -166,6 +166,23 @@ export class PlanEditorService {
     return plan;
   }
 
+  private assertVisibilityAllowed(
+    code: string | null | undefined,
+    visibility: PlanVisibility | undefined
+  ) {
+    if (!visibility) return;
+    const c = (code || "").toUpperCase();
+    const internalCodes = new Set(["OWNER", "COMPLIMENTARY"]);
+    if (
+      internalCodes.has(c) &&
+      visibility === PlanVisibility.PUBLIC
+    ) {
+      throw new ValidationError(
+        "Internal plans (OWNER / COMPLIMENTARY) can never be PUBLIC"
+      );
+    }
+  }
+
   async createPlan(input: {
     name: string;
     code?: string | null;
@@ -175,16 +192,22 @@ export class PlanEditorService {
     reason: string;
   }) {
     if (!input.reason?.trim()) throw new ValidationError("reason is required");
+    this.assertVisibilityAllowed(input.code, input.visibility);
     const maxSort = await prisma.plan.aggregate({ _max: { sortOrder: true } });
+    const code = input.code?.trim() || null;
+    const forcedInternal =
+      code && ["OWNER", "COMPLIMENTARY"].includes(code.toUpperCase())
+        ? PlanVisibility.INTERNAL
+        : input.visibility ?? PlanVisibility.PRIVATE;
     const plan = await prisma.plan.create({
       data: {
         name: input.name.trim(),
-        code: input.code?.trim() || null,
+        code,
         description: input.description ?? null,
         price: 0,
         currency: "USD",
         active: false,
-        visibility: input.visibility ?? PlanVisibility.PRIVATE,
+        visibility: forcedInternal,
         sortOrder: (maxSort._max.sortOrder ?? 0) + 1,
       },
     });
@@ -274,7 +297,17 @@ export class PlanEditorService {
       features: draft.features,
     };
 
-    if (payload.name != null || payload.description !== undefined) {
+    if (payload.name != null || payload.description !== undefined || payload.visibility != null) {
+      const planRow = await prisma.plan.findUniqueOrThrow({
+        where: { id: planId },
+        select: { code: true },
+      });
+      this.assertVisibilityAllowed(planRow.code, payload.visibility);
+      const visibility =
+        planRow.code &&
+        ["OWNER", "COMPLIMENTARY"].includes(planRow.code.toUpperCase())
+          ? PlanVisibility.INTERNAL
+          : payload.visibility;
       await prisma.plan.update({
         where: { id: planId },
         data: {
@@ -282,9 +315,7 @@ export class PlanEditorService {
           ...(payload.description !== undefined
             ? { description: payload.description }
             : {}),
-          ...(payload.visibility != null
-            ? { visibility: payload.visibility }
-            : {}),
+          ...(visibility != null ? { visibility } : {}),
           ...(payload.mostPopular != null
             ? { mostPopular: payload.mostPopular }
             : {}),

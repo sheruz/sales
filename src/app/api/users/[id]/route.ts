@@ -46,20 +46,39 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
   }
 }
 
-export async function DELETE(_request: NextRequest, { params }: RouteParams) {
+export async function DELETE(request: NextRequest, { params }: RouteParams) {
   try {
     const currentUser = await requireUser();
     const { id } = await params;
+    let reason = "Deactivated via admin UI";
+    try {
+      const body = await request.json();
+      if (typeof body?.reason === "string" && body.reason.trim()) {
+        reason = body.reason.trim();
+      }
+    } catch {
+      // no body
+    }
 
     if (currentUser.isPlatformAdmin) {
       await requireSuperAdmin();
-      await authService.deactivateUser(id, currentUser.id, currentUser.role);
+      await authService.deactivateUser(
+        id,
+        currentUser.id,
+        currentUser.role,
+        reason
+      );
       return NextResponse.json(apiSuccess({ message: "User deactivated" }));
     }
 
     await requireOrgPermission("users.delete");
     await assertOrgMember(currentUser.organizationId!, id);
-    await authService.deactivateUser(id, currentUser.id, currentUser.role);
+    await authService.deactivateUser(
+      id,
+      currentUser.id,
+      currentUser.role,
+      reason
+    );
     return NextResponse.json(apiSuccess({ message: "User deactivated" }));
   } catch (error) {
     return handleApiError(error);

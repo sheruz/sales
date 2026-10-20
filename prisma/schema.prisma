@@ -962,6 +962,13 @@ model User {
   platformRole PlatformRole? @map("platform_role")
   isActive     Boolean  @default(true) @map("is_active")
   avatarUrl    String?  @map("avatar_url")
+  /// B4a: TOTP secret (encrypted); null until enrolled
+  totpSecretEnc String? @map("totp_secret_enc") @db.Text
+  totpEnabledAt DateTime? @map("totp_enabled_at")
+  /// B4a: hashed one-time recovery codes (JSON string array of hashes)
+  totpRecoveryCodesEnc String? @map("totp_recovery_codes_enc") @db.Text
+  /// B4a: SUPER_ADMIN must enroll; false until first successful setup
+  totpEnrollmentRequired Boolean @default(false) @map("totp_enrollment_required")
   createdAt    DateTime @default(now()) @map("created_at")
   updatedAt    DateTime @updatedAt @map("updated_at")
   deletedAt    DateTime? @map("deleted_at")
@@ -3709,6 +3716,7 @@ model BillingTransaction {
   status               String
   amount               Decimal  @db.Decimal(12, 2)
   currency             String   @default("USD")
+  taxAmount            Decimal? @map("tax_amount") @db.Decimal(12, 2)
   feeAmount            Decimal? @map("fee_amount") @db.Decimal(12, 2)
   netAmount            Decimal? @map("net_amount") @db.Decimal(12, 2)
   externalId           String?  @map("external_id")

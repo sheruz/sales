@@ -22,8 +22,9 @@ import {
   AlertTriangle,
   FileWarning,
 } from "lucide-react";
-import { SubscriptionStatus } from "@prisma/client";
 import { env } from "@/lib/config/env";
+import { revenueMetricsService } from "@/services/billing/revenue-metrics.service";
+import { countConnectedIntegrations } from "@/lib/integrations/connected";
 
 function statusVariant(status: string) {
   if (status === "ACTIVE") return "default" as const;
@@ -31,11 +32,21 @@ function statusVariant(status: string) {
   return "secondary" as const;
 }
 
+function money(n: number) {
+  return `$${n.toLocaleString("en-US", {
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 0,
+  })}`;
+}
+
 export default async function PlatformOverviewPage() {
   const user = await getCurrentUser();
   if (!user) return null;
 
-  const ownerId = env.PLATFORM_OWNER_ORG_ID || null;
+  // B4a: Live metrics by default (B4b adds Live|Test switch)
+  const metrics = await revenueMetricsService.snapshot("production");
+  const testMetrics = await revenueMetricsService.snapshot("sandbox");
+
   const [
     organizationCount,
     totalUsers,
@@ -44,10 +55,6 @@ export default async function PlatformOverviewPage() {
     totalCampaigns,
     connectedIntegrations,
     autopilotEnabled,
-    activeSubs,
-    pastDueCount,
-    outstandingInvoices,
-    failedWebhooks,
   ] = await Promise.all([
     prisma.organization.count({ where: { deletedAt: null } }),
     prisma.user.count({
@@ -62,44 +69,16 @@ export default async function PlatformOverviewPage() {
     }),
     prisma.lead.count({ where: { deletedAt: null } }),
     prisma.campaign.count({ where: { deletedAt: null } }),
-    prisma.userIntegration.count({ where: { isConnected: true } }),
-    prisma.autopilotConfig.count({ where: { isEnabled: true } }),
-    prisma.subscription.findMany({
+    countConnectedIntegrations({ excludeOwnerOrg: true }),
+    prisma.autopilotConfig.count({
       where: {
-        status: SubscriptionStatus.ACTIVE,
-        ...(ownerId ? { organizationId: { not: ownerId } } : {}),
+        isEnabled: true,
+        ...(env.PLATFORM_OWNER_ORG_ID
+          ? { organizationId: { not: env.PLATFORM_OWNER_ORG_ID } }
+          : {}),
       },
-      include: {
-        planVersion: {
-          select: { priceMonthly: true, priceYearly: true, currency: true },
-        },
-      },
-    }),
-    prisma.subscription.count({
-      where: {
-        status: SubscriptionStatus.PAST_DUE,
-        ...(ownerId ? { organizationId: { not: ownerId } } : {}),
-      },
-    }),
-    prisma.invoice.count({
-      where: {
-        status: { in: ["OPEN", "OVERDUE"] },
-        ...(ownerId ? { organizationId: { not: ownerId } } : {}),
-      },
-    }),
-    prisma.billingWebhookEvent.count({
-      where: { status: { in: ["error", "unmatched"] } },
     }),
   ]);
-
-  const mrr = activeSubs.reduce((sum, s) => {
-    const v = s.planVersion;
-    if (!v) return sum;
-    if (s.billingInterval === "YEARLY") {
-      return sum + Number(v.priceYearly) / 12;
-    }
-    return sum + Number(v.priceMonthly);
-  }, 0);
 
   const recentOrgs = await prisma.organization.findMany({
     where: { deletedAt: null },
@@ -116,25 +95,32 @@ export default async function PlatformOverviewPage() {
 
   const stats = [
     {
-      label: "MRR (est.)",
-      value: `$${mrr.toFixed(0)}`,
+      label: "MRR (Live)",
+      value: money(metrics.mrr),
       icon: DollarSign,
       href: appOps("/revenue"),
-      sub: `${activeSubs.length} active · Delvix excluded`,
+      sub: `${metrics.activeSubscriptions} eligible · Test MRR ${money(testMetrics.mrr)}`,
+    },
+    {
+      label: "Revenue this month (Live)",
+      value: money(metrics.revenueThisMonth),
+      icon: DollarSign,
+      href: appOps("/transactions"),
+      sub: `Last month ${money(metrics.revenueLastMonth)}`,
     },
     {
       label: "Outstanding invoices",
-      value: outstandingInvoices,
+      value: metrics.outstandingManualInvoices,
       icon: FileWarning,
       href: appOps("/invoices"),
       sub: "OPEN + OVERDUE",
     },
     {
       label: "Failed / unmatched",
-      value: failedWebhooks,
+      value: metrics.webhooks.needingAttention,
       icon: AlertTriangle,
-      href: appOps("/transactions"),
-      sub: `${pastDueCount} past due subs`,
+      href: appOps("/payments"),
+      sub: `${metrics.failedPaymentsNeedingAttention} past due · ${metrics.webhooks.skipped} skipped`,
     },
     {
       label: "Organizations",
@@ -151,7 +137,12 @@ export default async function PlatformOverviewPage() {
     },
     { label: "Leads (platform)", value: totalLeads, icon: Target },
     { label: "Campaigns", value: totalCampaigns, icon: MessageSquare },
-    { label: "Connected integrations", value: connectedIntegrations, icon: Zap },
+    {
+      label: "Connected integrations",
+      value: connectedIntegrations,
+      icon: Zap,
+      sub: "TenantIntegration CONNECTED",
+    },
     { label: "Autopilot enabled", value: autopilotEnabled, icon: Zap },
   ];
 
@@ -165,8 +156,7 @@ export default async function PlatformOverviewPage() {
           <Badge>Super Admin</Badge>
         </div>
         <p className="text-muted-foreground">
-          Platform control center — manage organizations and monitor SaaS usage.
-          This is separate from each company&apos;s sales dashboard.
+          Platform control center — manage organizations and monitor usage.
         </p>
         {env.PAYMENTS_EMERGENCY_DISABLE && (
           <div className="mt-3 rounded-md border border-red-500/50 bg-red-500/10 px-3 py-2 text-sm text-red-700 dark:text-red-300">
@@ -213,14 +203,14 @@ export default async function PlatformOverviewPage() {
                 Manage organizations
               </Button>
             </Link>
-            <Link href={appOps("/users")}>
+            <Link href={appOps("/packages")}>
               <Button variant="outline" size="sm">
-                All users
+                Packages
               </Button>
             </Link>
-            <Link href={appOps("/activity")}>
+            <Link href={appOps("/payments")}>
               <Button variant="outline" size="sm">
-                View activity
+                Payments
               </Button>
             </Link>
           </CardContent>
@@ -229,32 +219,21 @@ export default async function PlatformOverviewPage() {
         <Card>
           <CardHeader>
             <CardTitle>Recent organizations</CardTitle>
-            <CardDescription>Latest customer tenants</CardDescription>
+            <CardDescription>Newest workspaces</CardDescription>
           </CardHeader>
-          <CardContent className="space-y-3">
+          <CardContent className="space-y-2">
             {recentOrgs.length === 0 ? (
-              <p className="text-sm text-muted-foreground">
-                No organizations yet. Create one under Organizations.
-              </p>
+              <p className="text-sm text-muted-foreground">None yet</p>
             ) : (
               recentOrgs.map((org) => (
-                <div
+                <Link
                   key={org.id}
-                  className="flex items-center justify-between gap-2 text-sm"
+                  href={appOps(`/companies/${org.id}`)}
+                  className="flex items-center justify-between rounded border px-3 py-2 text-sm hover:bg-muted"
                 >
-                  <div className="min-w-0">
-                    <Link
-                      href={appOps(`/companies/${org.id}`)}
-                      className="font-medium truncate hover:underline block"
-                    >
-                      {org.name}
-                    </Link>
-                    <p className="text-xs text-muted-foreground truncate font-mono">
-                      {org.slug}
-                    </p>
-                  </div>
+                  <span className="font-medium">{org.name}</span>
                   <Badge variant={statusVariant(org.status)}>{org.status}</Badge>
-                </div>
+                </Link>
               ))
             )}
           </CardContent>

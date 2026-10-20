@@ -12,8 +12,16 @@ export type ProviderEnvironment = "sandbox" | "production";
 
 export type BillingIntervalKind = "MONTHLY" | "YEARLY" | "ONE_TIME";
 
+export type MoneyFields = {
+  amount?: number;
+  taxAmount?: number | null;
+  feeAmount?: number | null;
+  netAmount?: number | null;
+  currency?: string;
+};
+
 export type MappedBillingEvent =
-  | {
+  | ({
       type: "subscription_activated";
       organizationId: string;
       planVersionId: string;
@@ -24,7 +32,7 @@ export type MappedBillingEvent =
       currentPeriodEnd: Date;
       transactionId?: string;
       trialEndsAt?: Date | null;
-    }
+    } & MoneyFields)
   | {
       type: "subscription_updated";
       organizationId: string;
@@ -49,7 +57,7 @@ export type MappedBillingEvent =
       externalSubscriptionId: string;
       occurredAt: Date;
     }
-  | {
+  | ({
       type: "renewal_paid";
       organizationId: string;
       externalSubscriptionId: string;
@@ -57,25 +65,30 @@ export type MappedBillingEvent =
       currentPeriodStart: Date;
       currentPeriodEnd: Date;
       occurredAt: Date;
-    }
-  | {
+    } & MoneyFields)
+  | ({
       type: "topup_paid";
       organizationId: string;
       topUpPackId: string;
       transactionId: string;
       credits: number;
       occurredAt: Date;
-    }
-  | {
+    } & MoneyFields)
+  | ({
       type: "refund_or_chargeback";
       organizationId: string | null;
       externalSubscriptionId?: string;
       transactionId?: string;
       isChargeback: boolean;
       occurredAt: Date;
-    }
+    } & MoneyFields)
   | {
       type: "unmatched";
+      reason: string;
+    }
+  | {
+      /** Ignored / not actionable — never counts as failed */
+      type: "skipped";
       reason: string;
     };
 

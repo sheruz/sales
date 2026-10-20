@@ -34,8 +34,8 @@ export class AuthService {
   async login(
     email: string,
     password: string,
-    meta?: SessionMeta
-  ): Promise<{ user: AuthUser; token: string }> {
+    meta?: SessionMeta & { totpCode?: string }
+  ): Promise<{ user: AuthUser; token: string; mfaEnrollPrompt?: boolean }> {
     const normalized = email.toLowerCase().trim();
     const ip = meta?.ipAddress || "unknown";
     assertNotLockedOut(normalized, ip);
@@ -53,6 +53,8 @@ export class AuthService {
         passwordHash: true,
         isActive: true,
         deletedAt: true,
+        totpEnabledAt: true,
+        totpEnrollmentRequired: true,
       },
     });
 
@@ -87,6 +89,20 @@ export class AuthService {
       user.role === UserRole.SUPER_ADMIN;
     const isPlatformOperator =
       isPlatformAdmin || user.platformRole === "PLATFORM_SUPPORT";
+
+    // B4a: TOTP required only after enrollment (not before first setup)
+    if (isPlatformAdmin && user.totpEnabledAt) {
+      const { mfaService } = await import("@/services/mfa.service");
+      const ok = await mfaService.verifyLoginCode(
+        user.id,
+        meta?.totpCode || ""
+      );
+      if (!ok) {
+        throw new UnauthorizedError(
+          "Authenticator code required. Enter the 6-digit code (or a recovery code)."
+        );
+      }
+    }
 
     // B2: plan-paused membership cannot log in (data kept; primary admin never paused)
     const primaryMembership = await prisma.organizationUser.findFirst({
@@ -132,7 +148,13 @@ export class AuthService {
       throw new UnauthorizedError("Failed to establish session");
     }
 
-    return { user: authUser, token };
+    return {
+      user: authUser,
+      token,
+      mfaEnrollPrompt: Boolean(
+        isPlatformAdmin && !user.totpEnabledAt
+      ),
+    };
   }
 
   async logout(token: string): Promise<void> {
@@ -382,9 +404,17 @@ export class AuthService {
     logger.info("Admin password reset", { userId, actorId });
   }
 
-  async deactivateUser(userId: string, actorId: string, actorRole: UserRole) {
+  async deactivateUser(
+    userId: string,
+    actorId: string,
+    actorRole: UserRole,
+    reason?: string
+  ) {
     if (userId === actorId) {
       throw new ValidationError("Cannot deactivate your own account");
+    }
+    if (!reason?.trim()) {
+      throw new ValidationError("Reason is required to deactivate a user");
     }
 
     const target = await prisma.user.findFirst({
@@ -395,25 +425,44 @@ export class AuthService {
       throw new ValidationError("User not found");
     }
 
+    if (
+      target.role === UserRole.SUPER_ADMIN ||
+      target.platformRole === "SUPER_ADMIN"
+    ) {
+      throw new ValidationError("Super Admin accounts cannot be deactivated here");
+    }
+
+    const primary = await prisma.organizationUser.findFirst({
+      where: { userId, isPrimaryAdmin: true, status: "ACTIVE" },
+    });
+    if (primary) {
+      throw new ValidationError(
+        "Cannot deactivate an organization's primary admin — transfer ownership first"
+      );
+    }
+
     if (!canManageTargetUser(actorRole, target.role)) {
       throw new ValidationError("You cannot deactivate this user");
     }
 
-    if (target.role === UserRole.SUPER_ADMIN) {
-      const superAdminCount = await prisma.user.count({
-        where: { role: UserRole.SUPER_ADMIN, isActive: true, deletedAt: null },
-      });
-      if (superAdminCount <= 1) {
-        throw new ValidationError("Cannot deactivate the last super admin");
-      }
-    }
-
     await prisma.user.update({
       where: { id: userId },
-      data: { isActive: false, deletedAt: new Date() },
+      data: { isActive: false },
     });
 
     await prisma.session.deleteMany({ where: { userId } });
+
+    const { organizationService } = await import(
+      "@/services/organization.service"
+    );
+    await organizationService.writePlatformAudit({
+      actorUserId: actorId,
+      action: "user.deactivated",
+      targetType: "user",
+      targetId: userId,
+      reason: reason.trim(),
+      after: { isActive: false, email: target.email },
+    });
     logger.info("User deactivated", { userId, actorId });
   }
 }

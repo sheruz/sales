@@ -18,6 +18,7 @@ import type {
   PaymentProvider,
 } from "@/services/billing/provider-types";
 import { logger } from "@/lib/logger";
+import { parsePaddleMoney } from "@/lib/billing/paddle-amounts";
 
 type PaddleData<T> = { data: T };
 
@@ -822,6 +823,7 @@ export class PaddleProvider implements PaymentProvider {
     if (eventType === "transaction.completed") {
       const kind = custom.kind as string | undefined;
       const txId = (data.id as string) || "";
+      const money = parsePaddleMoney(payload);
       if (kind === "topup") {
         return {
           type: "topup_paid",
@@ -830,6 +832,11 @@ export class PaddleProvider implements PaymentProvider {
           transactionId: txId,
           credits: Number(custom.credits || 0),
           occurredAt,
+          amount: money.amount,
+          taxAmount: money.tax,
+          feeAmount: money.fee,
+          netAmount: money.net,
+          currency: money.currency,
         };
       }
       // subscription first payment or renewal
@@ -887,6 +894,11 @@ export class PaddleProvider implements PaymentProvider {
           currentPeriodStart: periodStart,
           currentPeriodEnd: periodEnd,
           occurredAt,
+          amount: money.amount,
+          taxAmount: money.tax,
+          feeAmount: money.fee,
+          netAmount: money.net,
+          currency: money.currency,
         };
       }
 
@@ -900,6 +912,11 @@ export class PaddleProvider implements PaymentProvider {
         currentPeriodStart: periodStart,
         currentPeriodEnd: periodEnd,
         transactionId: txId,
+        amount: money.amount,
+        taxAmount: money.tax,
+        feeAmount: money.fee,
+        netAmount: money.net,
+        currency: money.currency,
       };
     }
 
@@ -964,16 +981,23 @@ export class PaddleProvider implements PaymentProvider {
 
     if (eventType === "adjustment.created") {
       const action = String(data.action || "");
+      const money = parsePaddleMoney(payload);
       return {
         type: "refund_or_chargeback",
         organizationId,
         transactionId: String(data.transaction_id || ""),
         isChargeback: /chargeback|dispute/i.test(action),
         occurredAt,
+        amount: money.amount,
+        taxAmount: money.tax,
+        feeAmount: money.fee,
+        netAmount: money.net,
+        currency: money.currency,
       };
     }
 
-    return { type: "unmatched", reason: `unhandled event ${eventType}` };
+    // Noise / informational — not a routing failure
+    return { type: "skipped", reason: `unhandled event ${eventType}` };
   }
 
   async testConnection() {

@@ -60,7 +60,7 @@ export function AuditLogClient() {
       <div>
         <h2 className="text-2xl font-bold tracking-tight">Audit log</h2>
         <p className="text-muted-foreground text-sm">
-          Thin read-only list — full polish in B4.
+          Platform audit trail of Super Admin actions.
         </p>
       </div>
       {error && <p className="text-sm text-destructive">{error}</p>}

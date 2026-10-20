@@ -108,12 +108,27 @@ export function UserManagement({ initialUsers, actorRole }: UserManagementProps)
     }
   }
 
-  async function handleDeactivate(userId: string) {
-    if (!confirm("Are you sure you want to deactivate this user?")) return;
+  async function handleDeactivate(userId: string, role: string) {
+    if (role === "SUPER_ADMIN") {
+      toast.error("Super Admin accounts cannot be deactivated");
+      return;
+    }
+    const reason = window.prompt(
+      "Reason for deactivation (required, saved to audit log):"
+    );
+    if (!reason?.trim()) {
+      toast.error("Deactivation cancelled — reason required");
+      return;
+    }
+    if (!confirm("Deactivate this user? They will no longer be able to sign in.")) {
+      return;
+    }
 
     try {
       const response = await fetch(`/api/users/${userId}`, {
         method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ reason: reason.trim() }),
       });
       const data = await response.json();
 
@@ -256,14 +271,16 @@ export function UserManagement({ initialUsers, actorRole }: UserManagementProps)
                 </TableCell>
                 <TableCell>
                   {user.isActive &&
+                    user.role !== "SUPER_ADMIN" &&
                     (!actorRole || canManageTargetUser(actorRole, user.role)) && (
                     <Button
                       variant="ghost"
-                      size="icon"
-                      onClick={() => handleDeactivate(user.id)}
+                      size="sm"
+                      onClick={() => handleDeactivate(user.id, user.role)}
                       aria-label="Deactivate user"
                     >
-                      <Trash2 className="h-4 w-4 text-destructive" />
+                      <Trash2 className="mr-1 h-4 w-4 text-destructive" />
+                      Deactivate
                     </Button>
                   )}
                 </TableCell>

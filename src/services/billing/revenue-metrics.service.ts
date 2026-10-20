@@ -1,10 +1,17 @@
 /**
- * B3.2 Super Admin revenue metrics (LIVE vs sandbox/Test).
+ * B4a: Canonical Super Admin revenue / MRR metrics (single source for all pages).
  */
 
 import prisma from "@/lib/db/prisma";
-import { SubscriptionStatus } from "@prisma/client";
+import { InvoiceStatus, SubscriptionStatus } from "@prisma/client";
 import { env } from "@/lib/config/env";
+import {
+  isMrrEligible,
+  monthlyEquivalent,
+  mrrContribution,
+} from "@/lib/billing/platform-metrics";
+
+export type BillingEnvironment = "production" | "sandbox";
 
 function monthStart(d = new Date()) {
   return new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), 1));
@@ -15,17 +22,30 @@ function addMonths(d: Date, n: number) {
 }
 
 export class RevenueMetricsService {
+  private ownerId() {
+    return env.PLATFORM_OWNER_ORG_ID || null;
+  }
+
   private ownerFilter() {
-    const ownerId = env.PLATFORM_OWNER_ORG_ID || null;
+    const ownerId = this.ownerId();
     return ownerId ? { organizationId: { not: ownerId } } : {};
   }
 
-  async snapshot(environment: "production" | "sandbox") {
+  async snapshot(environment: BillingEnvironment) {
     const owner = this.ownerFilter();
+    const ownerId = this.ownerId();
+
     const subs = await prisma.subscription.findMany({
       where: {
         ...owner,
-        providerEnvironment: environment,
+        ...(environment === "sandbox"
+          ? {
+              OR: [
+                { providerEnvironment: "sandbox" },
+                { providerEnvironment: null },
+              ],
+            }
+          : { providerEnvironment: environment }),
       },
       include: {
         planVersion: {
@@ -39,6 +59,20 @@ export class RevenueMetricsService {
       },
     });
 
+    // Manual paid = has PAID invoice or payment recorded
+    const orgIds = subs.map((s) => s.organizationId);
+    const paidOrgs = new Set<string>();
+    if (orgIds.length) {
+      const paid = await prisma.invoice.findMany({
+        where: {
+          organizationId: { in: orgIds },
+          status: InvoiceStatus.PAID,
+        },
+        select: { organizationId: true },
+      });
+      for (const p of paid) paidOrgs.add(p.organizationId);
+    }
+
     const byStatus: Record<string, number> = {
       ACTIVE: 0,
       TRIALING: 0,
@@ -51,96 +85,129 @@ export class RevenueMetricsService {
     let mrr = 0;
     const mrrByPlan: Record<string, number> = {};
     const mrrByProvider: Record<string, number> = {};
+    let activeEligible = 0;
 
     for (const s of subs) {
       byStatus[s.status] = (byStatus[s.status] || 0) + 1;
-      if (
-        s.status !== SubscriptionStatus.ACTIVE &&
-        s.status !== SubscriptionStatus.TRIALING &&
-        s.status !== SubscriptionStatus.PAST_DUE
-      ) {
-        continue;
-      }
-      const v = s.planVersion;
-      if (!v) continue;
-      const monthly =
-        s.billingInterval === "YEARLY"
-          ? Number(v.priceYearly) / 12
-          : Number(v.priceMonthly);
-      if (s.status === SubscriptionStatus.ACTIVE) {
-        mrr += monthly;
-        const planName = v.plan?.name || "Unknown";
-        mrrByPlan[planName] = (mrrByPlan[planName] || 0) + monthly;
-        const prov = s.provider || "UNKNOWN";
-        mrrByProvider[prov] = (mrrByProvider[prov] || 0) + monthly;
-      }
+      const planCode = s.planVersion?.plan?.code ?? null;
+      const input = {
+        status: s.status,
+        billingInterval: s.billingInterval,
+        accessMode: s.accessMode,
+        provider: s.provider,
+        organizationId: s.organizationId,
+        planCode,
+        priceMonthly: s.planVersion?.priceMonthly,
+        priceYearly: s.planVersion?.priceYearly,
+        manualPaid: paidOrgs.has(s.organizationId)
+          ? true
+          : s.accessMode === "manual" ||
+              (s.provider || "").startsWith("MANUAL")
+            ? false
+            : undefined,
+      };
+      if (!isMrrEligible(input, ownerId)) continue;
+      const contrib = mrrContribution(input, ownerId);
+      mrr += contrib;
+      activeEligible += 1;
+      const planName = s.planVersion?.plan?.name || "Unknown";
+      mrrByPlan[planName] = (mrrByPlan[planName] || 0) + contrib;
+      const prov = s.provider || "UNKNOWN";
+      mrrByProvider[prov] = (mrrByProvider[prov] || 0) + contrib;
     }
 
     const thisStart = monthStart();
     const lastStart = addMonths(thisStart, -1);
     const nextStart = addMonths(thisStart, 1);
 
-    const [revThis, revLast, topUpThis, refundsThis, outstanding, failedPay] =
-      await Promise.all([
-        prisma.billingTransaction.aggregate({
-          where: {
-            environment,
-            kind: { in: ["subscription", "renewal", "topup", "manual"] },
-            status: { in: ["completed", "paid", "succeeded"] },
-            occurredAt: { gte: thisStart, lt: nextStart },
-            ...(owner.organizationId
-              ? { organizationId: owner.organizationId }
-              : {}),
-          },
-          _sum: { amount: true },
-        }),
-        prisma.billingTransaction.aggregate({
-          where: {
-            environment,
-            kind: { in: ["subscription", "renewal", "topup", "manual"] },
-            status: { in: ["completed", "paid", "succeeded"] },
-            occurredAt: { gte: lastStart, lt: thisStart },
-            ...(owner.organizationId
-              ? { organizationId: owner.organizationId }
-              : {}),
-          },
-          _sum: { amount: true },
-        }),
-        prisma.billingTransaction.aggregate({
-          where: {
-            environment,
-            kind: "topup",
-            status: { in: ["completed", "paid", "succeeded"] },
-            occurredAt: { gte: thisStart, lt: nextStart },
-          },
-          _sum: { amount: true },
-        }),
-        prisma.billingTransaction.aggregate({
-          where: {
-            environment,
-            kind: { in: ["refund", "chargeback"] },
-            occurredAt: { gte: thisStart, lt: nextStart },
-          },
-          _sum: { amount: true },
-        }),
-        prisma.invoice.count({
-          where: {
-            status: { in: ["OPEN", "OVERDUE"] },
-            ...(env.PLATFORM_OWNER_ORG_ID
-              ? { organizationId: { not: env.PLATFORM_OWNER_ORG_ID } }
-              : {}),
-          },
-        }),
-        prisma.subscription.count({
-          where: {
-            status: SubscriptionStatus.PAST_DUE,
-            ...owner,
-            providerEnvironment: environment,
-          },
-        }),
-      ]);
+    // Approximate last-month MRR from same eligible set (no historical snapshot yet)
+    const mrrLastMonth = mrr;
 
-    // 12-month revenue chart from transactions
+    const orgNotOwner = ownerId
+      ? { organizationId: { not: ownerId } }
+      : {};
+
+    const [
+      revThis,
+      revLast,
+      topUpThis,
+      refundsThis,
+      outstanding,
+      failedPay,
+      webhookFailed,
+      webhookUnmatched,
+      webhookSkipped,
+    ] = await Promise.all([
+      prisma.billingTransaction.aggregate({
+        where: {
+          environment,
+          kind: { in: ["subscription", "renewal", "topup", "manual"] },
+          status: { in: ["completed", "paid", "succeeded"] },
+          occurredAt: { gte: thisStart, lt: nextStart },
+          ...orgNotOwner,
+        },
+        _sum: { amount: true },
+      }),
+      prisma.billingTransaction.aggregate({
+        where: {
+          environment,
+          kind: { in: ["subscription", "renewal", "topup", "manual"] },
+          status: { in: ["completed", "paid", "succeeded"] },
+          occurredAt: { gte: lastStart, lt: thisStart },
+          ...orgNotOwner,
+        },
+        _sum: { amount: true },
+      }),
+      prisma.billingTransaction.aggregate({
+        where: {
+          environment,
+          kind: "topup",
+          status: { in: ["completed", "paid", "succeeded"] },
+          occurredAt: { gte: thisStart, lt: nextStart },
+          ...orgNotOwner,
+        },
+        _sum: { amount: true },
+      }),
+      prisma.billingTransaction.aggregate({
+        where: {
+          environment,
+          kind: { in: ["refund", "chargeback"] },
+          occurredAt: { gte: thisStart, lt: nextStart },
+          ...orgNotOwner,
+        },
+        _sum: { amount: true },
+      }),
+      prisma.invoice.count({
+        where: {
+          status: { in: ["OPEN", "OVERDUE"] },
+          ...orgNotOwner,
+        },
+      }),
+      prisma.subscription.count({
+        where: {
+          status: SubscriptionStatus.PAST_DUE,
+          ...owner,
+          ...(environment === "sandbox"
+            ? {
+                OR: [
+                  { providerEnvironment: "sandbox" },
+                  { providerEnvironment: null },
+                ],
+              }
+            : { providerEnvironment: environment }),
+        },
+      }),
+      prisma.billingWebhookEvent.count({
+        where: { status: "error", environment },
+      }),
+      prisma.billingWebhookEvent.count({
+        where: { status: "unmatched", environment },
+      }),
+      prisma.billingWebhookEvent.count({
+        where: { status: "skipped", environment },
+      }),
+    ]);
+
     const chartStart = addMonths(thisStart, -11);
     const txns = await prisma.billingTransaction.findMany({
       where: {
@@ -148,6 +215,7 @@ export class RevenueMetricsService {
         kind: { in: ["subscription", "renewal", "topup", "manual"] },
         status: { in: ["completed", "paid", "succeeded"] },
         occurredAt: { gte: chartStart },
+        ...orgNotOwner,
       },
       select: { amount: true, occurredAt: true },
     });
@@ -167,33 +235,36 @@ export class RevenueMetricsService {
     const trialToPaid =
       trialing + active > 0 ? active / (trialing + active) : 0;
 
-    // MRR movement approximations from status (full cohort history needs ledger — best-effort)
-    const newMrr = mrr; // placeholder detail; UI labels as estimated
     return {
       environment,
       label: environment === "production" ? "LIVE" : "Test",
       mrr,
+      mrrChangeVsLastMonth: mrr - mrrLastMonth,
       arr: mrr * 12,
+      activeSubscriptions: activeEligible,
       revenueThisMonth: Number(revThis._sum.amount || 0),
       revenueLastMonth: Number(revLast._sum.amount || 0),
       chart12m: chart,
       mrrByPlan,
       mrrByProvider,
-      movement: {
-        newMrr,
-        expansionMrr: 0,
-        contractionMrr: 0,
-        churnedMrr: 0,
-        note: "Movement breakdown improves as BillingTransaction history grows",
-      },
       counts: byStatus,
       trialToPaidRate: trialToPaid,
       topUpRevenueThisMonth: Number(topUpThis._sum.amount || 0),
       refundsThisMonth: Number(refundsThis._sum.amount || 0),
       outstandingManualInvoices: outstanding,
       failedPaymentsNeedingAttention: failedPay,
+      webhooks: {
+        failed: webhookFailed,
+        unmatched: webhookUnmatched,
+        skipped: webhookSkipped,
+        /** Real attention count — not skipped */
+        needingAttention: webhookFailed + webhookUnmatched,
+      },
     };
   }
+
+  /** Helper for tests / callers */
+  monthlyFromPlan = monthlyEquivalent;
 }
 
 export const revenueMetricsService = new RevenueMetricsService();

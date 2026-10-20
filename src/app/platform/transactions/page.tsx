@@ -76,7 +76,7 @@ export default async function PlatformTransactionsPage({
       <Card>
         <CardHeader>
           <CardTitle className="text-base">Filters</CardTitle>
-          <CardDescription>Pass via query string</CardDescription>
+          <CardDescription>Filter by environment, provider, or type</CardDescription>
         </CardHeader>
         <CardContent className="flex flex-wrap gap-2 text-sm">
           {[

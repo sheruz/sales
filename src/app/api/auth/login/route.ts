@@ -19,13 +19,15 @@ export async function POST(request: NextRequest) {
 
     assertAuthRateLimit(ipAddress, input.email);
 
-    const { user, token } = await authService.login(
+    const { user, token, mfaEnrollPrompt } = await authService.login(
       input.email,
       input.password,
-      { ipAddress, userAgent }
+      { ipAddress, userAgent, totpCode: input.totpCode }
     );
 
-    const response = NextResponse.json(apiSuccess({ user }));
+    const response = NextResponse.json(
+      apiSuccess({ user, mfaEnrollPrompt: Boolean(mfaEnrollPrompt) })
+    );
     return setSessionCookie(response, token);
   } catch (error) {
     return handleApiError(error);

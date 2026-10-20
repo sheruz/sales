@@ -113,7 +113,7 @@ export function TenantLifecycleActions({
 
   return (
     <div className="space-y-4 rounded-lg border p-4">
-      <h3 className="text-sm font-semibold">B1 lifecycle</h3>
+      <h3 className="text-sm font-semibold">Lifecycle</h3>
       <div className="flex flex-wrap items-end gap-2 border-b pb-3">
         <div className="space-y-1">
           <label className="text-xs text-muted-foreground">Billing method</label>

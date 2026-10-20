@@ -119,7 +119,7 @@ export function TopUpPacksClient({ canWrite }: { canWrite: boolean }) {
       <div>
         <h2 className="text-2xl font-bold tracking-tight">Top-up packs</h2>
         <p className="text-muted-foreground text-sm">
-          Tenants see Contact us until B3. Super Admin can grant manually.
+          Super Admin can grant packs to an organization manually.
         </p>
       </div>
       {error && <p className="text-sm text-destructive">{error}</p>}

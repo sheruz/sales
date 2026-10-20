@@ -121,6 +121,18 @@ export class WebhookProcessorService {
         row.provider === "stripe" ? stripeProvider : paddleProvider;
       const mapped = await mapper.mapEvent(row.payload);
 
+      if (mapped.type === "skipped") {
+        await prisma.billingWebhookEvent.update({
+          where: { id: row.id },
+          data: {
+            status: "skipped",
+            error: mapped.reason,
+            processedAt: new Date(),
+          },
+        });
+        return;
+      }
+
       if (mapped.type === "unmatched") {
         await prisma.billingWebhookEvent.update({
           where: { id: row.id },
@@ -139,7 +151,7 @@ export class WebhookProcessorService {
         await prisma.billingWebhookEvent.update({
           where: { id: row.id },
           data: {
-            status: "processed",
+            status: "skipped",
             error: "ignored platform owner",
             processedAt: new Date(),
           },
@@ -181,7 +193,7 @@ export class WebhookProcessorService {
           await prisma.billingWebhookEvent.update({
             where: { id: row.id },
             data: {
-              status: "processed",
+              status: "skipped",
               error: "ignored older event",
               processedAt: new Date(),
               organizationId: orgId,
@@ -284,7 +296,11 @@ export class WebhookProcessorService {
           environment: providerEnv,
           kind: "subscription",
           status: "completed",
-          amount: 0,
+          amount: mapped.amount ?? 0,
+          taxAmount: mapped.taxAmount,
+          feeAmount: mapped.feeAmount,
+          netAmount: mapped.netAmount,
+          currency: mapped.currency || "USD",
           externalId: mapped.transactionId || mapped.externalSubscriptionId,
           planVersionId: mapped.planVersionId,
           occurredAt: new Date(),
@@ -325,6 +341,29 @@ export class WebhookProcessorService {
             });
           }
         }
+        {
+          const envName =
+            webhookProvider === "stripe"
+              ? (
+                  await paymentConfigService.getProviderCredentials("STRIPE")
+                )?.environment || "sandbox"
+              : await paddleEnvironment();
+          await billingTransactionService.record({
+            organizationId: mapped.organizationId,
+            provider: webhookProvider === "stripe" ? "STRIPE" : "PADDLE",
+            environment: envName,
+            kind: "renewal",
+            status: "completed",
+            amount: mapped.amount ?? 0,
+            taxAmount: mapped.taxAmount,
+            feeAmount: mapped.feeAmount,
+            netAmount: mapped.netAmount,
+            currency: mapped.currency || "USD",
+            externalId: mapped.transactionId,
+            occurredAt: mapped.occurredAt,
+            description: "Subscription renewal",
+          });
+        }
         break;
       }
       case "topup_paid": {
@@ -354,7 +393,11 @@ export class WebhookProcessorService {
             environment: envName,
             kind: "topup",
             status: "completed",
-            amount: 0,
+            amount: mapped.amount ?? 0,
+            taxAmount: mapped.taxAmount,
+            feeAmount: mapped.feeAmount,
+            netAmount: mapped.netAmount,
+            currency: mapped.currency || "USD",
             externalId: mapped.transactionId,
             topUpPackId: mapped.topUpPackId,
             occurredAt: mapped.occurredAt,
@@ -512,7 +555,11 @@ export class WebhookProcessorService {
             environment: envName,
             kind: mapped.isChargeback ? "chargeback" : "refund",
             status: "completed",
-            amount: 0,
+            amount: mapped.amount ?? 0,
+            taxAmount: mapped.taxAmount,
+            feeAmount: mapped.feeAmount,
+            netAmount: mapped.netAmount,
+            currency: mapped.currency || "USD",
             externalId: mapped.transactionId || undefined,
             occurredAt: mapped.occurredAt,
             description: mapped.isChargeback ? "Chargeback" : "Refund",
