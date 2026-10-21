@@ -54,7 +54,7 @@ describe("email track tokens", () => {
       content: "cta",
       outboxId: "abcdef12-xxxx",
     });
-    expect(u).toContain("utm_source=delvix_email");
+    expect(u).toContain("utm_source=email");
     expect(u).toContain("utm_medium=email");
     expect(u).toContain("utm_content=cta");
   });

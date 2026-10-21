@@ -433,6 +433,15 @@ export class InvoiceService {
         })
       )?.value as Record<string, string> | null) ||
       {};
+    const { platformEmailBrandingService } = await import(
+      "@/services/platform-email-branding.service"
+    );
+    const platformBrand = await platformEmailBrandingService.get();
+    const sellerName =
+      biz.name?.trim() ||
+      platformBrand.legalCompanyName.trim() ||
+      process.env.SMTP_FROM_NAME?.trim() ||
+      "Platform";
     const items = invoice.lineItems as Array<{ description: string; amount: number }>;
     const lines = items
       .map(
@@ -442,7 +451,7 @@ export class InvoiceService {
       .join("");
     return `<!doctype html><html><body style="font-family:system-ui;padding:32px">
       <h1>Invoice ${invoice.number}</h1>
-      <p><strong>${biz.name || "Delvix"}</strong><br/>${biz.address || ""}<br/>${biz.email || ""}
+      <p><strong>${sellerName}</strong><br/>${biz.address || platformBrand.businessAddress || ""}<br/>${biz.email || ""}
       ${biz.taxId ? `<br/>Tax ID: ${biz.taxId}` : ""}</p>
       <p>Bill to: ${invoice.billingName || invoice.organization.name}<br/>
       ${invoice.billingEmail || ""}<br/>${invoice.billingAddress || ""}</p>

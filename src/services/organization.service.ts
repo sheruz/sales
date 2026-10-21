@@ -385,14 +385,6 @@ export class OrganizationService {
     expiresAt: Date;
   }) {
     const link = `${env.APP_URL}/invite?token=${input.token}`;
-    const text = `Hi ${input.firstName},
-
-You've been invited to ${input.organizationName} on Delvix Revenue OS.
-
-Set your password (link expires in 72 hours):
-${link}
-
-If you didn't expect this, ignore this email.`;
 
     if (
       !env.SMTP_HOST ||
@@ -414,7 +406,7 @@ If you didn't expect this, ignore this email.`;
       await billingNotifyService.sendBrandedTo({
         to: input.to,
         subject: `You're invited to ${input.organizationName}`,
-        body: `You've been invited to ${input.organizationName}.\n\nSet your password (link expires in 72 hours). If you didn't expect this, ignore this email.`,
+        body: `Hi ${input.firstName},\n\nYou've been invited to ${input.organizationName}.\n\nSet your password (link expires in 72 hours). If you didn't expect this, ignore this email.`,
         orgName: input.organizationName,
         ctaUrl: link,
         ctaLabel: "Set password",

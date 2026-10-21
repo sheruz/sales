@@ -253,13 +253,13 @@ export class UserIntegrationService {
       secure: data.smtpSecure ?? false,
       user: data.smtpUser,
       password: data.smtpPassword,
-      fromName: data.fromName ?? "Delvix",
+      fromName: data.fromName?.trim() || data.fromEmail,
       fromEmail: data.fromEmail,
     };
 
     await sendEmailWithConfig(config, {
       to: data.fromEmail,
-      subject: "Delvix — SMTP test",
+      subject: "SMTP test",
       text: "Your email integration is configured correctly.",
     });
 
@@ -290,7 +290,7 @@ export class UserIntegrationService {
           smtpPort: data.smtpPort,
           smtpSecure: data.smtpSecure ?? false,
           smtpUser: data.smtpUser,
-          fromName: data.fromName ?? "Delvix",
+          fromName: data.fromName?.trim() || data.fromEmail,
           fromEmail: data.fromEmail,
         },
         displayLabel: data.fromEmail,
@@ -308,7 +308,7 @@ export class UserIntegrationService {
           smtpPort: data.smtpPort,
           smtpSecure: data.smtpSecure ?? false,
           smtpUser: data.smtpUser,
-          fromName: data.fromName ?? "Delvix",
+          fromName: data.fromName?.trim() || data.fromEmail,
           fromEmail: data.fromEmail,
         },
         displayLabel: data.fromEmail,
@@ -350,7 +350,7 @@ export class UserIntegrationService {
       secure: pub.smtpSecure ?? false,
       user: pub.smtpUser,
       password: secrets.smtpPassword,
-      fromName: pub.fromName ?? "Delvix",
+      fromName: pub.fromName?.trim() || pub.fromEmail || "",
       fromEmail: pub.fromEmail,
     };
   }

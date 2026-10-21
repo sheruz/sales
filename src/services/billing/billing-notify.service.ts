@@ -21,7 +21,7 @@ function platformSmtp(fromName?: string) {
     secure: env.SMTP_SECURE,
     user: env.SMTP_USER,
     password: env.SMTP_PASSWORD,
-    fromName: fromName || env.SMTP_FROM_NAME || "Delvix",
+    fromName: fromName || env.SMTP_FROM_NAME || "Platform",
     fromEmail: env.SMTP_FROM_EMAIL ?? env.SMTP_USER,
   };
 }

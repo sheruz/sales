@@ -117,7 +117,7 @@ export function withEmailUtm(
   try {
     const u = new URL(url);
     if (!u.protocol.startsWith("http")) return url;
-    u.searchParams.set("utm_source", "delvix_email");
+    u.searchParams.set("utm_source", "email");
     u.searchParams.set("utm_medium", "email");
     u.searchParams.set("utm_campaign", opts.campaign || "cold_outreach");
     u.searchParams.set("utm_content", opts.content);

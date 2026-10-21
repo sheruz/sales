@@ -23,7 +23,6 @@ import {
 } from "@/lib/security/brute-force";
 import { writeAuditLog } from "@/lib/security/audit";
 import { env } from "@/lib/config/env";
-import { sendEmailWithConfig } from "@/lib/email/send-mail";
 
 interface SessionMeta {
   ipAddress?: string;
@@ -335,27 +334,20 @@ export class AuthService {
 
     logger.info("Password reset requested", { userId: user.id });
 
-    // Email reset link via platform SMTP when configured
+    // Platform-branded reset (Super Admin email branding)
     if (env.SMTP_HOST && env.SMTP_USER && env.SMTP_PASSWORD && env.SMTP_FROM_EMAIL) {
       const resetUrl = `${env.APP_URL}/reset-password?token=${token}`;
       try {
-        await sendEmailWithConfig(
-          {
-            host: env.SMTP_HOST,
-            port: env.SMTP_PORT,
-            secure: env.SMTP_SECURE,
-            user: env.SMTP_USER,
-            password: env.SMTP_PASSWORD,
-            fromName: env.SMTP_FROM_NAME,
-            fromEmail: env.SMTP_FROM_EMAIL,
-          },
-          {
-            to: email.toLowerCase().trim(),
-            subject: "Reset your password",
-            text: `Reset your password: ${resetUrl}\n\nThis link expires in 1 hour. If you did not request this, ignore this email.`,
-            html: `<p>Reset your password:</p><p><a href="${resetUrl}">${resetUrl}</a></p><p>This link expires in 1 hour.</p>`,
-          }
+        const { billingNotifyService } = await import(
+          "@/services/billing/billing-notify.service"
         );
+        await billingNotifyService.sendBrandedTo({
+          to: email.toLowerCase().trim(),
+          subject: "Reset your password",
+          body: "Click the button below to reset your password. This link expires in 1 hour. If you did not request this, ignore this email.",
+          ctaUrl: resetUrl,
+          ctaLabel: "Reset password",
+        });
       } catch (err) {
         logger.error("Password reset email failed", {
           userId: user.id,

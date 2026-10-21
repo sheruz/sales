@@ -2,6 +2,8 @@
  * Branded outbound HTML — inlined so production/standalone deploys never
  * miss the filesystem template (readFileSync of .html is not always traced).
  * Keep in sync with branded-outbound.html (source of truth for designers).
+ *
+ * Tenant-only branding via placeholders — never hard-code a platform brand.
  */
 export const BRANDED_OUTBOUND_HTML = `<!DOCTYPE html>
 <html lang="en" xmlns="http://www.w3.org/1999/xhtml">
@@ -28,15 +30,15 @@ export const BRANDED_OUTBOUND_HTML = `<!DOCTYPE html>
           <td valign="middle">
             <table role="presentation" cellpadding="0" cellspacing="0" border="0"><tr>
               <td valign="middle" style="padding-right:10px;">
-                <img src="{{logo_url}}" width="32" height="32" alt="Delvix" style="display:block;width:32px;height:32px;border:0;border-radius:8px;">
+                <img src="{{logo_url}}" width="32" height="32" alt="{{company_legal_name}}" style="display:block;width:32px;height:32px;border:0;border-radius:8px;">
               </td>
               <td valign="middle" style="font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;font-size:18px;font-weight:800;color:#ffffff;letter-spacing:-0.3px;">
-                Delvix<span style="font-family:'Courier New',Courier,monospace;font-size:10px;font-weight:400;color:#9aa0c3;letter-spacing:2px;">&nbsp;STUDIO</span>
+                {{company_legal_name}}
               </td>
             </tr></table>
           </td>
           <td align="right" valign="middle" style="font-family:'Courier New',Courier,monospace;font-size:10px;color:#9aa0c3;letter-spacing:1.5px;">
-            <span style="color:#3ddc97;">&#9679;</span>&nbsp;SOFTWARE STUDIO
+            {{header_tagline}}
           </td>
         </tr>
       </table>

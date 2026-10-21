@@ -19,15 +19,15 @@ const sender: ResolvedSender = {
   senderTitle: "Founder",
   senderPhotoUrl: "https://example.com/branding/org/sender.png",
   logoUrl: "https://example.com/branding/org/logo.png",
-  websiteUrl: "https://delvix.studio",
-  websiteLabel: "delvix.studio",
+  websiteUrl: "https://acme.example",
+  websiteLabel: "acme.example",
   whatsappDigits: "12105550100",
   whatsappDisplay: "+1 210 555 0100",
   ctaUrl: "https://cal.example/book",
   ctaLabel: "Book a call",
   footerServices: "Web apps · Mobile apps",
   availabilityLine: "TAKING NEW PROJECTS",
-  companyLegalName: "Delvix Studio LLC",
+  companyLegalName: "Acme Studio LLC",
   businessAddress: "1 Main St, Austin, TX",
 };
 

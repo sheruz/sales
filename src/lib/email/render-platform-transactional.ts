@@ -23,8 +23,19 @@ function escapeHtml(s: string): string {
     .replace(/"/g, "&quot;");
 }
 
+/**
+ * Platform → tenant mail. Prefer Super Admin platform email branding;
+ * env SMTP_FROM_NAME only as last resort (never hard-code a brand string).
+ */
 export function resolvePlatformBrandingUrls(branding: EmailBranding) {
-  const fromName = process.env.SMTP_FROM_NAME || "Delvix";
+  const envFrom = (process.env.SMTP_FROM_NAME || "").trim();
+  const company =
+    branding.legalCompanyName.trim() || envFrom || "Platform";
+  const sender =
+    branding.senderName.trim() ||
+    branding.legalCompanyName.trim() ||
+    envFrom ||
+    "Platform";
   return {
     logoUrl: brandingFileUrlFromPath(
       PLATFORM_BRANDING_ORG_KEY,
@@ -38,12 +49,9 @@ export function resolvePlatformBrandingUrls(branding: EmailBranding) {
     websiteLabel:
       branding.websiteLabel.trim() ||
       branding.websiteUrl.replace(/^https?:\/\//, "").replace(/\/$/, ""),
-    companyLegalName: branding.legalCompanyName.trim() || fromName,
+    companyLegalName: company,
     businessAddress: branding.businessAddress.trim(),
-    senderName:
-      branding.senderName.trim() ||
-      branding.legalCompanyName.trim() ||
-      fromName,
+    senderName: sender,
     senderTitle: branding.senderTitle.trim(),
     footerServices: branding.footerServices.trim(),
     availabilityLine: branding.availabilityLine.trim(),

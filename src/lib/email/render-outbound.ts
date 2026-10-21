@@ -281,6 +281,10 @@ function renderBranded(input: RenderOutboundInput): RenderOutboundResult {
     availability_line: escapeHtml(s.availabilityLine)
       .replace(/·/g, "&middot;")
       .replace(/  /g, " &nbsp;"),
+    // Tenant tagline only — blank when unset (never a platform brand)
+    header_tagline: s.availabilityLine
+      ? `<span style="color:#3ddc97;">&#9679;</span>&nbsp;${escapeHtml(s.availabilityLine)}`
+      : "",
     open_pixel_url: escapeHtml(links.openPixelUrl),
   };
 

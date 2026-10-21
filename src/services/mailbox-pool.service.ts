@@ -255,7 +255,7 @@ export class MailboxPoolService {
       userId: row.emailAccount.userId || userId,
       emailAccountId: row.emailAccountId,
       toEmail: to,
-      subject: "Delvix outbound — test email",
+      subject: "Outbound — test email",
       body: `This is a test send from your outbound pool mailbox (${to}).\n\nIf you received this, SMTP/OAuth sending works.`,
       idempotencyKey: `outbound-test:${mailboxId}:${Date.now()}`,
     });
