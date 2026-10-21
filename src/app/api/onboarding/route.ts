@@ -40,12 +40,12 @@ export async function PATCH(request: NextRequest) {
     if (body.markDone) {
       await onboardingService.markStepDone(user.organizationId, body.markDone);
     }
-    const progress = await onboardingService.patch(user.organizationId, body);
+    await onboardingService.patch(user.organizationId, body);
     const snapshot = await onboardingService.snapshot(
       user.organizationId,
       user.id
     );
-    return NextResponse.json(apiSuccess({ progress, ...snapshot }));
+    return NextResponse.json(apiSuccess(snapshot));
   } catch (error) {
     return handleApiError(error);
   }

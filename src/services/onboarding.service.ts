@@ -3,6 +3,7 @@
  */
 
 import prisma from "@/lib/db/prisma";
+import type { Prisma } from "@prisma/client";
 import { getUserReadiness } from "@/lib/integrations/readiness";
 import { appHome } from "@/lib/app-paths";
 import {
@@ -92,7 +93,7 @@ export class OnboardingService {
       data: {
         currentStep: current,
         completedSteps: completed,
-        payload,
+        payload: payload as Prisma.InputJsonValue,
         skipped,
         completedAt,
       },
