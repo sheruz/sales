@@ -9,8 +9,15 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { DeadlineCountdown } from "@/components/billing/deadline-countdown";
+import { deadlineExplanation } from "@/lib/billing/countdown";
 
-type Resource = { id: string; label: string };
+type Resource = {
+  id: string;
+  label: string;
+  isPrimaryAdmin?: boolean;
+};
 type Notice = {
   id: string;
   featureKey: string;
@@ -35,9 +42,18 @@ export function ChooseWhatStaysClient() {
     setNotices(json.data.notices);
     const init: Record<string, Set<string>> = {};
     for (const n of json.data.notices as Notice[]) {
-      // Pre-select oldest up to allowedCount
-      const oldest = [...n.resources].reverse().slice(0, n.allowedCount);
-      init[n.id] = new Set(oldest.map((r) => r.id));
+      const set = new Set<string>();
+      // Always include primary admin
+      for (const r of n.resources) {
+        if (r.isPrimaryAdmin) set.add(r.id);
+      }
+      // Fill remaining with oldest (resources are newest-first)
+      const oldest = [...n.resources].reverse();
+      for (const r of oldest) {
+        if (set.size >= n.allowedCount) break;
+        set.add(r.id);
+      }
+      init[n.id] = set;
     }
     setSelected(init);
   }
@@ -46,7 +62,8 @@ export function ChooseWhatStaysClient() {
     void load();
   }, []);
 
-  function toggle(noticeId: string, resourceId: string, max: number) {
+  function toggle(noticeId: string, resourceId: string, max: number, locked: boolean) {
+    if (locked) return;
     setSelected((prev) => {
       const set = new Set(prev[noticeId] || []);
       if (set.has(resourceId)) set.delete(resourceId);
@@ -81,9 +98,10 @@ export function ChooseWhatStaysClient() {
         <h2 className="text-2xl font-bold tracking-tight">
           Choose what stays active
         </h2>
-        <p className="text-muted-foreground text-sm">
-          Nothing is deleted. If you don&apos;t choose, newest items pause at
-          the deadline.
+        <p className="text-muted-foreground text-sm mt-1">
+          Your plan seat limit dropped. Pick which items stay within the new
+          limit. Nothing is deleted — extras are soft-paused at the deadline if
+          you don&apos;t choose.
         </p>
       </div>
       {error && <p className="text-sm text-destructive">{error}</p>}
@@ -91,32 +109,66 @@ export function ChooseWhatStaysClient() {
       {notices.length === 0 && (
         <p className="text-sm text-muted-foreground">No pending choices.</p>
       )}
-      {notices.map((n) => (
-        <Card key={n.id}>
-          <CardHeader>
-            <CardTitle>
-              {n.featureKey.replace(/_/g, " ")} — keep {n.allowedCount}
-            </CardTitle>
-            <CardDescription>
-              Deadline {new Date(n.deadlineAt).toLocaleString()} · selected{" "}
-              {(selected[n.id] || new Set()).size}/{n.allowedCount}
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-2">
-            {n.resources.map((r) => (
-              <label key={r.id} className="flex items-center gap-2 text-sm">
-                <input
-                  type="checkbox"
-                  checked={(selected[n.id] || new Set()).has(r.id)}
-                  onChange={() => toggle(n.id, r.id, n.allowedCount)}
-                />
-                {r.label}
-              </label>
-            ))}
-            <Button onClick={() => void submit(n.id)}>Save choices</Button>
-          </CardContent>
-        </Card>
-      ))}
+      {notices.map((n) => {
+        const sel = selected[n.id] || new Set();
+        return (
+          <Card key={n.id}>
+            <CardHeader>
+              <div className="flex flex-wrap items-center gap-2">
+                <CardTitle className="capitalize">
+                  {n.featureKey.replace(/_/g, " ")} — keep {n.allowedCount}
+                </CardTitle>
+                <Badge variant="secondary">
+                  <DeadlineCountdown deadlineAt={n.deadlineAt} />
+                </Badge>
+              </div>
+              <CardDescription className="space-y-2">
+                <span className="block">
+                  Deadline{" "}
+                  {new Date(n.deadlineAt).toLocaleString(undefined, {
+                    dateStyle: "medium",
+                    timeStyle: "short",
+                  })}{" "}
+                  · selected {sel.size}/{n.allowedCount}
+                </span>
+                <span className="block text-foreground/80">
+                  {deadlineExplanation(n.featureKey, n.allowedCount)}
+                </span>
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-2">
+              {n.resources.map((r) => {
+                const locked = Boolean(r.isPrimaryAdmin);
+                const checked = sel.has(r.id);
+                return (
+                  <label
+                    key={r.id}
+                    className={`flex items-center gap-2 text-sm ${
+                      locked ? "opacity-80" : ""
+                    }`}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={checked}
+                      disabled={locked}
+                      onChange={() =>
+                        toggle(n.id, r.id, n.allowedCount, locked)
+                      }
+                    />
+                    <span>{r.label}</span>
+                    {locked ? (
+                      <Badge variant="outline" className="text-[10px]">
+                        Always kept
+                      </Badge>
+                    ) : null}
+                  </label>
+                );
+              })}
+              <Button onClick={() => void submit(n.id)}>Save choices</Button>
+            </CardContent>
+          </Card>
+        );
+      })}
     </div>
   );
 }

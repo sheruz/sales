@@ -3,7 +3,7 @@ import Link from "next/link";
 import { Plus } from "lucide-react";
 import prisma from "@/lib/db/prisma";
 import { hasOrgPermission } from "@/lib/tenant/scope";
-import { ImportCsvDialog } from "@/components/leads/import-csv-dialog";
+import { ImportCrmCsvDialog } from "@/components/crm/import-crm-csv-dialog";
 import type { AuthUser } from "@/types/auth";
 
 export async function getLeadsHubCounts(organizationId: string) {
@@ -41,7 +41,7 @@ export async function LeadsHubHeader({
         </div>
         {canCreate ? (
           <div className="page-actions">
-            <ImportCsvDialog variant="dx" />
+            <ImportCrmCsvDialog variant="dx" />
             <Link href={appHome("/leads/new")} className="btn primary">
               <Plus />
               Add lead

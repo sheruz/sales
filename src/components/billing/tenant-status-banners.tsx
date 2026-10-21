@@ -4,6 +4,7 @@ import {
   resolveTenantBanners,
   type TenantBanner,
 } from "@/lib/billing/tenant-banner-state";
+import { DeadlineCountdown } from "@/components/billing/deadline-countdown";
 
 function toneClasses(tone: TenantBanner["tone"]) {
   if (tone === "danger") {
@@ -23,6 +24,11 @@ export async function TenantStatusBanners({
   const banner = await resolveTenantBanners(organizationId);
   if (!banner) return null;
 
+  const deadline =
+    banner.kind === "limit_notice" && banner.meta?.deadlineAt
+      ? String(banner.meta.deadlineAt)
+      : null;
+
   return (
     <div
       className={`border-b px-4 py-2.5 text-sm ${toneClasses(banner.tone)}`}
@@ -32,6 +38,15 @@ export async function TenantStatusBanners({
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="min-w-0">
           <span className="font-semibold">{banner.title}</span>
+          {deadline ? (
+            <>
+              <span className="mx-1.5 text-current/40">·</span>
+              <DeadlineCountdown
+                deadlineAt={deadline}
+                className="font-mono text-xs font-medium"
+              />
+            </>
+          ) : null}
           <span className="mx-1.5 text-current/40">·</span>
           <span>{banner.body}</span>
         </div>

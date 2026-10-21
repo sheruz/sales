@@ -578,6 +578,19 @@ export class OutboundJobService {
     if (pitch.company.enrichmentStatus === "SKIPPED") {
       return { ok: false, reason: "company_skipped" };
     }
+    // Clients / past_client / partner / DNC — never auto-enroll
+    const { isOutreachExcluded } = await import(
+      "@/lib/crm/import/outreach-exclude"
+    );
+    if (
+      isOutreachExcluded({
+        companyMetadata: (pitch.company as { metadata?: unknown }).metadata,
+        contactMetadata: (pitch.contact as { metadata?: unknown }).metadata,
+        contactStatus: (pitch.contact as { status?: string | null }).status,
+      })
+    ) {
+      return { ok: false, reason: "outreach_excluded" };
+    }
     if (pitch.company.auditStatus !== CompanyAuditStatus.DONE) {
       return { ok: false, reason: "not_audited" };
     }

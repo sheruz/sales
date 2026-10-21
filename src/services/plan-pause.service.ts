@@ -33,7 +33,12 @@ export function isSeatFeatureKey(key: string): key is SeatResourceKind {
   return (SEAT_KEYS as string[]).includes(key);
 }
 
-type ResourceRow = { id: string; createdAt: Date; label: string };
+export type ResourceRow = {
+  id: string;
+  createdAt: Date;
+  label: string;
+  isPrimaryAdmin?: boolean;
+};
 
 export class PlanPauseService {
   async listActiveResources(
@@ -297,10 +302,11 @@ export class PlanPauseService {
       },
     });
 
-    logger.info("plan limit notice opened (email stub)", {
+    logger.info("plan limit notice opened", {
       organizationId: input.organizationId,
       featureKey: input.featureKey,
       noticeId: notice.id,
+      deadlineAt: deadlineAt.toISOString(),
     });
 
     return notice;

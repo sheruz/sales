@@ -187,22 +187,33 @@ export class WebsiteAuditService {
       select: {
         id: true,
         website: true,
+        metadata: true,
         contacts: {
           where: { email: { not: null } },
           orderBy: { createdAt: "asc" },
           take: 5,
-          select: { id: true, emailStatus: true },
+          select: { id: true, emailStatus: true, metadata: true, status: true },
         },
       },
     });
 
+    const { isOutreachExcluded } = await import(
+      "@/lib/crm/import/outreach-exclude"
+    );
     const eligible: string[] = [];
     for (const c of companies) {
-      const ok = c.contacts.some((ct) =>
-        isEnrollableVerification(
-          (ct.emailStatus || "unknown") as EmailVerificationStatus,
-          enrichmentCfg.allowAcceptAll
-        )
+      if (isOutreachExcluded({ companyMetadata: c.metadata })) continue;
+      const ok = c.contacts.some(
+        (ct) =>
+          !isOutreachExcluded({
+            companyMetadata: c.metadata,
+            contactMetadata: ct.metadata,
+            contactStatus: ct.status,
+          }) &&
+          isEnrollableVerification(
+            (ct.emailStatus || "unknown") as EmailVerificationStatus,
+            enrichmentCfg.allowAcceptAll
+          )
       );
       if (ok) eligible.push(c.id);
       if (eligible.length >= limit) break;
@@ -317,12 +328,27 @@ export class WebsiteAuditService {
       throw new ValidationError("Company must be ENRICHED before audit");
     }
 
+    const { isOutreachExcluded } = await import(
+      "@/lib/crm/import/outreach-exclude"
+    );
+    if (isOutreachExcluded({ companyMetadata: company.metadata })) {
+      throw new ValidationError(
+        "Clients, partners, and do-not-contact companies are never audited"
+      );
+    }
+
     const enrichmentCfg = await enrichmentJobService.getConfig(organizationId);
-    const enrollable = company.contacts.filter((ct) =>
-      isEnrollableVerification(
-        (ct.emailStatus || "unknown") as EmailVerificationStatus,
-        enrichmentCfg.allowAcceptAll
-      )
+    const enrollable = company.contacts.filter(
+      (ct) =>
+        !isOutreachExcluded({
+          companyMetadata: company.metadata,
+          contactMetadata: ct.metadata,
+          contactStatus: ct.status,
+        }) &&
+        isEnrollableVerification(
+          (ct.emailStatus || "unknown") as EmailVerificationStatus,
+          enrichmentCfg.allowAcceptAll
+        )
     );
     if (!enrollable.length) {
       throw new ValidationError(

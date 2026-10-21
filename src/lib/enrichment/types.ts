@@ -1,5 +1,6 @@
 export type EmailVerificationStatus =
   | "valid"
+  | "valid_manual"
   | "accept_all"
   | "invalid"
   | "unknown";

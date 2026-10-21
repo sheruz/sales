@@ -150,16 +150,25 @@ export async function resolveTenantBanners(
   }
 
   if (notice) {
+    const msLeft = notice.deadlineAt.getTime() - now.getTime();
+    const daysLeft = Math.max(0, Math.ceil(msLeft / 86_400_000));
+    const timeLabel =
+      msLeft <= 0
+        ? "Deadline passed"
+        : daysLeft <= 1
+          ? "Less than 1 day left"
+          : `${daysLeft} days left`;
     candidates.push({
       kind: "limit_notice",
-      title: "Plan limit change",
-      body: `Your plan now allows ${notice.allowedCount} ${notice.featureKey.replace(/_/g, " ")} — choose what stays before ${notice.deadlineAt.toISOString().slice(0, 10)}.`,
+      title: `Plan limit — ${timeLabel}`,
+      body: `Keep ${notice.allowedCount} ${notice.featureKey.replace(/_/g, " ")}. Extras soft-pause at the deadline (not deleted). Primary admin is never paused.`,
       ctaLabel: "Choose what stays",
       ctaHref: "/billing/choose-what-stays",
       tone: "warn",
       meta: {
         featureKey: notice.featureKey,
         deadlineAt: notice.deadlineAt.toISOString(),
+        allowedCount: notice.allowedCount,
       },
     });
   }

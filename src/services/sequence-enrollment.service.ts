@@ -217,10 +217,27 @@ export class SequenceEnrollmentService {
 
     const contact = await prisma.contact.findFirst({
       where: { id: input.contactId, organizationId },
+      include: {
+        company: { select: { id: true, metadata: true } },
+      },
     });
     if (!contact) throw new ValidationError("Contact not found in your organization");
     if (!contact.email?.trim()) {
       throw new ValidationError("Contact must have an email to enroll");
+    }
+    const { isOutreachExcluded } = await import(
+      "@/lib/crm/import/outreach-exclude"
+    );
+    if (
+      isOutreachExcluded({
+        companyMetadata: contact.company?.metadata,
+        contactMetadata: contact.metadata,
+        contactStatus: contact.status,
+      })
+    ) {
+      throw new ValidationError(
+        "Clients, partners, and do-not-contact contacts cannot be enrolled"
+      );
     }
 
     const opportunityId = input.opportunityId ?? null;

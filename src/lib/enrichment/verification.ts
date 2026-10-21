@@ -19,7 +19,7 @@ export function isEnrollableVerification(
   status: EmailVerificationStatus,
   allowAcceptAll = false
 ): boolean {
-  if (status === "valid") return true;
+  if (status === "valid" || status === "valid_manual") return true;
   if (status === "accept_all" && allowAcceptAll) return true;
   return false;
 }

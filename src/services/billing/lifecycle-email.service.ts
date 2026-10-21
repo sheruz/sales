@@ -624,8 +624,8 @@ export class LifecycleEmailService {
     for (const n of notices) {
       const daysLeft =
         (n.deadlineAt.getTime() - now.getTime()) / 86_400_000;
-      // Reminder when ~1 day into the 7-day window still open (idempotent per notice)
-      if (daysLeft <= 6.5) {
+      // T-1 reminder before deadline (open email already sent via plan_limit_notice)
+      if (daysLeft <= 1.5 && daysLeft > 0) {
         const r = await this.enqueue({
           organizationId: n.organizationId,
           templateKey: "downgrade_reminder_7d",

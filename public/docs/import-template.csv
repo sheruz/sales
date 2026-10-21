@@ -1,0 +1,2 @@
+company_name,website,company_email,company_phone,address,city,state_province,country,industry,employee_count,company_linkedin_url,first_name,last_name,title,email,phone,linkedin_url,relationship,do_not_contact,tags,notes,source,owner_email
+Acme Corp,https://acme.com,hello@acme.com,+1-555-0100,123 Main St,Toronto,ON,Canada,Software,50,https://linkedin.com/company/acme,Jane,Doe,CEO,jane@acme.com,+1-555-0101,https://linkedin.com/in/janedoe,client,no,vip;priority,Existing client since 2024,csv_import,owner@example.com
