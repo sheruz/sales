@@ -68,7 +68,7 @@ const newForms = `/* ---------- Forms & copy (always active) ---------- */
       document.getElementById('wlEmail').value = '';
     }).catch(function(){
       note.style.color = 'var(--coral)';
-      note.textContent = 'Network error. Email hello@delvixstudio.com with subject Autopilot early access.';
+      note.textContent = 'Network error. Email info@delvixstudio.com with subject Autopilot early access.';
     });
   });
   var out = document.getElementById('fOut');
@@ -107,11 +107,11 @@ const newForms = `/* ---------- Forms & copy (always active) ---------- */
       out.textContent = (res.d && res.d.message) || "Thanks — we will reply within one business day.";
       var panel = document.getElementById('donePanel');
       panel.hidden = false;
-      panel.innerHTML = '<strong>Thanks — we got it.</strong> We will reply within one business day. You can also reach us at hello@delvixstudio.com.';
+      panel.innerHTML = '<strong>Thanks — we got it.</strong> We will reply within one business day. You can also reach us at info@delvixstudio.com.';
       document.getElementById('brief').reset();
     }).catch(function(){
       out.className = 'form-msg err';
-      out.textContent = 'Network error. Email hello@delvixstudio.com directly.';
+      out.textContent = 'Network error. Email info@delvixstudio.com directly.';
     });
   });
 })();

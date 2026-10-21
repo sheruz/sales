@@ -560,7 +560,8 @@ footer{border-top:1px solid var(--line);padding-block:48px 34px;overflow:hidden}
         <span class="eyebrow">Start a project</span>
         <h2>Tell us what you want to build.</h2>
         <p class="lede">Share a few details and we will reply within one business day.</p>
-        <div class="mailbox"><code>hello@delvixstudio.com</code><button class="copy hov" type="button" data-copy="hello@delvixstudio.com">Copy email</button></div>
+        <div class="mailbox"><code>info@delvixstudio.com</code><button class="copy hov" type="button" data-copy="info@delvixstudio.com">Copy email</button></div>
+        <div class="mailbox"><code>+1 (609) 691-6966</code><a class="copy hov" href="https://wa.me/16096916966" target="_blank" rel="noopener noreferrer">WhatsApp</a></div>
         <div class="c-points"><div><b>01</b><span>A short reply with clarifying questions</span></div><div><b>02</b><span>A 30-minute discovery call at a time that suits you</span></div><div><b>03</b><span>A written scope and quote within 3 days</span></div></div>
       </div>
       <form class="brief rv" id="brief" novalidate>
@@ -582,7 +583,7 @@ footer{border-top:1px solid var(--line);padding-block:48px 34px;overflow:hidden}
         <div class="field full"><label for="fMsg">Project details</label><textarea id="fMsg" placeholder="What are you building, who will use it, and what problem does it solve?"></textarea></div>
         <input type="text" name="website_url" id="fHp" tabindex="-1" autocomplete="off" aria-hidden="true" style="position:absolute;left:-9999px;opacity:0;height:0;width:0" />
         <div class="form-foot"><span class="form-msg" id="fOut">Takes about two minutes.</span><button class="btn btn-primary mag hov" type="submit">Prepare my brief <span class="arr">→</span></button></div>
-        <div class="done-panel" id="donePanel" hidden><strong>Your brief is ready.</strong> Copy it and send it to hello@delvixstudio.com.<pre id="briefText"></pre><button class="copy hov" type="button" id="copyBrief">Copy brief</button></div>
+        <div class="done-panel" id="donePanel" hidden><strong>Your brief is ready.</strong> Copy it and send it to info@delvixstudio.com.<pre id="briefText"></pre><button class="copy hov" type="button" id="copyBrief">Copy brief</button></div>
       </form>
     </div>
   </section>
@@ -595,7 +596,7 @@ footer{border-top:1px solid var(--line);padding-block:48px 34px;overflow:hidden}
       <div class="foot-links"><a class="hov" href="#services">Services</a><a class="hov" href="#process">Process</a><a class="hov" href="#autopilot">Delvix Autopilot</a><a class="hov" href="#engage">Engagement</a><a class="hov" href="#contact">Contact</a></div>
     </div>
     <div class="giant" id="giant" aria-hidden="true">delvix</div>
-    <div class="foot-bottom"><span>© <span id="yr">2026</span> Delvix Studio · delvixstudio.com</span><span>hello@delvixstudio.com</span></div>
+    <div class="foot-bottom"><span>© <span id="yr">2026</span> Delvix Studio · delvixstudio.com</span><span>info@delvixstudio.com · <a class="hov" href="https://wa.me/16096916966" target="_blank" rel="noopener noreferrer">+1 (609) 691-6966</a></span></div>
   </div>
 </footer>
 
@@ -920,7 +921,7 @@ footer{border-top:1px solid var(--line);padding-block:48px 34px;overflow:hidden}
       document.getElementById('wlEmail').value = '';
     }).catch(function(){
       note.style.color = 'var(--coral)';
-      note.textContent = 'Network error. Email hello@delvixstudio.com with subject Autopilot early access.';
+      note.textContent = 'Network error. Email info@delvixstudio.com with subject Autopilot early access.';
     });
   });
   var out = document.getElementById('fOut');
@@ -959,11 +960,11 @@ footer{border-top:1px solid var(--line);padding-block:48px 34px;overflow:hidden}
       out.textContent = (res.d && res.d.message) || "Thanks — we will reply within one business day.";
       var panel = document.getElementById('donePanel');
       panel.hidden = false;
-      panel.innerHTML = '<strong>Thanks — we got it.</strong> We will reply within one business day. You can also reach us at hello@delvixstudio.com.';
+      panel.innerHTML = '<strong>Thanks — we got it.</strong> We will reply within one business day. You can also reach us at info@delvixstudio.com.';
       document.getElementById('brief').reset();
     }).catch(function(){
       out.className = 'form-msg err';
-      out.textContent = 'Network error. Email hello@delvixstudio.com directly.';
+      out.textContent = 'Network error. Email info@delvixstudio.com directly.';
     });
   });
 })();
