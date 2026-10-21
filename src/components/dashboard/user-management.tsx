@@ -35,6 +35,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { ROLE_LABELS } from "@/lib/auth/permissions";
 import { canManageTargetUser, getAssignableRoles } from "@/lib/auth/role-policy";
+import { PlatformConfirmDialog } from "@/components/platform/ui/confirm-dialog";
 
 interface UserRecord {
   id: string;
@@ -108,27 +109,25 @@ export function UserManagement({ initialUsers, actorRole }: UserManagementProps)
     }
   }
 
-  async function handleDeactivate(userId: string, role: string) {
+  const [deactivateId, setDeactivateId] = useState<string | null>(null);
+  const [deactivateBusy, setDeactivateBusy] = useState(false);
+
+  function requestDeactivate(userId: string, role: string) {
     if (role === "SUPER_ADMIN") {
       toast.error("Super Admin accounts cannot be deactivated");
       return;
     }
-    const reason = window.prompt(
-      "Reason for deactivation (required, saved to audit log):"
-    );
-    if (!reason?.trim()) {
-      toast.error("Deactivation cancelled — reason required");
-      return;
-    }
-    if (!confirm("Deactivate this user? They will no longer be able to sign in.")) {
-      return;
-    }
+    setDeactivateId(userId);
+  }
 
+  async function handleDeactivate(reason: string) {
+    if (!deactivateId) return;
+    setDeactivateBusy(true);
     try {
-      const response = await fetch(`/api/users/${userId}`, {
+      const response = await fetch(`/api/users/${deactivateId}`, {
         method: "DELETE",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ reason: reason.trim() }),
+        body: JSON.stringify({ reason }),
       });
       const data = await response.json();
 
@@ -137,11 +136,14 @@ export function UserManagement({ initialUsers, actorRole }: UserManagementProps)
       }
 
       toast.success("User deactivated");
+      setDeactivateId(null);
       router.refresh();
     } catch (error) {
       toast.error(
         error instanceof Error ? error.message : "Failed to deactivate user"
       );
+    } finally {
+      setDeactivateBusy(false);
     }
   }
 
@@ -276,7 +278,7 @@ export function UserManagement({ initialUsers, actorRole }: UserManagementProps)
                     <Button
                       variant="ghost"
                       size="sm"
-                      onClick={() => handleDeactivate(user.id, user.role)}
+                      onClick={() => requestDeactivate(user.id, user.role)}
                       aria-label="Deactivate user"
                     >
                       <Trash2 className="mr-1 h-4 w-4 text-destructive" />
@@ -289,6 +291,18 @@ export function UserManagement({ initialUsers, actorRole }: UserManagementProps)
           </TableBody>
         </Table>
       </div>
+
+      <PlatformConfirmDialog
+        open={!!deactivateId}
+        onOpenChange={(o) => !o && setDeactivateId(null)}
+        title="Deactivate this user?"
+        description="They will no longer be able to sign in. Reason is saved to the audit log."
+        requireReason
+        destructive
+        confirmLabel="Deactivate"
+        busy={deactivateBusy}
+        onConfirm={({ reason }) => handleDeactivate(reason)}
+      />
     </div>
   );
 }

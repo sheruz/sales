@@ -2,6 +2,9 @@ import { getCurrentUser } from "@/lib/auth/session";
 import { ProfileSettings } from "@/components/settings/profile-settings";
 import { EmailBrandingPanel } from "@/components/settings/email-branding-panel";
 import { MfaSettingsPanel } from "@/components/platform/mfa-settings-panel";
+import { PlatformPageHeader } from "@/components/platform/ui/page-header";
+import Link from "next/link";
+import { appOps } from "@/lib/app-paths";
 
 export default async function PlatformSettingsPage() {
   const user = await getCurrentUser();
@@ -9,13 +12,16 @@ export default async function PlatformSettingsPage() {
 
   return (
     <div className="space-y-8">
-      <div>
-        <h2 className="text-2xl font-bold tracking-tight">Platform Settings</h2>
-        <p className="text-muted-foreground">
-          Super Admin profile, two-factor authentication, and system email
-          branding for tenant notices.
-        </p>
-      </div>
+      <PlatformPageHeader
+        title="Platform Settings"
+        description="Profile, two-factor authentication, and system email branding for tenant notices. Seller alert emails live under Payments → Checkout."
+      />
+      <p className="text-sm text-muted-foreground -mt-4">
+        <Link href={appOps("/payments")} className="underline">
+          Open Payments
+        </Link>{" "}
+        to edit seller alert recipients.
+      </p>
       <ProfileSettings
         user={{
           firstName: user.firstName,
@@ -26,7 +32,7 @@ export default async function PlatformSettingsPage() {
       />
       <MfaSettingsPanel />
       <div>
-        <h3 className="text-lg font-semibold mb-3">System email branding</h3>
+        <h3 className="mb-3 text-lg font-semibold">System email branding</h3>
         <EmailBrandingPanel
           mode="platform"
           apiBase="/api/platform/email-branding"

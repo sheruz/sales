@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { QRCodeSVG } from "qrcode.react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -12,6 +13,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Skeleton } from "@/components/ui/skeleton";
 
 export function MfaSettingsPanel() {
   const [status, setStatus] = useState<{
@@ -47,7 +49,7 @@ export function MfaSettingsPanel() {
       setSecret(json.data.secret);
       setOtpauthUrl(json.data.otpauthUrl);
       setRecovery(null);
-      toast.success("Scan the secret in your authenticator app");
+      toast.success("Scan the QR code in your authenticator app");
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Failed");
     } finally {
@@ -67,6 +69,7 @@ export function MfaSettingsPanel() {
       if (!json.success) throw new Error(json.error?.message || "Failed");
       setRecovery(json.data.recoveryCodes);
       setSecret(null);
+      setOtpauthUrl(null);
       setCode("");
       toast.success("2FA enabled — save your recovery codes now");
       await load();
@@ -77,8 +80,21 @@ export function MfaSettingsPanel() {
     }
   }
 
+  function downloadRecovery() {
+    if (!recovery?.length) return;
+    const blob = new Blob([recovery.join("\n") + "\n"], {
+      type: "text/plain",
+    });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "sales-platform-2fa-recovery-codes.txt";
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
   if (!status) {
-    return <p className="text-sm text-muted-foreground">Loading 2FA…</p>;
+    return <Skeleton className="h-40 w-full" />;
   }
 
   return (
@@ -96,7 +112,7 @@ export function MfaSettingsPanel() {
           {status.enabled ? (
             <Badge>Enabled</Badge>
           ) : status.mustEnroll ? (
-            <Badge variant="destructive">Enrollment recommended</Badge>
+            <Badge variant="destructive">Enrollment required</Badge>
           ) : (
             <Badge variant="secondary">Not enabled</Badge>
           )}
@@ -106,17 +122,30 @@ export function MfaSettingsPanel() {
             <Button size="sm" disabled={busy} onClick={() => void begin()}>
               Start setup
             </Button>
-            {secret && (
-              <div className="space-y-2 rounded border p-3">
-                <p className="text-xs text-muted-foreground">
-                  Manual secret (add to authenticator):
-                </p>
-                <code className="block break-all text-xs">{secret}</code>
-                {otpauthUrl && (
-                  <p className="text-xs text-muted-foreground break-all">
-                    {otpauthUrl}
-                  </p>
-                )}
+            {secret && otpauthUrl && (
+              <div className="space-y-3 rounded border p-3">
+                <div className="flex flex-col items-start gap-3 sm:flex-row sm:items-center">
+                  <div className="rounded-md bg-white p-2">
+                    <QRCodeSVG value={otpauthUrl} size={160} />
+                  </div>
+                  <div className="min-w-0 space-y-2">
+                    <p className="text-xs text-muted-foreground">
+                      Scan with your authenticator, or enter the secret manually:
+                    </p>
+                    <code className="block break-all text-xs">{secret}</code>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      onClick={() => {
+                        void navigator.clipboard.writeText(secret);
+                        toast.success("Secret copied");
+                      }}
+                    >
+                      Copy secret
+                    </Button>
+                  </div>
+                </div>
                 <Input
                   placeholder="6-digit code"
                   value={code}
@@ -135,14 +164,23 @@ export function MfaSettingsPanel() {
         )}
         {recovery && (
           <div className="rounded border border-amber-500/40 bg-amber-500/10 p-3">
-            <p className="font-medium mb-2">
+            <p className="mb-2 font-medium">
               Save these recovery codes (shown once):
             </p>
-            <ul className="font-mono text-xs space-y-1">
+            <ul className="space-y-1 font-mono text-xs">
               {recovery.map((c) => (
                 <li key={c}>{c}</li>
               ))}
             </ul>
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              className="mt-3"
+              onClick={downloadRecovery}
+            >
+              Download codes
+            </Button>
           </div>
         )}
       </CardContent>

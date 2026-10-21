@@ -21,6 +21,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { ROLE_KEYS } from "@/lib/auth/permission-catalog";
+import { PlatformConfirmDialog } from "@/components/platform/ui/confirm-dialog";
 
 const INVITE_ROLES = [
   { key: ROLE_KEYS.COMPANY_ADMIN, label: "Company Admin" },
@@ -44,6 +45,7 @@ export function OrganizationActions({
   const [inviteToken, setInviteToken] = useState<string | null>(null);
   const [email, setEmail] = useState("");
   const [roleKey, setRoleKey] = useState<string>(ROLE_KEYS.SALES_REP);
+  const [confirmSuspend, setConfirmSuspend] = useState(false);
 
   async function patchStatus(next: "ACTIVE" | "SUSPENDED") {
     setIsUpdating(true);
@@ -63,6 +65,7 @@ export function OrganizationActions({
       toast.success(
         next === "SUSPENDED" ? "Organization suspended" : "Organization activated"
       );
+      setConfirmSuspend(false);
       router.refresh();
     } catch (error) {
       toast.error(
@@ -124,21 +127,32 @@ export function OrganizationActions({
               variant="destructive"
               size="sm"
               disabled={isUpdating}
-              onClick={() => patchStatus("SUSPENDED")}
+              onClick={() => setConfirmSuspend(true)}
             >
-              {isUpdating ? "Updating..." : "Suspend"}
+              Suspend
             </Button>
           ) : (
             <Button
               size="sm"
               disabled={isUpdating}
-              onClick={() => patchStatus("ACTIVE")}
+              onClick={() => void patchStatus("ACTIVE")}
             >
               {isUpdating ? "Updating..." : "Activate"}
             </Button>
           )}
         </CardContent>
       </Card>
+
+      <PlatformConfirmDialog
+        open={confirmSuspend}
+        onOpenChange={setConfirmSuspend}
+        title="Suspend this organization?"
+        description="Members will lose access until you activate it again."
+        confirmLabel="Suspend"
+        destructive
+        busy={isUpdating}
+        onConfirm={() => patchStatus("SUSPENDED")}
+      />
 
       <Card>
         <CardHeader>

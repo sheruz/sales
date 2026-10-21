@@ -7,6 +7,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { PlatformPageHeader } from "@/components/platform/ui/page-header";
 
 export default async function PlatformUsersPage() {
   const user = await getCurrentUser();
@@ -14,13 +15,10 @@ export default async function PlatformUsersPage() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h2 className="text-2xl font-bold tracking-tight">All Users</h2>
-        <p className="text-muted-foreground">
-          Create company admins for customer accounts, or other platform operators.
-          Company admins then manage their own sales teams inside the company dashboard.
-        </p>
-      </div>
+      <PlatformPageHeader
+        title="Users"
+        description="Create company admins for customer accounts, or other platform operators. Company admins manage their sales teams inside the company dashboard."
+      />
 
       <Card>
         <CardHeader>

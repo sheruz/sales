@@ -108,7 +108,7 @@ export function PaymentsSettingsClient({ canWrite }: { canWrite: boolean }) {
   const [confirm, setConfirm] = useState<{
     title: string;
     body: string;
-    onConfirm: () => void;
+    onConfirm: (password: string) => void;
   } | null>(null);
   const [orgQuery, setOrgQuery] = useState("");
   const [orgResults, setOrgResults] = useState<
@@ -261,10 +261,10 @@ export function PaymentsSettingsClient({ canWrite }: { canWrite: boolean }) {
                     ? "Turn payments off?"
                     : "Turn payments on?",
                   body: "Requires your password. Tenants will see checkout when on (unless emergency kill is set).",
-                  onConfirm: () => {
+                  onConfirm: (pwd) => {
                     void saveSettings({
                       paymentsEnabled: !data.settings.paymentsEnabled,
-                      password,
+                      password: pwd,
                     });
                     setConfirm(null);
                   },
@@ -438,11 +438,11 @@ export function PaymentsSettingsClient({ canWrite }: { canWrite: boolean }) {
                                 : p.activeSubscriptions > 0
                                   ? `${p.activeSubscriptions} active subscription(s) keep running and receiving webhooks. New checkouts stop.`
                                   : "Requires your login password.",
-                              onConfirm: () => {
+                              onConfirm: (pwd) => {
                                 void updateProvider({
                                   provider: p.provider,
                                   enabled: next,
-                                  password: password.trim(),
+                                  password: pwd,
                                 });
                                 setConfirm(null);
                               },
@@ -957,7 +957,15 @@ export function PaymentsSettingsClient({ canWrite }: { canWrite: boolean }) {
         </SheetContent>
       </Sheet>
 
-      <Dialog open={!!confirm} onOpenChange={(o) => !o && setConfirm(null)}>
+      <Dialog
+        open={!!confirm}
+        onOpenChange={(o) => {
+          if (!o) {
+            setConfirm(null);
+            setPassword("");
+          }
+        }}
+      >
         <DialogContent>
           <DialogHeader>
             <DialogTitle>{confirm?.title}</DialogTitle>
@@ -965,17 +973,28 @@ export function PaymentsSettingsClient({ canWrite }: { canWrite: boolean }) {
           </DialogHeader>
           <Input
             type="password"
-            placeholder="Confirm password"
+            autoComplete="current-password"
+            placeholder="Your Super Admin login password"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
           />
           <DialogFooter>
-            <Button variant="outline" onClick={() => setConfirm(null)}>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setConfirm(null);
+                setPassword("");
+              }}
+            >
               Cancel
             </Button>
             <Button
-              disabled={!password}
-              onClick={() => confirm?.onConfirm()}
+              disabled={!password.trim()}
+              onClick={() => {
+                const pwd = password.trim();
+                confirm?.onConfirm(pwd);
+                setPassword("");
+              }}
             >
               Confirm
             </Button>

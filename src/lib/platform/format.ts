@@ -1,10 +1,26 @@
 /** Platform console money / date helpers */
 
+/** Prisma Decimal | number | string → finite number */
+function toMoneyNumber(amount: unknown): number {
+  if (amount == null) return 0;
+  if (typeof amount === "number") return amount;
+  if (typeof amount === "string") return Number(amount);
+  if (
+    typeof amount === "object" &&
+    amount !== null &&
+    "toNumber" in amount &&
+    typeof (amount as { toNumber: () => number }).toNumber === "function"
+  ) {
+    return (amount as { toNumber: () => number }).toNumber();
+  }
+  return Number(amount);
+}
+
 export function formatMoney(
-  amount: number | string | null | undefined,
+  amount: unknown,
   opts?: { currency?: string; compact?: boolean }
 ): string {
-  const n = typeof amount === "string" ? Number(amount) : Number(amount ?? 0);
+  const n = toMoneyNumber(amount);
   if (!Number.isFinite(n)) return "$0.00";
   const currency = opts?.currency || "USD";
   if (opts?.compact && Math.abs(n) >= 1000) {
@@ -23,10 +39,8 @@ export function formatMoney(
   }).format(n);
 }
 
-export function formatMoneyShort(
-  amount: number | string | null | undefined
-): string {
-  const n = typeof amount === "string" ? Number(amount) : Number(amount ?? 0);
+export function formatMoneyShort(amount: unknown): string {
+  const n = toMoneyNumber(amount);
   if (!Number.isFinite(n)) return "$0";
   return new Intl.NumberFormat("en-US", {
     style: "currency",
