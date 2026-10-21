@@ -277,7 +277,8 @@ export class TenantAccessService {
     if (access.accessMode === "locked") {
       if (
         dashboardPath.startsWith("/billing") ||
-        dashboardPath.startsWith("/settings")
+        dashboardPath.startsWith("/settings") ||
+        dashboardPath.startsWith("/onboarding")
       ) {
         return { ok: true };
       }

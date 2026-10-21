@@ -804,6 +804,7 @@ model Organization {
   billingTransactions  BillingTransaction[]
   emailSendLogs        EmailSendLog[]
   dataExportJobs       DataExportJob[]
+  onboardingProgress   OnboardingProgress?
 
   /// S2 cached credit balance (absolute). Reconcile from ledger.
   creditBalanceCached       Int       @default(0) @map("credit_balance_cached")
@@ -3800,6 +3801,24 @@ model DataExportJob {
   @@index([organizationId, createdAt])
   @@index([status, expiresAt])
   @@map("data_export_jobs")
+}
+
+/// B5d: tenant onboarding wizard progress (skippable / resumable)
+model OnboardingProgress {
+  organizationId String    @id @map("organization_id")
+  currentStep    String    @default("business_profile") @map("current_step")
+  /// Completed step keys in order
+  completedSteps Json      @default("[]") @map("completed_steps")
+  skipped        Boolean   @default(false)
+  completedAt    DateTime? @map("completed_at")
+  /// Wizard draft payload (ICP choice, etc.)
+  payload        Json      @default("{}")
+  createdAt      DateTime  @default(now()) @map("created_at")
+  updatedAt      DateTime  @updatedAt @map("updated_at")
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@map("onboarding_progress")
 }
 
 /// B3.2: synced provider + manual money movements for SA Transactions / revenue

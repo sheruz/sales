@@ -24,7 +24,18 @@ export default function ActivatingPage() {
           if (json.data.active) {
             clearInterval(poll);
             clearInterval(tick);
-            router.replace(appHome());
+            // B5d: first activation → onboarding wizard (skippable)
+            let dest = appHome("/onboarding");
+            try {
+              const ob = await fetch("/api/onboarding");
+              const obJson = await ob.json();
+              if (obJson.success && obJson.data.dismissed) {
+                dest = appHome();
+              }
+            } catch {
+              /* default to onboarding */
+            }
+            router.replace(dest);
           }
         }
       } catch {

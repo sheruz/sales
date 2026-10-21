@@ -77,7 +77,9 @@ export default async function DashboardLayout({
       tenantAccess.accessMode === "locked"
     ) {
       const open =
-        dashPath.startsWith("/billing") || dashPath.startsWith("/settings");
+        dashPath.startsWith("/billing") ||
+        dashPath.startsWith("/settings") ||
+        dashPath.startsWith("/onboarding");
       if (!open) {
         redirect(appHome("/billing/choose-plan"));
       }

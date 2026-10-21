@@ -34,6 +34,7 @@ import { DelvixLogoMark } from "@/components/dashboard/delvix-logo";
 import { SidebarUserFooter } from "@/components/dashboard/sidebar-user-footer";
 import { SidebarCreditsMeter } from "@/components/dashboard/sidebar-credits-meter";
 import { AutopilotStatusPill } from "@/components/dashboard/autopilot-status-pill";
+import { SidebarSetupChecklist } from "@/components/dashboard/sidebar-setup-checklist";
 import { hasOrgPermission } from "@/lib/tenant/scope";
 import type { PermissionKey } from "@/lib/auth/permission-catalog";
 import type { FeatureFlags } from "@/lib/features/flags";
@@ -248,6 +249,7 @@ export function AppSidebar({
       </SidebarContent>
 
       <SidebarFooter className="gap-2 border-t border-sidebar-border p-3">
+        <SidebarSetupChecklist />
         <SidebarCreditsMeter />
         <AutopilotStatusPill status={autopilotStatus} />
         <SidebarMenu>

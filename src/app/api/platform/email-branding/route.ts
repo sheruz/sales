@@ -36,7 +36,7 @@ export async function GET() {
       branding,
       subject: "Welcome — your workspace is active",
       body: "Your payment was received and your workspace is now active. You can open billing anytime from Settings.",
-      orgName: "Acme Demo Co",
+      orgName: branding.legalCompanyName,
       ctaLabel: "Open billing",
       cacheBust: bust,
     });
