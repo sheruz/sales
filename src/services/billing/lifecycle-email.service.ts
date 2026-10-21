@@ -129,7 +129,7 @@ export class LifecycleEmailService {
         ],
       },
       include: {
-        user: { select: { email: true, name: true } },
+        user: { select: { email: true, firstName: true, lastName: true } },
       },
       orderBy: { isPrimaryAdmin: "desc" },
     });
@@ -140,9 +140,10 @@ export class LifecycleEmailService {
           .map((e) => e.trim().toLowerCase())
       ),
     ];
+    const first = admins[0]?.user;
     const adminName =
-      admins[0]?.user.name?.split(" ")[0] ||
-      admins[0]?.user.email?.split("@")[0] ||
+      first?.firstName?.trim() ||
+      first?.email?.split("@")[0] ||
       "there";
     return { emails, orgName: org?.name ?? null, adminName };
   }
