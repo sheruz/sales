@@ -1,16 +1,30 @@
 import { NextRequest, NextResponse } from "next/server";
+import { cookies } from "next/headers";
 import { requireSuperAdmin } from "@/lib/auth/api-auth";
 import { apiSuccess } from "@/lib/api/response";
 import { handleApiError } from "@/lib/api/error-handler";
 import { billingTransactionService } from "@/services/billing/billing-transaction.service";
+import {
+  PLATFORM_BILLING_ENV_COOKIE,
+  parsePlatformBillingEnv,
+} from "@/lib/platform/environment-preference";
 
 export async function GET(request: NextRequest) {
   try {
     await requireSuperAdmin();
     const sp = request.nextUrl.searchParams;
     const format = sp.get("format");
+    const jar = await cookies();
+    const cookieEnv = parsePlatformBillingEnv(
+      jar.get(PLATFORM_BILLING_ENV_COOKIE)?.value
+    );
+    const envRaw = sp.get("environment");
+    const environment =
+      envRaw === "all"
+        ? undefined
+        : envRaw || cookieEnv;
     const result = await billingTransactionService.list({
-      environment: sp.get("environment") || undefined,
+      environment,
       organizationId: sp.get("organizationId") || undefined,
       provider: sp.get("provider") || undefined,
       status: sp.get("status") || undefined,

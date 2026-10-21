@@ -1,5 +1,6 @@
 import { appOps } from "@/lib/app-paths";
 import Link from "next/link";
+import { cookies } from "next/headers";
 import { billingTransactionService } from "@/services/billing/billing-transaction.service";
 import {
   Card,
@@ -18,6 +19,12 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import {
+  PLATFORM_BILLING_ENV_COOKIE,
+  parsePlatformBillingEnv,
+  platformBillingEnvLabel,
+} from "@/lib/platform/environment-preference";
+import { formatMoney, formatPlatformDateTime } from "@/lib/platform/format";
 
 interface PageProps {
   searchParams: Promise<{
@@ -31,15 +38,24 @@ export default async function PlatformTransactionsPage({
   searchParams,
 }: PageProps) {
   const sp = await searchParams;
+  const jar = await cookies();
+  const cookieEnv = parsePlatformBillingEnv(
+    jar.get(PLATFORM_BILLING_ENV_COOKIE)?.value
+  );
+  const environment =
+    sp.environment === "all"
+      ? undefined
+      : sp.environment || cookieEnv;
+
   const { rows, total } = await billingTransactionService.list({
-    environment: sp.environment || undefined,
+    environment,
     provider: sp.provider || undefined,
     kind: sp.kind || undefined,
     take: 200,
   });
 
   const qs = new URLSearchParams();
-  if (sp.environment) qs.set("environment", sp.environment);
+  if (environment) qs.set("environment", environment);
   if (sp.provider) qs.set("provider", sp.provider);
   if (sp.kind) qs.set("kind", sp.kind);
   qs.set("format", "csv");
@@ -50,16 +66,17 @@ export default async function PlatformTransactionsPage({
         <div>
           <h2 className="text-2xl font-bold tracking-tight">Transactions</h2>
           <p className="text-muted-foreground text-sm">
-            Paddle/Stripe synced events + manual payments ({total} shown)
+            Default filter: {platformBillingEnvLabel(cookieEnv)} (header
+            switch). {total} shown.
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
           <Button
             variant="outline"
             size="sm"
-            render={<Link href={appOps("/revenue")} />}
+            render={<Link href={appOps()} />}
           >
-            Revenue
+            Dashboard
           </Button>
           <Button
             variant="outline"
@@ -80,7 +97,10 @@ export default async function PlatformTransactionsPage({
         </CardHeader>
         <CardContent className="flex flex-wrap gap-2 text-sm">
           {[
-            { label: "All", href: appOps("/transactions") },
+            {
+              label: "All",
+              href: `${appOps("/transactions")}?environment=all`,
+            },
             {
               label: "LIVE",
               href: `${appOps("/transactions")}?environment=production`,
@@ -140,7 +160,7 @@ export default async function PlatformTransactionsPage({
                   {rows.map((r) => (
                     <TableRow key={r.id}>
                       <TableCell className="whitespace-nowrap text-xs">
-                        {r.occurredAt.toISOString().slice(0, 10)}
+                        {formatPlatformDateTime(r.occurredAt)}
                       </TableCell>
                       <TableCell>
                         <Link
@@ -154,13 +174,17 @@ export default async function PlatformTransactionsPage({
                         <Badge variant="secondary">{r.kind}</Badge>
                       </TableCell>
                       <TableCell className="tabular-nums">
-                        {r.currency} {Number(r.amount).toFixed(2)}
+                        {formatMoney(r.amount, { currency: r.currency })}
                       </TableCell>
                       <TableCell className="tabular-nums text-muted-foreground">
-                        {r.feeAmount != null ? Number(r.feeAmount).toFixed(2) : "—"}
+                        {r.feeAmount != null
+                          ? formatMoney(r.feeAmount, { currency: r.currency })
+                          : "—"}
                       </TableCell>
                       <TableCell className="tabular-nums">
-                        {r.netAmount != null ? Number(r.netAmount).toFixed(2) : "—"}
+                        {r.netAmount != null
+                          ? formatMoney(r.netAmount, { currency: r.currency })
+                          : "—"}
                       </TableCell>
                       <TableCell>{r.status}</TableCell>
                       <TableCell>{r.provider}</TableCell>

@@ -9,14 +9,12 @@ import {
   Settings,
   Shield,
   Users,
-  Activity,
   Package,
   Coins,
   Gift,
   ScrollText,
   CreditCard,
   FileText,
-  TrendingUp,
   Receipt,
 } from "lucide-react";
 import {
@@ -35,20 +33,42 @@ import {
 import { SidebarUserFooter } from "@/components/dashboard/sidebar-user-footer";
 import type { AuthUser } from "@/types/auth";
 
-const platformNav = [
-  { title: "Overview", href: appOps(), icon: LayoutDashboard },
-  { title: "Organizations", href: appOps("/companies"), icon: Building2 },
-  { title: "Packages", href: appOps("/packages"), icon: Package },
-  { title: "Credit prices", href: appOps("/credit-prices"), icon: Coins },
-  { title: "Top-ups", href: appOps("/top-ups"), icon: Gift },
-  { title: "Payments", href: appOps("/payments"), icon: CreditCard },
-  { title: "Revenue", href: appOps("/revenue"), icon: TrendingUp },
-  { title: "Transactions", href: appOps("/transactions"), icon: Receipt },
-  { title: "Invoices", href: appOps("/invoices"), icon: FileText },
-  { title: "Audit", href: appOps("/audit"), icon: ScrollText },
-  { title: "All Users", href: appOps("/users"), icon: Users },
-  { title: "Activity", href: appOps("/activity"), icon: Activity },
-  { title: "Settings", href: appOps("/settings"), icon: Settings },
+type NavItem = {
+  title: string;
+  href: string;
+  icon: typeof LayoutDashboard;
+};
+
+const navGroups: { label: string; items: NavItem[] }[] = [
+  {
+    label: "Dashboard",
+    items: [{ title: "Overview", href: appOps(), icon: LayoutDashboard }],
+  },
+  {
+    label: "Customers",
+    items: [
+      { title: "Organizations", href: appOps("/companies"), icon: Building2 },
+      { title: "Users", href: appOps("/users"), icon: Users },
+    ],
+  },
+  {
+    label: "Billing",
+    items: [
+      { title: "Packages", href: appOps("/packages"), icon: Package },
+      { title: "Credit prices", href: appOps("/credit-prices"), icon: Coins },
+      { title: "Top-ups", href: appOps("/top-ups"), icon: Gift },
+      { title: "Payments", href: appOps("/payments"), icon: CreditCard },
+      { title: "Transactions", href: appOps("/transactions"), icon: Receipt },
+      { title: "Invoices", href: appOps("/invoices"), icon: FileText },
+    ],
+  },
+  {
+    label: "System",
+    items: [
+      { title: "Audit", href: appOps("/audit"), icon: ScrollText },
+      { title: "Settings", href: appOps("/settings"), icon: Settings },
+    ],
+  },
 ];
 
 interface PlatformSidebarProps {
@@ -79,29 +99,31 @@ export function PlatformSidebar({ user }: PlatformSidebarProps) {
       </SidebarHeader>
 
       <SidebarContent>
-        <SidebarGroup>
-          <SidebarGroupLabel>Platform</SidebarGroupLabel>
-          <SidebarGroupContent>
-            <SidebarMenu>
-              {platformNav.map((item) => (
-                <SidebarMenuItem key={item.href}>
-                  <SidebarMenuButton
-                    isActive={
-                      item.href === appOps()
-                        ? pathname === appOps()
-                        : pathname.startsWith(item.href)
-                    }
-                    tooltip={item.title}
-                    render={<Link href={item.href} />}
-                  >
-                    <item.icon />
-                    <span>{item.title}</span>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-              ))}
-            </SidebarMenu>
-          </SidebarGroupContent>
-        </SidebarGroup>
+        {navGroups.map((group) => (
+          <SidebarGroup key={group.label}>
+            <SidebarGroupLabel>{group.label}</SidebarGroupLabel>
+            <SidebarGroupContent>
+              <SidebarMenu>
+                {group.items.map((item) => (
+                  <SidebarMenuItem key={item.href}>
+                    <SidebarMenuButton
+                      isActive={
+                        item.href === appOps()
+                          ? pathname === appOps()
+                          : pathname.startsWith(item.href)
+                      }
+                      tooltip={item.title}
+                      render={<Link href={item.href} />}
+                    >
+                      <item.icon />
+                      <span>{item.title}</span>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                ))}
+              </SidebarMenu>
+            </SidebarGroupContent>
+          </SidebarGroup>
+        ))}
       </SidebarContent>
 
       <SidebarFooter>

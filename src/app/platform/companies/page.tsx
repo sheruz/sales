@@ -26,8 +26,23 @@ function statusVariant(status: string) {
   return "secondary" as const;
 }
 
-export default async function PlatformOrganizationsPage() {
-  const organizations = await organizationService.listOrganizations();
+interface PageProps {
+  searchParams: Promise<{ q?: string }>;
+}
+
+export default async function PlatformOrganizationsPage({
+  searchParams,
+}: PageProps) {
+  const sp = await searchParams;
+  const q = (sp.q || "").trim().toLowerCase();
+  const all = await organizationService.listOrganizations();
+  const organizations = q
+    ? all.filter(
+        (org) =>
+          org.name.toLowerCase().includes(q) ||
+          org.slug.toLowerCase().includes(q)
+      )
+    : all;
 
   return (
     <div className="space-y-6">
@@ -36,6 +51,7 @@ export default async function PlatformOrganizationsPage() {
           <h2 className="text-2xl font-bold tracking-tight">Organizations</h2>
           <p className="text-muted-foreground">
             Customer tenants with their own members, leads, and campaigns.
+            {q ? ` Filtered by “${sp.q}”.` : ""}
           </p>
         </div>
         <CreateOrganizationForm />
@@ -43,7 +59,9 @@ export default async function PlatformOrganizationsPage() {
 
       <Card>
         <CardHeader>
-          <CardTitle>All organizations ({organizations.length})</CardTitle>
+          <CardTitle>
+            {q ? "Matching" : "All"} organizations ({organizations.length})
+          </CardTitle>
           <CardDescription>
             Click a row to view members, invite users, or change status.
           </CardDescription>
@@ -51,7 +69,9 @@ export default async function PlatformOrganizationsPage() {
         <CardContent>
           {organizations.length === 0 ? (
             <p className="text-sm text-muted-foreground py-6 text-center">
-              No organizations yet. Create one to get started.
+              {q
+                ? "No organizations match that search."
+                : "No organizations yet. Create one to get started."}
             </p>
           ) : (
             <div className="rounded-md border">
