@@ -29,6 +29,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { CreditCard, Landmark, Wallet } from "lucide-react";
+import { PlatformEmailTransportPanel } from "@/components/platform/platform-email-transport-panel";
 
 type ProviderRow = {
   provider: string;
@@ -85,6 +86,7 @@ type PaymentsData = {
 const TABS = [
   "Providers",
   "Checkout settings",
+  "Platform email",
   "Manual methods",
   "Business details",
   "Webhooks & sync",
@@ -573,6 +575,10 @@ export function PaymentsSettingsClient({ canWrite }: { canWrite: boolean }) {
             </div>
           </CardContent>
         </Card>
+      )}
+
+      {tab === "Platform email" && (
+        <PlatformEmailTransportPanel canWrite={canWrite} />
       )}
 
       {tab === "Manual methods" && (

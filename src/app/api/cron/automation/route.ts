@@ -54,7 +54,16 @@ export async function POST(request: NextRequest) {
         );
       }
 
-      let lifecycle = {
+      let lifecycle: Awaited<
+        ReturnType<typeof billingLifecycleService.runDaily>
+      > | {
+        trialExpired: number;
+        graceSuspended: number;
+        cancelReadOnly: number;
+        pendingVersionsApplied: number;
+        overridesExpired: number;
+        pauseNoticesApplied: number;
+      } = {
         trialExpired: 0,
         graceSuspended: 0,
         cancelReadOnly: 0,

@@ -6,6 +6,7 @@ import { OrganizationActions } from "@/components/platform/organization-actions"
 import { TenantLifecycleActions } from "@/components/platform/tenant-lifecycle-actions";
 import { TenantOverridesClient } from "@/components/platform/tenant-overrides-client";
 import { TenantBillingTab } from "@/components/platform/tenant-billing-tab";
+import { TenantEmailActivityTab } from "@/components/platform/tenant-email-activity-tab";
 import { getCurrentUser } from "@/lib/auth/session";
 import { NotFoundError } from "@/lib/api/response";
 import {
@@ -71,6 +72,7 @@ export default async function OrganizationDetailPage({ params }: PageProps) {
             Members ({org.members.length})
           </TabsTrigger>
           <TabsTrigger value="billing">Billing</TabsTrigger>
+          <TabsTrigger value="activity">Activity</TabsTrigger>
           <TabsTrigger value="overrides">Overrides</TabsTrigger>
           <TabsTrigger value="actions">Actions</TabsTrigger>
         </TabsList>
@@ -192,6 +194,10 @@ export default async function OrganizationDetailPage({ params }: PageProps) {
               />
             </CardContent>
           </Card>
+        </TabsContent>
+
+        <TabsContent value="activity" className="mt-4">
+          <TenantEmailActivityTab organizationId={org.id} />
         </TabsContent>
 
         <TabsContent value="overrides" className="mt-4">

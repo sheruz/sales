@@ -13,6 +13,7 @@ import { FEATURE_KEYS } from "@/lib/billing/features";
 import { billingGateway } from "@/services/billing-gateway.service";
 import { invoiceService } from "@/services/billing/invoice.service";
 import { webhookProcessorService } from "@/services/billing/webhook-processor.service";
+import { lifecycleEmailService } from "@/services/billing/lifecycle-email.service";
 
 export class BillingLifecycleService {
   async runDaily(): Promise<{
@@ -25,6 +26,9 @@ export class BillingLifecycleService {
     renewalInvoices: number;
     overdueInvoices: number;
     webhooksRetried: number;
+    lifecycleEmails: Awaited<
+      ReturnType<typeof lifecycleEmailService.runCadences>
+    > | null;
   }> {
     const now = new Date();
     const ownerId = env.PLATFORM_OWNER_ORG_ID;
@@ -65,6 +69,9 @@ export class BillingLifecycleService {
             before: { status: "TRIALING" },
             after: { status: "EXPIRED" },
           });
+          await lifecycleEmailService
+            .sendTrialExpired(sub.organizationId, sub.id)
+            .catch(() => null);
           trialExpired++;
           continue;
         }
@@ -87,6 +94,9 @@ export class BillingLifecycleService {
             before: { status: "PAST_DUE" },
             after: { status: "SUSPENDED" },
           });
+          await lifecycleEmailService
+            .sendSuspended(sub.organizationId, sub.id)
+            .catch(() => null);
           graceSuspended++;
           continue;
         }
@@ -112,6 +122,9 @@ export class BillingLifecycleService {
             organizationId: sub.organizationId,
             after: { readOnlyUntil: readOnlyUntil.toISOString() },
           });
+          await lifecycleEmailService
+            .sendCanceledExport(sub.organizationId, sub.id, readOnlyUntil)
+            .catch(() => null);
           cancelReadOnly++;
         }
 
@@ -171,6 +184,15 @@ export class BillingLifecycleService {
       }
     }
 
+    let lifecycleEmails = null;
+    try {
+      lifecycleEmails = await lifecycleEmailService.runCadences(now);
+    } catch (err) {
+      logger.error("lifecycle email cadences failed", {
+        error: err instanceof Error ? err.message : String(err),
+      });
+    }
+
     return {
       trialExpired,
       graceSuspended,
@@ -181,6 +203,7 @@ export class BillingLifecycleService {
       renewalInvoices,
       overdueInvoices,
       webhooksRetried,
+      lifecycleEmails,
     };
   }
 }

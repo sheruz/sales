@@ -6,25 +6,12 @@
 import prisma from "@/lib/db/prisma";
 import { env } from "@/lib/config/env";
 import { logger } from "@/lib/logger";
-import { sendEmailWithConfig } from "@/lib/email/send-mail";
 import { NotificationType, UserRole } from "@prisma/client";
 import { paymentConfigService } from "@/services/billing/payment-config.service";
 import { platformEmailBrandingService } from "@/services/platform-email-branding.service";
 import { renderPlatformTransactionalEmail } from "@/lib/email/render-platform-transactional";
+import { platformEmailTransportService } from "@/services/billing/platform-email-transport.service";
 import { appOps, appHome } from "@/lib/app-paths";
-
-function platformSmtp(fromName?: string) {
-  if (!env.SMTP_HOST || !env.SMTP_USER || !env.SMTP_PASSWORD) return null;
-  return {
-    host: env.SMTP_HOST,
-    port: env.SMTP_PORT,
-    secure: env.SMTP_SECURE,
-    user: env.SMTP_USER,
-    password: env.SMTP_PASSWORD,
-    fromName: fromName || env.SMTP_FROM_NAME || "Platform",
-    fromEmail: env.SMTP_FROM_EMAIL ?? env.SMTP_USER,
-  };
-}
 
 async function sendBrandedPlatformMail(input: {
   to: string[];
@@ -50,16 +37,15 @@ async function sendBrandedPlatformMail(input: {
     ctaUrl: input.ctaUrl,
     ctaLabel: input.ctaLabel,
   });
-  const cfg = platformSmtp(rendered.fromName);
-  if (!cfg) return;
 
   for (const addr of unique) {
     try {
-      await sendEmailWithConfig(cfg, {
+      await platformEmailTransportService.send({
         to: addr,
         subject: rendered.subject,
         text: rendered.text,
         html: rendered.html,
+        fromName: rendered.fromName,
       });
     } catch (err) {
       logger.warn("billing notify email failed", {

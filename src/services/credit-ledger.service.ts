@@ -815,8 +815,20 @@ export class CreditLedgerService {
         title,
         body,
         href: appHome("/settings?tab=billing"),
-        sendEmail: true,
+        sendEmail: false,
       });
+      const org = await prisma.organization.findUnique({
+        where: { id: organizationId },
+        select: { creditBalanceCached: true },
+      });
+      const { lifecycleEmailService } = await import(
+        "@/services/billing/lifecycle-email.service"
+      );
+      await lifecycleEmailService.sendLowCredits(
+        organizationId,
+        level === "zero" ? "0" : level,
+        org?.creditBalanceCached ?? 0
+      );
     } catch (err) {
       console.warn(
         "[credits] warning notify failed",

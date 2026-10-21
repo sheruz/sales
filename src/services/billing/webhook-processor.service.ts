@@ -18,6 +18,7 @@ import { billingGateway } from "@/services/billing-gateway.service";
 import { logger } from "@/lib/logger";
 import { billingNotifyService } from "@/services/billing/billing-notify.service";
 import { billingTransactionService } from "@/services/billing/billing-transaction.service";
+import { lifecycleEmailService } from "@/services/billing/lifecycle-email.service";
 
 export class WebhookProcessorService {
   private async storeAndProcess(
@@ -290,6 +291,17 @@ export class WebhookProcessorService {
           "Welcome — your workspace is active",
           "Your payment was received and your workspace is now active."
         );
+        await lifecycleEmailService
+          .sendPaymentReceived(
+            mapped.organizationId,
+            `activated:${mapped.transactionId || mapped.externalSubscriptionId || mapped.organizationId}`,
+            {
+              amount:
+                mapped.amount != null ? String(mapped.amount) : undefined,
+              currency: mapped.currency || "USD",
+            }
+          )
+          .catch(() => null);
         await billingTransactionService.record({
           organizationId: mapped.organizationId,
           provider: providerLabel,
@@ -339,6 +351,23 @@ export class WebhookProcessorService {
               idempotencyKey: `paddle_tx:${mapped.transactionId}`,
               reason: "paddle_renewal",
             });
+          }
+          if (sub) {
+            const suffix = mapped.transactionId || sub.id;
+            await lifecycleEmailService
+              .sendReactivated(mapped.organizationId, sub.id, `renewal:${suffix}`)
+              .catch(() => null);
+            await lifecycleEmailService
+              .sendPaymentReceived(
+                mapped.organizationId,
+                `renewal:${suffix}`,
+                {
+                  amount:
+                    mapped.amount != null ? String(mapped.amount) : undefined,
+                  currency: mapped.currency || "USD",
+                }
+              )
+              .catch(() => null);
           }
         }
         {
@@ -426,6 +455,17 @@ export class WebhookProcessorService {
           "Payment failed",
           "Your payment failed. Please update your payment method to avoid suspension."
         );
+        {
+          const sub = await prisma.subscription.findUnique({
+            where: { organizationId: mapped.organizationId },
+            select: { id: true },
+          });
+          if (sub) {
+            await lifecycleEmailService
+              .sendPaymentFailed0(mapped.organizationId, sub.id, grace)
+              .catch(() => null);
+          }
+        }
         await billingNotifyService.notifySellers({
           type: "payment_failed",
           organizationId: mapped.organizationId,
@@ -519,6 +559,21 @@ export class WebhookProcessorService {
           "Subscription canceled",
           "Your subscription has been canceled."
         );
+        {
+          const sub = await prisma.subscription.findUnique({
+            where: { organizationId: mapped.organizationId },
+            select: { id: true, readOnlyUntil: true },
+          });
+          if (sub) {
+            await lifecycleEmailService
+              .sendCanceledExport(
+                mapped.organizationId,
+                sub.id,
+                sub.readOnlyUntil
+              )
+              .catch(() => null);
+          }
+        }
         await billingNotifyService.notifySellers({
           type: "cancellation",
           organizationId: mapped.organizationId,

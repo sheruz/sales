@@ -802,6 +802,7 @@ model Organization {
   planLimitNotices     PlanLimitNotice[]
   invoices             Invoice[]
   billingTransactions  BillingTransaction[]
+  emailSendLogs        EmailSendLog[]
 
   /// S2 cached credit balance (absolute). Reconcile from ledger.
   creditBalanceCached       Int       @default(0) @map("credit_balance_cached")
@@ -3326,6 +3327,14 @@ enum PlanLimitNoticeStatus {
   APPLIED
 }
 
+/// B5a: platform lifecycle email delivery status
+enum EmailSendStatus {
+  QUEUED
+  SENT
+  FAILED
+  BOUNCED
+}
+
 enum TenantIntegrationStatus {
   CONNECTED
   NEEDS_RECONNECT
@@ -3698,10 +3707,66 @@ model PaymentSettings {
   sellerAdminEmails      Json     @default("[]") @map("seller_admin_emails")
   /// B3.2: platform system-email branding (same shape as org EmailBranding)
   emailBranding          Json     @default("{}") @map("email_branding")
+  /// B5a: RESEND | SMTP — transactional provider for platform → tenant mail
+  platformEmailProvider  String   @default("SMTP") @map("platform_email_provider")
+  platformEmailFromEmail String?  @map("platform_email_from_email")
+  platformEmailFromName  String?  @map("platform_email_from_name")
+  platformEmailReplyTo   String?  @map("platform_email_reply_to")
+  platformEmailDomain    String?  @map("platform_email_domain")
+  /// Encrypted JSON { apiKey }
+  platformEmailResendKeyEnc String? @map("platform_email_resend_key_enc")
   createdAt              DateTime @default(now()) @map("created_at")
   updatedAt              DateTime @updatedAt @map("updated_at")
 
   @@map("payment_settings")
+}
+
+/// B5a: editable lifecycle email templates (Super Admin)
+model EmailTemplate {
+  id              String   @id @default(uuid())
+  key             String   @unique
+  name            String
+  subject         String
+  bodyHtml        String   @map("body_html") @db.Text
+  bodyText        String   @map("body_text") @db.Text
+  variables       Json     @default("[]")
+  /// Seed defaults for reset-to-default
+  defaultSubject  String   @map("default_subject")
+  defaultBodyHtml String   @map("default_body_html") @db.Text
+  defaultBodyText String   @map("default_body_text") @db.Text
+  updatedById     String?  @map("updated_by_id")
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  @@map("email_templates")
+}
+
+/// B5a: idempotent platform email send log (queued → sent/failed with retries)
+model EmailSendLog {
+  id                String          @id @default(uuid())
+  organizationId    String?         @map("organization_id")
+  toEmail           String          @map("to_email")
+  templateKey       String          @map("template_key")
+  /// Unique per logical event e.g. trial_ending_3d:{subId}:{trialEndsAt}
+  eventKey          String          @unique @map("event_key")
+  status            EmailSendStatus @default(QUEUED)
+  attempts          Int             @default(0)
+  maxAttempts       Int             @default(3) @map("max_attempts")
+  providerMessageId String?         @map("provider_message_id")
+  error             String?         @db.Text
+  subject           String?
+  metadata          Json            @default("{}")
+  nextRetryAt       DateTime?       @map("next_retry_at")
+  sentAt            DateTime?       @map("sent_at")
+  createdAt         DateTime        @default(now()) @map("created_at")
+  updatedAt         DateTime        @updatedAt @map("updated_at")
+
+  organization Organization? @relation(fields: [organizationId], references: [id], onDelete: SetNull)
+
+  @@index([organizationId, createdAt])
+  @@index([status, nextRetryAt])
+  @@index([templateKey, createdAt])
+  @@map("email_send_logs")
 }
 
 /// B3.2: synced provider + manual money movements for SA Transactions / revenue

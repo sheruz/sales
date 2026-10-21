@@ -264,6 +264,24 @@ export class PlanPauseService {
       await this.setPauseNoticeAt(input.featureKey, row.id, now);
     }
 
+    try {
+      const { lifecycleEmailService } = await import(
+        "@/services/billing/lifecycle-email.service"
+      );
+      await lifecycleEmailService.sendPlanLimitNotice({
+        organizationId: input.organizationId,
+        noticeId: notice.id,
+        featureKey: input.featureKey,
+        allowedCount: input.allowedCount,
+        deadlineAt,
+      });
+    } catch (err) {
+      logger.warn("plan limit notice email failed", {
+        noticeId: notice.id,
+        error: err instanceof Error ? err.message : String(err),
+      });
+    }
+
     await organizationService.writePlatformAudit({
       actorUserId: input.actorUserId,
       action: "plan_limit.notice_opened",
@@ -275,7 +293,7 @@ export class PlanPauseService {
         allowedCount: input.allowedCount,
         deadlineAt: deadlineAt.toISOString(),
         overBy: impact.overBy,
-        emailStub: `Would email tenant admin: plan now allows ${input.allowedCount} ${input.featureKey}`,
+        email: `plan_limit_notice:${notice.id}`,
       },
     });
 
