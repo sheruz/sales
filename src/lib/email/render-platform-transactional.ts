@@ -27,7 +27,10 @@ function escapeHtml(s: string): string {
  * Platform → tenant mail. Prefer Super Admin platform email branding;
  * env SMTP_FROM_NAME only as last resort (never hard-code a brand string).
  */
-export function resolvePlatformBrandingUrls(branding: EmailBranding) {
+export function resolvePlatformBrandingUrls(
+  branding: EmailBranding,
+  opts?: { cacheBust?: string | number }
+) {
   const envFrom = (process.env.SMTP_FROM_NAME || "").trim();
   const company =
     branding.legalCompanyName.trim() || envFrom || "Platform";
@@ -36,14 +39,17 @@ export function resolvePlatformBrandingUrls(branding: EmailBranding) {
     branding.legalCompanyName.trim() ||
     envFrom ||
     "Platform";
+  const bust = opts?.cacheBust;
   return {
     logoUrl: brandingFileUrlFromPath(
       PLATFORM_BRANDING_ORG_KEY,
-      branding.logoPath
+      branding.logoPath,
+      bust
     ),
     senderPhotoUrl: brandingFileUrlFromPath(
       PLATFORM_BRANDING_ORG_KEY,
-      branding.senderPhotoPath
+      branding.senderPhotoPath,
+      bust
     ),
     websiteUrl: branding.websiteUrl.trim(),
     websiteLabel:
@@ -69,9 +75,13 @@ export function renderPlatformTransactionalEmail(input: {
   ctaUrl?: string;
   ctaLabel?: string;
   orgName?: string | null;
+  /** Bust browser/CDN cache after logo upload (preview). */
+  cacheBust?: string | number;
 }): { subject: string; html: string; text: string; fromName: string } {
   const bare = asEmailBranding({ emailBranding: input.branding ?? {} });
-  const b = resolvePlatformBrandingUrls(bare);
+  const b = resolvePlatformBrandingUrls(bare, {
+    cacheBust: input.cacheBust,
+  });
   const ctaUrl = input.ctaUrl || `${appBaseUrl()}/dashboard`;
   const ctaLabel = input.ctaLabel || b.ctaLabel;
   const preheader = input.preheader || input.subject;

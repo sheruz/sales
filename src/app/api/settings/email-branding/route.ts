@@ -7,7 +7,10 @@ import {
 import { apiSuccess } from "@/lib/api/response";
 import { handleApiError } from "@/lib/api/error-handler";
 import { emailBrandingService } from "@/services/email-branding.service";
-import { resolveSenderBranding } from "@/lib/email/branding";
+import {
+  brandingFileUrlFromPath,
+  resolveSenderBranding,
+} from "@/lib/email/branding";
 import { renderOutboundEmail } from "@/lib/email/render-outbound";
 import { unsubscribeUrl } from "@/services/unsubscribe.service";
 
@@ -34,10 +37,18 @@ export async function GET() {
     ]);
     await requireOrganizationContext();
     const branding = await emailBrandingService.get(user.organizationId);
+    const bust = Date.now();
     const sender = resolveSenderBranding({
       organizationId: user.organizationId,
       branding,
     });
+    // Bust CDN/browser cache after re-upload so preview shows new logo
+    if (sender.logoUrl) {
+      sender.logoUrl = `${sender.logoUrl}${sender.logoUrl.includes("?") ? "&" : "?"}v=${bust}`;
+    }
+    if (sender.senderPhotoUrl) {
+      sender.senderPhotoUrl = `${sender.senderPhotoUrl}${sender.senderPhotoUrl.includes("?") ? "&" : "?"}v=${bust}`;
+    }
     const preview = renderOutboundEmail({
       style: "BRANDED",
       subject: "Acme Realty - quick idea",
@@ -61,7 +72,20 @@ export async function GET() {
       ),
     });
     return NextResponse.json(
-      apiSuccess({ branding, previewHtml: preview.html })
+      apiSuccess({
+        branding,
+        previewHtml: preview.html,
+        logoUrl: brandingFileUrlFromPath(
+          user.organizationId,
+          branding.logoPath,
+          bust
+        ),
+        senderPhotoUrl: brandingFileUrlFromPath(
+          user.organizationId,
+          branding.senderPhotoPath,
+          bust
+        ),
+      })
     );
   } catch (error) {
     return handleApiError(error);

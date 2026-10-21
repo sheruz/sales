@@ -40,6 +40,8 @@ export function EmailBrandingPanel({
 }) {
   const [branding, setBranding] = useState<Branding | null>(null);
   const [previewHtml, setPreviewHtml] = useState("");
+  const [logoUrl, setLogoUrl] = useState<string | null>(null);
+  const [senderPhotoUrl, setSenderPhotoUrl] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
   async function load() {
@@ -48,6 +50,8 @@ export function EmailBrandingPanel({
     if (!json.success) throw new Error(json.error?.message);
     setBranding(json.data.branding);
     setPreviewHtml(json.data.previewHtml);
+    setLogoUrl(json.data.logoUrl ?? null);
+    setSenderPhotoUrl(json.data.senderPhotoUrl ?? null);
   }
 
   useEffect(() => {
@@ -148,9 +152,19 @@ export function EmailBrandingPanel({
           {field("footerServices", "Footer services line")}
           {field("availabilityLine", "Availability line")}
 
-          <div className="flex flex-wrap gap-3 pt-2">
-            <div>
+          <div className="flex flex-wrap gap-4 pt-2">
+            <div className="space-y-2">
               <Label className="text-xs">Logo (PNG/JPEG → 96×96)</Label>
+              {logoUrl ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={logoUrl}
+                  alt="Logo"
+                  className="h-12 w-12 rounded-md border bg-white object-cover"
+                />
+              ) : (
+                <p className="text-xs text-muted-foreground">No logo yet</p>
+              )}
               <Input
                 type="file"
                 accept="image/png,image/jpeg"
@@ -160,8 +174,18 @@ export function EmailBrandingPanel({
                 }}
               />
             </div>
-            <div>
+            <div className="space-y-2">
               <Label className="text-xs">Sender photo (circle in email)</Label>
+              {senderPhotoUrl ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={senderPhotoUrl}
+                  alt="Sender"
+                  className="h-12 w-12 rounded-full border bg-white object-cover"
+                />
+              ) : (
+                <p className="text-xs text-muted-foreground">No photo yet</p>
+              )}
               <Input
                 type="file"
                 accept="image/png,image/jpeg"
@@ -194,8 +218,9 @@ export function EmailBrandingPanel({
           <iframe
             title="Branding preview"
             srcDoc={previewHtml}
-            className="w-full h-[560px] rounded-md border bg-white"
-            sandbox=""
+            className="h-[560px] w-full rounded-md border bg-white"
+            // allow-same-origin so preview can load /branding/* logos
+            sandbox="allow-same-origin allow-popups"
           />
         </CardContent>
       </Card>

@@ -11,11 +11,12 @@ import {
   type EmailBranding,
   resolveSenderBranding,
 } from "@/lib/email/branding";
+import { brandingRootDir } from "@/lib/email/branding-fs";
 import { normalizeWhatsappE164 } from "@/lib/email/whatsapp";
 import { outboundConfigService } from "@/services/outbound-config.service";
 
 function orgBrandingDir(organizationId: string) {
-  return join(process.cwd(), "public", "branding", organizationId);
+  return join(brandingRootDir(), organizationId);
 }
 
 export class EmailBrandingService {

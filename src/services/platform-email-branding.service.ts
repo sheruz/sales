@@ -14,12 +14,13 @@ import {
   brandingPublicUrl,
   type EmailBranding,
 } from "@/lib/email/branding";
+import { brandingRootDir } from "@/lib/email/branding-fs";
 import { PLATFORM_BRANDING_ORG_KEY } from "@/lib/email/render-platform-transactional";
 import { paymentConfigService } from "@/services/billing/payment-config.service";
 import { organizationService } from "@/services/organization.service";
 
 function brandDir() {
-  return join(process.cwd(), "public", "branding", PLATFORM_BRANDING_ORG_KEY);
+  return join(brandingRootDir(), PLATFORM_BRANDING_ORG_KEY);
 }
 
 export class PlatformEmailBrandingService {

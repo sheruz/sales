@@ -88,26 +88,30 @@ export function asEmailBranding(raw: unknown): EmailBranding {
   };
 }
 
-/** Stable public URL — no auth, no query tokens. */
+/** Public URL served by `app/branding/[orgId]/[filename]/route.ts`. */
 export function brandingPublicUrl(
   organizationId: string,
-  filename: string
+  filename: string,
+  cacheBust?: string | number
 ): string {
   const base = env.APP_URL.replace(/\/$/, "");
   const safe = filename.replace(/[^a-zA-Z0-9._-]/g, "");
-  return `${base}/branding/${organizationId}/${safe}`;
+  const url = `${base}/branding/${organizationId}/${safe}`;
+  if (cacheBust == null || cacheBust === "") return url;
+  return `${url}?v=${encodeURIComponent(String(cacheBust))}`;
 }
 
 export function brandingFileUrlFromPath(
   organizationId: string,
-  relativePath: string | null | undefined
+  relativePath: string | null | undefined,
+  cacheBust?: string | number
 ): string | null {
   if (!relativePath) return null;
   // relativePath like branding/{orgId}/logo.png or just logo.png
   const parts = relativePath.replace(/\\/g, "/").split("/");
   const filename = parts[parts.length - 1];
   if (!filename) return null;
-  return brandingPublicUrl(organizationId, filename);
+  return brandingPublicUrl(organizationId, filename, cacheBust);
 }
 
 export type ResolvedSender = {
