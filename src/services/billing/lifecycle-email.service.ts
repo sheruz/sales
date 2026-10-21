@@ -93,6 +93,29 @@ export class LifecycleEmailService {
     });
   }
 
+  async updateTemplate(
+    key: string,
+    input: {
+      subject?: string;
+      bodyHtml?: string;
+      bodyText?: string;
+    },
+    updatedById: string
+  ) {
+    await this.ensureTemplatesSeeded();
+    const existing = await prisma.emailTemplate.findUnique({ where: { key } });
+    if (!existing) throw new Error(`Unknown template key: ${key}`);
+    return prisma.emailTemplate.update({
+      where: { key },
+      data: {
+        ...(input.subject !== undefined ? { subject: input.subject } : {}),
+        ...(input.bodyHtml !== undefined ? { bodyHtml: input.bodyHtml } : {}),
+        ...(input.bodyText !== undefined ? { bodyText: input.bodyText } : {}),
+        updatedById,
+      },
+    });
+  }
+
   renderPreview(input: {
     subject: string;
     bodyHtml: string;
@@ -101,12 +124,94 @@ export class LifecycleEmailService {
     orgName?: string;
   }) {
     const vars = input.vars || sampleVarsForTemplate("preview");
+    const subject = interpolateTemplate(input.subject, vars);
+    const bodyHtml = interpolateTemplate(input.bodyHtml, vars);
+    const bodyText = interpolateTemplate(input.bodyText, vars);
     return {
-      subject: interpolateTemplate(input.subject, vars),
-      html: interpolateTemplate(input.bodyHtml, vars),
-      text: interpolateTemplate(input.bodyText, vars),
+      subject,
+      html: bodyHtml,
+      text: bodyText,
       vars,
     };
+  }
+
+  /** Branded HTML preview for SA editor */
+  async renderBrandedPreview(input: {
+    subject: string;
+    bodyHtml: string;
+    bodyText: string;
+    vars?: Record<string, string>;
+  }) {
+    const preview = this.renderPreview(input);
+    const branding = await platformEmailBrandingService.get();
+    const rendered = renderPlatformTransactionalEmail({
+      branding,
+      subject: preview.subject,
+      body: preview.html,
+      orgName: preview.vars.orgName || "Acme Demo Co",
+      ctaUrl: preview.vars.ctaUrl,
+      ctaLabel: "Open billing",
+    });
+    return {
+      ...preview,
+      brandedHtml: rendered.html,
+      brandedText: rendered.text || preview.text,
+    };
+  }
+
+  /** Send test email to the acting Super Admin (not idempotent lifecycle log). */
+  async sendTestToSelf(input: {
+    templateKey: string;
+    toEmail: string;
+    subject?: string;
+    bodyHtml?: string;
+    bodyText?: string;
+    actorUserId: string;
+  }) {
+    await this.ensureTemplatesSeeded();
+    const template = await prisma.emailTemplate.findUnique({
+      where: { key: input.templateKey },
+    });
+    if (!template) throw new Error(`Unknown template key: ${input.templateKey}`);
+
+    const subject = input.subject ?? template.subject;
+    const bodyHtml = input.bodyHtml ?? template.bodyHtml;
+    const bodyText = input.bodyText ?? template.bodyText;
+    const branded = await this.renderBrandedPreview({
+      subject,
+      bodyHtml,
+      bodyText,
+    });
+
+    const result = await platformEmailTransportService.send({
+      to: input.toEmail,
+      subject: `[TEST] ${branded.subject}`,
+      html: branded.brandedHtml,
+      text: branded.brandedText,
+    });
+
+    // Log for SA send-log visibility (unique eventKey per send)
+    await prisma.emailSendLog.create({
+      data: {
+        organizationId: null,
+        toEmail: input.toEmail.trim().toLowerCase(),
+        templateKey: input.templateKey,
+        eventKey: `test:${input.templateKey}:${input.actorUserId}:${Date.now()}`,
+        status: EmailSendStatus.SENT,
+        attempts: 1,
+        maxAttempts: 1,
+        providerMessageId: result.messageId,
+        subject: `[TEST] ${branded.subject}`,
+        sentAt: new Date(),
+        metadata: {
+          test: true,
+          provider: result.provider,
+          actorUserId: input.actorUserId,
+        },
+      },
+    });
+
+    return { messageId: result.messageId, provider: result.provider };
   }
 
   /** Resolve billing recipients: billingEmail + org admins */
