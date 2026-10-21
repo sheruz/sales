@@ -41,29 +41,42 @@ async function inspectB32Schema(client) {
 
 async function verifyB32(client) {
   const schema = await inspectB32Schema(client);
-  const shared = await client.$queryRawUnsafe(`
+  const hasPaddle =
+    (await columnExists(client, "organizations", "paddle_customer_id")) &&
+    (await columnExists(client, "organizations", "paddle_customer_env"));
+  const shared = hasPaddle
+    ? await client
+        .$queryRawUnsafe(`
     SELECT paddle_customer_id, paddle_customer_env, COUNT(*)::int AS n
     FROM organizations
     WHERE paddle_customer_id IS NOT NULL
       AND deleted_at IS NULL
     GROUP BY paddle_customer_id, paddle_customer_env
     HAVING COUNT(*) > 1
-  `).catch(() => []);
+  `)
+        .catch(() => [])
+    : [];
 
-  const missingBillingEmail = await client.$queryRawUnsafe(`
+  const missingBillingEmail = (await columnExists(
+    client,
+    "organizations",
+    "billing_email"
+  ))
+    ? await client
+        .$queryRawUnsafe(`
     SELECT COUNT(*)::int AS n FROM organizations
     WHERE deleted_at IS NULL
       AND billing_email IS NULL
       AND status <> 'ARCHIVED'
-  `).catch(() => [{ n: -1 }]);
+  `)
+        .catch(() => [{ n: -1 }])
+    : [{ n: -1 }];
 
   return {
     schema,
     sharedPaddleCustomers: shared,
     orgsMissingBillingEmail: missingBillingEmail[0]?.n ?? -1,
-    ok:
-      schema.ready &&
-      (!shared || shared.length === 0),
+    ok: schema.ready && (!shared || shared.length === 0),
   };
 }
 

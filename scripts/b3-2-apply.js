@@ -47,6 +47,13 @@ async function applySchema(prisma, log) {
   await ensureColumn(
     prisma,
     "organizations",
+    "billing_email",
+    `"billing_email" TEXT`,
+    log
+  );
+  await ensureColumn(
+    prisma,
+    "organizations",
     "billing_contact_name",
     `"billing_contact_name" TEXT`,
     log
@@ -73,6 +80,26 @@ async function applySchema(prisma, log) {
     log
   );
 
+  await ensureTable(
+    prisma,
+    "payment_settings",
+    `CREATE TABLE "payment_settings" (
+      "id" TEXT PRIMARY KEY DEFAULT 'default',
+      "payments_enabled" BOOLEAN NOT NULL DEFAULT false,
+      "default_provider" TEXT NOT NULL DEFAULT 'PADDLE',
+      "checkout_methods" JSONB NOT NULL DEFAULT '[]',
+      "currency" TEXT NOT NULL DEFAULT 'USD',
+      "grace_days" INTEGER NOT NULL DEFAULT 7,
+      "manual_renewal_lead_days" INTEGER NOT NULL DEFAULT 7,
+      "business" JSONB NOT NULL DEFAULT '{}',
+      "manual_instructions" JSONB NOT NULL DEFAULT '{}',
+      "seller_admin_emails" JSONB NOT NULL DEFAULT '[]',
+      "email_branding" JSONB NOT NULL DEFAULT '{}',
+      "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      "updated_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP
+    )`,
+    log
+  );
   if (await tableExists(prisma, "payment_settings")) {
     await ensureColumn(
       prisma,
@@ -146,20 +173,32 @@ async function applySchema(prisma, log) {
 
 async function backfill(prisma, log) {
   // billing_email from primary admin
-  const r1 = await prisma.$executeRawUnsafe(`
-    UPDATE organizations o
-    SET billing_email = u.email,
-        updated_at = CURRENT_TIMESTAMP
-    FROM organization_users ou
-    JOIN users u ON u.id = ou.user_id
-    WHERE ou.organization_id = o.id
-      AND ou.is_primary_admin = true
-      AND o.billing_email IS NULL
-      AND o.deleted_at IS NULL
-  `);
-  log.push(`backfill billing_email rows≈${r1}`);
+  if (await columnExists(prisma, "organizations", "billing_email")) {
+    const r1 = await prisma.$executeRawUnsafe(`
+      UPDATE organizations o
+      SET billing_email = u.email,
+          updated_at = CURRENT_TIMESTAMP
+      FROM organization_users ou
+      JOIN users u ON u.id = ou.user_id
+      WHERE ou.organization_id = o.id
+        AND ou.is_primary_admin = true
+        AND o.billing_email IS NULL
+        AND o.deleted_at IS NULL
+    `);
+    log.push(`backfill billing_email rows≈${r1}`);
+  } else {
+    log.push("skip billing_email backfill (column missing)");
+  }
 
   // Clear shared paddle customers (keep oldest org by created_at)
+  const hasPaddle =
+    (await columnExists(prisma, "organizations", "paddle_customer_id")) &&
+    (await columnExists(prisma, "organizations", "paddle_customer_env"));
+  if (!hasPaddle) {
+    log.push("skip shared paddle cleanup (paddle_customer_* missing)");
+    return;
+  }
+
   const shared = await prisma.$queryRawUnsafe(`
     SELECT paddle_customer_id, paddle_customer_env
     FROM organizations
