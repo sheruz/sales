@@ -11,7 +11,7 @@ import { getAutopilotShellStatus } from "@/lib/autopilot/shell-status";
 import { hasOrgPermission } from "@/lib/tenant/scope";
 import { tenantAccessService } from "@/services/tenant-access.service";
 import prisma from "@/lib/db/prisma";
-import { PlanLimitNoticeBanner } from "@/components/billing/plan-limit-notice-banner";
+import { TenantStatusBanners } from "@/components/billing/tenant-status-banners";
 
 export const dynamic = "force-dynamic";
 
@@ -127,7 +127,9 @@ export default async function DashboardLayout({
       />
       <SidebarInset className="min-h-svh min-w-0 overflow-hidden">
         <DashboardHeader user={user} />
-        <PlanLimitNoticeBanner />
+        {user.organizationId ? (
+          <TenantStatusBanners organizationId={user.organizationId} />
+        ) : null}
         <div className="dx w-full min-w-0 flex-1 overflow-x-hidden overflow-y-auto">
           {children}
         </div>

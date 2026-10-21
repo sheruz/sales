@@ -219,7 +219,11 @@ export default async function SettingsPage({
               />
             )}
 
-            {activeTab === "billing" && canManageBilling && <BillingPanel />}
+            {activeTab === "billing" && canManageBilling && (
+              <Suspense fallback={null}>
+                <BillingPanel />
+              </Suspense>
+            )}
 
             {activeTab === "integrations" &&
               canManageIntegrations &&

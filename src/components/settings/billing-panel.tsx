@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -13,6 +14,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { DataExportCard } from "@/components/settings/data-export-card";
 
 type Plan = {
   id: string;
@@ -101,6 +103,8 @@ type BillingContact = {
 };
 
 export function BillingPanel() {
+  const searchParams = useSearchParams();
+  const exportFocus = searchParams.get("export") === "1";
   const [plans, setPlans] = useState<Plan[]>([]);
   const [billing, setBilling] = useState<BillingSnapshot | null>(null);
   const [ledger, setLedger] = useState<LedgerEntry[]>([]);
@@ -114,6 +118,12 @@ export function BillingPanel() {
   });
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!exportFocus) return;
+    const el = document.getElementById("data-export");
+    el?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, [exportFocus, loading]);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -693,6 +703,8 @@ export function BillingPanel() {
           })}
         </div>
       </div>
+
+      <DataExportCard autoStart={exportFocus} />
     </div>
   );
 }

@@ -803,6 +803,7 @@ model Organization {
   invoices             Invoice[]
   billingTransactions  BillingTransaction[]
   emailSendLogs        EmailSendLog[]
+  dataExportJobs       DataExportJob[]
 
   /// S2 cached credit balance (absolute). Reconcile from ledger.
   creditBalanceCached       Int       @default(0) @map("credit_balance_cached")
@@ -3335,6 +3336,15 @@ enum EmailSendStatus {
   BOUNCED
 }
 
+/// B5c: org data export ZIP job
+enum DataExportStatus {
+  PENDING
+  PROCESSING
+  READY
+  FAILED
+  EXPIRED
+}
+
 enum TenantIntegrationStatus {
   CONNECTED
   NEEDS_RECONNECT
@@ -3767,6 +3777,29 @@ model EmailSendLog {
   @@index([status, nextRetryAt])
   @@index([templateKey, createdAt])
   @@map("email_send_logs")
+}
+
+/// B5c: background ZIP/CSV export for tenant (company_admin; valid 24h)
+model DataExportJob {
+  id               String           @id @default(uuid())
+  organizationId   String           @map("organization_id")
+  requestedByUserId String          @map("requested_by_user_id")
+  status           DataExportStatus @default(PENDING)
+  downloadToken    String           @unique @map("download_token")
+  filePath         String?          @map("file_path")
+  fileSizeBytes    Int?             @map("file_size_bytes")
+  error            String?          @db.Text
+  expiresAt        DateTime?        @map("expires_at")
+  startedAt        DateTime?        @map("started_at")
+  completedAt      DateTime?        @map("completed_at")
+  createdAt        DateTime         @default(now()) @map("created_at")
+  updatedAt        DateTime         @updatedAt @map("updated_at")
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId, createdAt])
+  @@index([status, expiresAt])
+  @@map("data_export_jobs")
 }
 
 /// B3.2: synced provider + manual money movements for SA Transactions / revenue
