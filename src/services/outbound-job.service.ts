@@ -1059,8 +1059,13 @@ export class OutboundJobService {
     // Manual Process outbox: unblock fixable holds first (timezone / pitch)
     if (manual) {
       await this.ensureColdOutreachSequence(organizationId);
+      // Drop day-3/7 rows that were pre-queued; send only what's due now
+      await this.cancelPrematureFollowUpOutbox(organizationId);
       await this.releaseFixableHolds(organizationId, limit);
     }
+
+    // Promote follow-ups whose delay elapsed into Queued
+    await this.queueDueFollowUpSteps(organizationId, Math.max(limit, 10));
 
     const config = await this.getConfig(organizationId);
     const day = startOfUtcDay();
@@ -1721,6 +1726,8 @@ export class OutboundJobService {
       return;
     }
 
+    // Schedule next step on the enrollment only — do NOT pre-queue outbox.
+    // Follow-ups appear in Queued when due (queueDueFollowUpSteps).
     await prisma.sequenceEnrollment.update({
       where: { id: enrollment.id },
       data: {
@@ -1732,9 +1739,123 @@ export class OutboundJobService {
         ),
       },
     });
+  }
 
-    // Queue next step immediately as HELD/QUEUED with schedule; delay handled via scheduledFor + delayMinutes
-    await this.queueStep(item.organizationId, enrollment.id);
+  /**
+   * Create outbox rows for enrollments whose nextRunAt is due.
+   * Keeps Queued empty of day-3/day-7 until they are actually ready.
+   */
+  async queueDueFollowUpSteps(organizationId: string, limit = 25) {
+    const now = new Date();
+    const due = await prisma.sequenceEnrollment.findMany({
+      where: {
+        organizationId,
+        status: SequenceEnrollmentStatus.ACTIVE,
+        source: SequenceEnrollmentSource.AUTOPILOT,
+        nextRunAt: { lte: now },
+      },
+      orderBy: { nextRunAt: "asc" },
+      take: limit,
+      select: { id: true, currentStepOrder: true },
+    });
+
+    let queued = 0;
+    for (const e of due) {
+      const existing = await prisma.emailOutbox.findFirst({
+        where: {
+          organizationId,
+          enrollmentId: e.id,
+          stepOrder: e.currentStepOrder,
+          status: {
+            in: [
+              EmailOutboxStatus.QUEUED,
+              EmailOutboxStatus.HELD,
+              EmailOutboxStatus.SENDING,
+              EmailOutboxStatus.SENT,
+            ],
+          },
+        },
+        select: { id: true, status: true },
+      });
+      if (existing) continue;
+      try {
+        const row = await this.queueStep(organizationId, e.id);
+        if (row && row.status === EmailOutboxStatus.QUEUED) queued += 1;
+      } catch (err) {
+        console.warn(
+          "[outbound] queueDueFollowUpSteps failed",
+          e.id,
+          err instanceof Error ? err.message : err
+        );
+      }
+    }
+    return { queued };
+  }
+
+  /**
+   * Cancel pre-queued follow-ups still waiting on sequence delay so Queued
+   * only shows step-1 / due mail. Enrollment.nextRunAt keeps the schedule.
+   */
+  async cancelPrematureFollowUpOutbox(organizationId: string) {
+    const now = new Date();
+    const waiting = await prisma.emailOutbox.findMany({
+      where: {
+        organizationId,
+        purpose: EmailOutboxPurpose.SEQUENCE,
+        status: EmailOutboxStatus.QUEUED,
+        scheduledFor: { gt: now },
+      },
+      select: {
+        id: true,
+        enrollmentId: true,
+        stepOrder: true,
+        scheduledFor: true,
+        metadata: true,
+      },
+      take: 500,
+    });
+
+    let cancelled = 0;
+    for (const row of waiting) {
+      const meta =
+        row.metadata && typeof row.metadata === "object"
+          ? (row.metadata as {
+              notBefore?: string;
+              sequenceDelayMinutes?: number;
+            })
+          : {};
+      const delayMin = meta.sequenceDelayMinutes ?? 0;
+      if (delayMin <= 0 && (row.stepOrder ?? 1) <= 1) continue;
+
+      const notBefore = meta.notBefore
+        ? new Date(meta.notBefore)
+        : row.scheduledFor;
+      if (!notBefore || notBefore.getTime() <= now.getTime()) continue;
+
+      await prisma.emailOutbox.update({
+        where: { id: row.id },
+        data: {
+          status: EmailOutboxStatus.CANCELLED,
+          lastError: "deferred_to_enrollment_schedule",
+        },
+      });
+      cancelled += 1;
+
+      if (row.enrollmentId && row.stepOrder != null) {
+        await prisma.sequenceEnrollment.updateMany({
+          where: {
+            id: row.enrollmentId,
+            organizationId,
+            status: SequenceEnrollmentStatus.ACTIVE,
+          },
+          data: {
+            currentStepOrder: row.stepOrder,
+            nextRunAt: notBefore,
+          },
+        });
+      }
+    }
+    return { cancelled };
   }
 
   async processTickForOrg(organizationId: string) {
@@ -1750,6 +1871,7 @@ export class OutboundJobService {
       results: [],
       error: e instanceof Error ? e.message : "enroll failed",
     }));
+    await this.queueDueFollowUpSteps(organizationId, config.maxSendPerTick);
     const send = await this.processOutboxBatch(
       organizationId,
       config.maxSendPerTick
