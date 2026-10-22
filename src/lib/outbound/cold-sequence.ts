@@ -8,7 +8,7 @@ export const COLD_OUTREACH_STEPS = [
     stepOrder: 1,
     delayMinutes: 0,
     emailStyle: "BRANDED" as const,
-    subjectTemplate: `{{company_name}} - quick idea`,
+    subjectTemplate: `Website Audit Guidelines`,
     bodyTemplate: `{{greeting}}
 
 {{intro_html}}
@@ -24,7 +24,7 @@ export const COLD_OUTREACH_STEPS = [
     delayMinutes: 3 * 24 * 60,
     // Always BRANDED HTML template — never plain text
     emailStyle: "BRANDED" as const,
-    subjectTemplate: `Re: {{company_name}} - quick idea`,
+    subjectTemplate: `Re: Website Audit Guidelines`,
     bodyTemplate: `{{greeting}}
 
 Circling back on {{finding_title}}.
@@ -37,7 +37,7 @@ Happy to share a short example of {{recommended_service}} if useful.`,
     stepOrder: 3,
     delayMinutes: 7 * 24 * 60,
     emailStyle: "BRANDED" as const,
-    subjectTemplate: `Re: {{company_name}} - quick idea`,
+    subjectTemplate: `Re: Website Audit Guidelines`,
     bodyTemplate: `{{greeting}}
 
 Last note from me - if {{finding_title}} isn't a priority, no worries at all.

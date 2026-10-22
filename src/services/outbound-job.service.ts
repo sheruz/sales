@@ -86,15 +86,32 @@ export class OutboundJobService {
           data: { status: OutreachSequenceStatus.ACTIVE },
         });
       }
-      // Sync cold step styles — always BRANDED (no plain-text sends)
+      // Sync cold step styles + subjects (always BRANDED; rename legacy "quick idea")
       for (const s of existing.steps) {
+        const def = COLD_OUTREACH_STEPS.find((d) => d.stepOrder === s.stepOrder);
+        const patch: {
+          emailStyle?: typeof EmailStyle.BRANDED;
+          subjectTemplate?: string;
+        } = {};
         if (s.emailStyle !== EmailStyle.BRANDED) {
+          patch.emailStyle = EmailStyle.BRANDED;
+        }
+        if (
+          def &&
+          (s.subjectTemplate?.includes("quick idea") ||
+            s.subjectTemplate === `{{company_name}} - quick idea` ||
+            s.subjectTemplate === `Re: {{company_name}} - quick idea`)
+        ) {
+          patch.subjectTemplate = def.subjectTemplate;
+        }
+        if (Object.keys(patch).length) {
           await prisma.outreachSequenceStep.update({
             where: { id: s.id },
-            data: { emailStyle: EmailStyle.BRANDED },
+            data: patch,
           });
         }
       }
+      await this.rewriteQueuedQuickIdeaSubjects(organizationId);
       return prisma.outreachSequence.findFirstOrThrow({
         where: { id: existing.id },
         include: { steps: { orderBy: { stepOrder: "asc" } } },
@@ -107,13 +124,30 @@ export class OutboundJobService {
     });
     if (byName) {
       for (const s of byName.steps) {
+        const def = COLD_OUTREACH_STEPS.find((d) => d.stepOrder === s.stepOrder);
+        const patch: {
+          emailStyle?: typeof EmailStyle.BRANDED;
+          subjectTemplate?: string;
+        } = {};
         if (s.emailStyle !== EmailStyle.BRANDED) {
+          patch.emailStyle = EmailStyle.BRANDED;
+        }
+        if (
+          def &&
+          (s.subjectTemplate?.includes("quick idea") ||
+            s.subjectTemplate === `{{company_name}} - quick idea` ||
+            s.subjectTemplate === `Re: {{company_name}} - quick idea`)
+        ) {
+          patch.subjectTemplate = def.subjectTemplate;
+        }
+        if (Object.keys(patch).length) {
           await prisma.outreachSequenceStep.update({
             where: { id: s.id },
-            data: { emailStyle: EmailStyle.BRANDED },
+            data: patch,
           });
         }
       }
+      await this.rewriteQueuedQuickIdeaSubjects(organizationId);
       return prisma.outreachSequence.update({
         where: { id: byName.id },
         data: {
@@ -150,6 +184,35 @@ export class OutboundJobService {
       },
       include: { steps: { orderBy: { stepOrder: "asc" } } },
     });
+  }
+
+  /** Rewrite QUEUED subjects that still use the legacy "quick idea" line. */
+  private async rewriteQueuedQuickIdeaSubjects(organizationId: string) {
+    const queued = await prisma.emailOutbox.findMany({
+      where: {
+        organizationId,
+        purpose: EmailOutboxPurpose.SEQUENCE,
+        status: {
+          in: [EmailOutboxStatus.QUEUED, EmailOutboxStatus.HELD],
+        },
+        subject: { contains: "quick idea", mode: "insensitive" },
+      },
+      select: { id: true, subject: true, stepOrder: true },
+      take: 500,
+    });
+    for (const row of queued) {
+      const isFollowUp =
+        (row.stepOrder ?? 1) > 1 ||
+        /^re:\s*/i.test(row.subject || "");
+      await prisma.emailOutbox.update({
+        where: { id: row.id },
+        data: {
+          subject: isFollowUp
+            ? "Re: Website Audit Guidelines"
+            : "Website Audit Guidelines",
+        },
+      });
+    }
   }
 
   /** Inbound / Meta — BRANDED single-step (or multi) sequence. */
@@ -711,7 +774,7 @@ export class OutboundJobService {
     });
 
     const subjectRendered = renderSequenceTemplateDetailed(
-      step.subjectTemplate || "Quick idea for {{company_name}}",
+      step.subjectTemplate || "Website Audit Guidelines",
       vars,
       REQUIRED_PITCH_VARS
     );
@@ -995,6 +1058,7 @@ export class OutboundJobService {
 
     // Manual Process outbox: unblock fixable holds first (timezone / pitch)
     if (manual) {
+      await this.ensureColdOutreachSequence(organizationId);
       await this.releaseFixableHolds(organizationId, limit);
     }
 
