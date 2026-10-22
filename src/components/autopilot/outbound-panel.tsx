@@ -194,7 +194,7 @@ function formatSendResult(data: {
     const when = data.nextScheduledFor
       ? new Date(data.nextScheduledFor).toLocaleString()
       : "later";
-    return `0 due now — ${data.waitingForWindow ?? 0} waiting for Mon–Fri 8–11 window (next ${when}). Process outbox sends immediately.`;
+    return `Nothing ready — ${data.waitingForWindow ?? 0} still waiting on sequence delay (day 3/7), next ${when}. Step-1 emails send immediately via Process outbox.`;
   }
   if (data.reason === "held_not_queued" || (data.held ?? 0) > 0) {
     return `${data.held ?? 0} held (not queued) — open Scheduled tab for reason, then Process outbox again after deploy/fix`;
@@ -464,10 +464,10 @@ export function OutboundPanel({ initial }: Props) {
           <div>
             <CardTitle className="text-base">Outbound email</CardTitle>
             <CardDescription>
-              OFF by default. Only APPROVED pitches, US allow-list. Cron and
-              Process outbox only send rows that are due (sequence delay +
-              Mon–Fri 8–11 window). Follow-ups (day 3 / 7) stay queued until
-              then. Sticky mailbox + compliance footer.
+              OFF by default. Only APPROVED pitches. Cron respects Mon–Fri
+              8–11. <strong>Process outbox</strong> sends immediately (bypasses
+              the window for step 1); day 3 / 7 follow-ups stay queued until
+              their delay. Sticky mailbox + compliance footer.
             </CardDescription>
           </div>
           <div className="flex flex-wrap gap-2">
@@ -510,9 +510,10 @@ export function OutboundPanel({ initial }: Props) {
               <p className="text-2xl font-semibold">{stats.queued}</p>
               {stats.waitingForWindow > 0 ? (
                 <p className="text-xs text-muted-foreground">
-                  {stats.waitingForWindow} waiting for send window
+                  {stats.waitingForWindow} scheduled (window / follow-up) — use
+                  Process outbox to send step 1 now
                   {stats.nextScheduledFor
-                    ? ` (next ${new Date(stats.nextScheduledFor).toLocaleString()})`
+                    ? ` · next cron ${new Date(stats.nextScheduledFor).toLocaleString()}`
                     : ""}
                 </p>
               ) : stats.dueNow > 0 ? (

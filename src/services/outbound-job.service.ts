@@ -981,9 +981,10 @@ export class OutboundJobService {
     limit = 5,
     opts?: {
       /**
-       * Manual "Process outbox": release fixable HELD rows and send anything
-       * whose scheduledFor is due. Never ignores future scheduledFor — that
-       * would burn day-3/day-7 follow-ups early (seen in prod 2026-10-19).
+       * Manual "Process outbox":
+       * - Releases fixable HELD rows
+       * - Bypasses Mon–Fri send window for rows whose sequence delay (notBefore) has elapsed
+       * - Never burns day-3/day-7 follow-ups early (notBefore must be <= now)
        */
       manual?: boolean;
       /** @deprecated use manual — kept so old callers compile */
@@ -1021,8 +1022,19 @@ export class OutboundJobService {
     const remaining = config.dailyGlobalCap - sentToday;
     const take = Math.min(limit, remaining, config.maxSendPerTick);
 
-    // Always respect scheduledFor (sequence delay + send window).
-    const due = await prisma.emailOutbox.findMany({
+    const includeOutbox = {
+      enrollment: true,
+      contact: true,
+      company: true,
+      emailAccount: true,
+    } as const;
+
+    /**
+     * Cron: only scheduledFor <= now (window + delay).
+     * Manual: also include QUEUED rows waiting only for the send window
+     * (sequence delay already elapsed — step 1 delayMinutes=0).
+     */
+    let due = await prisma.emailOutbox.findMany({
       where: {
         organizationId,
         purpose: EmailOutboxPurpose.SEQUENCE,
@@ -1031,13 +1043,55 @@ export class OutboundJobService {
       },
       orderBy: { scheduledFor: "asc" },
       take,
-      include: {
-        enrollment: true,
-        contact: true,
-        company: true,
-        emailAccount: true,
-      },
+      include: includeOutbox,
     });
+
+    if (manual && due.length < take) {
+      const waiting = await prisma.emailOutbox.findMany({
+        where: {
+          organizationId,
+          purpose: EmailOutboxPurpose.SEQUENCE,
+          status: EmailOutboxStatus.QUEUED,
+          scheduledFor: { gt: now },
+        },
+        orderBy: { scheduledFor: "asc" },
+        take: Math.max(take * 5, 25),
+        include: includeOutbox,
+      });
+      const already = new Set(due.map((d) => d.id));
+      for (const item of waiting) {
+        if (due.length >= take) break;
+        if (already.has(item.id)) continue;
+        const meta =
+          item.metadata && typeof item.metadata === "object"
+            ? (item.metadata as {
+                notBefore?: string;
+                sequenceDelayMinutes?: number;
+              })
+            : {};
+        const delayMin = meta.sequenceDelayMinutes ?? 0;
+        const notBefore = meta.notBefore
+          ? new Date(meta.notBefore)
+          : delayMin > 0
+            ? item.scheduledFor
+            : null;
+        // Sequence delay not done → skip (protect day 3 / day 7)
+        if (notBefore && notBefore.getTime() > now.getTime()) continue;
+        // Delay elapsed (or step 1 with 0 delay) — only blocked by window → send now
+        due.push(item);
+        already.add(item.id);
+      }
+      // Pull those forward so cron state matches
+      const bumpIds = due
+        .filter((d) => d.scheduledFor && d.scheduledFor > now)
+        .map((d) => d.id);
+      if (bumpIds.length) {
+        await prisma.emailOutbox.updateMany({
+          where: { id: { in: bumpIds }, organizationId },
+          data: { scheduledFor: now },
+        });
+      }
+    }
 
     const waitingForWindow = await prisma.emailOutbox.count({
       where: {

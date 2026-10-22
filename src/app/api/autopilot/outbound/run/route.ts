@@ -34,8 +34,8 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(apiSuccess(result));
     }
     if (body.action === "send") {
-      // Manual Process outbox: release fixable holds + send rows that are due.
-      // Always respects scheduledFor (day-3/day-7 delays). Does NOT burn follow-ups early.
+      // Manual Process outbox: bypass Mon–Fri send window for delay-elapsed
+      // rows (e.g. step 1). Still never burns day-3/day-7 early.
       const result = await outboundJobService.processOutboxBatch(
         user.organizationId,
         limit,
