@@ -6,14 +6,25 @@ import sharp from "sharp";
 const DEFAULT_MAX_BYTES = 400_000; // ~400KB after compress
 const RETENTION_DAYS = 90;
 
+/**
+ * Private evidence root — statically scoped under cwd/storage so Turbopack
+ * does not trace the whole project (see Next "Dynamic filesystem access" warning).
+ */
 export function auditEvidenceRootDir(): string {
   const custom = process.env.AUDIT_EVIDENCE_DIR?.trim();
   if (custom) return custom;
-  return join(process.cwd(), "storage", "audit-evidence");
+  return join(
+    /*turbopackIgnore: true*/ process.cwd(),
+    "storage",
+    "audit-evidence"
+  );
 }
 
 export function evidenceOrgDir(organizationId: string): string {
-  return join(auditEvidenceRootDir(), organizationId);
+  return join(
+    /*turbopackIgnore: true*/ auditEvidenceRootDir(),
+    organizationId
+  );
 }
 
 /** Ensure path stays under org root (no traversal). */
@@ -21,8 +32,8 @@ export function resolveEvidencePath(
   organizationId: string,
   relativePath: string
 ): string {
-  const root = resolve(evidenceOrgDir(organizationId));
-  const abs = resolve(root, relativePath);
+  const root = resolve(/*turbopackIgnore: true*/ evidenceOrgDir(organizationId));
+  const abs = resolve(/*turbopackIgnore: true*/ root, relativePath);
   if (abs !== root && !abs.startsWith(root + sep)) {
     throw new Error("Invalid evidence path");
   }
@@ -119,7 +130,7 @@ export async function cleanupExpiredEvidence(opts?: {
     }
     let empty = true;
     for (const ent of entries) {
-      const full = join(dir, ent.name);
+      const full = join(/*turbopackIgnore: true*/ dir, ent.name);
       if (ent.isDirectory()) {
         const childEmpty = await walk(full);
         if (childEmpty) {

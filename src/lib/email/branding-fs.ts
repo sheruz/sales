@@ -4,9 +4,17 @@ import { join } from "path";
 export function brandingRootDir(): string {
   const custom = process.env.BRANDING_UPLOAD_DIR?.trim();
   if (custom) return custom;
-  return join(process.cwd(), "public", "branding");
+  return join(
+    /*turbopackIgnore: true*/ process.cwd(),
+    "public",
+    "branding"
+  );
 }
 
 export function brandingAbsPath(orgId: string, filename: string): string {
-  return join(brandingRootDir(), orgId, filename);
+  return join(
+    /*turbopackIgnore: true*/ brandingRootDir(),
+    orgId,
+    filename
+  );
 }
