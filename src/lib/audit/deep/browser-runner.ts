@@ -3,6 +3,7 @@
  * MUST only be imported from sales-audit-worker (never from Next.js request path).
  */
 
+import type { Page } from "playwright";
 import {
   assertSafeOutboundUrlResolved,
   isUrlBlockedAfterDns,
@@ -20,16 +21,7 @@ export type RunDeepBrowserOpts = {
   timeoutMs?: number;
 };
 
-async function installSsrfRoute(page: {
-  route: (
-    pattern: string | RegExp,
-    handler: (route: {
-      request: () => { url: () => string };
-      abort: () => Promise<void>;
-      continue: () => Promise<void>;
-    }) => Promise<void>
-  ) => Promise<void>;
-}) {
+async function installSsrfRoute(page: Page) {
   await page.route("**/*", async (route) => {
     const reqUrl = route.request().url();
     if (isUrlClearlyUnsafe(reqUrl)) {

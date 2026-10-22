@@ -114,7 +114,7 @@ export class EmailBrandingService {
       filename = "sender.png";
     }
 
-    const abs = join(dir, filename);
+    const abs = join(/*turbopackIgnore: true*/ dir, filename);
     await writeFile(abs, png);
     const relative = `branding/${organizationId}/${filename}`;
     const url = brandingPublicUrl(organizationId, filename);

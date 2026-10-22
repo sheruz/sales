@@ -18,7 +18,11 @@ const ROW_CAP = 20_000;
 function exportRootDir(): string {
   const custom = process.env.DATA_EXPORT_DIR?.trim();
   if (custom) return custom;
-  return join(process.cwd(), "storage", "exports");
+  return join(
+    /*turbopackIgnore: true*/ process.cwd(),
+    "storage",
+    "exports"
+  );
 }
 
 function flattenRow(row: Record<string, unknown>): Record<string, unknown> {
@@ -226,9 +230,9 @@ export class PrivacyExportService {
         },
       ]);
 
-      const dir = join(exportRootDir(), orgId);
+      const dir = join(/*turbopackIgnore: true*/ exportRootDir(), orgId);
       await mkdir(dir, { recursive: true });
-      const filePath = join(dir, `${job.id}.zip`);
+      const filePath = join(/*turbopackIgnore: true*/ dir, `${job.id}.zip`);
       await writeFile(filePath, zip);
 
       const expiresAt = new Date(Date.now() + TTL_MS);
