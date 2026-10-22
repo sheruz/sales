@@ -420,6 +420,20 @@ enum WebsiteAuditStatus {
   SKIPPED
 }
 
+enum DeepAuditJobStatus {
+  QUEUED
+  RUNNING
+  DONE
+  FAILED
+  SKIPPED
+}
+
+enum AuditEvidenceKind {
+  SCREENSHOT_DESKTOP
+  SCREENSHOT_MOBILE
+  OTHER
+}
+
 enum PitchStatus {
   DRAFT
   APPROVED
@@ -788,6 +802,8 @@ model Organization {
   cronTickLogs      CronTickLog[]
   companyTimelineEvents CompanyTimelineEvent[]
   websiteAudits     WebsiteAudit[]
+  auditEvidence     AuditEvidence[]
+  deepAuditJobs     DeepAuditJob[]
   pitches           Pitch[]
   outboundMailboxes OutboundMailbox[]
   emailOutbox       EmailOutbox[]
@@ -1119,6 +1135,8 @@ model Company {
   emails        CompanyEmail[]
   timelineEvents CompanyTimelineEvent[]
   websiteAudits WebsiteAudit[]
+  auditEvidence AuditEvidence[]
+  deepAuditJobs DeepAuditJob[]
   pitches       Pitch[]
   emailOutbox   EmailOutbox[]
 
@@ -1226,6 +1244,11 @@ model WebsiteAudit {
   organizationId   String             @map("organization_id")
   companyId        String             @map("company_id")
   status           WebsiteAuditStatus @default(PENDING)
+  /// light = Audit 1.0 (fetch+PSI); deep = Audit 2.0 (Playwright worker)
+  mode             String             @default("light")
+  /// high | medium | low — ICP fit for PoW (low → skip deep spend)
+  icpFit           String?            @map("icp_fit")
+  icpFitScore      Int?               @map("icp_fit_score")
   pageSpeedMobile  Int?               @map("page_speed_mobile")
   pageSpeedDesktop Int?               @map("page_speed_desktop")
   /// LCP, CLS, TBT, FCP, SI, etc.
@@ -1243,11 +1266,66 @@ model WebsiteAudit {
   organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   company      Company      @relation(fields: [companyId], references: [id], onDelete: Cascade)
   pitches      Pitch[]
+  evidence     AuditEvidence[]
+  deepJobs     DeepAuditJob[]
 
   @@index([organizationId, createdAt])
   @@index([companyId, createdAt])
   @@index([organizationId, status])
+  @@index([organizationId, mode])
   @@map("website_audits")
+}
+
+/// PoW1 — private screenshot / evidence metadata (files on disk under storage/audit-evidence)
+model AuditEvidence {
+  id             String            @id @default(uuid())
+  organizationId String            @map("organization_id")
+  companyId      String            @map("company_id")
+  websiteAuditId String            @map("website_audit_id")
+  kind           AuditEvidenceKind @default(OTHER)
+  /// Relative to org evidence root (never under public/)
+  relativePath   String            @map("relative_path")
+  contentType    String            @map("content_type")
+  byteSize       Int               @map("byte_size")
+  expiresAt      DateTime          @map("expires_at")
+  createdAt      DateTime          @default(now()) @map("created_at")
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  company      Company      @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  websiteAudit WebsiteAudit @relation(fields: [websiteAuditId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId, expiresAt])
+  @@index([websiteAuditId])
+  @@map("audit_evidence")
+}
+
+/// PoW1 — queue for sales-audit-worker (main app never launches Chromium)
+model DeepAuditJob {
+  id             String             @id @default(uuid())
+  organizationId String             @map("organization_id")
+  companyId      String             @map("company_id")
+  websiteAuditId String?            @map("website_audit_id")
+  status         DeepAuditJobStatus @default(QUEUED)
+  attempts       Int                @default(0)
+  maxAttempts    Int                @default(2) @map("max_attempts")
+  error          String?
+  lockedAt       DateTime?          @map("locked_at")
+  lockedBy       String?            @map("locked_by")
+  startedAt      DateTime?          @map("started_at")
+  finishedAt     DateTime?          @map("finished_at")
+  /// Transient Places signals etc. — never store review text
+  metadata       Json?
+  createdAt      DateTime           @default(now()) @map("created_at")
+  updatedAt      DateTime           @updatedAt @map("updated_at")
+
+  organization Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  company      Company       @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  websiteAudit WebsiteAudit? @relation(fields: [websiteAuditId], references: [id], onDelete: SetNull)
+
+  @@index([status, createdAt])
+  @@index([organizationId, status])
+  @@index([companyId])
+  @@map("deep_audit_jobs")
 }
 
 /// Phase 3 — personalized pitch per contact (separate from audit history)

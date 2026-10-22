@@ -1,6 +1,9 @@
 /**
- * Homepage fetch for audits — same crawler rules (UA, timeout, robots).
+ * Homepage fetch for audits — same crawler rules (UA, timeout, robots) + SSRF.
  */
+
+import { safeFetch, assertSafeOutboundUrlResolved } from "@/lib/security/ssrf";
+import { ValidationError } from "@/lib/api/response";
 
 const USER_AGENT =
   "RevenueOS-SourcingBot/1.0 (+https://sales.zoiax.com; contact=support@zoiax.com)";
@@ -27,18 +30,26 @@ function normalizeBase(website: string): URL | null {
 
 async function fetchText(
   url: string
-): Promise<{ ok: boolean; status: number; text: string; blocked: boolean; finalUrl: string }> {
+): Promise<{
+  ok: boolean;
+  status: number;
+  text: string;
+  blocked: boolean;
+  finalUrl: string;
+  ssrfBlocked?: boolean;
+}> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
   try {
-    const res = await fetch(url, {
+    await assertSafeOutboundUrlResolved(url, { allowHttp: true });
+    const res = await safeFetch(url, {
       method: "GET",
-      redirect: "follow",
       signal: controller.signal,
       headers: {
         "User-Agent": USER_AGENT,
         Accept: "text/html,application/xhtml+xml",
       },
+      ssrf: { allowHttp: true },
     });
     const blocked = res.status === 403 || res.status === 429;
     const text = blocked ? "" : await res.text();
@@ -49,7 +60,17 @@ async function fetchText(
       blocked,
       finalUrl: res.url || url,
     };
-  } catch {
+  } catch (err) {
+    if (err instanceof ValidationError) {
+      return {
+        ok: false,
+        status: 0,
+        text: "",
+        blocked: true,
+        finalUrl: url,
+        ssrfBlocked: true,
+      };
+    }
     return { ok: false, status: 0, text: "", blocked: false, finalUrl: url };
   } finally {
     clearTimeout(timer);
@@ -62,6 +83,7 @@ async function robotsAllows(
 ): Promise<{ allowed: boolean; blockedByRobots: boolean }> {
   const robotsUrl = `${origin}/robots.txt`;
   const res = await fetchText(robotsUrl);
+  if (res.ssrfBlocked) return { allowed: false, blockedByRobots: false };
   if (res.blocked) return { allowed: false, blockedByRobots: true };
   if (!res.ok || !res.text) return { allowed: true, blockedByRobots: false };
 
@@ -110,6 +132,21 @@ export async function fetchHomepageHtml(
     };
   }
 
+  try {
+    await assertSafeOutboundUrlResolved(base.toString(), { allowHttp: true });
+  } catch {
+    return {
+      ok: false,
+      url: base.toString(),
+      finalUrl: null,
+      status: 0,
+      html: "",
+      blocked: true,
+      blockedByRobots: false,
+      error: "SSRF blocked",
+    };
+  }
+
   const robots = await robotsAllows(base.origin, "/");
   if (!robots.allowed) {
     return {
@@ -126,6 +163,18 @@ export async function fetchHomepageHtml(
 
   const home = new URL("/", base.origin).toString();
   const res = await fetchText(home);
+  if (res.ssrfBlocked) {
+    return {
+      ok: false,
+      url: home,
+      finalUrl: res.finalUrl,
+      status: 0,
+      html: "",
+      blocked: true,
+      blockedByRobots: false,
+      error: "SSRF blocked",
+    };
+  }
   if (res.blocked) {
     return {
       ok: false,
@@ -170,11 +219,12 @@ export async function probeUrl(
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
   try {
-    const res = await fetch(url, {
+    await assertSafeOutboundUrlResolved(url, { allowHttp: true });
+    const res = await safeFetch(url, {
       method: "GET",
-      redirect: "follow",
       signal: controller.signal,
       headers: { "User-Agent": USER_AGENT, Accept: "*/*" },
+      ssrf: { allowHttp: true },
     });
     return { ok: res.ok, status: res.status };
   } catch {

@@ -24,6 +24,10 @@
 .DS_Store
 *.pem
 
+# Private audit evidence (PoW1) — never commit screenshots
+/storage/audit-evidence/
+/storage/exports/
+
 # debug
 npm-debug.log*
 yarn-debug.log*

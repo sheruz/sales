@@ -322,6 +322,8 @@ export class OutboundJobService {
           organizationId,
           type: EmailEventType.OPENED,
           occurredAt: { gte: day },
+          // PoW1: exclude email-security / scanner opens from honest rates
+          NOT: { metadata: { path: ["bot"], equals: true } },
         },
       }),
       prisma.emailEvent.count({
@@ -329,6 +331,7 @@ export class OutboundJobService {
           organizationId,
           type: EmailEventType.CLICKED,
           occurredAt: { gte: day },
+          NOT: { metadata: { path: ["bot"], equals: true } },
         },
       }),
     ]);

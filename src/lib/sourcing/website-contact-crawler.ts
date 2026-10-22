@@ -4,6 +4,11 @@ import {
   extractPhonesFromText,
   extractSocialLinks,
 } from "@/lib/sourcing/email-extract";
+import {
+  assertSafeOutboundUrlResolved,
+  safeFetch,
+} from "@/lib/security/ssrf";
+import { ValidationError } from "@/lib/api/response";
 
 const USER_AGENT =
   "RevenueOS-SourcingBot/1.0 (+https://sales.zoiax.com; contact=support@zoiax.com)";
@@ -44,19 +49,23 @@ async function fetchText(
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
   try {
-    const res = await fetch(url, {
+    await assertSafeOutboundUrlResolved(url, { allowHttp: true });
+    const res = await safeFetch(url, {
       method: "GET",
-      redirect: "follow",
       signal: controller.signal,
       headers: {
         "User-Agent": USER_AGENT,
         Accept: "text/html,application/xhtml+xml",
       },
+      ssrf: { allowHttp: true },
     });
     const blocked = res.status === 403 || res.status === 429;
     const text = blocked ? "" : await res.text();
     return { ok: res.ok, status: res.status, text, blocked };
   } catch (err) {
+    if (err instanceof ValidationError) {
+      return { ok: false, status: 0, text: "", blocked: true };
+    }
     return {
       ok: false,
       status: 0,
@@ -117,6 +126,21 @@ export async function crawlWebsiteForContacts(
     return {
       status: "FAILED",
       error: "Invalid website URL",
+      emails: [],
+      phones: [],
+      linkedInUrl: null,
+      facebookUrl: null,
+      instagramUrl: null,
+      pagesVisited: 0,
+    };
+  }
+
+  try {
+    await assertSafeOutboundUrlResolved(base.toString(), { allowHttp: true });
+  } catch {
+    return {
+      status: "FAILED",
+      error: "SSRF blocked",
       emails: [],
       phones: [],
       linkedInUrl: null,
