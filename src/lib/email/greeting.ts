@@ -6,6 +6,7 @@ const GENERIC_LOCAL_PARTS = new Set([
   "info",
   "office",
   "hello",
+  "studio",
   "contact",
   "admin",
   "support",

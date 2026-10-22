@@ -1,5 +1,6 @@
 import { applyMapping } from "@/lib/crm/import/headers";
 import { checkEmailQualitySync } from "@/lib/crm/import/email-quality";
+import { resolveImportContact } from "@/lib/crm/import/contact-from-row";
 import {
   normalizeCountry,
   normalizeRelationship,
@@ -148,13 +149,14 @@ export function validateMappedRows(
 
     const first = row.first_name.trim();
     const last = row.last_name.trim();
-    const hasPerson = Boolean(first || last || email);
-    if (hasPerson && (!first || !last)) {
+    // Email-only contacts are allowed (no first/last required when email or company_email present)
+    if ((first && !last) || (!first && last)) {
       issues.push({
         row: n,
         field: "first_name",
-        code: "incomplete_contact",
-        message: "Contact needs both first_name and last_name (or omit person)",
+        code: "partial_name",
+        message:
+          "Only one of first_name/last_name set — contact will still import (email-only or named)",
       });
     }
 
@@ -201,6 +203,26 @@ export function validateMappedRows(
         code: "unknown_relationship",
         message: `Unrecognized relationship "${row.relationship}" — treated as prospect`,
       });
+    }
+
+    if (row.email.trim() || row.company_email.trim()) {
+      const resolved = resolveImportContact({
+        email: row.email,
+        companyEmail: row.company_email,
+        firstName: row.first_name,
+        lastName: row.last_name,
+        title: row.title,
+        website: row.website,
+        companyDomain: domain,
+      });
+      if (!resolved.ok && resolved.code !== "no_email") {
+        issues.push({
+          row: n,
+          field: "email",
+          code: resolved.code,
+          message: resolved.message,
+        });
+      }
     }
   }
 

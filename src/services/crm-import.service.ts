@@ -22,6 +22,7 @@ import { emailSafetyService } from "@/services/email-safety.service";
 import { websiteAuditService } from "@/services/website-audit.service";
 import { suggestColumnMapping } from "@/lib/crm/import/headers";
 import { checkEmailQuality } from "@/lib/crm/import/email-quality";
+import { resolveImportContact } from "@/lib/crm/import/contact-from-row";
 import { customerTypeFromRelationship } from "@/lib/crm/import/outreach-exclude";
 import {
   deriveImportTimezone,
@@ -422,16 +423,6 @@ export class CrmImportService {
         const country = normalizeCountry(row.country);
         const companyKey = `${companyName.toLowerCase()}|${(country || "").toLowerCase()}`;
 
-        let email = normalizeEmail(row.email);
-        if (email && seenEmails.has(email)) {
-          result.status = "skipped";
-          result.reason = "duplicate_in_file_email";
-          summary.skipped++;
-          summary.results.push(result);
-          continue;
-        }
-        if (email) seenEmails.add(email);
-
         const rel = normalizeRelationship(row.relationship);
         const isCustomer = isCustomerRelationship(rel);
         const dnc = parseYesNo(row.do_not_contact);
@@ -448,14 +439,48 @@ export class CrmImportService {
           ? CompanyEnrichmentStatus.SKIPPED
           : CompanyEnrichmentStatus.ENRICHED;
 
+        // Resolve contact identity (email-only / company_email → General inbox)
+        const resolved = resolveImportContact({
+          email: row.email,
+          companyEmail: row.company_email,
+          firstName: row.first_name,
+          lastName: row.last_name,
+          title: row.title,
+          website: row.website.trim() || domain,
+          companyDomain: domain,
+        });
+
+        let email: string | null = resolved.ok
+          ? resolved.contact.email
+          : normalizeEmail(row.email);
+        let contactSkipReason: string | null = null;
+        if (
+          !resolved.ok &&
+          resolved.code !== "no_email" &&
+          (row.email.trim() || row.company_email.trim())
+        ) {
+          contactSkipReason = `${resolved.code}:${resolved.message}`;
+          email = null;
+        }
+
+        if (email && seenEmails.has(email)) {
+          result.status = "skipped";
+          result.reason = "duplicate_in_file_email";
+          summary.skipped++;
+          summary.results.push(result);
+          continue;
+        }
+        if (email) seenEmails.add(email);
+
         // Free built-in email checks (no Hunter)
         let emailStatus: string | null = null;
         let roleGeneric = false;
         let typoSuggestion: string | null = null;
-        if (email) {
+        if (email && resolved.ok) {
           const quality = await checkEmailQuality(email);
           emailStatus = quality.emailStatus;
-          roleGeneric = quality.roleGeneric;
+          roleGeneric =
+            quality.roleGeneric || resolved.contact.isGeneralInbox;
           typoSuggestion = quality.typoSuggestion;
           result.typoSuggestion = typoSuggestion ?? undefined;
           result.roleGeneric = roleGeneric || undefined;
@@ -469,11 +494,12 @@ export class CrmImportService {
             summary.emailChecks.invalid++;
             result.emailStatus = "invalid";
             result.reason = `email_${quality.failure}:${quality.message ?? email}`;
-            // Still import company/contact as invalid (not enrollable)
           } else {
             summary.emailChecks.validManual++;
             result.emailStatus = "valid_manual";
           }
+        } else if (contactSkipReason) {
+          result.reason = contactSkipReason;
         }
 
         let company =
@@ -644,21 +670,25 @@ export class CrmImportService {
         result.companyId = company.id;
         result.companyAction = companyAction;
 
-        const first = row.first_name.trim();
-        const last = row.last_name.trim();
         let contactId: string | undefined;
         let contactAction: ImportRowResult["contactAction"] = "none";
 
-        if (first && last) {
+        if (resolved.ok && email) {
+          const rc = resolved.contact;
+          const first = rc.firstName;
+          const last = rc.lastName;
+
           let contact =
-            (email && indexes.contactByEmail.get(email)) ||
-            indexes.contactByNameCompany.get(
-              `${first.toLowerCase()}|${last.toLowerCase()}|${company.id}`
-            ) ||
+            indexes.contactByEmail.get(email) ||
+            (first && last
+              ? indexes.contactByNameCompany.get(
+                  `${first.toLowerCase()}|${last.toLowerCase()}|${company.id}`
+                )
+              : null) ||
             null;
 
-          if (contact && !email && contact.companyId !== company.id) {
-            contact = null;
+          if (contact && contact.companyId !== company.id) {
+            // Org-unique email — still update that contact's empty fields
           }
 
           const contactMeta: Record<string, unknown> = {
@@ -669,7 +699,11 @@ export class CrmImportService {
             relationship: outreachFlags.relationship,
             doNotContact: dnc,
             outreachExcluded: outreachFlags.outreachExcluded,
-            ...(roleGeneric ? { emailRole: "generic" } : {}),
+            isGeneralInbox: rc.isGeneralInbox,
+            emailSource: rc.emailSource,
+            ...(roleGeneric || rc.isGeneralInbox
+              ? { emailRole: "generic" }
+              : {}),
             ...(typoSuggestion
               ? { typoSuggestion, typoSuggestionApplied: false }
               : {}),
@@ -691,10 +725,10 @@ export class CrmImportService {
               data: {
                 organizationId: input.organizationId,
                 companyId: company.id,
-                firstName: first,
-                lastName: last,
-                fullName: `${first} ${last}`.trim(),
-                title: row.title.trim() || null,
+                firstName: first || "there",
+                lastName: last || "",
+                fullName: rc.fullName || email,
+                title: rc.title,
                 email,
                 normalizedEmail: email,
                 emailStatus,
@@ -719,60 +753,80 @@ export class CrmImportService {
             contactAction = "created";
             contactId = created.id;
             summary.contactsCreated++;
-            if (email) {
-              indexes.emails.add(email);
-              indexes.contactByEmail.set(email, contact);
+            indexes.emails.add(email);
+            indexes.contactByEmail.set(email, contact);
+            if (first && last) {
+              indexes.contactByNameCompany.set(
+                `${first.toLowerCase()}|${last.toLowerCase()}|${company.id}`,
+                contact
+              );
             }
-            indexes.contactByNameCompany.set(
-              `${first.toLowerCase()}|${last.toLowerCase()}|${company.id}`,
-              contact
-            );
           } else {
             const full = await prisma.contact.findFirst({
               where: { id: contact.id, organizationId: input.organizationId },
             });
             if (full) {
+              // Re-import: attach to this company if contact had no company match
+              // and fill empty fields only (including names when previously empty)
               const incoming = {
-                title: row.title.trim() || null,
+                title: rc.title || full.title,
                 phone: row.phone.trim() || null,
                 linkedInUrl: row.linkedin_url.trim() || null,
                 email: email || full.email,
                 normalizedEmail: email || full.normalizedEmail,
+                firstName:
+                  full.firstName === "there" || !full.firstName.trim()
+                    ? first || full.firstName
+                    : full.firstName,
+                lastName: !full.lastName.trim() ? last : full.lastName,
+                fullName:
+                  !full.fullName.trim() ||
+                  full.fullName === full.email ||
+                  full.firstName === "there"
+                    ? rc.fullName
+                    : full.fullName,
               };
               const { patch, filled } = fillEmptyFields(
-                full as unknown as Record<string, unknown>,
-                incoming as unknown as Record<string, unknown>,
-                ["title", "phone", "linkedInUrl", "email", "normalizedEmail"]
+                {
+                  title: full.title,
+                  phone: full.phone,
+                  linkedInUrl: full.linkedInUrl,
+                  email: full.email,
+                  normalizedEmail: full.normalizedEmail,
+                  firstName: full.firstName,
+                  lastName: full.lastName,
+                  fullName: full.fullName,
+                } as Record<string, unknown>,
+                incoming as Record<string, unknown>,
+                [
+                  "title",
+                  "phone",
+                  "linkedInUrl",
+                  "email",
+                  "normalizedEmail",
+                  "firstName",
+                  "lastName",
+                  "fullName",
+                ]
               );
-              // Fill empty emailStatus from this import check
               if (!full.emailStatus && emailStatus) {
                 (patch as Record<string, unknown>).emailStatus = emailStatus;
                 filled.push("emailStatus");
               }
-              // Prospects with valid_manual: upgrade unknown → valid_manual
               if (
                 !outreachFlags.outreachExcluded &&
                 emailStatus === "valid_manual" &&
-                (!full.emailStatus ||
-                  full.emailStatus === "unknown" ||
-                  full.emailStatus === "invalid")
+                (!full.emailStatus || full.emailStatus === "unknown")
               ) {
-                // Only upgrade invalid if this check passed
-                if (full.emailStatus !== "invalid" || emailStatus === "valid_manual") {
-                  if (
-                    full.emailStatus === "unknown" ||
-                    !full.emailStatus
-                  ) {
-                    (patch as Record<string, unknown>).emailStatus =
-                      "valid_manual";
-                    if (!filled.includes("emailStatus")) {
-                      filled.push("emailStatus");
-                    }
-                  }
-                }
+                (patch as Record<string, unknown>).emailStatus =
+                  "valid_manual";
+                if (!filled.includes("emailStatus")) filled.push("emailStatus");
               }
-              // Invalid check always wins for this import's email
-              if (emailStatus === "invalid" && email && full.normalizedEmail === email) {
+              if (
+                emailStatus === "invalid" &&
+                email &&
+                full.normalizedEmail === email
+              ) {
                 (patch as Record<string, unknown>).emailStatus = "invalid";
               }
 
@@ -790,10 +844,18 @@ export class CrmImportService {
                   ])
                 ),
               };
+
+              // Move contact onto this company if empty-company mismatch and same org email
+              const companyPatch =
+                full.companyId !== company.id
+                  ? { companyId: company.id }
+                  : {};
+
               await prisma.contact.update({
                 where: { id: full.id },
                 data: {
                   ...patch,
+                  ...companyPatch,
                   ...(dnc ? { status: ContactStatus.UNSUBSCRIBED } : {}),
                   metadata: nextMeta as Prisma.InputJsonValue,
                   ...(emailStatus === "valid_manual" && !full.verifiedAt
@@ -802,13 +864,15 @@ export class CrmImportService {
                 },
               });
               contactId = full.id;
-              if (filled.length) {
+              if (filled.length || companyPatch.companyId) {
                 contactAction = "updated";
                 summary.contactsUpdated++;
                 summary.changes.push({
                   row: row._rowNumber,
                   entity: "contact",
-                  fields: filled,
+                  fields: filled.length
+                    ? filled
+                    : ["companyId"],
                 });
                 result.fieldsFilled = [...filledCompanyFields, ...filled];
               } else {
@@ -818,6 +882,8 @@ export class CrmImportService {
           }
           result.contactId = contactId;
           result.contactAction = contactAction;
+        } else if (contactSkipReason) {
+          result.contactAction = "none";
         }
 
         if (dnc) {
@@ -912,9 +978,12 @@ export class CrmImportService {
           summary.auditsQueued++;
         }
 
-        if (emailStatus === "invalid") {
-          // Count as failed for error report visibility, but row was persisted
+        if (emailStatus === "invalid" || contactSkipReason) {
+          // Company may still be persisted; contact skipped / invalid → error report
           result.status = "failed";
+          if (contactSkipReason && !result.reason) {
+            result.reason = contactSkipReason;
+          }
           summary.failed++;
         } else if (
           companyAction === "created" ||

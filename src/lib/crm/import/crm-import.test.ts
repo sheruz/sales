@@ -28,8 +28,18 @@ import {
 } from "@/lib/crm/import/normalize";
 import { parseCsvText, toErrorCsv } from "@/lib/crm/import/parse";
 import { mapRows, validateMappedRows } from "@/lib/crm/import/validate";
+import {
+  contactDisplayName,
+  emailMatchesCompanyDomain,
+  firstNameForGreeting,
+  resolveImportContact,
+} from "@/lib/crm/import/contact-from-row";
 import { CRM_IMPORT_HEADERS, CSV_IMPORT_SOURCE } from "@/lib/crm/import/types";
 import { isEnrollableVerification } from "@/lib/enrichment/verification";
+import {
+  buildSequenceTemplateVars,
+  renderSequenceTemplate,
+} from "@/lib/sequences/runtime";
 import { CompanyEnrichmentStatus } from "@prisma/client";
 
 describe("CRM CSV import — headers", () => {
@@ -267,12 +277,6 @@ describe("CRM CSV import — normalize / parse / validate", () => {
 
 describe("CRM CSV import — pipeline contract (prospect)", () => {
   it("documents audit → DRAFT pitch → approve → enroll → send eligibility", () => {
-    // Contract assertions used by import + outbound/audit services:
-    // 1) import sets ENRICHED + valid_manual for prospects
-    // 2) findEligible / auditOne accept enrollable contacts
-    // 3) pitch created as DRAFT (websiteAuditService)
-    // 4) after approve, outbound eligibilityCheck allows (not outreach_excluded)
-    // 5) invalid MX/syntax/disposable → not enrollable
     expect(isEnrollableVerification("valid_manual")).toBe(true);
     expect(isEnrollableVerification("invalid")).toBe(false);
     expect(isEnrollableVerification("unknown")).toBe(false);
@@ -283,3 +287,146 @@ describe("CRM CSV import — pipeline contract (prospect)", () => {
     ).toBe(true);
   });
 });
+
+describe("CRM CSV import — email-only contacts", () => {
+  it("creates contact from email with empty names — role → General inbox", () => {
+    const r = resolveImportContact({
+      email: "info@acme.com",
+      firstName: "",
+      lastName: "",
+      website: "https://acme.com",
+    });
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    expect(r.contact.isGeneralInbox).toBe(true);
+    expect(r.contact.fullName).toBe("General inbox");
+    expect(r.contact.title).toBe("General inbox");
+    expect(contactDisplayName(r.contact)).toBe("General inbox");
+  });
+
+  it("creates contact from email with empty names — personal local → display email", () => {
+    const r = resolveImportContact({
+      email: "jane@acme.com",
+      firstName: "",
+      lastName: "",
+      website: "https://www.acme.com",
+    });
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    expect(r.contact.isGeneralInbox).toBe(false);
+    expect(r.contact.fullName).toBe("jane@acme.com");
+    expect(r.contact.firstName).toBe("");
+    expect(firstNameForGreeting(r.contact)).toBe("");
+  });
+
+  it("title General inbox forces General inbox display", () => {
+    const r = resolveImportContact({
+      email: "jane@acme.com",
+      firstName: "Jane",
+      lastName: "Doe",
+      title: "General inbox",
+      website: "acme.com",
+    });
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    expect(r.contact.fullName).toBe("General inbox");
+    expect(r.contact.isGeneralInbox).toBe(true);
+  });
+
+  it("company_email (non-blocked) → General inbox when email empty", () => {
+    const r = resolveImportContact({
+      email: "",
+      companyEmail: "hello@studio.example",
+      website: "https://studio.example",
+    });
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    expect(r.contact.emailSource).toBe("company_email");
+    expect(r.contact.isGeneralInbox).toBe(true);
+    expect(r.contact.email).toBe("hello@studio.example");
+  });
+
+  it("company_email careers/jobs/hr blocked — no contact", () => {
+    for (const local of ["careers", "jobs", "hr", "talent", "hiring", "press", "privacy", "helpdesk"]) {
+      const r = resolveImportContact({
+        email: "",
+        companyEmail: `${local}@acme.com`,
+        website: "https://acme.com",
+      });
+      expect(r.ok).toBe(false);
+      if (r.ok) return;
+      expect(r.code).toBe("company_email_blocked");
+    }
+  });
+
+  it("rejects email when domain does not match company website", () => {
+    const r = resolveImportContact({
+      email: "jane@gmail.com",
+      website: "https://acme.com",
+    });
+    expect(r.ok).toBe(false);
+    if (r.ok) return;
+    expect(r.code).toBe("domain_mismatch");
+  });
+
+  it("rejects when no company website to verify domain", () => {
+    const r = resolveImportContact({
+      email: "jane@acme.com",
+      website: "",
+    });
+    expect(r.ok).toBe(false);
+    if (r.ok) return;
+    expect(r.code).toBe("no_company_domain");
+  });
+
+  it("{{first_name}} falls back to there for General inbox / empty", () => {
+    const vars = buildSequenceTemplateVars({
+      contact: {
+        firstName: "General",
+        lastName: "inbox",
+        fullName: "General inbox",
+        title: "General inbox",
+        email: "info@acme.com",
+      },
+      company: { name: "Acme" },
+    });
+    expect(vars.first_name).toBe("");
+    expect(
+      renderSequenceTemplate("Hi {{first_name}}, welcome to {{company_name}}", vars)
+    ).toBe("Hi there, welcome to Acme");
+  });
+
+  it("validation flags domain_mismatch in report", () => {
+    const mapping = suggestColumnMapping([
+      "company_name",
+      "website",
+      "email",
+    ]);
+    const mapped = mapRows(
+      [
+        {
+          company_name: "Acme",
+          website: "https://acme.com",
+          email: "x@other.com",
+        },
+      ],
+      mapping
+    );
+    const report = validateMappedRows(mapped, {
+      domains: new Set(),
+      companyKeys: new Set(),
+      emails: new Set(),
+      contactKeys: new Set(),
+    });
+    expect(report.issues.some((i) => i.code === "domain_mismatch")).toBe(true);
+  });
+
+  it("emailMatchesCompanyDomain allows same host", () => {
+    expect(emailMatchesCompanyDomain("a@acme.com", "https://www.acme.com")).toBe(
+      true
+    );
+    expect(emailMatchesCompanyDomain("a@mail.acme.com", "acme.com")).toBe(true);
+    expect(emailMatchesCompanyDomain("a@gmail.com", "acme.com")).toBe(false);
+  });
+});
+

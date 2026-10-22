@@ -113,7 +113,16 @@ export function buildSequenceTemplateVars(input: {
   const o = input.opportunity;
   const p = input.pitch;
 
-  const firstName = c?.firstName?.trim() || "";
+  // Import / role inboxes: empty first → TEMPLATE_FALLBACKS → "there"
+  let firstName = c?.firstName?.trim() || "";
+  const titleLower = (c?.title || "").trim().toLowerCase();
+  if (
+    !firstName ||
+    firstName.toLowerCase() === "general" ||
+    titleLower === "general inbox"
+  ) {
+    firstName = "";
+  }
   const companyName = co?.name?.trim() || "";
   const city = co?.city?.trim() || "";
   const firstLine = p?.personalizedFirstLine?.trim() || "";
