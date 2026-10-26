@@ -222,7 +222,12 @@ export function AutopilotPanel({
             <p className="font-medium">Connect integrations before running autopilot</p>
             <ul className="list-disc list-inside text-muted-foreground">
               {!aiConfigured && <li>Connect OpenAI or Anthropic in Settings → Integrations</li>}
-              {!emailConfigured && <li>Connect your business email (SMTP) in Settings → Integrations</li>}
+              {!emailConfigured && (
+                <li>
+                  Connect your business email (Gmail, Outlook, or SMTP) in
+                  Settings → Integrations
+                </li>
+              )}
             </ul>
           </CardContent>
         </Card>

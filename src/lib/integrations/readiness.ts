@@ -78,7 +78,7 @@ export async function getUserReadiness(organizationId: string, userId: string) {
     },
     {
       id: "email",
-      label: "Connect your business email (SMTP)",
+      label: "Connect your business email (Gmail, Outlook, or SMTP)",
       done: email,
       href: appHome("/settings?tab=integrations"),
     },

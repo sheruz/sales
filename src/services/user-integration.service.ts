@@ -1,5 +1,9 @@
 import prisma from "@/lib/db/prisma";
-import { IntegrationPlatform } from "@prisma/client";
+import {
+  EmailAccountStatus,
+  EmailProvider,
+  IntegrationPlatform,
+} from "@prisma/client";
 import { ValidationError } from "@/lib/api/response";
 import {
   decryptCredentials,
@@ -355,7 +359,25 @@ export class UserIntegrationService {
     };
   }
 
+  /**
+   * True when the user can send from a connected mailbox:
+   * Gmail OAuth, Outlook OAuth, or SMTP (any ACTIVE EmailAccount),
+   * or a connected EMAIL_SMTP UserIntegration config.
+   */
   async isEmailConfigured(organizationId: string, userId: string): Promise<boolean> {
+    const activeAccount = await prisma.emailAccount.findFirst({
+      where: {
+        organizationId,
+        userId,
+        status: EmailAccountStatus.ACTIVE,
+        provider: {
+          in: [EmailProvider.GMAIL, EmailProvider.OUTLOOK, EmailProvider.SMTP],
+        },
+      },
+      select: { id: true },
+    });
+    if (activeAccount) return true;
+
     const cfg = await this.getEmailConfig(organizationId, userId);
     return Boolean(cfg);
   }
