@@ -166,57 +166,76 @@ export class WebsiteAuditService {
     onlyIds?: string[]
   ) {
     const enrichmentCfg = await enrichmentJobService.getConfig(organizationId);
-    const companies = await prisma.company.findMany({
-      where: {
-        organizationId,
-        deletedAt: null,
-        enrichmentStatus: CompanyEnrichmentStatus.ENRICHED,
-        website: { not: null },
-        ...(onlyIds?.length ? { id: { in: onlyIds } } : {}),
-        OR: [
-          { auditStatus: null },
-          { auditStatus: CompanyAuditStatus.PENDING },
-          {
-            auditStatus: CompanyAuditStatus.FAILED,
-            auditAttempts: { lt: config.maxAttempts },
-          },
-        ],
-      },
-      orderBy: [{ enrichedAt: "asc" }, { createdAt: "asc" }],
-      take: Math.min(50, Math.max(1, limit * 3)),
-      select: {
-        id: true,
-        website: true,
-        metadata: true,
-        contacts: {
-          where: { email: { not: null } },
-          orderBy: { createdAt: "asc" },
-          take: 5,
-          select: { id: true, emailStatus: true, metadata: true, status: true },
-        },
-      },
-    });
-
     const { isOutreachExcluded } = await import(
       "@/lib/crm/import/outreach-exclude"
     );
+    const need = Math.max(1, limit);
     const eligible: string[] = [];
-    for (const c of companies) {
-      if (isOutreachExcluded({ companyMetadata: c.metadata })) continue;
-      const ok = c.contacts.some(
-        (ct) =>
-          !isOutreachExcluded({
-            companyMetadata: c.metadata,
-            contactMetadata: ct.metadata,
-            contactStatus: ct.status,
-          }) &&
-          isEnrollableVerification(
-            (ct.emailStatus || "unknown") as EmailVerificationStatus,
-            enrichmentCfg.allowAcceptAll
-          )
-      );
-      if (ok) eligible.push(c.id);
-      if (eligible.length >= limit) break;
+    // Keep paging — do not stop after the first small window (earlier companies
+    // may be ENRICHED+website but lack enrollable contacts; dashboard counted
+    // 14 while Audit now scanned only ~9 and returned 0).
+    const pageSize = 50;
+    let skip = 0;
+    const maxScan = onlyIds?.length ? onlyIds.length : 500;
+
+    while (eligible.length < need && skip < maxScan) {
+      const companies = await prisma.company.findMany({
+        where: {
+          organizationId,
+          deletedAt: null,
+          enrichmentStatus: CompanyEnrichmentStatus.ENRICHED,
+          website: { not: null },
+          ...(onlyIds?.length ? { id: { in: onlyIds } } : {}),
+          OR: [
+            { auditStatus: null },
+            { auditStatus: CompanyAuditStatus.PENDING },
+            {
+              auditStatus: CompanyAuditStatus.FAILED,
+              auditAttempts: { lt: config.maxAttempts },
+            },
+          ],
+        },
+        orderBy: [{ enrichedAt: "asc" }, { createdAt: "asc" }],
+        skip,
+        take: pageSize,
+        select: {
+          id: true,
+          website: true,
+          metadata: true,
+          contacts: {
+            where: { email: { not: null } },
+            orderBy: { createdAt: "asc" },
+            take: 5,
+            select: {
+              id: true,
+              emailStatus: true,
+              metadata: true,
+              status: true,
+            },
+          },
+        },
+      });
+      if (!companies.length) break;
+
+      for (const c of companies) {
+        if (isOutreachExcluded({ companyMetadata: c.metadata })) continue;
+        const ok = c.contacts.some(
+          (ct) =>
+            !isOutreachExcluded({
+              companyMetadata: c.metadata,
+              contactMetadata: ct.metadata,
+              contactStatus: ct.status,
+            }) &&
+            isEnrollableVerification(
+              (ct.emailStatus || "unknown") as EmailVerificationStatus,
+              enrichmentCfg.allowAcceptAll
+            )
+        );
+        if (ok) eligible.push(c.id);
+        if (eligible.length >= need) break;
+      }
+      skip += companies.length;
+      if (companies.length < pageSize) break;
     }
     return eligible;
   }

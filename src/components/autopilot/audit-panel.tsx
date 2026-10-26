@@ -92,10 +92,25 @@ export function AuditPanel({ initial }: Props) {
       });
       const json = await res.json();
       if (!json.success) throw new Error(json.error?.message);
-      const done = (json.data.results as Array<{ status: string }>).filter(
-        (r) => r.status === "DONE"
-      ).length;
-      toast.success(`Processed ${json.data.processed} · audited ${done}`);
+      const results = (json.data.results ?? []) as Array<{
+        status?: string;
+        reason?: string;
+        companyId?: string;
+      }>;
+      const done = results.filter((r) => r.status === "DONE").length;
+      const failed = results.filter((r) => r.status === "FAILED").length;
+      const paused = results.filter((r) => r.status === "PAUSED").length;
+      if (json.data.processed === 0) {
+        toast.message(
+          "No companies ready in this batch (need ENRICHED + enrollable email). Check contact email status."
+        );
+      } else {
+        toast.success(
+          `Processed ${json.data.processed} · audited ${done}` +
+            (failed ? ` · failed ${failed}` : "") +
+            (paused ? ` · paused ${paused}` : "")
+        );
+      }
       router.refresh();
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Audit failed");
