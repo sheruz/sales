@@ -4,6 +4,8 @@ import {
   industries,
   services,
   siteConfig,
+  solutions,
+  technologies,
 } from "@/content/site";
 
 export default function sitemap(): MetadataRoute.Sitemap {
@@ -17,6 +19,11 @@ export default function sitemap(): MetadataRoute.Sitemap {
     "/contact",
     "/pricing",
     "/autopilot",
+    "/process",
+    "/faq",
+    "/security",
+    "/solutions",
+    "/technologies",
     "/privacy",
     "/terms",
     "/cookies",
@@ -40,6 +47,18 @@ export default function sitemap(): MetadataRoute.Sitemap {
       lastModified: new Date(),
       changeFrequency: "monthly" as const,
       priority: 0.6,
+    })),
+    ...solutions.map((s) => ({
+      url: `${base}/solutions/${s.slug}`,
+      lastModified: new Date(),
+      changeFrequency: "monthly" as const,
+      priority: 0.6,
+    })),
+    ...technologies.map((t) => ({
+      url: `${base}/technologies/${t.slug}`,
+      lastModified: new Date(),
+      changeFrequency: "monthly" as const,
+      priority: 0.5,
     })),
     ...caseStudies
       .filter((c) => c.verified)

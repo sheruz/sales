@@ -6,9 +6,10 @@ import { siteConfig } from "@/content/site";
 
 const NAV = [
   { href: "/services", label: "Services" },
+  { href: "/solutions", label: "Solutions" },
   { href: "/industries", label: "Industries" },
   { href: "/work", label: "Work" },
-  { href: "/#process", label: "Process" },
+  { href: "/process", label: "Process" },
   { href: "/autopilot", label: "Autopilot" },
   { href: "/about", label: "About" },
   { href: "/contact", label: "Contact" },

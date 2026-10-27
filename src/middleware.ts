@@ -25,6 +25,11 @@ const publicPages = [
   "/contact",
   "/pricing",
   "/autopilot",
+  "/process",
+  "/faq",
+  "/security",
+  "/solutions",
+  "/technologies",
 ];
 
 function startsWithPath(pathname: string, base: string): boolean {

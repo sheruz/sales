@@ -26,6 +26,13 @@ export default function AboutPage() {
             {aboutContent.headline}
           </h1>
           <p className="mkt-muted text-lg leading-relaxed">{aboutContent.intro}</p>
+          <ul className="space-y-2 pt-2">
+            {aboutContent.howWeDiffer.map((line) => (
+              <li key={line} className="mkt-card text-sm">
+                {line}
+              </li>
+            ))}
+          </ul>
         </div>
       </section>
 

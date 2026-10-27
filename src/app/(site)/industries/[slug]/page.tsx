@@ -1,9 +1,11 @@
 import Link from "next/link";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
+import { SectionCta } from "@/components/marketing/section-cta";
 import {
   getCaseStudy,
   getIndustry,
+  getService,
   industries,
   siteConfig,
 } from "@/content/site";
@@ -32,16 +34,32 @@ export default async function IndustryDetailPage({ params }: Props) {
   const related = i.relatedCaseStudySlug
     ? getCaseStudy(i.relatedCaseStudySlug)
     : null;
+  const relatedServices = (i.relatedServiceSlugs || [])
+    .map((id) => getService(id))
+    .filter(Boolean);
 
   return (
     <>
       <section className="mkt-section mkt-section--dark">
         <div className="mkt-wrap max-w-3xl space-y-4">
           <p className="mkt-eyebrow">Industry</p>
-          <h1 className="text-4xl font-extrabold sm:text-5xl">{i.name}</h1>
+          <h1 className="text-4xl font-extrabold sm:text-5xl">{i.headline}</h1>
           <p className="mkt-muted text-lg">{i.short}</p>
+          <div className="flex flex-wrap gap-3 pt-2">
+            <Link
+              href={siteConfig.contact.bookingUrl}
+              className="mkt-btn mkt-btn--primary"
+              data-mkt-schedule
+            >
+              Book a free call
+            </Link>
+            <Link href="/contact" className="mkt-btn mkt-btn--secondary">
+              Get a quote
+            </Link>
+          </div>
         </div>
       </section>
+
       <section className="mkt-section mkt-section--light">
         <div className="mkt-wrap grid gap-10 lg:grid-cols-2">
           <div>
@@ -66,8 +84,64 @@ export default async function IndustryDetailPage({ params }: Props) {
           </div>
         </div>
       </section>
-      {related ? (
+
+      <section className="mkt-section mkt-section--dark">
+        <div className="mkt-wrap space-y-8">
+          <div className="max-w-2xl space-y-3">
+            <p className="mkt-eyebrow">Modules</p>
+            <h2 className="text-3xl font-extrabold">Typical building blocks</h2>
+            <p className="mkt-muted">
+              Exact modules are written into your scope — this is the usual menu.
+            </p>
+          </div>
+          <ul className="mkt-grid-3">
+            {i.modules.map((m) => (
+              <li key={m} className="mkt-card text-sm font-medium">
+                {m}
+              </li>
+            ))}
+          </ul>
+        </div>
+      </section>
+
+      <section className="mkt-section mkt-section--light">
+        <div className="mkt-wrap space-y-8">
+          <p className="mkt-eyebrow">Outcomes</p>
+          <ul className="mkt-grid-3">
+            {i.outcomes.map((o) => (
+              <li key={o} className="mkt-card text-sm leading-relaxed">
+                {o}
+              </li>
+            ))}
+          </ul>
+        </div>
+      </section>
+
+      {relatedServices.length > 0 ? (
         <section className="mkt-section mkt-section--dark">
+          <div className="mkt-wrap space-y-6">
+            <p className="mkt-eyebrow">Related services</p>
+            <div className="mkt-grid-3">
+              {relatedServices.map((s) =>
+                s ? (
+                  <Link
+                    key={s.slug}
+                    href={`/services/${s.slug}`}
+                    className="mkt-card block"
+                  >
+                    <h3 className="mb-2 font-bold">{s.name}</h3>
+                    <p className="mkt-muted mb-3 text-sm">{s.short}</p>
+                    <span className="mkt-link text-sm">Learn more →</span>
+                  </Link>
+                ) : null
+              )}
+            </div>
+          </div>
+        </section>
+      ) : null}
+
+      {related ? (
+        <section className="mkt-section mkt-section--light">
           <div className="mkt-wrap">
             <Link href={`/work/${related.slug}`} className="mkt-card block max-w-2xl">
               <p className="mkt-eyebrow mb-2">Related work</p>
@@ -77,17 +151,22 @@ export default async function IndustryDetailPage({ params }: Props) {
           </div>
         </section>
       ) : null}
-      <section className="mkt-section mkt-section--dark">
-        <div className="mkt-wrap text-center">
-          <Link
-            href={siteConfig.contact.bookingUrl}
-            className="mkt-btn mkt-btn--primary"
-            data-mkt-schedule
-          >
-            Book a free call
-          </Link>
-        </div>
-      </section>
+
+      {i.faq.length > 0 ? (
+        <section className="mkt-section mkt-section--dark">
+          <div className="mkt-wrap max-w-3xl space-y-4">
+            <p className="mkt-eyebrow">FAQ</p>
+            {i.faq.map((f) => (
+              <details key={f.q} className="mkt-card">
+                <summary className="cursor-pointer font-semibold">{f.q}</summary>
+                <p className="mkt-muted mt-3 text-sm">{f.a}</p>
+              </details>
+            ))}
+          </div>
+        </section>
+      ) : null}
+
+      <SectionCta title={`Building for ${i.name.toLowerCase()}?`} />
     </>
   );
 }

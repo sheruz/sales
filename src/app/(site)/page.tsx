@@ -10,6 +10,7 @@ import {
   processSteps,
   services,
   siteConfig,
+  solutions,
   techStack,
   testimonials,
   valueTags,
@@ -170,9 +171,14 @@ export default function MarketingHomePage() {
       {/* Process */}
       <section className="mkt-section mkt-section--light" id="process">
         <div className="mkt-wrap space-y-8">
-          <div className="max-w-2xl space-y-3">
-            <p className="mkt-eyebrow">How we work</p>
-            <h2 className="text-3xl font-bold sm:text-4xl">From call to launch</h2>
+          <div className="flex flex-wrap items-end justify-between gap-4">
+            <div className="max-w-2xl space-y-3">
+              <p className="mkt-eyebrow">How we work</p>
+              <h2 className="text-3xl font-bold sm:text-4xl">From call to launch</h2>
+            </div>
+            <Link href="/process" className="mkt-link">
+              Full process →
+            </Link>
           </div>
           <ol className="mkt-grid-3 list-none p-0">
             {processSteps.map((step) => (
@@ -185,6 +191,36 @@ export default function MarketingHomePage() {
               </li>
             ))}
           </ol>
+        </div>
+      </section>
+
+      {/* Solutions */}
+      <section className="mkt-section mkt-section--dark" id="solutions">
+        <div className="mkt-wrap space-y-8">
+          <div className="flex flex-wrap items-end justify-between gap-4">
+            <div className="max-w-2xl space-y-3">
+              <p className="mkt-eyebrow">Solutions</p>
+              <h2 className="text-3xl font-bold sm:text-4xl">
+                How the engagement is shaped
+              </h2>
+              <p className="mkt-muted text-lg">
+                MVP, SaaS platforms, dedicated capacity or discovery — pick the
+                shape, then the services.
+              </p>
+            </div>
+            <Link href="/solutions" className="mkt-link">
+              All solutions →
+            </Link>
+          </div>
+          <div className="mkt-grid-2">
+            {solutions.map((s) => (
+              <Link key={s.slug} href={`/solutions/${s.slug}`} className="mkt-card block">
+                <h3 className="mb-2 text-xl font-bold">{s.name}</h3>
+                <p className="mkt-muted mb-4 text-sm leading-relaxed">{s.short}</p>
+                <span className="mkt-link text-sm">Learn more →</span>
+              </Link>
+            ))}
+          </div>
         </div>
       </section>
 
