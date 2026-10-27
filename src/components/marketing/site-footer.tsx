@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { SiteLogo } from "@/components/marketing/site-logo";
 import { industries, services, siteConfig } from "@/content/site";
 
 export function SiteFooter() {
@@ -6,9 +7,7 @@ export function SiteFooter() {
     <footer className="mkt-footer">
       <div className="mkt-wrap grid gap-10 md:grid-cols-[1.2fr_1fr_1fr_1fr]">
         <div className="space-y-3">
-          <p className="text-lg font-semibold text-[var(--mkt-ink)]">
-            {siteConfig.name}
-          </p>
+          <SiteLogo height={32} />
           <p className="max-w-sm text-sm leading-relaxed">
             {siteConfig.tagline} Fixed scope, weekly demos, and you own the code.
           </p>

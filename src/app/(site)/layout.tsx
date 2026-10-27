@@ -27,12 +27,17 @@ export const metadata: Metadata = {
   },
   description:
     "Delvix Studio builds web apps, mobile apps, custom ERP/CRM, AI integrations and automation. Fixed scope. Weekly demos. You own the code.",
+  icons: {
+    icon: [{ url: siteConfig.icon, type: "image/svg+xml" }],
+    apple: [{ url: "/delvix-icon-dark-192.png" }],
+  },
   openGraph: {
     type: "website",
     url: siteConfig.url,
     siteName: siteConfig.name,
     title: siteConfig.name,
     description: siteConfig.tagline,
+    images: [{ url: siteConfig.logoOnDark }],
   },
   alternates: { canonical: siteConfig.url },
 };

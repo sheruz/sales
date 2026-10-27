@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useState } from "react";
+import { SiteLogo } from "@/components/marketing/site-logo";
 import { siteConfig } from "@/content/site";
 
 const NAV = [
@@ -41,9 +42,7 @@ export function SiteHeader() {
       </div>
       <header className="mkt-header">
         <div className="mkt-wrap flex items-center justify-between gap-4 py-3">
-          <Link href="/" className="text-lg font-bold tracking-tight text-[var(--mkt-ink)]">
-            Delvix Studio
-          </Link>
+          <SiteLogo />
           <nav className="mkt-nav hidden items-center gap-4 xl:gap-5 lg:flex" aria-label="Primary">
             {NAV.map((item) => (
               <Link key={item.href} href={item.href}>

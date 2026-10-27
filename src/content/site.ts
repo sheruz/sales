@@ -9,6 +9,11 @@ export const siteConfig = {
   tagline: "We build the systems behind growing businesses.",
   url: "https://delvixstudio.com",
   locale: "en_US",
+  /** Wordmark for dark backgrounds (header / footer / dark hero chrome) */
+  logoOnDark: "/delvix-logo-on-dark.svg",
+  /** Wordmark for light backgrounds */
+  logoOnLight: "/delvix-logo-on-light.svg",
+  icon: "/delvix-icon-dark.svg",
   contact: {
     email: "hello@delvixstudio.com",
     phone: "+971581177638",
