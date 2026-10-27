@@ -23,6 +23,15 @@ function fail(name, detail) {
   process.exitCode = 1;
 }
 
+/** tsx/CJS interop: named exports may sit on mod or mod.default */
+async function importMod(specifier) {
+  const mod = await import(specifier);
+  if (mod && typeof mod === "object" && mod.default && typeof mod.default === "object") {
+    return { ...mod.default, ...mod };
+  }
+  return mod;
+}
+
 async function main() {
   const orgId = process.env.POW1_ORG_ID?.trim();
   if (!orgId) {
@@ -37,7 +46,7 @@ async function main() {
 
   // ── 2. SSRF ─────────────────────────────────────────────────────────────
   {
-    const { assertSafeOutboundUrlResolved } = await import(
+    const { assertSafeOutboundUrlResolved } = await importMod(
       "../src/lib/security/ssrf.ts"
     );
     const cases = [
@@ -70,7 +79,7 @@ async function main() {
     const prev = globalThis.fetch;
     globalThis.fetch = fetchMock;
     try {
-      const { safeFetch } = await import("../src/lib/security/ssrf.ts");
+      const { safeFetch } = await importMod("../src/lib/security/ssrf.ts");
       try {
         await safeFetch("https://example.com/start", {
           ssrf: { allowHttp: true },
@@ -101,16 +110,16 @@ async function main() {
       return;
     }
 
-    const { deepAuditService } = await import(
+    const { deepAuditService } = await importMod(
       "../src/services/deep-audit.service.ts"
     );
-    const { creditLedgerService } = await import(
+    const { creditLedgerService } = await importMod(
       "../src/services/credit-ledger.service.ts"
     );
 
     // ── 5. Low-fit skip: no browser job, 0 credits ─────────────────────────
     {
-      const { scoreIcpFit, shouldSkipDeepAudit } = await import(
+      const { scoreIcpFit, shouldSkipDeepAudit } = await importMod(
         "../src/lib/audit/icp-fit.ts"
       );
       const unitFit = scoreIcpFit({
