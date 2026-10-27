@@ -17,6 +17,14 @@ const publicPages = [
   "/signup",
   "/privacy",
   "/terms",
+  "/cookies",
+  "/services",
+  "/industries",
+  "/work",
+  "/about",
+  "/contact",
+  "/pricing",
+  "/autopilot",
 ];
 
 function startsWithPath(pathname: string, base: string): boolean {

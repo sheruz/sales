@@ -655,11 +655,25 @@ export function PaymentsSettingsClient({ canWrite }: { canWrite: boolean }) {
               disabled={!canWrite}
               defaultValue={String(biz.address || "")}
             />
+            <Input
+              id="biz-meta-pixel"
+              placeholder="Meta Pixel ID (digits only)"
+              disabled={!canWrite}
+              defaultValue={String(biz.metaPixelId || "")}
+              className="sm:col-span-2"
+            />
+            <p className="text-xs text-muted-foreground sm:col-span-2">
+              Used on marketing pages only. Leave blank to disable the Pixel.
+              Never store this in .env.
+            </p>
             {canWrite && (
               <Button
                 onClick={() =>
                   void saveSettings({
                     business: {
+                      ...Object.fromEntries(
+                        Object.entries(biz).map(([k, v]) => [k, String(v ?? "")])
+                      ),
                       name: (
                         document.getElementById("biz-name") as HTMLInputElement
                       )?.value,
@@ -674,6 +688,11 @@ export function PaymentsSettingsClient({ canWrite }: { canWrite: boolean }) {
                           "biz-address"
                         ) as HTMLTextAreaElement
                       )?.value,
+                      metaPixelId: (
+                        document.getElementById(
+                          "biz-meta-pixel"
+                        ) as HTMLInputElement
+                      )?.value.trim(),
                     },
                   })
                 }
