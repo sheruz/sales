@@ -40,7 +40,6 @@ async function main() {
     const { assertSafeOutboundUrlResolved } = await import(
       "../src/lib/security/ssrf.ts"
     );
-    const { ValidationError } = await import("../src/lib/api/response.ts");
     const cases = [
       "http://127.0.0.1/",
       "http://localhost/admin",
@@ -53,10 +52,8 @@ async function main() {
         await assertSafeOutboundUrlResolved(u, { allowHttp: true });
         fail("2.ssrf", `allowed blocked URL: ${u}`);
         ssrfOk = false;
-      } catch (e) {
-        if (!(e instanceof ValidationError) && e?.name !== "ValidationError") {
-          // still blocked is fine
-        }
+      } catch {
+        // expected — URL blocked (any throw is fine)
       }
     }
     // Redirect to metadata
