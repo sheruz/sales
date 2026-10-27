@@ -8,10 +8,7 @@ import {
 import prisma from "@/lib/db/prisma";
 import { ValidationError } from "@/lib/api/response";
 import { CREDIT_ACTIONS } from "@/lib/billing/credit-actions";
-import {
-  isOutOfCreditsPause,
-  withCreditReservation,
-} from "@/lib/billing/with-credits";
+import { withCreditReservation } from "@/lib/billing/with-credits";
 import {
   POW_OUTREACH_STEPS,
   POW_SEQUENCE_NAME,
@@ -367,12 +364,7 @@ export class PowPitchService {
     });
 
     if (!credit.ok) {
-      if (isOutOfCreditsPause(credit)) {
-        throw new ValidationError("Out of credits");
-      }
-      throw new ValidationError(
-        ("error" in credit && credit.error) || "Credit reservation failed"
-      );
+      throw new ValidationError(credit.message || "Out of credits");
     }
 
     return {
