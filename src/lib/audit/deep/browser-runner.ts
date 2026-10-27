@@ -66,23 +66,9 @@ async function installSsrfRoute(
   abortedUrls: Set<string>
 ) {
   await page.route("**/*", async (route) => {
-    const req = route.request();
-    const reqUrl = req.url();
-    // Never block images for audit accuracy — only abort clearly unsafe non-image targets
-    const rt = req.resourceType();
-    const isImage = rt === "image" || rt === "media";
-    if (isUrlClearlyUnsafe(reqUrl)) {
-      if (!isImage) {
-        abortedUrls.add(reqUrl);
-        await route.abort();
-        return;
-      }
-      // Images to clearly-unsafe hosts: still abort (SSRF) but track so we don't count as broken
-      abortedUrls.add(reqUrl);
-      await route.abort();
-      return;
-    }
-    if (await isUrlBlockedAfterDns(reqUrl)) {
+    const reqUrl = route.request().url();
+    // SSRF gate for all resources. Aborted URLs are tracked and never counted as "broken images".
+    if (isUrlClearlyUnsafe(reqUrl) || (await isUrlBlockedAfterDns(reqUrl))) {
       abortedUrls.add(reqUrl);
       await route.abort();
       return;
