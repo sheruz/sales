@@ -41,8 +41,10 @@ type DeepStatus = {
     id: string;
     severity: "A" | "B" | "C";
     title: string;
+    whyItMatters?: string;
     evidence: string;
     confidence: string;
+    emailEligible?: boolean;
     viewport: string | null;
   }>;
   evidence: Array<{
@@ -273,12 +275,20 @@ export function CompanyDeepAuditPanel({
                         <Badge variant="outline" className="text-xs">
                           {f.confidence}
                         </Badge>
+                        {f.emailEligible === false ? (
+                          <span className="text-xs text-muted-foreground">
+                            not for email
+                          </span>
+                        ) : null}
                         {f.viewport ? (
                           <span className="text-xs text-muted-foreground">
                             {f.viewport}
                           </span>
                         ) : null}
                       </div>
+                      {f.whyItMatters ? (
+                        <p className="text-xs">{f.whyItMatters}</p>
+                      ) : null}
                       <p className="text-xs text-muted-foreground break-all">
                         {f.evidence}
                       </p>
@@ -291,11 +301,11 @@ export function CompanyDeepAuditPanel({
             {statusLabel === "done" && (desktop || mobile) ? (
               <div className="space-y-2">
                 <p className="font-medium">Screenshots</p>
-                <div className="grid gap-3 sm:grid-cols-2">
+                <div className="grid gap-3 sm:grid-cols-2 items-start">
                   {desktop ? (
                     <button
                       type="button"
-                      className="rounded-md border overflow-hidden text-left hover:bg-muted/40"
+                      className="rounded-md border overflow-hidden text-left hover:bg-muted/40 flex flex-col"
                       onClick={() =>
                         setLightbox({ id: desktop.id, label: "Desktop" })
                       }
@@ -304,7 +314,7 @@ export function CompanyDeepAuditPanel({
                       <img
                         src={`/api/audit-evidence/${desktop.id}`}
                         alt="Desktop screenshot"
-                        className="w-full h-36 object-cover object-top bg-muted"
+                        className="block w-full max-h-48 h-auto object-contain object-top bg-muted"
                       />
                       <p className="px-2 py-1 text-xs text-muted-foreground">
                         Desktop — click for full size
@@ -314,7 +324,7 @@ export function CompanyDeepAuditPanel({
                   {mobile ? (
                     <button
                       type="button"
-                      className="rounded-md border overflow-hidden text-left hover:bg-muted/40"
+                      className="rounded-md border overflow-hidden text-left hover:bg-muted/40 flex flex-col"
                       onClick={() =>
                         setLightbox({ id: mobile.id, label: "Mobile" })
                       }
@@ -323,7 +333,7 @@ export function CompanyDeepAuditPanel({
                       <img
                         src={`/api/audit-evidence/${mobile.id}`}
                         alt="Mobile screenshot"
-                        className="w-full h-36 object-cover object-top bg-muted"
+                        className="block w-full max-h-48 h-auto object-contain object-top bg-muted"
                       />
                       <p className="px-2 py-1 text-xs text-muted-foreground">
                         Mobile — click for full size

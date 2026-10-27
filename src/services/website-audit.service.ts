@@ -922,9 +922,27 @@ export class WebsiteAuditService {
     return { orgs: results.length, results };
   }
 
+  /**
+   * Website audit card: prefer latest successful light (Audit 1.0) result.
+   * Deep audits (mode=deep) are shown in the Deep audit panel, not here.
+   */
   async latestAudit(organizationId: string, companyId: string) {
+    const done = await prisma.websiteAudit.findFirst({
+      where: {
+        organizationId,
+        companyId,
+        mode: "light",
+        status: WebsiteAuditStatus.DONE,
+      },
+      orderBy: { createdAt: "desc" },
+    });
+    if (done) return done;
     return prisma.websiteAudit.findFirst({
-      where: { organizationId, companyId },
+      where: {
+        organizationId,
+        companyId,
+        mode: "light",
+      },
       orderBy: { createdAt: "desc" },
     });
   }

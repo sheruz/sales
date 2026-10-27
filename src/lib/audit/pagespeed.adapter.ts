@@ -15,6 +15,11 @@ export type PageSpeedResult = {
     fcpMs: number | null;
     siMs: number | null;
   };
+  /** CrUX field data when Google has enough traffic samples */
+  fieldMetrics?: {
+    lcpMs: number | null;
+    category: string | null;
+  };
   error?: string;
   rawCategories?: Record<string, unknown>;
 };
@@ -29,6 +34,24 @@ function num(v: unknown): number | null {
     return typeof n === "number" && Number.isFinite(n) ? n : null;
   }
   return null;
+}
+
+function cruxLcp(
+  experience:
+    | {
+        metrics?: Record<
+          string,
+          { percentile?: number; category?: string }
+        >;
+      }
+    | undefined
+): { lcpMs: number | null; category: string | null } {
+  const m = experience?.metrics?.["LARGEST_CONTENTFUL_PAINT_MS"];
+  if (!m) return { lcpMs: null, category: null };
+  return {
+    lcpMs: typeof m.percentile === "number" ? m.percentile : null,
+    category: typeof m.category === "string" ? m.category : null,
+  };
 }
 
 export async function runPageSpeed(
@@ -66,6 +89,18 @@ export async function runPageSpeed(
         categories?: { performance?: { score?: number } };
         audits?: Record<string, { numericValue?: number; score?: number }>;
       };
+      loadingExperience?: {
+        metrics?: Record<
+          string,
+          { percentile?: number; category?: string }
+        >;
+      };
+      originLoadingExperience?: {
+        metrics?: Record<
+          string,
+          { percentile?: number; category?: string }
+        >;
+      };
       error?: { message?: string };
     };
 
@@ -83,6 +118,10 @@ export async function runPageSpeed(
     const score =
       typeof perf === "number" ? Math.round(perf * 100) : null;
     const audits = lr?.audits ?? {};
+    const field =
+      cruxLcp(json.loadingExperience).lcpMs != null
+        ? cruxLcp(json.loadingExperience)
+        : cruxLcp(json.originLoadingExperience);
 
     return {
       strategy,
@@ -93,6 +132,10 @@ export async function runPageSpeed(
         tbtMs: num(audits["total-blocking-time"]),
         fcpMs: num(audits["first-contentful-paint"]),
         siMs: num(audits["speed-index"]),
+      },
+      fieldMetrics: {
+        lcpMs: field.lcpMs,
+        category: field.category,
       },
       rawCategories: lr?.categories as Record<string, unknown> | undefined,
     };

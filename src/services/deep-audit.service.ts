@@ -1,8 +1,10 @@
 import { randomUUID } from "crypto";
 import {
   CompanyAuditStatus,
+  CompanyTimelineEventType,
   DeepAuditJobStatus,
   AuditEvidenceKind,
+  TimelineActor,
   WebsiteAuditStatus,
   type Prisma,
 } from "@prisma/client";
@@ -11,13 +13,21 @@ import { ValidationError } from "@/lib/api/response";
 import { BILLING_ACTIONS } from "@/lib/billing/actions";
 import { billingGateway } from "@/services/billing-gateway.service";
 import { businessBrainService } from "@/services/business-brain.service";
+import { googlePlacesService } from "@/services/google-places.service";
+import { timelineService } from "@/services/timeline.service";
 import {
   scoreIcpFit,
   shouldSkipDeepAudit,
 } from "@/lib/audit/icp-fit";
 import { saveAuditScreenshot } from "@/lib/audit/evidence-store";
 import { assertSafeOutboundUrlResolved } from "@/lib/security/ssrf";
+import { runPageSpeed } from "@/lib/audit/pagespeed.adapter";
+import {
+  sortFindings,
+  speedFindingFromPageSpeed,
+} from "@/lib/audit/deep/findings";
 import { DEEP_AUDIT_SITE_TIMEOUT_MS } from "@/lib/audit/deep/types";
+import type { DeepFinding } from "@/lib/audit/deep/types";
 
 type JobMeta = {
   enqueuedBy?: string | null;
@@ -101,19 +111,23 @@ export class DeepAuditService {
 
     const severityOrder: Record<string, number> = { A: 0, B: 1, C: 2 };
     const findings = findingsList
-      .map((f) => ({
-        id: String(f.id ?? ""),
-        severity: String(f.severity ?? "C") as "A" | "B" | "C",
-        title: String(f.title ?? ""),
-        evidence: String(f.evidence ?? ""),
-        viewport: f.viewport ? String(f.viewport) : null,
-        confidence:
-          String(f.severity) === "A"
-            ? "High"
-            : String(f.severity) === "B"
-              ? "Medium"
-              : "Low",
-      }))
+      .map((f) => {
+        const confRaw = String(f.confidence ?? "Medium");
+        const confidence =
+          confRaw === "High" || confRaw === "Low" || confRaw === "Medium"
+            ? confRaw
+            : "Medium";
+        return {
+          id: String(f.id ?? ""),
+          severity: String(f.severity ?? "C") as "A" | "B" | "C",
+          title: String(f.title ?? ""),
+          whyItMatters: String(f.whyItMatters ?? ""),
+          evidence: String(f.evidence ?? ""),
+          viewport: f.viewport ? String(f.viewport) : null,
+          confidence,
+          emailEligible: Boolean(f.emailEligible ?? confidence === "High"),
+        };
+      })
       .sort(
         (a, b) =>
           (severityOrder[a.severity] ?? 9) - (severityOrder[b.severity] ?? 9)
@@ -337,7 +351,7 @@ export class DeepAuditService {
           auditError: `low_icp_fit:${fit.score}`,
         },
       });
-      await prisma.websiteAudit.create({
+      const skippedAudit = await prisma.websiteAudit.create({
         data: {
           organizationId,
           companyId,
@@ -347,6 +361,23 @@ export class DeepAuditService {
           icpFitScore: fit.score,
           findings: { skipped: true, reasons: fit.reasons } as Prisma.InputJsonValue,
         },
+      });
+      await timelineService.record({
+        organizationId,
+        companyId,
+        type: CompanyTimelineEventType.AUDITED,
+        title: `Deep audit low fit (score ${fit.score})`,
+        details: {
+          kind: "deep_audit",
+          event: "low_fit",
+          score: fit.score,
+          band: fit.band,
+          reasons: fit.reasons,
+          auditId: skippedAudit.id,
+        },
+        actor: TimelineActor.SYSTEM,
+        userId: userId ?? null,
+        dedupeKey: `deep_audit_low_fit:${skippedAudit.id}`,
       });
       return { status: "SKIPPED", reason: "low_icp_fit", fit };
     }
@@ -414,6 +445,22 @@ export class DeepAuditService {
           auditError: null,
           auditAttempts: { increment: 1 },
         },
+      });
+      await timelineService.record({
+        organizationId,
+        companyId,
+        type: CompanyTimelineEventType.AUDITED,
+        title: "Deep audit queued",
+        details: {
+          kind: "deep_audit",
+          event: "queued",
+          jobId,
+          auditId,
+          credits: auth.credits,
+        },
+        actor: TimelineActor.SYSTEM,
+        userId: userId ?? null,
+        dedupeKey: `deep_audit_queued:${jobId}`,
       });
     } catch (err) {
       await billingGateway
@@ -493,6 +540,41 @@ export class DeepAuditService {
       return;
     }
 
+    // PageSpeed Insights is the source of truth for speed (Severity B only).
+    let findings: DeepFinding[] = [...result.findings];
+    let pageSpeedMobile: number | null = null;
+    let psiPayload: Record<string, unknown> | null = null;
+    try {
+      const apiKey = await googlePlacesService.resolveApiKey(
+        job.organizationId
+      );
+      const psi = await runPageSpeed(
+        result.finalUrl || website,
+        apiKey,
+        "mobile",
+        45_000
+      );
+      pageSpeedMobile = psi.score;
+      psiPayload = {
+        score: psi.score,
+        lcpMs: psi.metrics.lcpMs,
+        fieldLcpMs: psi.fieldMetrics?.lcpMs ?? null,
+        fieldCategory: psi.fieldMetrics?.category ?? null,
+        error: psi.error ?? null,
+      };
+      const speed = speedFindingFromPageSpeed({
+        psi,
+        playwrightMobileMs: result.metrics.mobileLoadMs,
+        playwrightDesktopMs: result.metrics.desktopLoadMs,
+      });
+      if (speed) findings.push(speed);
+    } catch (err) {
+      psiPayload = {
+        error: err instanceof Error ? err.message : "PSI unavailable",
+      };
+    }
+    findings = sortFindings(findings);
+
     const evidenceIds: string[] = [];
     if (result.screenshots.desktop) {
       const saved = await saveAuditScreenshot({
@@ -541,16 +623,22 @@ export class DeepAuditService {
       where: { id: auditId },
       data: {
         status: WebsiteAuditStatus.DONE,
+        pageSpeedMobile,
         findings: {
           deep: true,
-          findings: result.findings,
+          findings,
           metrics: result.metrics,
+          pageSpeed: psiPayload,
           finalUrl: result.finalUrl,
           title: result.title,
           evidenceIds,
           placesReviewText: null,
+          consentBannerVisible: result.metrics.consentBannerVisible ?? false,
         } as Prisma.InputJsonValue,
-        coreMetrics: result.metrics as unknown as Prisma.InputJsonValue,
+        coreMetrics: {
+          ...result.metrics,
+          pageSpeed: psiPayload,
+        } as unknown as Prisma.InputJsonValue,
       },
     });
 
@@ -580,6 +668,25 @@ export class DeepAuditService {
         error: null,
         metadata: meta as Prisma.InputJsonValue,
       },
+    });
+
+    const aCount = findings.filter((f) => f.severity === "A").length;
+    await timelineService.record({
+      organizationId: job.organizationId,
+      companyId: job.companyId,
+      type: CompanyTimelineEventType.AUDITED,
+      title: `Deep audit done (${findings.length} finding${findings.length === 1 ? "" : "s"}${aCount ? `, ${aCount} A` : ""})`,
+      details: {
+        kind: "deep_audit",
+        event: "done",
+        jobId: job.id,
+        auditId,
+        findingCount: findings.length,
+        severityA: aCount,
+        pageSpeedMobile,
+      },
+      actor: TimelineActor.SYSTEM,
+      dedupeKey: `deep_audit_done:${job.id}`,
     });
   }
 
@@ -621,6 +728,21 @@ export class DeepAuditService {
           auditStatus: CompanyAuditStatus.FAILED,
           auditError: error.slice(0, 500),
         },
+      });
+      await timelineService.record({
+        organizationId: job.organizationId,
+        companyId: job.companyId,
+        type: CompanyTimelineEventType.AUDITED,
+        title: "Deep audit failed",
+        details: {
+          kind: "deep_audit",
+          event: "failed",
+          jobId,
+          auditId: websiteAuditId,
+          error: error.slice(0, 300),
+        },
+        actor: TimelineActor.SYSTEM,
+        dedupeKey: `deep_audit_failed:${jobId}`,
       });
     }
 
