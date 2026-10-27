@@ -92,12 +92,12 @@ export async function runDeepBrowserAudit(
     });
     await context.grantPermissions([]);
     context.setDefaultTimeout(timeoutMs);
-    context.on("page", (p) => {
-      // Block unexpected popups
-      void p.close().catch(() => {});
-    });
 
     const page = await context.newPage();
+    // Close popups only — never the main page (context "page" would kill newPage())
+    page.on("popup", (popup) => {
+      void popup.close().catch(() => {});
+    });
     await installSsrfRoute(page);
     page.on("console", (msg) => {
       if (msg.type() === "error") consoleErrors += 1;
@@ -279,6 +279,9 @@ export async function runDeepBrowserAudit(
       permissions: [],
     });
     const mobile = await mobileCtx.newPage();
+    mobile.on("popup", (popup) => {
+      void popup.close().catch(() => {});
+    });
     await installSsrfRoute(mobile);
     const tm = Date.now();
     await mobile.goto(finalUrl || opts.url, {
