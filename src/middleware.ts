@@ -30,6 +30,7 @@ const publicPages = [
   "/security",
   "/solutions",
   "/technologies",
+  "/for-agencies",
 ];
 
 function startsWithPath(pathname: string, base: string): boolean {

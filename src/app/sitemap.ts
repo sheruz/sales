@@ -24,6 +24,7 @@ export default function sitemap(): MetadataRoute.Sitemap {
     "/security",
     "/solutions",
     "/technologies",
+    "/for-agencies",
     "/privacy",
     "/terms",
     "/cookies",

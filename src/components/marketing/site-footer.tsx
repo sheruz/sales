@@ -1,11 +1,20 @@
 import Link from "next/link";
 import { SiteLogo } from "@/components/marketing/site-logo";
-import { industries, services, siteConfig } from "@/content/site";
+import {
+  getMainNav,
+  industries,
+  services,
+  siteConfig,
+  solutions,
+} from "@/content/site";
 
 export function SiteFooter() {
+  const company =
+    getMainNav().find((n) => n.label === "Company")?.children ?? [];
+
   return (
     <footer className="mkt-footer">
-      <div className="mkt-wrap grid gap-10 md:grid-cols-[1.2fr_1fr_1fr_1fr]">
+      <div className="mkt-wrap grid gap-10 md:grid-cols-[1.15fr_1fr_1fr_1fr]">
         <div className="space-y-3">
           <SiteLogo height={32} />
           <p className="max-w-sm text-sm leading-relaxed">
@@ -33,11 +42,27 @@ export function SiteFooter() {
             Services
           </p>
           <ul className="space-y-2 text-sm">
+            <li>
+              <Link href="/services">All services</Link>
+            </li>
             {services.map((s) => (
               <li key={s.slug}>
                 <Link href={`/services/${s.slug}`}>{s.name}</Link>
               </li>
             ))}
+          </ul>
+          <p className="mb-3 mt-6 text-sm font-semibold text-[var(--mkt-ink)]">
+            Solutions
+          </p>
+          <ul className="space-y-2 text-sm">
+            {solutions.map((s) => (
+              <li key={s.slug}>
+                <Link href={`/solutions/${s.slug}`}>{s.name}</Link>
+              </li>
+            ))}
+            <li>
+              <Link href="/for-agencies">For agencies</Link>
+            </li>
           </ul>
         </div>
         <div>
@@ -58,35 +83,19 @@ export function SiteFooter() {
               Company
             </p>
             <ul className="space-y-2 text-sm">
-              <li>
-                <Link href="/about">About</Link>
-              </li>
+              {company.map((c) => (
+                <li key={c.href}>
+                  <Link href={c.href}>{c.label}</Link>
+                </li>
+              ))}
               <li>
                 <Link href="/work">Work</Link>
-              </li>
-              <li>
-                <Link href="/solutions">Solutions</Link>
-              </li>
-              <li>
-                <Link href="/process">Process</Link>
               </li>
               <li>
                 <Link href="/technologies">Technologies</Link>
               </li>
               <li>
-                <Link href="/pricing">Pricing</Link>
-              </li>
-              <li>
-                <Link href="/faq">FAQ</Link>
-              </li>
-              <li>
-                <Link href="/security">Security</Link>
-              </li>
-              <li>
                 <Link href="/autopilot">Autopilot</Link>
-              </li>
-              <li>
-                <Link href="/contact">Contact</Link>
               </li>
             </ul>
           </div>
@@ -109,11 +118,18 @@ export function SiteFooter() {
         </div>
       </div>
       <div className="mkt-wrap mt-10 flex flex-wrap items-center justify-between gap-3 border-t border-[var(--mkt-line)] pt-6 text-xs">
-        <p>© {new Date().getFullYear()} {siteConfig.legalName}</p>
+        <p>
+          © {new Date().getFullYear()} {siteConfig.legalName}
+        </p>
         {siteConfig.socials.length > 0 ? (
           <div className="flex gap-4">
             {siteConfig.socials.map((s) => (
-              <a key={s.href} href={s.href} target="_blank" rel="noopener noreferrer">
+              <a
+                key={s.href}
+                href={s.href}
+                target="_blank"
+                rel="noopener noreferrer"
+              >
                 {s.label}
               </a>
             ))}

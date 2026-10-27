@@ -1169,3 +1169,112 @@ export function getSolution(slug: string) {
 export function getTechnology(slug: string) {
   return technologies.find((t) => t.slug === slug) ?? null;
 }
+
+export type NavChild = {
+  href: string;
+  label: string;
+  description?: string;
+};
+
+export type NavItem = {
+  href: string;
+  label: string;
+  /** When set, desktop shows a dropdown of every inner page */
+  children?: NavChild[];
+};
+
+/** Full marketing nav — every inner page is listed under its parent (Software Pro–style). */
+export function getMainNav(): NavItem[] {
+  return [
+    {
+      href: "/services",
+      label: "Services",
+      children: [
+        { href: "/services", label: "All services", description: "Overview of what we build" },
+        ...services.map((s) => ({
+          href: `/services/${s.slug}`,
+          label: s.name,
+          description: s.short,
+        })),
+      ],
+    },
+    {
+      href: "/solutions",
+      label: "Solutions",
+      children: [
+        { href: "/solutions", label: "All solutions", description: "How engagements are shaped" },
+        ...solutions.map((s) => ({
+          href: `/solutions/${s.slug}`,
+          label: s.name,
+          description: s.short,
+        })),
+        {
+          href: "/for-agencies",
+          label: "For agencies",
+          description: "Studio builds + Autopilot for agencies",
+        },
+      ],
+    },
+    {
+      href: "/industries",
+      label: "Industries",
+      children: [
+        { href: "/industries", label: "All industries", description: "Operational businesses we serve" },
+        ...industries.map((i) => ({
+          href: `/industries/${i.slug}`,
+          label: i.name,
+          description: i.short,
+        })),
+      ],
+    },
+    {
+      href: "/technologies",
+      label: "Technologies",
+      children: [
+        { href: "/technologies", label: "All technologies", description: "Stacks we ship with" },
+        ...technologies.map((t) => ({
+          href: `/technologies/${t.slug}`,
+          label: t.name,
+          description: t.short,
+        })),
+      ],
+    },
+    {
+      href: "/work",
+      label: "Work",
+      children: [
+        { href: "/work", label: "Case studies", description: "Verified engagements only" },
+        { href: "/work/revenue-os", label: "Delvix Revenue OS", description: "Our multi-tenant acquisition platform" },
+      ],
+    },
+    {
+      href: "/about",
+      label: "Company",
+      children: [
+        { href: "/about", label: "About", description: "How Delvix works" },
+        { href: "/process", label: "Process", description: "Discovery to launch" },
+        { href: "/pricing", label: "Pricing", description: "Engagement models" },
+        { href: "/faq", label: "FAQ", description: "Common questions" },
+        { href: "/security", label: "Security", description: "How we handle risk" },
+        { href: "/contact", label: "Contact", description: "Book a call or send a brief" },
+      ],
+    },
+    { href: "/autopilot", label: "Autopilot" },
+  ];
+}
+
+export const forAgenciesPage = {
+  headline: "Built for agencies that sell delivery",
+  intro:
+    "Use Delvix Studio when you need custom software for a client — or Delvix Autopilot when you need a system to find and qualify your own clients.",
+  studio: [
+    "White-label or co-branded delivery with a written scope",
+    "Weekly demos your client can attend",
+    "Code ownership that matches your contract with them",
+  ],
+  autopilot: [
+    "Prospecting, deep audit, outreach and pipeline in one product",
+    "Early access for agencies — separate from studio retainers",
+    "See how we built it: Revenue OS case study",
+  ],
+};
