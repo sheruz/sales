@@ -238,17 +238,22 @@ export class AutopilotOverviewService {
         },
         {
           key: "services",
-          label: "Services / case studies filled",
-          // Catalog services OR PoW starter offers; legacy service case studies OR PoW case studies
-          done:
-            (servicesCount > 0 || starterOffersCount > 0) &&
-            (caseStudiesCount > 0 || powCaseStudiesCount > 0),
-          href:
-            caseStudiesCount === 0 && powCaseStudiesCount === 0
-              ? "/case-studies"
-              : servicesCount === 0 && starterOffersCount === 0
-                ? "/starter-offers"
-                : "/case-studies",
+          label: "Services filled",
+          done: servicesCount > 0,
+          href: "/services",
+        },
+        {
+          key: "starter_offers",
+          label: "Starter offers filled",
+          done: starterOffersCount > 0,
+          href: "/starter-offers",
+        },
+        {
+          key: "case_studies",
+          label: "Case studies filled",
+          // Legacy service-linked case studies OR PoW case studies
+          done: caseStudiesCount > 0 || powCaseStudiesCount > 0,
+          href: "/case-studies",
         },
         {
           key: "cron",
