@@ -43,14 +43,14 @@ export function SiteHeader() {
           <Link href="/" className="text-lg font-bold tracking-tight text-[var(--mkt-ink)]">
             Delvix Studio
           </Link>
-          <nav className="mkt-nav hidden items-center gap-5 lg:flex" aria-label="Primary">
+          <nav className="mkt-nav hidden items-center gap-4 xl:gap-5 lg:flex" aria-label="Primary">
             {NAV.map((item) => (
               <Link key={item.href} href={item.href}>
                 {item.label}
               </Link>
             ))}
           </nav>
-          <div className="hidden items-center gap-2 md:flex">
+          <div className="ml-auto hidden items-center gap-2 lg:flex">
             <Link href="/contact" className="mkt-btn mkt-btn--secondary">
               Get a quote
             </Link>
