@@ -49,16 +49,25 @@ export type ServiceSlug =
   | "automation"
   | "project-rescue";
 
+export type ContentBlock = { title: string; body: string };
+
 export type Service = {
   slug: ServiceSlug;
   name: string;
   short: string;
   headline: string;
   problem: string;
+  /** How we approach the problem (paired with problem on the page) */
+  approach: string;
   whoFor: string[];
   outcomes: string[];
   whatWeBuild: string[];
+  /** Capability cards — Software Pro–style depth */
+  capabilities: ContentBlock[];
+  /** Realistic production shapes — no fake client names */
+  useCases: ContentBlock[];
   deliverables: string[];
+  whyUs: ContentBlock[];
   stack: string[];
   faq: Array<{ q: string; a: string }>;
   relatedSolutionSlugs?: string[];
@@ -73,6 +82,8 @@ export const services: Service[] = [
     headline: "Web apps your ops team can actually live in",
     problem:
       "Spreadsheets, shared inboxes and three SaaS tabs that do not talk to each other slow the business down. Staff invent workarounds; customers wait; nobody trusts the numbers.",
+    approach:
+      "We map the real workflow first, then build a web product around it — auth, roles, APIs and the screens people use daily. Scope is written before build; you see working software every week.",
     whoFor: [
       "Operators who outgrew sheets and chat threads",
       "Teams shipping a client portal or multi-tenant SaaS",
@@ -89,11 +100,73 @@ export const services: Service[] = [
       "API-backed apps with auth, roles and audit logs",
       "Billing, notifications and file workflows when the product needs them",
     ],
+    capabilities: [
+      {
+        title: "SaaS and multi-tenant products",
+        body: "Org boundaries, roles, entitlements and an admin path so a second customer does not mean a forked codebase.",
+      },
+      {
+        title: "Internal tools and ops dashboards",
+        body: "Dense screens for dispatch, inventory, approvals and reporting — built for people who live in the tool all day.",
+      },
+      {
+        title: "Customer and partner portals",
+        body: "Status, documents, tickets and self-serve flows so your clients stop calling for updates.",
+      },
+      {
+        title: "APIs and integrations",
+        body: "Stable APIs, webhooks and connectors to the systems you already pay for.",
+      },
+      {
+        title: "Auth, roles and audit",
+        body: "Sign-in, permissions and logs that match how your team actually works — including optional 2FA.",
+      },
+      {
+        title: "Marketing site + app on one stack",
+        body: "Public pages and the authenticated product in one Next.js deploy when that simplifies ops.",
+      },
+    ],
+    useCases: [
+      {
+        title: "Ops tool that replaces the master spreadsheet",
+        body: "One source of truth for jobs, stock or pipeline — with roles so the office and field see the right slice.",
+      },
+      {
+        title: "B2B client portal",
+        body: "Customers log in for status, files and requests instead of chasing email threads.",
+      },
+      {
+        title: "Multi-tenant SaaS MVP",
+        body: "Tenancy, billing hooks and an admin console — enough to onboard early customers without rewriting later.",
+      },
+      {
+        title: "Admin console for an existing API",
+        body: "Your backend already works; we ship the UI operators need to run it safely.",
+      },
+    ],
     deliverables: [
       "Written scope with milestones",
       "Design for core flows",
       "Production deploy + handover docs",
       "Weekly demos during build",
+    ],
+    whyUs: [
+      {
+        title: "Scope before code",
+        body: "You approve a written plan in days — not after months of open-ended discovery.",
+      },
+      {
+        title: "Weekly demos",
+        body: "You click the product every week. Surprises show up while there is still time to steer.",
+      },
+      {
+        title: "You own the repo",
+        body: "Source, env templates and access maps transfer. We are not a black-box host.",
+      },
+      {
+        title: "Timezone overlap",
+        body: "US / UK / EU / Gulf hours so reviews happen live, not only overnight.",
+      },
     ],
     stack: ["Next.js", "React", "Node.js", "PostgreSQL", "AWS"],
     icon: "web",
@@ -111,6 +184,10 @@ export const services: Service[] = [
         q: "How long does a typical web app take?",
         a: "Depends on scope. After discovery you get a written timeline with milestones — not a vague range.",
       },
+      {
+        q: "SaaS platform vs internal tool?",
+        a: "Same craft, different tenancy and billing. We write which shape you are buying into the scope.",
+      },
     ],
   },
   {
@@ -120,6 +197,8 @@ export const services: Service[] = [
     headline: "Mobile apps built for field work and customers on the go",
     problem:
       "Field teams and customers need a phone-first workflow, not a desktop site squeezed onto a screen. Offline gaps and push gaps kill adoption.",
+    approach:
+      "We design for the job on site — capture, sync, push — then share one API with your web product so you do not maintain two backends.",
     whoFor: [
       "Businesses with drivers, crews or visits on site",
       "Products that already have (or need) a shared API",
@@ -136,11 +215,73 @@ export const services: Service[] = [
       "Shared APIs with your web app",
       "Camera, location and document capture when the job needs it",
     ],
+    capabilities: [
+      {
+        title: "Cross-platform apps",
+        body: "React Native or Flutter so one team can ship iOS and Android without doubling every feature.",
+      },
+      {
+        title: "Field capture",
+        body: "Photos, signatures, GPS and documents that sync when signal returns.",
+      },
+      {
+        title: "Push and reminders",
+        body: "Job alerts, status changes and booking reminders that actually arrive.",
+      },
+      {
+        title: "Shared backend with web",
+        body: "Same auth and domain API as your portal or admin — no parallel truth.",
+      },
+      {
+        title: "Store release pipeline",
+        body: "Internal tracks, versioning and a checklist for App Store / Play submission.",
+      },
+      {
+        title: "Offline-tolerant flows",
+        body: "Queues and conflict rules for weak-signal sites and warehouses.",
+      },
+    ],
+    useCases: [
+      {
+        title: "Driver or crew app",
+        body: "Assignments, POD photos and status updates without calling the office.",
+      },
+      {
+        title: "Customer companion app",
+        body: "Bookings, status and chat-lite next to your existing web account.",
+      },
+      {
+        title: "Inspection / checklist app",
+        body: "Structured forms with photos that land in the job record automatically.",
+      },
+      {
+        title: "Internal ops on phones",
+        body: "Approvals and lookups for managers who are rarely at a desk.",
+      },
+    ],
     deliverables: [
       "Written mobile scope and device matrix",
       "TestFlight / Play internal tracks",
       "API contract with the backend",
       "Handover for store listing assets you provide",
+    ],
+    whyUs: [
+      {
+        title: "Phone-first scope",
+        body: "We cut desktop-only fantasies and write what must work offline.",
+      },
+      {
+        title: "One API",
+        body: "Mobile and web share contracts so features do not drift.",
+      },
+      {
+        title: "Weekly device demos",
+        body: "You tap the build on a real phone — not only a simulator screenshot.",
+      },
+      {
+        title: "Clear store ownership",
+        body: "Your Apple / Google accounts; we prepare the binaries and notes.",
+      },
     ],
     stack: ["React Native", "Flutter", "Node.js", "PostgreSQL"],
     icon: "mobile",
@@ -154,6 +295,10 @@ export const services: Service[] = [
         q: "Do you publish to the stores?",
         a: "We prepare builds and guide submission. Your developer accounts own the listing.",
       },
+      {
+        q: "Can it work offline?",
+        a: "When the scope says so — with an explicit sync and conflict plan.",
+      },
     ],
   },
   {
@@ -163,6 +308,8 @@ export const services: Service[] = [
     headline: "ERP and CRM that follow your process",
     problem:
       "Off-the-shelf ERP/CRM forces your process into someone else's workflow and unused modules. Teams keep a shadow spreadsheet beside the ‘system of record’.",
+    approach:
+      "We model your pipeline, jobs or stock as they actually run, migrate the data you care about, and integrate the tools that still earn their keep.",
     whoFor: [
       "Operators with inventory, jobs or pipeline that do not fit SaaS defaults",
       "Teams migrating off Excel as the real CRM",
@@ -179,11 +326,73 @@ export const services: Service[] = [
       "Integrations with the tools you already pay for",
       "Migration from sheets or legacy tools with a cutover plan",
     ],
+    capabilities: [
+      {
+        title: "Sales pipeline and CRM",
+        body: "Stages, tasks and follow-ups that match how your team sells — not a generic funnel template.",
+      },
+      {
+        title: "Job and work-order systems",
+        body: "From quote to delivery with change orders, docs and status your client can see.",
+      },
+      {
+        title: "Inventory and warehouses",
+        body: "Stock levels, movements and alerts without nightly spreadsheet merges.",
+      },
+      {
+        title: "Reporting your board will trust",
+        body: "Saved views and exports from the same data staff use day to day.",
+      },
+      {
+        title: "Accounting and channel hooks",
+        body: "Push invoices, pull payments or sync orders when those APIs exist.",
+      },
+      {
+        title: "Migration and cutover",
+        body: "Column maps, dry runs and a go-live window so you are not double-entering forever.",
+      },
+    ],
+    useCases: [
+      {
+        title: "CRM that replaces the Excel pipeline",
+        body: "Leads, stages and reminders with ownership — no more lost follow-ups in chat.",
+      },
+      {
+        title: "Job system for trades or logistics",
+        body: "Quotes, schedules, docs and invoices in one flow.",
+      },
+      {
+        title: "Inventory hub across channels",
+        body: "One stock number; connectors for the shops you already run.",
+      },
+      {
+        title: "Hybrid: keep one SaaS, replace the painful slice",
+        body: "We do not rip out what works — we write the boundary in the scope.",
+      },
+    ],
     deliverables: [
       "Process map + written scope",
       "Data migration plan",
       "Admin training notes",
       "Go-live checklist",
+    ],
+    whyUs: [
+      {
+        title: "Process first",
+        body: "Screens follow your jobs — not the other way around.",
+      },
+      {
+        title: "Honest replace vs keep",
+        body: "We say when a vendor product is enough for a slice of the work.",
+      },
+      {
+        title: "Migration as a milestone",
+        body: "Cutover is planned and written — not a weekend surprise.",
+      },
+      {
+        title: "Exit-friendly data",
+        body: "Exports and APIs so you are never trapped in our schema.",
+      },
     ],
     stack: ["Next.js", "Node.js", "PostgreSQL", "Python"],
     icon: "erp",
@@ -197,6 +406,10 @@ export const services: Service[] = [
         q: "Will this replace Salesforce / Odoo?",
         a: "Sometimes. Often we replace the painful slice and keep what already works.",
       },
+      {
+        q: "Can finance stay in QuickBooks / Xero?",
+        a: "Yes — we integrate when those products expose APIs and list limits in the scope.",
+      },
     ],
   },
   {
@@ -206,6 +419,8 @@ export const services: Service[] = [
     headline: "AI inside the workflow — with review and permissions",
     problem:
       "Chatbots bolted on the side do not change the workflow. Production AI needs tools, permissions, logging and a human review path when stakes are high.",
+    approach:
+      "We wire models into your product with tools, roles and a review queue — BYOK keys, encrypted secrets and logs you can audit.",
     whoFor: [
       "Product teams adding assistants to an existing app",
       "Ops teams drowning in email, PDFs or tickets",
@@ -222,11 +437,73 @@ export const services: Service[] = [
       "Human-in-the-loop review queues",
       "Reply and outreach agents with audit logs",
     ],
+    capabilities: [
+      {
+        title: "In-app assistants",
+        body: "Copilots that read your records and propose actions — with permission checks on every tool call.",
+      },
+      {
+        title: "Document and email intelligence",
+        body: "Classify, extract and route PDFs, tickets and inbox threads into the right queue.",
+      },
+      {
+        title: "Agents with guardrails",
+        body: "Multi-step workflows that stop for human approval when the risk is high.",
+      },
+      {
+        title: "Outreach and reply drafting",
+        body: "Personalized drafts grounded in evidence (e.g. site audits) — not generic spam.",
+      },
+      {
+        title: "BYOK and encrypted secrets",
+        body: "Your OpenAI / Anthropic keys; we store credentials encrypted when we must hold them.",
+      },
+      {
+        title: "Eval and cost controls",
+        body: "Logging, rate limits and rough cost notes so AI does not surprise finance.",
+      },
+    ],
+    useCases: [
+      {
+        title: "Support triage assistant",
+        body: "Incoming messages classified and drafted — agent reviews before send.",
+      },
+      {
+        title: "Document intake",
+        body: "Invoices, applications or contracts parsed into structured fields for ops.",
+      },
+      {
+        title: "Sales research + draft",
+        body: "Enrich a lead and draft outreach that cites real findings from their site or CRM.",
+      },
+      {
+        title: "Internal knowledge Q&A",
+        body: "Staff ask questions against your docs with citations — not hallucinated policy.",
+      },
+    ],
     deliverables: [
       "Threat and data-flow notes for the AI surface",
       "Prompt and tool inventory",
       "Review queue UX",
       "Cost and rate-limit guidance",
+    ],
+    whyUs: [
+      {
+        title: "Workflow over widgets",
+        body: "AI lands in the same product your team already uses.",
+      },
+      {
+        title: "Human review when it matters",
+        body: "High-risk sends and writes stay behind an approval step.",
+      },
+      {
+        title: "Your keys",
+        body: "BYOK by default — we do not force a shared vendor account.",
+      },
+      {
+        title: "We run this ourselves",
+        body: "Revenue OS uses the same class of patterns — audits, drafting, reply agents.",
+      },
     ],
     stack: ["OpenAI", "Anthropic", "Node.js", "PostgreSQL"],
     icon: "ai",
@@ -240,6 +517,10 @@ export const services: Service[] = [
         q: "Will you train models on our data?",
         a: "Not through our application layer. Provider policies for your BYOK keys still apply.",
       },
+      {
+        q: "Can we force human approval?",
+        a: "Yes. Tool policies and review queues are part of the written scope.",
+      },
     ],
   },
   {
@@ -249,6 +530,8 @@ export const services: Service[] = [
     headline: "Integrations that survive real volume",
     problem:
       "Manual handoffs between CRM, email, sheets and ops tools create delays and errors. Fragile Zapier chains break silently.",
+    approach:
+      "We map the systems, pick custom vs light glue, and ship syncs with retries, idempotency and a place to see failures.",
     whoFor: [
       "Teams with two or more systems that must stay in sync",
       "Ops leads tired of re-keying the same record",
@@ -265,11 +548,73 @@ export const services: Service[] = [
       "Internal tools that glue systems together",
       "Idempotent imports and reconciliation reports",
     ],
+    capabilities: [
+      {
+        title: "API and webhook bridges",
+        body: "Two-way sync with clear ownership of which system is source of truth.",
+      },
+      {
+        title: "Scheduled jobs",
+        body: "Nightly imports, reminders and reconciliations with retries and dead-letter handling.",
+      },
+      {
+        title: "Internal glue apps",
+        body: "Small admin UIs when Zapier cannot express the rule cleanly.",
+      },
+      {
+        title: "Idempotent imports",
+        body: "Re-runs do not duplicate rows — reconciliation reports show drift.",
+      },
+      {
+        title: "Event-driven flows",
+        body: "React to CRM, billing or form events without polling forever.",
+      },
+      {
+        title: "Observability",
+        body: "Logs and alerts you can keep after handover — not a black box on our laptop.",
+      },
+    ],
+    useCases: [
+      {
+        title: "CRM ↔ accounting sync",
+        body: "Won deals create invoices; payment status flows back without retyping.",
+      },
+      {
+        title: "Form to pipeline",
+        body: "Website or ad leads land as structured opportunities with dedupe.",
+      },
+      {
+        title: "Multi-channel inventory",
+        body: "Stock updates fan out to shops with conflict rules written down.",
+      },
+      {
+        title: "Ops alert bridge",
+        body: "System events become Slack / email / ticket with rate limits.",
+      },
+    ],
     deliverables: [
       "Integration map",
       "Error and retry policy",
       "Runbooks for common failures",
       "Monitoring hooks you can keep",
+    ],
+    whyUs: [
+      {
+        title: "Reliability over duct tape",
+        body: "We choose Zapier when it is enough — custom when silent failure is costly.",
+      },
+      {
+        title: "Visible failures",
+        body: "Retries and reports beat ‘it usually works’.",
+      },
+      {
+        title: "Documented ownership",
+        body: "Which system wins on conflict is written in the scope.",
+      },
+      {
+        title: "Handover-ready",
+        body: "Runbooks and credentials maps so your team can operate the sync.",
+      },
     ],
     stack: ["Node.js", "Python", "PostgreSQL", "AWS"],
     icon: "auto",
@@ -283,6 +628,10 @@ export const services: Service[] = [
         q: "Can you work with our existing vendor APIs?",
         a: "Yes — if they expose a documented API or webhook. We write that into the scope.",
       },
+      {
+        q: "What if a vendor has no API?",
+        a: "We say so early. Options may include export files, RPA-style bridges, or changing vendor — never pretend.",
+      },
     ],
   },
   {
@@ -292,6 +641,8 @@ export const services: Service[] = [
     headline: "Unstick a build that slipped",
     problem:
       "The previous vendor left half-built code, unclear scope and a launch date that slipped. You need honesty before another invoice cycle.",
+    approach:
+      "Fixed-price review first: risks, salvage vs rewrite, then a stabilization sprint you can see — before we talk about a long rebuild.",
     whoFor: [
       "Founders mid-build with no confidence in delivery",
       "Teams inheriting code with no docs",
@@ -308,11 +659,73 @@ export const services: Service[] = [
       "Takeover of delivery through launch",
       "Handover package for your next team if you prefer",
     ],
+    capabilities: [
+      {
+        title: "Code and architecture audit",
+        body: "Repos, tests, deploy path, secrets handling and the real state of ‘done’.",
+      },
+      {
+        title: "Salvage vs rewrite memo",
+        body: "A clear recommendation with cost/risk — not a sales pitch for a greenfield rewrite.",
+      },
+      {
+        title: "Stabilization sprint",
+        body: "Fix the blockers that stop launch: auth, data, deploy, critical bugs.",
+      },
+      {
+        title: "Delivery takeover",
+        body: "We own the remaining milestones with weekly demos until launch.",
+      },
+      {
+        title: "Vendor transition",
+        body: "Access maps, repo hygiene and knowledge capture when the old team exits.",
+      },
+      {
+        title: "Optional retainer after",
+        body: "Same engineers for growth work once the fire is out.",
+      },
+    ],
+    useCases: [
+      {
+        title: "Slippage with no working demo",
+        body: "We restore a demoable build and a written path to production.",
+      },
+      {
+        title: "Inherited codebase, no docs",
+        body: "Audit + runbooks so your next hire is not flying blind.",
+      },
+      {
+        title: "Almost launched, blocked on infra",
+        body: "Deploy, env and monitoring fixed as a scoped sprint.",
+      },
+      {
+        title: "Second opinion before rewrite",
+        body: "Independent memo you can take to your board or another vendor.",
+      },
+    ],
     deliverables: [
       "Audit memo (risks, debt, go/no-go)",
       "Stabilization backlog",
       "Revised launch plan",
       "Optional ongoing retainer",
+    ],
+    whyUs: [
+      {
+        title: "Honesty before hours",
+        body: "Review is fixed-price. We will tell you if walking away is smarter.",
+      },
+      {
+        title: "Prefer salvage",
+        body: "Rewrite only when the foundation cannot ship.",
+      },
+      {
+        title: "Visible stabilization",
+        body: "Weekly demos during the rescue — not a black-box ‘fix sprint’.",
+      },
+      {
+        title: "Clean exit for the old vendor",
+        body: "Access and docs so knowledge does not leave with them.",
+      },
     ],
     stack: ["Depends on your stack"],
     icon: "rescue",
@@ -325,6 +738,10 @@ export const services: Service[] = [
       {
         q: "How fast can you start a rescue?",
         a: "Discovery call first, then a fixed-price review week when you approve the scope.",
+      },
+      {
+        q: "Will you work with our stack?",
+        a: "Usually yes. If we cannot, we say so in the review instead of learning on your dime.",
       },
     ],
   },
@@ -343,9 +760,11 @@ export type Industry = {
   name: string;
   short: string;
   headline: string;
+  approach: string;
   problems: string[];
   whatWeBuild: string[];
   modules: string[];
+  capabilities: ContentBlock[];
   outcomes: string[];
   faq: Array<{ q: string; a: string }>;
   relatedServiceSlugs?: ServiceSlug[];
@@ -358,6 +777,8 @@ export const industries: Industry[] = [
     name: "Logistics & trucking",
     short: "Dispatch, tracking and paperwork that keep trucks moving.",
     headline: "Software for fleets that still run on WhatsApp and sheets",
+    approach:
+      "We replace chat-and-sheet dispatch with a board, documents and status your customers can see — without forcing a bloated TMS you will not use.",
     problems: [
       "Loads tracked in WhatsApp and sheets",
       "No single view of drivers, freight and invoices",
@@ -376,6 +797,24 @@ export const industries: Industry[] = [
       "Document vault (BOL, POD, invoices)",
       "Customer status page",
       "Basic billing hooks",
+    ],
+    capabilities: [
+      {
+        title: "Dispatch board",
+        body: "Open loads, assignments and status in one place for the office.",
+      },
+      {
+        title: "Driver capture",
+        body: "POD photos and signatures from the phone when the job needs it.",
+      },
+      {
+        title: "Customer status",
+        body: "A link or portal so shippers stop calling for updates.",
+      },
+      {
+        title: "Document vault",
+        body: "BOL, POD and invoices attached to the load — ready for billing.",
+      },
     ],
     outcomes: [
       "Dispatchers see open loads without hunting chats",
@@ -399,6 +838,8 @@ export const industries: Industry[] = [
     name: "Real estate & property management",
     short: "Owner, tenant and maintenance workflows in one place.",
     headline: "Property ops without the email black hole",
+    approach:
+      "One system for units, leases, tickets and owner reporting — so renewals and maintenance stop living in inboxes.",
     problems: [
       "Leases and renewals living in email",
       "Maintenance tickets with no owner",
@@ -418,6 +859,24 @@ export const industries: Industry[] = [
       "Owner reporting",
       "Document vault",
     ],
+    capabilities: [
+      {
+        title: "Portfolio registry",
+        body: "Properties, units and leases with the fields your PMs actually use.",
+      },
+      {
+        title: "Maintenance tickets",
+        body: "Owned tickets with status — vendors and tenants stop guessing.",
+      },
+      {
+        title: "Owner reporting",
+        body: "Portfolio snapshots without assembling a deck from five tools.",
+      },
+      {
+        title: "Document vault",
+        body: "Leases and notices attached to the right unit.",
+      },
+    ],
     outcomes: [
       "Tickets have an owner and a status",
       "Owners see portfolio facts without chasing PMs",
@@ -436,6 +895,8 @@ export const industries: Industry[] = [
     name: "Clinics & healthcare",
     short: "Scheduling, intake and follow-up without extra admin load.",
     headline: "Clinic ops software that respects staff time",
+    approach:
+      "Scheduling, intake and follow-ups in one ops layer — clinical systems stay with regulated vendors when they must.",
     problems: [
       "Double-booked calendars",
       "Paper intake and lost follow-ups",
@@ -455,6 +916,24 @@ export const industries: Industry[] = [
       "Follow-up queues",
       "Basic reporting",
     ],
+    capabilities: [
+      {
+        title: "Booking and reminders",
+        body: "Calendars staff trust, with reminders you control.",
+      },
+      {
+        title: "Digital intake",
+        body: "Forms completed before the visit — data lands in the right queue.",
+      },
+      {
+        title: "Follow-up queues",
+        body: "Recalls and no-shows visible instead of lost in paper.",
+      },
+      {
+        title: "Client portal",
+        body: "Appointments and documents without calling the front desk.",
+      },
+    ],
     outcomes: [
       "Fewer no-shows with reminders you control",
       "Intake ready before the visit",
@@ -473,6 +952,8 @@ export const industries: Industry[] = [
     name: "Construction & trades",
     short: "Jobs, quotes and site updates that match how crews actually work.",
     headline: "Job systems for trades that live on site",
+    approach:
+      "Quotes, jobs, site capture and client status in one flow — built for crews who are not at a desk.",
     problems: [
       "Quotes rewritten in Word every time",
       "Site photos scattered across phones",
@@ -492,6 +973,24 @@ export const industries: Industry[] = [
       "Client updates",
       "Invoice handoff",
     ],
+    capabilities: [
+      {
+        title: "Quote builder",
+        body: "Reusable line items instead of rewriting Word every time.",
+      },
+      {
+        title: "Job board",
+        body: "Open jobs and owners visible to the office.",
+      },
+      {
+        title: "Field capture",
+        body: "Photos and notes attached to the job from site.",
+      },
+      {
+        title: "Client status",
+        body: "Updates without calling the owner for every question.",
+      },
+    ],
     outcomes: [
       "Quotes reuse your real line items",
       "Office sees site progress without chasing crews",
@@ -510,6 +1009,8 @@ export const industries: Industry[] = [
     name: "Retail & inventory",
     short: "Stock, orders and channels without nightly spreadsheet merges.",
     headline: "Inventory and orders without the nightly merge",
+    approach:
+      "A hub for stock and orders with channel sync and alerts — so staff stop merging sheets at midnight.",
     problems: [
       "Inventory out of sync across channels",
       "Manual order routing",
@@ -529,6 +1030,24 @@ export const industries: Industry[] = [
       "Stock alerts",
       "Basic fulfillment status",
     ],
+    capabilities: [
+      {
+        title: "Stock hub",
+        body: "One view of SKUs and locations staff can trust.",
+      },
+      {
+        title: "Order inbox",
+        body: "Orders from channels land in one queue for routing.",
+      },
+      {
+        title: "Channel sync",
+        body: "Retries and conflict rules when shops update stock.",
+      },
+      {
+        title: "Reorder alerts",
+        body: "Low-stock signals before you sell air.",
+      },
+    ],
     outcomes: [
       "One stock number staff can trust",
       "Orders route without retyping",
@@ -547,6 +1066,8 @@ export const industries: Industry[] = [
     name: "Professional services",
     short: "Pipeline, delivery and retainers for firms that sell expertise.",
     headline: "Pipeline and delivery for firms that sell expertise",
+    approach:
+      "CRM, delivery and client status in one place — so partners see capacity before they promise dates.",
     problems: [
       "Leads dying without follow-up",
       "Projects tracked in email threads",
@@ -565,6 +1086,24 @@ export const industries: Industry[] = [
       "Time / capacity snapshot",
       "Proposal templates",
       "Client portal",
+    ],
+    capabilities: [
+      {
+        title: "Pipeline board",
+        body: "Leads and stages with ownership and nudges for follow-up.",
+      },
+      {
+        title: "Delivery workspace",
+        body: "Projects and milestones without living in email threads.",
+      },
+      {
+        title: "Capacity snapshot",
+        body: "Partners see load before committing dates.",
+      },
+      {
+        title: "Client portal",
+        body: "Progress and files without weekly status theater.",
+      },
     ],
     outcomes: [
       "Follow-ups happen because the system nudges them",

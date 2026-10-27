@@ -7,6 +7,7 @@ import {
   getIndustry,
   getService,
   industries,
+  processSteps,
   siteConfig,
 } from "@/content/site";
 
@@ -45,6 +46,7 @@ export default async function IndustryDetailPage({ params }: Props) {
           <p className="mkt-eyebrow">Industry</p>
           <h1 className="text-4xl font-extrabold sm:text-5xl">{i.headline}</h1>
           <p className="mkt-muted text-lg">{i.short}</p>
+          <p className="leading-relaxed text-[var(--mkt-ink)]">{i.approach}</p>
           <div className="flex flex-wrap gap-3 pt-2">
             <Link
               href={siteConfig.contact.bookingUrl}
@@ -88,6 +90,25 @@ export default async function IndustryDetailPage({ params }: Props) {
       <section className="mkt-section mkt-section--dark">
         <div className="mkt-wrap space-y-8">
           <div className="max-w-2xl space-y-3">
+            <p className="mkt-eyebrow">Capabilities</p>
+            <h2 className="text-3xl font-extrabold">
+              What we typically ship for {i.name.toLowerCase()}
+            </h2>
+          </div>
+          <div className="mkt-grid-2">
+            {i.capabilities.map((c) => (
+              <div key={c.title} className="mkt-card">
+                <h3 className="mb-2 text-lg font-bold">{c.title}</h3>
+                <p className="mkt-muted text-sm leading-relaxed">{c.body}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      <section className="mkt-section mkt-section--light">
+        <div className="mkt-wrap space-y-8">
+          <div className="max-w-2xl space-y-3">
             <p className="mkt-eyebrow">Modules</p>
             <h2 className="text-3xl font-extrabold">Typical building blocks</h2>
             <p className="mkt-muted">
@@ -104,7 +125,7 @@ export default async function IndustryDetailPage({ params }: Props) {
         </div>
       </section>
 
-      <section className="mkt-section mkt-section--light">
+      <section className="mkt-section mkt-section--dark">
         <div className="mkt-wrap space-y-8">
           <p className="mkt-eyebrow">Outcomes</p>
           <ul className="mkt-grid-3">
@@ -114,6 +135,31 @@ export default async function IndustryDetailPage({ params }: Props) {
               </li>
             ))}
           </ul>
+        </div>
+      </section>
+
+      <section className="mkt-section mkt-section--light">
+        <div className="mkt-wrap space-y-8">
+          <div className="flex flex-wrap items-end justify-between gap-4">
+            <div>
+              <p className="mkt-eyebrow mb-2">Process</p>
+              <h2 className="text-3xl font-extrabold">How we engage</h2>
+            </div>
+            <Link href="/process" className="mkt-link text-sm">
+              Full process →
+            </Link>
+          </div>
+          <ol className="mkt-grid-3 list-none p-0">
+            {processSteps.slice(0, 3).map((step) => (
+              <li key={step.n} className="mkt-card">
+                <p className="mb-2 font-mono text-sm text-[var(--mkt-accent)]">
+                  {step.n}
+                </p>
+                <h3 className="mb-1 font-bold">{step.title}</h3>
+                <p className="mkt-muted text-sm">{step.body}</p>
+              </li>
+            ))}
+          </ol>
         </div>
       </section>
 
