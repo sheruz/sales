@@ -8,6 +8,9 @@
  *   APP_URL=https://your-app          (default from .env APP_URL)
  *   POW1_OTHER_ORG_ID=<uuid>          (for cross-org 404; auto-picked if omitted)
  *
+ * Check 6 creates/deletes its own fixture ICP + company inside POW1_ORG_ID (never
+ * mutates Default Workspace). Org still needs credits for a full reserve/refund proof.
+ *
  * Manual checks still required: 1 (3 real sites + hand-verify findings), 3 (worker stop), 4 (Severity A).
  */
 /* eslint-disable @typescript-eslint/no-require-imports */
@@ -203,127 +206,161 @@ async function main() {
     }
 
     // ── 6. Credits: 3 once, re-run no charge, refund on failure ────────────
+    // Self-contained: fixture ICP + company that always pass fit, then cleanup.
+    // Does not mutate the org's existing ICPs (e.g. Default Workspace untouched).
     {
-      const balance0 = await creditLedgerService.getBalance(orgId);
-      // Fail URL: public IP unlikely to speak HTTP on :81 → worker fail → refund
-      const failHost = process.env.POW1_VERIFY_FAIL_URL || "https://1.1.1.1:81";
-      const company = await prisma.company.create({
-        data: {
-          organizationId: orgId,
-          name: `PoW1 Verify Credits ${Date.now()}`,
-          website: failHost,
-          industry: "Software", // hope ICP allows; if skipped, force medium via empty ICP path
-          enrichmentStatus: "ENRICHED",
-          enrichedAt: new Date(),
-        },
-      });
-
-      // If ICP would skip, temporarily clear company to match "no_icp" path by using
-      // industries that overlap — or set brain-less: scoreIcpFit with no ICP → medium.
-      // Ensure not skipped: set industry empty + rely on no_icp_configured OR match.
-      await prisma.company.update({
-        where: { id: company.id },
-        data: { industry: null },
-      });
-
-      const enq1 = await deepAuditService.enqueue(orgId, company.id);
-      if (enq1.status === "SKIPPED") {
-        fail("6.credits", "enqueue skipped — set ICP empty or matching for verify org");
-      } else if (enq1.status === "PAUSED") {
-        fail("6.credits", "out of credits — top up verify org");
-      } else {
-        const balance1 = await creditLedgerService.getBalance(orgId);
-        const reserved = balance0 - balance1;
-        if (reserved !== 3 && reserved !== 0) {
-          // 0 if owner/exempt
-          fail(
-            "6.credits-reserve",
-            `expected reserve 3 (or 0 if owner), got delta ${reserved}`
-          );
-        } else if (reserved === 0) {
-          ok(
-            "6.credits-reserve",
-            "0 credits (owner/exempt org) — use a non-owner org for full check"
-          );
-        } else {
-          ok("6.credits-reserve", `reserved ${reserved}`);
-        }
-
-        const enq2 = await deepAuditService.enqueue(orgId, company.id);
-        const balance2 = await creditLedgerService.getBalance(orgId);
-        if (!enq2.reused && enq2.status === "QUEUED") {
-          // should be reused
-          fail("6.credits-rerun", "second enqueue created a new job (expected reused)");
-        } else if (balance2 !== balance1) {
-          fail(
-            "6.credits-rerun",
-            `re-enqueue changed balance ${balance1} → ${balance2}`
-          );
-        } else {
-          ok("6.credits-rerun", "same job reused, no extra charge");
-        }
-
-        // Force permanent fail + refund (bypass browser): mark attempts exhausted
-        const job = await prisma.deepAuditJob.findUnique({
-          where: { id: enq1.jobId },
+      const passIndustry = `PoW1 Verify Pass Industry ${randomUUID().slice(0, 8)}`;
+      let fixtureIcpId = null;
+      let companyId = null;
+      try {
+        const fixtureIcp = await prisma.icp.create({
+          data: {
+            organizationId: orgId,
+            name: `PoW1 Verify Pass ICP ${Date.now()}`,
+            industries: [passIndustry],
+            countries: [],
+            regions: [],
+            companySizes: ["1-10000"],
+            jobSignals: [],
+            buyingSignals: [],
+            decisionMakerTitles: [],
+            exclusions: [],
+            priority: 99,
+            status: "ACTIVE",
+          },
         });
-        if (job) {
-          await prisma.deepAuditJob.update({
-            where: { id: job.id },
-            data: {
-              status: "RUNNING",
-              attempts: job.maxAttempts,
-              maxAttempts: job.maxAttempts,
-            },
-          });
-          // Invoke private fail via processClaimedJob with no website trick:
-          // temporarily clear website so processClaimedJob fails permanently
-          await prisma.company.update({
-            where: { id: company.id },
-            data: { website: null },
-          });
-          await prisma.deepAuditJob.update({
-            where: { id: job.id },
-            data: { status: "QUEUED", attempts: job.maxAttempts },
-          });
-          const claimed = await deepAuditService.claimJobs("pow1-verify", 1);
-          const mine = claimed.find((j) => j.id === job.id);
-          if (mine) {
-            await deepAuditService.processClaimedJob(mine.id);
+        fixtureIcpId = fixtureIcp.id;
+
+        const balance0 = await creditLedgerService.getBalance(orgId);
+        // Fail URL: public IP unlikely to speak HTTP on :81 → worker fail → refund
+        const failHost =
+          process.env.POW1_VERIFY_FAIL_URL || "https://1.1.1.1:81";
+        const company = await prisma.company.create({
+          data: {
+            organizationId: orgId,
+            name: `PoW1 Verify Credits ${Date.now()}`,
+            website: failHost,
+            industry: passIndustry,
+            employeeCount: 50,
+            size: "1-10000",
+            enrichmentStatus: "ENRICHED",
+            enrichedAt: new Date(),
+          },
+        });
+        companyId = company.id;
+
+        const enq1 = await deepAuditService.enqueue(orgId, company.id);
+        if (enq1.status === "SKIPPED") {
+          fail(
+            "6.credits",
+            `enqueue skipped despite fixture ICP — ${JSON.stringify(enq1.fit || enq1)}`
+          );
+        } else if (enq1.status === "PAUSED") {
+          fail("6.credits", "out of credits — top up verify org");
+        } else {
+          const balance1 = await creditLedgerService.getBalance(orgId);
+          const reserved = balance0 - balance1;
+          if (reserved !== 3 && reserved !== 0) {
+            fail(
+              "6.credits-reserve",
+              `expected reserve 3 (or 0 if owner), got delta ${reserved}`
+            );
+          } else if (reserved === 0) {
+            ok(
+              "6.credits-reserve",
+              "0 credits (owner/exempt org) — use a non-owner org for full check"
+            );
           } else {
-            // claim might have taken another job — fail this one via re-claim path
+            ok("6.credits-reserve", `reserved ${reserved}`);
+          }
+
+          const enq2 = await deepAuditService.enqueue(orgId, company.id);
+          const balance2 = await creditLedgerService.getBalance(orgId);
+          if (!enq2.reused && enq2.status === "QUEUED") {
+            fail(
+              "6.credits-rerun",
+              "second enqueue created a new job (expected reused)"
+            );
+          } else if (balance2 !== balance1) {
+            fail(
+              "6.credits-rerun",
+              `re-enqueue changed balance ${balance1} → ${balance2}`
+            );
+          } else {
+            ok("6.credits-rerun", "same job reused, no extra charge");
+          }
+
+          const job = await prisma.deepAuditJob.findUnique({
+            where: { id: enq1.jobId },
+          });
+          if (job) {
+            await prisma.company.update({
+              where: { id: company.id },
+              data: { website: null },
+            });
             await prisma.deepAuditJob.update({
               where: { id: job.id },
               data: {
-                status: "RUNNING",
+                status: "QUEUED",
                 attempts: job.maxAttempts,
               },
             });
-            await deepAuditService.processClaimedJob(job.id);
-          }
+            const claimed = await deepAuditService.claimJobs("pow1-verify", 1);
+            const mine = claimed.find((j) => j.id === job.id);
+            if (mine) {
+              await deepAuditService.processClaimedJob(mine.id);
+            } else {
+              await prisma.deepAuditJob.update({
+                where: { id: job.id },
+                data: {
+                  status: "RUNNING",
+                  attempts: job.maxAttempts,
+                },
+              });
+              await deepAuditService.processClaimedJob(job.id);
+            }
 
-          const balance3 = await creditLedgerService.getBalance(orgId);
-          const settled = await prisma.deepAuditJob.findUnique({
-            where: { id: job.id },
-          });
-          const meta = settled?.metadata || {};
-          if (reserved === 3 && balance3 !== balance0) {
-            fail(
-              "6.credits-refund",
-              `after fail expected balance ${balance0}, got ${balance3}; meta=${JSON.stringify(meta)}`
-            );
-          } else if (reserved === 3) {
-            ok("6.credits-refund", "reserved 3 refunded after permanent failure");
-          } else {
-            ok("6.credits-refund", "skipped (exempt org)");
+            const balance3 = await creditLedgerService.getBalance(orgId);
+            const settled = await prisma.deepAuditJob.findUnique({
+              where: { id: job.id },
+            });
+            const meta = settled?.metadata || {};
+            if (reserved === 3 && balance3 !== balance0) {
+              fail(
+                "6.credits-refund",
+                `after fail expected balance ${balance0}, got ${balance3}; meta=${JSON.stringify(meta)}`
+              );
+            } else if (reserved === 3) {
+              ok(
+                "6.credits-refund",
+                "reserved 3 refunded after permanent failure"
+              );
+            } else {
+              ok("6.credits-refund", "skipped (exempt org)");
+            }
           }
         }
+      } finally {
+        if (companyId) {
+          await prisma.auditEvidence
+            .deleteMany({ where: { companyId } })
+            .catch(() => {});
+          await prisma.deepAuditJob
+            .deleteMany({ where: { companyId } })
+            .catch(() => {});
+          await prisma.websiteAudit
+            .deleteMany({ where: { companyId } })
+            .catch(() => {});
+          await prisma.company
+            .delete({ where: { id: companyId } })
+            .catch(() => {});
+        }
+        if (fixtureIcpId) {
+          await prisma.icp
+            .delete({ where: { id: fixtureIcpId } })
+            .catch(() => {});
+        }
       }
-
-      await prisma.auditEvidence.deleteMany({ where: { companyId: company.id } });
-      await prisma.deepAuditJob.deleteMany({ where: { companyId: company.id } });
-      await prisma.websiteAudit.deleteMany({ where: { companyId: company.id } });
-      await prisma.company.delete({ where: { id: company.id } }).catch(() => {});
     }
 
     // ── 7. Evidence privacy ───────────────────────────────────────────────
