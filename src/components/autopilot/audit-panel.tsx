@@ -15,6 +15,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { DeepAuditRowButton } from "@/components/companies/company-deep-audit-panel";
 
 type AuditConfig = {
   enabled: boolean;
@@ -45,6 +46,14 @@ type Props = {
       auditStatus: string | null;
       auditError: string | null;
       domain: string | null;
+    }>;
+    deepEligibleRows?: Array<{
+      id: string;
+      name: string;
+      domain: string | null;
+      website: string | null;
+      deepInFlight: boolean;
+      deepJobStatus: string | null;
     }>;
     lastCronRun: {
       startedAt: string;
@@ -256,6 +265,50 @@ export function AuditPanel({ initial }: Props) {
         </CardContent>
       </Card>
 
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">Deep audit (Audit 2.0)</CardTitle>
+          <CardDescription>
+            Playwright desktop + mobile evidence via sales-audit-worker (3
+            credits each). Audit now above stays Audit 1.0.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-2 text-sm">
+          {(initial.deepEligibleRows?.length ?? 0) === 0 ? (
+            <p className="text-muted-foreground">
+              No eligible companies (need ENRICHED + website + enrollable
+              contact).
+            </p>
+          ) : (
+            (initial.deepEligibleRows ?? []).map((row) => (
+              <div
+                key={row.id}
+                className="flex flex-wrap items-center justify-between gap-2 rounded-md border p-2"
+              >
+                <div className="min-w-0">
+                  <Link
+                    href={appHome(`/companies/${row.id}`)}
+                    className="font-medium hover:underline"
+                  >
+                    {row.name}
+                  </Link>
+                  <p className="text-xs text-muted-foreground truncate">
+                    {row.domain || row.website || "—"}
+                    {row.deepJobStatus
+                      ? ` · deep ${row.deepJobStatus.toLowerCase()}`
+                      : ""}
+                  </p>
+                </div>
+                <DeepAuditRowButton
+                  companyId={row.id}
+                  disabled={row.deepInFlight}
+                />
+              </div>
+            ))
+          )}
+        </CardContent>
+      </Card>
+
       {initial.recentErrors.length > 0 ? (
         <Card>
           <CardHeader>
@@ -273,7 +326,10 @@ export function AuditPanel({ initial }: Props) {
                     {e.domain} · {e.auditError}
                   </p>
                 </div>
-                <Badge variant="outline">{e.auditStatus}</Badge>
+                <div className="flex items-center gap-2">
+                  <Badge variant="outline">{e.auditStatus}</Badge>
+                  <DeepAuditRowButton companyId={e.id} />
+                </div>
               </div>
             ))}
           </CardContent>

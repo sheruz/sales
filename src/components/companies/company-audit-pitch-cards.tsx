@@ -17,6 +17,7 @@ import {
 } from "@/components/ui/card";
 import { EmptyState } from "@/components/crm/empty-state";
 import { EmailPreview } from "@/components/email/email-preview";
+import { CompanyDeepAuditPanel } from "@/components/companies/company-deep-audit-panel";
 
 type Check = {
   id: string;
@@ -175,6 +176,7 @@ export function CompanyAuditPitchCards({
   const issues = latestAudit?.findings?.top_issues ?? [];
 
   return (
+    <div className="space-y-6">
     <div className="grid gap-6 lg:grid-cols-2">
       <Card>
         <CardHeader className="flex flex-row items-start justify-between space-y-0">
@@ -214,6 +216,7 @@ export function CompanyAuditPitchCards({
               ) : null}
               Audit now
             </Button>
+            <CompanyDeepAuditPanel companyId={companyId} buttonOnly />
           </div>
         </CardHeader>
         <CardContent className="space-y-3 text-sm">
@@ -405,6 +408,9 @@ export function CompanyAuditPitchCards({
           ) : null}
         </CardContent>
       </Card>
+    </div>
+
+      <CompanyDeepAuditPanel companyId={companyId} showButton={false} />
     </div>
   );
 }

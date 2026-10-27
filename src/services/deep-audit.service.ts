@@ -37,6 +37,219 @@ function asJobMeta(raw: unknown): JobMeta {
 
 export class DeepAuditService {
   /**
+   * Latest deep-audit status for company UI (poll every 3s while in-flight).
+   */
+  async getStatus(organizationId: string, companyId: string) {
+    const company = await prisma.company.findFirst({
+      where: { id: companyId, organizationId, deletedAt: null },
+      select: { id: true, name: true, website: true, domain: true },
+    });
+    if (!company) throw new ValidationError("Company not found");
+
+    const job = await prisma.deepAuditJob.findFirst({
+      where: { organizationId, companyId },
+      orderBy: { createdAt: "desc" },
+    });
+
+    const audit = await prisma.websiteAudit.findFirst({
+      where: { organizationId, companyId, mode: "deep" },
+      orderBy: { createdAt: "desc" },
+      include: {
+        evidence: { orderBy: { createdAt: "asc" } },
+      },
+    });
+
+    const meta = asJobMeta(job?.metadata);
+    const inFlight =
+      job?.status === DeepAuditJobStatus.QUEUED ||
+      job?.status === DeepAuditJobStatus.RUNNING;
+
+    let uiStatus:
+      | "idle"
+      | "queued"
+      | "running"
+      | "done"
+      | "failed"
+      | "skipped" = "idle";
+    if (audit?.status === WebsiteAuditStatus.SKIPPED || job?.status === DeepAuditJobStatus.SKIPPED) {
+      uiStatus = "skipped";
+    } else if (job?.status === DeepAuditJobStatus.QUEUED) {
+      uiStatus = "queued";
+    } else if (job?.status === DeepAuditJobStatus.RUNNING) {
+      uiStatus = "running";
+    } else if (
+      job?.status === DeepAuditJobStatus.DONE ||
+      audit?.status === WebsiteAuditStatus.DONE
+    ) {
+      uiStatus = "done";
+    } else if (
+      job?.status === DeepAuditJobStatus.FAILED ||
+      audit?.status === WebsiteAuditStatus.FAILED
+    ) {
+      uiStatus = "failed";
+    }
+
+    const findingsRaw =
+      audit?.findings &&
+      typeof audit.findings === "object" &&
+      !Array.isArray(audit.findings)
+        ? (audit.findings as Record<string, unknown>)
+        : null;
+    const findingsList = Array.isArray(findingsRaw?.findings)
+      ? (findingsRaw!.findings as Array<Record<string, unknown>>)
+      : [];
+
+    const severityOrder: Record<string, number> = { A: 0, B: 1, C: 2 };
+    const findings = findingsList
+      .map((f) => ({
+        id: String(f.id ?? ""),
+        severity: String(f.severity ?? "C") as "A" | "B" | "C",
+        title: String(f.title ?? ""),
+        evidence: String(f.evidence ?? ""),
+        viewport: f.viewport ? String(f.viewport) : null,
+        confidence:
+          String(f.severity) === "A"
+            ? "High"
+            : String(f.severity) === "B"
+              ? "Medium"
+              : "Low",
+      }))
+      .sort(
+        (a, b) =>
+          (severityOrder[a.severity] ?? 9) - (severityOrder[b.severity] ?? 9)
+      );
+
+    const lowFit =
+      uiStatus === "skipped"
+        ? {
+            band: audit?.icpFit ?? meta.icpFit?.band ?? "low",
+            score: audit?.icpFitScore ?? meta.icpFit?.score ?? null,
+            reasons:
+              meta.icpFit?.reasons ??
+              (findingsRaw && Array.isArray(findingsRaw.reasons)
+                ? (findingsRaw.reasons as string[])
+                : []),
+          }
+        : null;
+
+    return {
+      company,
+      status: uiStatus,
+      inFlight,
+      job: job
+        ? {
+            id: job.id,
+            status: job.status,
+            error: job.error,
+            attempts: job.attempts,
+            createdAt: job.createdAt.toISOString(),
+            startedAt: job.startedAt?.toISOString() ?? null,
+            finishedAt: job.finishedAt?.toISOString() ?? null,
+            creditsSettled: meta.creditsSettled ?? null,
+            creditsCharged: meta.creditsCharged ?? null,
+          }
+        : null,
+      audit: audit
+        ? {
+            id: audit.id,
+            status: audit.status,
+            icpFit: audit.icpFit,
+            icpFitScore: audit.icpFitScore,
+            error: audit.error,
+            createdAt: audit.createdAt.toISOString(),
+            metrics:
+              findingsRaw?.metrics &&
+              typeof findingsRaw.metrics === "object"
+                ? findingsRaw.metrics
+                : audit.coreMetrics,
+            finalUrl:
+              typeof findingsRaw?.finalUrl === "string"
+                ? findingsRaw.finalUrl
+                : null,
+            title:
+              typeof findingsRaw?.title === "string" ? findingsRaw.title : null,
+          }
+        : null,
+      findings,
+      evidence: (audit?.evidence ?? []).map((e) => ({
+        id: e.id,
+        kind: e.kind,
+        contentType: e.contentType,
+        byteSize: e.byteSize,
+      })),
+      lowFit,
+      creditsNote:
+        uiStatus === "skipped"
+          ? "no credits charged"
+          : uiStatus === "failed" && meta.creditsSettled === "refunded"
+            ? "credits refunded"
+            : uiStatus === "failed"
+              ? "credits refunded"
+              : null,
+    };
+  }
+
+  /** Eligible companies for Autopilot Audit tab deep-audit rows. */
+  async listEligibleRows(organizationId: string, limit = 25) {
+    const { websiteAuditService } = await import(
+      "@/services/website-audit.service"
+    );
+    const config = await websiteAuditService.getConfig(organizationId);
+    const ids = await websiteAuditService.findEligibleCompanyIds(
+      organizationId,
+      limit,
+      config
+    );
+    if (!ids.length) return [];
+
+    const [companies, inflight] = await Promise.all([
+      prisma.company.findMany({
+        where: { id: { in: ids }, organizationId },
+        select: {
+          id: true,
+          name: true,
+          domain: true,
+          website: true,
+        },
+      }),
+      prisma.deepAuditJob.findMany({
+        where: {
+          organizationId,
+          companyId: { in: ids },
+          status: {
+            in: [DeepAuditJobStatus.QUEUED, DeepAuditJobStatus.RUNNING],
+          },
+        },
+        select: { companyId: true, status: true },
+      }),
+    ]);
+    const byId = new Map(companies.map((c) => [c.id, c]));
+    const jobByCompany = new Map(inflight.map((j) => [j.companyId, j.status]));
+    return ids
+      .map((id) => {
+        const c = byId.get(id);
+        if (!c) return null;
+        const jobStatus = jobByCompany.get(id) ?? null;
+        return {
+          id: c.id,
+          name: c.name,
+          domain: c.domain,
+          website: c.website,
+          deepInFlight: Boolean(jobStatus),
+          deepJobStatus: jobStatus,
+        };
+      })
+      .filter(Boolean) as Array<{
+      id: string;
+      name: string;
+      domain: string | null;
+      website: string | null;
+      deepInFlight: boolean;
+      deepJobStatus: DeepAuditJobStatus | null;
+    }>;
+  }
+
+  /**
    * Enqueue a deep audit.
    * Reserves audit_deep (3) at enqueue; commits on worker DONE; refunds on permanent FAIL.
    * Re-enqueue while QUEUED/RUNNING returns the same job (no second charge).

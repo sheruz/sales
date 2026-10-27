@@ -303,6 +303,14 @@ export class WebsiteAuditService {
       }),
     ]);
 
+    const { deepAuditService } = await import(
+      "@/services/deep-audit.service"
+    );
+    const deepEligibleRows = await deepAuditService.listEligibleRows(
+      organizationId,
+      25
+    );
+
     return {
       config,
       pending,
@@ -320,6 +328,7 @@ export class WebsiteAuditService {
         claudeTodayCalls: claudeCost.calls,
       },
       recentErrors,
+      deepEligibleRows,
     };
   }
 

@@ -30,6 +30,7 @@
     "db:migrate:phase3-website-audit": "node scripts/run-with-env.js node scripts/phase3-website-audit-migrate.js",
     "db:migrate:pow1-deep-audit": "node scripts/run-with-env.js node scripts/pow1-deep-audit-migrate.js",
     "pow1:verify": "node scripts/run-with-env.js npx tsx scripts/pow1-verify.js",
+    "verify:pow1": "node scripts/run-with-env.js npx tsx scripts/pow1-verify.js",
     "worker:audit": "node scripts/audit-worker.js",
     "db:migrate:phase4-outbound": "node scripts/run-with-env.js node scripts/phase4-outbound-autopilot-migrate.js",
     "db:migrate:phase5-ai-reply": "node scripts/run-with-env.js node scripts/phase5-ai-reply-migrate.js",

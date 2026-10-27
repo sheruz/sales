@@ -23,6 +23,8 @@ export async function GET(
       "integrations.manage",
       "campaigns.manage",
       "business_brain.manage",
+      "opportunities.view",
+      "leads.view",
     ]);
     await requireOrganizationContext();
     const { id } = await context.params;
