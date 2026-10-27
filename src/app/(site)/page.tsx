@@ -139,7 +139,7 @@ export default function MarketingHomePage() {
             {services.map((s) => (
               <Link key={s.slug} href={`/services/${s.slug}`} className="mkt-card block">
                 <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-[var(--mkt-accent)]">
-                  {s.icon}
+                  {s.name.split(" ")[0]}
                 </p>
                 <h3 className="mb-2 text-xl font-bold">{s.name}</h3>
                 <p className="mkt-muted mb-4 text-sm leading-relaxed">{s.short}</p>

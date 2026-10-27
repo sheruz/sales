@@ -64,9 +64,10 @@ export function SiteHeader() {
           </div>
           <button
             type="button"
-            className="mkt-btn mkt-btn--secondary lg:hidden"
+            className="mkt-btn mkt-btn--secondary min-w-[2.75rem] lg:!hidden"
             aria-expanded={open}
             aria-controls="mkt-mobile-nav"
+            aria-label={open ? "Close menu" : "Open menu"}
             onClick={() => setOpen((v) => !v)}
           >
             Menu
