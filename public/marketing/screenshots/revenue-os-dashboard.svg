@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="750" viewBox="0 0 1200 750" role="img" aria-label="Revenue OS dashboard placeholder">
+  <rect width="1200" height="750" fill="#0B1220"/>
+  <rect x="40" y="40" width="220" height="670" rx="12" fill="#141C2E"/>
+  <rect x="290" y="40" width="870" height="120" rx="12" fill="#141C2E"/>
+  <rect x="290" y="190" width="280" height="160" rx="12" fill="#1A2438"/>
+  <rect x="590" y="190" width="280" height="160" rx="12" fill="#1A2438"/>
+  <rect x="890" y="190" width="270" height="160" rx="12" fill="#1A2438"/>
+  <rect x="290" y="380" width="870" height="330" rx="12" fill="#141C2E"/>
+  <text x="320" y="110" fill="#8E9CFF" font-family="system-ui,sans-serif" font-size="28">Dashboard placeholder</text>
+  <text x="320" y="150" fill="#9AA6BF" font-family="system-ui,sans-serif" font-size="18">Replace with real Revenue OS screenshot</text>
+</svg>
