@@ -1407,8 +1407,14 @@ export type Solution = {
   short: string;
   headline: string;
   problem: string;
+  approach: string;
+  whoFor: string[];
   includes: string[];
+  capabilities: ContentBlock[];
+  useCases: ContentBlock[];
   outcomes: string[];
+  deliverables: string[];
+  whyUs: ContentBlock[];
   relatedServiceSlugs: ServiceSlug[];
   faq: Array<{ q: string; a: string }>;
 };
@@ -1421,22 +1427,93 @@ export const solutions: Solution[] = [
     headline: "Ship a credible MVP without boiling the ocean",
     problem:
       "Teams either overbuild for months or ship a thin demo that cannot survive real use. You need a cut that is small and honest.",
+    approach:
+      "We write a ruthless MVP scope — core flows in, everything else as explicit non-goals — then ship a production deploy you can put in front of users.",
+    whoFor: [
+      "Founders validating a workflow with real customers",
+      "Operators replacing a painful spreadsheet with a thin product",
+      "Teams that need a date, not an endless backlog",
+    ],
     includes: [
       "Discovery and written MVP scope",
       "Core user flows only — explicit non-goals",
       "Production deploy you can put in front of users",
       "Backlog for version two, prioritized with you",
     ],
+    capabilities: [
+      {
+        title: "Scope that cuts",
+        body: "Non-goals written down so the MVP cannot silently grow mid-build.",
+      },
+      {
+        title: "Core flow design",
+        body: "The paths users must complete — not decorative screens.",
+      },
+      {
+        title: "Production deploy",
+        body: "Hosting, auth and basic monitoring so learning is real.",
+      },
+      {
+        title: "v2 backlog",
+        body: "Deferred work ranked with you after the first users touch it.",
+      },
+    ],
+    useCases: [
+      {
+        title: "Internal tool MVP",
+        body: "Replace the worst spreadsheet with one workflow staff will actually open.",
+      },
+      {
+        title: "Customer portal MVP",
+        body: "Login, status and one request type — enough to stop email chaos.",
+      },
+      {
+        title: "SaaS wedge",
+        body: "One persona, one job-to-be-done, tenancy ready for a second customer.",
+      },
+      {
+        title: "Mobile + API wedge",
+        body: "Field capture and a thin admin — shared backend from day one.",
+      },
+    ],
     outcomes: [
       "Something real to learn from — not a pitch deck",
       "Clear list of what was deferred and why",
       "Code you can keep extending",
+    ],
+    deliverables: [
+      "Written MVP scope and non-goals",
+      "Weekly demos",
+      "Production URL + handover notes",
+      "Prioritized v2 backlog",
+    ],
+    whyUs: [
+      {
+        title: "Honest cuts",
+        body: "We will say no to features that blow the date.",
+      },
+      {
+        title: "Real deploy",
+        body: "MVP means users can touch it — not a Figma walkthrough.",
+      },
+      {
+        title: "You own the code",
+        body: "Extend with us or with your next hire.",
+      },
+      {
+        title: "Same process as larger builds",
+        body: "Written scope and weekly demos — just a smaller cut.",
+      },
     ],
     relatedServiceSlugs: ["web-apps", "mobile-apps", "ai-integrations"],
     faq: [
       {
         q: "How small is an MVP?",
         a: "Small enough to demo weekly and launch on a date you approve in the scope. We cut features in writing, not by surprise.",
+      },
+      {
+        q: "Can we add features mid-MVP?",
+        a: "Yes via a written change — timeline and price update together.",
       },
     ],
   },
@@ -1447,22 +1524,101 @@ export const solutions: Solution[] = [
     headline: "Multi-tenant SaaS with the hard parts included",
     problem:
       "A beautiful UI without tenancy, billing, audit logs and admin tools is not a product. Agencies and founders need the platform layer done right.",
+    approach:
+      "We build the platform spine first — orgs, roles, entitlements, billing hooks and an ops console — then the features that sit on top.",
+    whoFor: [
+      "Founders selling software to other businesses",
+      "Agencies productizing a delivery into a SaaS",
+      "Teams stuck on a single-tenant fork per customer",
+    ],
     includes: [
       "Tenant isolation and role models",
       "Plans, credits or seats — wired to a billing provider",
       "Super-admin / ops console",
       "BYOK integrations and encrypted secrets when required",
     ],
+    capabilities: [
+      {
+        title: "Tenant isolation",
+        body: "Org boundaries in the data model and queries — not hope.",
+      },
+      {
+        title: "Roles and entitlements",
+        body: "Plans map to features staff and customers can actually use.",
+      },
+      {
+        title: "Billing hooks",
+        body: "Paddle, Stripe or your provider — checkout and webhooks in scope.",
+      },
+      {
+        title: "Super-admin console",
+        body: "Support tenants, packages and flags without SSH folklore.",
+      },
+      {
+        title: "Audit and 2FA",
+        body: "When the threat model needs them — written into the build.",
+      },
+      {
+        title: "BYOK integrations",
+        body: "Customers bring API keys; we encrypt what we store.",
+      },
+    ],
+    useCases: [
+      {
+        title: "B2B SaaS from day one",
+        body: "Onboard customer two without cloning the database.",
+      },
+      {
+        title: "Agency productized offering",
+        body: "Your delivery becomes a tenanted product with billing.",
+      },
+      {
+        title: "Credits / usage products",
+        body: "Plans and ledgers for consumable work (audits, sends, seats).",
+      },
+      {
+        title: "White-label ops",
+        body: "Admin tools so your team supports tenants without engineering.",
+      },
+    ],
     outcomes: [
       "You can onboard a second customer without forking the codebase",
       "Billing and entitlements match what you sell",
       "Ops can support tenants without SSH folklore",
+    ],
+    deliverables: [
+      "Tenancy and role design doc",
+      "Billing integration in scope",
+      "Admin console for ops",
+      "Handover of repos and env maps",
+    ],
+    whyUs: [
+      {
+        title: "We run one",
+        body: "Delvix Revenue OS is multi-tenant with billing, admin and BYOK — see /work/revenue-os.",
+      },
+      {
+        title: "Spine before features",
+        body: "Tenancy and entitlements early so you do not rewrite later.",
+      },
+      {
+        title: "Security basics included",
+        body: "Isolation, secrets and audit where the product needs them.",
+      },
+      {
+        title: "Exit-friendly",
+        body: "You own the code and the customer relationship.",
+      },
     ],
     relatedServiceSlugs: ["web-apps", "ai-integrations", "automation"],
     faq: [
       {
         q: "Have you built this before?",
         a: "Yes — including Delvix Revenue OS, our own multi-tenant acquisition platform. See /work/revenue-os.",
+      },
+      {
+        q: "Which billing provider?",
+        a: "We integrate what you choose (e.g. Paddle or Stripe) and write webhooks into the scope.",
       },
     ],
   },
@@ -1473,22 +1629,93 @@ export const solutions: Solution[] = [
     headline: "Embedded capacity you can direct weekly",
     problem:
       "Hiring is slow; freelancers vanish; big agencies bury you in account managers. You need consistent output and direct access.",
+    approach:
+      "Named engineers on your tools and backlog, with demos and written expectations — capacity you can scale month to month.",
+    whoFor: [
+      "Product teams with a clear backlog and no hire yet",
+      "Companies that need a senior pair for a workstream",
+      "Teams coming out of a rescue who want continuity",
+    ],
     includes: [
       "Named engineer(s) on your tools and standups",
       "Agreed capacity each month",
       "Backlog you prioritize",
       "Flexible month-to-month after the first period",
     ],
+    capabilities: [
+      {
+        title: "Embedded cadence",
+        body: "Standups, PRs and demos in your tools — not a parallel process.",
+      },
+      {
+        title: "Owned workstream",
+        body: "Clear slice of the product with accountability.",
+      },
+      {
+        title: "Flexible capacity",
+        body: "Scale up for a launch; scale down when the rush ends.",
+      },
+      {
+        title: "Knowledge in your repos",
+        body: "Docs and code stay with you when the engagement ends.",
+      },
+    ],
+    useCases: [
+      {
+        title: "Bridge to hire",
+        body: "Ship while you recruit a full-time engineer.",
+      },
+      {
+        title: "Feature squad",
+        body: "A pod owns one initiative end to end.",
+      },
+      {
+        title: "Post-rescue continuity",
+        body: "Same people who stabilized stay for growth work.",
+      },
+      {
+        title: "Part-time senior",
+        body: "Architecture and hard tickets without a full FTE.",
+      },
+    ],
     outcomes: [
       "Velocity without a full-time hire risk",
       "Knowledge stays in your repos and docs",
       "Easy to scale down when the rush ends",
+    ],
+    deliverables: [
+      "Named roster and capacity agreement",
+      "Weekly demos / PR rhythm",
+      "Shared backlog board",
+      "Monthly written summary",
+    ],
+    whyUs: [
+      {
+        title: "Direct access",
+        body: "You talk to the people writing the code.",
+      },
+      {
+        title: "Quality bar",
+        body: "Demos and review — not only hours logged.",
+      },
+      {
+        title: "Your repos",
+        body: "No shadow codebase on our side.",
+      },
+      {
+        title: "Clean off-ramp",
+        body: "Month-to-month after the first period.",
+      },
     ],
     relatedServiceSlugs: ["web-apps", "mobile-apps", "project-rescue"],
     faq: [
       {
         q: "Is this staff augmentation?",
         a: "Close — with written expectations, demos and ownership of delivery quality, not just hours logged.",
+      },
+      {
+        q: "Minimum term?",
+        a: "Confirmed in the proposal. Usually a first month, then month-to-month.",
       },
     ],
   },
@@ -1499,22 +1726,93 @@ export const solutions: Solution[] = [
     headline: "Know what you are buying before you buy the build",
     problem:
       "Jumping straight into development without shared assumptions burns budget. Discovery turns fuzzy goals into a scope you can approve or walk away from.",
+    approach:
+      "Short fixed engagement: interviews, process map, risks, then a written scope with milestones you can bid or build against.",
+    whoFor: [
+      "Buyers who need a scope before committing to build",
+      "Teams mid-rescue who need an honest plan",
+      "Stakeholders who want a document they can share with another vendor",
+    ],
     includes: [
       "Stakeholder interviews and process mapping",
       "Risk and dependency list",
       "Written scope, milestones and assumptions",
       "Ballpark or fixed-price build option",
     ],
+    capabilities: [
+      {
+        title: "Process mapping",
+        body: "How work actually moves today — including the shadow spreadsheets.",
+      },
+      {
+        title: "Risk register",
+        body: "Integrations, data, compliance and open questions called out early.",
+      },
+      {
+        title: "Build-ready scope",
+        body: "Milestones, assumptions and non-goals — not a vague brochure.",
+      },
+      {
+        title: "Pricing path",
+        body: "Fixed-price or capacity options for the build that follows.",
+      },
+    ],
+    useCases: [
+      {
+        title: "Greenfield product",
+        body: "Turn a pitch into a scope before hiring a team.",
+      },
+      {
+        title: "Replace a legacy tool",
+        body: "Map migration and cutover before writing code.",
+      },
+      {
+        title: "Second opinion",
+        body: "Independent scope you can take to another bidder.",
+      },
+      {
+        title: "Stuck project",
+        body: "Reset assumptions after a slipped vendor engagement.",
+      },
+    ],
     outcomes: [
       "A document you can send to another vendor if you want a second bid",
       "Fewer surprise change orders later",
       "Clear go / no-go",
+    ],
+    deliverables: [
+      "Interview notes summary",
+      "Process / system map",
+      "Written scope + assumptions",
+      "Build estimate options",
+    ],
+    whyUs: [
+      {
+        title: "Fixed, short",
+        body: "Discovery is priced and timed — not endless.",
+      },
+      {
+        title: "Portable artifact",
+        body: "You can build with us or take the scope elsewhere.",
+      },
+      {
+        title: "No fake certainty",
+        body: "Open risks stay on the page until resolved.",
+      },
+      {
+        title: "Leads into build cleanly",
+        body: "Same team can execute the scope without re-discovery tax.",
+      },
     ],
     relatedServiceSlugs: ["project-rescue", "erp-crm", "web-apps"],
     faq: [
       {
         q: "Is discovery free?",
         a: "The intro call is free. A full discovery with a written scope is a short fixed engagement — priced up front.",
+      },
+      {
+        q: "Must we build with you after?",
+        a: "No. The scope is yours.",
       },
     ],
   },
