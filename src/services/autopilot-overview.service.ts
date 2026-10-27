@@ -6,6 +6,7 @@ import {
   CompanyCrawlStatus,
   CompanyEnrichmentStatus,
   IntegrationPlatform,
+  OfferStatus,
   OpportunityStage,
   OpportunityStatus,
 } from "@prisma/client";
@@ -41,6 +42,8 @@ export class AutopilotOverviewService {
       icps,
       servicesCount,
       caseStudiesCount,
+      powCaseStudiesCount,
+      starterOffersCount,
       outboundMailboxCount,
       errors24h,
     ] = await Promise.all([
@@ -135,6 +138,12 @@ export class AutopilotOverviewService {
         },
       }),
       prisma.serviceCaseStudy.count({ where: { organizationId } }),
+      prisma.caseStudy.count({
+        where: { organizationId, status: OfferStatus.ACTIVE },
+      }),
+      prisma.starterOffer.count({
+        where: { organizationId, status: OfferStatus.ACTIVE },
+      }),
       prisma.outboundMailbox.count({ where: { organizationId } }),
       prisma.company.count({
         where: {
@@ -230,7 +239,16 @@ export class AutopilotOverviewService {
         {
           key: "services",
           label: "Services / case studies filled",
-          done: servicesCount > 0 && caseStudiesCount > 0,
+          // Catalog services OR PoW starter offers; legacy service case studies OR PoW case studies
+          done:
+            (servicesCount > 0 || starterOffersCount > 0) &&
+            (caseStudiesCount > 0 || powCaseStudiesCount > 0),
+          href:
+            caseStudiesCount === 0 && powCaseStudiesCount === 0
+              ? "/case-studies"
+              : servicesCount === 0 && starterOffersCount === 0
+                ? "/starter-offers"
+                : "/case-studies",
         },
         {
           key: "cron",

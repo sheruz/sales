@@ -27,7 +27,7 @@ const SETUP_HREFS: Record<string, string> = {
   pagespeed: appHome("/settings?tab=integrations"),
   hunter: appHome("/settings?tab=integrations"),
   icp: appHome("/icp"),
-  services: appHome("/services"),
+  services: appHome("/case-studies"),
   cron: appHome("/autopilot"),
   outbound_compliance: appHome("/outreach?tab=outbound"),
   inboxes: appHome("/outreach?tab=outbound"),
@@ -504,7 +504,13 @@ pm2 restart all`}
                         &nbsp; {item.label}
                         {!item.done ? (
                           <Link
-                            href={SETUP_HREFS[item.key] ?? appHome("/settings")}
+                            href={
+                              typeof (item as { href?: string }).href ===
+                              "string"
+                                ? appHome((item as { href: string }).href)
+                                : (SETUP_HREFS[item.key] ??
+                                  appHome("/settings"))
+                            }
                             className="muted"
                             style={{ float: "right" }}
                           >
