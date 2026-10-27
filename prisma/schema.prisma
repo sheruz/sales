@@ -784,6 +784,8 @@ model Organization {
   sourceConnectors  SourceConnector[]
   sourceRuns        SourceRun[]
   offers            Offer[]
+  starterOffers     StarterOffer[]
+  caseStudies       CaseStudy[]
   opportunityOfferRecommendations OpportunityOfferRecommendation[]
   opportunityIntelligences OpportunityIntelligence[]
   aiRecommendations AiRecommendation[]
@@ -1353,6 +1355,12 @@ model Pitch {
   editedByUser           Boolean     @default(false) @map("edited_by_user")
   /// Required template vars that were missing at generate/render time
   missingVars            String[]    @default([]) @map("missing_vars")
+  /// PoW2 — "legacy" (Audit 1.0) | "pow"
+  kind                   String      @default("legacy")
+  /// PoW2 draft payload: steps day0/3/7/14, validation, finding snapshot
+  powDraft               Json?       @map("pow_draft")
+  powStaleAt             DateTime?   @map("pow_stale_at")
+  powStarterOfferId      String?     @map("pow_starter_offer_id")
   approvedAt             DateTime?   @map("approved_at")
   approvedBy             String?     @map("approved_by")
   createdAt              DateTime    @default(now()) @map("created_at")
@@ -1364,11 +1372,13 @@ model Pitch {
   opportunity  Opportunity? @relation(fields: [opportunityId], references: [id], onDelete: SetNull)
   websiteAudit WebsiteAudit @relation(fields: [websiteAuditId], references: [id], onDelete: Cascade)
   approver     User?        @relation("PitchApprovedBy", fields: [approvedBy], references: [id], onDelete: SetNull)
+  powStarterOffer StarterOffer? @relation(fields: [powStarterOfferId], references: [id], onDelete: SetNull)
 
   @@index([organizationId, status])
   @@index([companyId, status])
   @@index([contactId, status])
   @@index([websiteAuditId])
+  @@index([kind])
   @@map("pitches")
 }
 
@@ -1389,6 +1399,8 @@ model Contact {
   phone          String?
   linkedInUrl    String?       @map("linkedin_url")
   source         String?
+  /// PoW2 / CASL — e.g. "published" required for Canadian enroll into PoW
+  emailSource    String?       @map("email_source")
   verifiedAt     DateTime?     @map("verified_at")
   status         ContactStatus @default(ACTIVE)
   metadata       Json?
@@ -2388,6 +2400,8 @@ model OutreachSequence {
   stopOnUnsubscribe Boolean                @default(true) @map("stop_on_unsubscribe")
   /// Phase 4 — default Cold outreach sequence for autopilot enroll
   isAutopilotDefault Boolean               @default(false) @map("is_autopilot_default")
+  /// PoW2 — Proof of Work sequence (send blocked until POW_SEND_ENABLED / PoW3)
+  isProofOfWork      Boolean               @default(false) @map("is_proof_of_work")
   /// B2 plan-limit pause (soft) — paused sequences never send
   pausedAt          DateTime?              @map("paused_at")
   pauseReason       String?                @map("pause_reason")
@@ -2403,6 +2417,7 @@ model OutreachSequence {
   @@index([organizationId])
   @@index([status])
   @@index([organizationId, isAutopilotDefault])
+  @@index([organizationId, isProofOfWork])
   @@index([pausedAt])
   @@map("outreach_sequences")
 }
@@ -2860,6 +2875,48 @@ model Offer {
   @@index([serviceId])
   @@index([status])
   @@map("offers")
+}
+
+/// PoW2 — fixed-price starter packages matched to deep-audit finding types
+model StarterOffer {
+  id             String      @id @default(uuid())
+  organizationId String      @map("organization_id")
+  name           String
+  price          Decimal     @db.Decimal(14, 2)
+  currency       String      @default("USD")
+  deliveryDays   Int         @map("delivery_days")
+  includes       String      @db.Text
+  /// e.g. slow_site | broken_form | no_booking | outdated_design | other
+  findingTypes   String[]    @default([]) @map("finding_types")
+  status         OfferStatus @default(ACTIVE)
+  createdAt      DateTime    @default(now()) @map("created_at")
+  updatedAt      DateTime    @updatedAt @map("updated_at")
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  pitches      Pitch[]
+
+  @@index([organizationId])
+  @@index([status])
+  @@map("starter_offers")
+}
+
+/// PoW2 — niche case studies for Day 7 PoW emails (real numbers only)
+model CaseStudy {
+  id             String      @id @default(uuid())
+  organizationId String      @map("organization_id")
+  clientType     String      @map("client_type")
+  problem        String      @db.Text
+  whatBuilt      String      @map("what_built") @db.Text
+  result         String      @db.Text
+  status         OfferStatus @default(ACTIVE)
+  createdAt      DateTime    @default(now()) @map("created_at")
+  updatedAt      DateTime    @updatedAt @map("updated_at")
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId])
+  @@index([status])
+  @@map("case_studies")
 }
 
 model OpportunityOfferRecommendation {

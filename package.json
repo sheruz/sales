@@ -29,6 +29,7 @@
     "db:migrate:phase25-ui": "node scripts/run-with-env.js node scripts/phase25-timeline-ui-migrate.js",
     "db:migrate:phase3-website-audit": "node scripts/run-with-env.js node scripts/phase3-website-audit-migrate.js",
     "db:migrate:pow1-deep-audit": "node scripts/run-with-env.js node scripts/pow1-deep-audit-migrate.js",
+    "db:migrate:pow2": "node scripts/run-with-env.js node scripts/pow2-migrate.js",
     "pow1:verify": "node scripts/run-with-env.js npx tsx scripts/pow1-verify.js",
     "verify:pow1": "node scripts/run-with-env.js npx tsx scripts/pow1-verify.js",
     "worker:audit": "node scripts/audit-worker.js",

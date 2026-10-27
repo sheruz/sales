@@ -128,6 +128,11 @@ const envSchema = z.object({
   /** B1: default trial days when Super Admin picks trial */
   BILLING_DEFAULT_TRIAL_DAYS: z.coerce.number().default(14),
   AUTOPILOT_ENABLED: envBoolean(false),
+  /**
+   * PoW2/PoW3 — when false (default), Proof of Work sequences cannot send.
+   * Flip true only after PoW3 preview URLs ship.
+   */
+  POW_SEND_ENABLED: envBoolean(false),
   CRON_SECRET: z.string().optional(),
   /** Comma-separated: email, linkedin. Default email-only to protect LinkedIn account */
   OUTREACH_CHANNELS: z.string().default("email"),

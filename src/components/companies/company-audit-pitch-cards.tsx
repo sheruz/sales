@@ -18,6 +18,7 @@ import {
 import { EmptyState } from "@/components/crm/empty-state";
 import { EmailPreview } from "@/components/email/email-preview";
 import { CompanyDeepAuditPanel } from "@/components/companies/company-deep-audit-panel";
+import { PowPitchReview } from "@/components/companies/pow-pitch-review";
 
 type Check = {
   id: string;
@@ -290,127 +291,120 @@ export function CompanyAuditPitchCards({
         </CardContent>
       </Card>
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">Pitch</CardTitle>
-          <CardDescription>
-            Separate from audit history. Re-audit does not replace an APPROVED
-            pitch.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-3 text-sm">
-          {!activePitch ? (
-            <EmptyState
-              title="No pitch yet"
-              description="A successful audit creates a DRAFT pitch for the primary contact."
-            />
-          ) : (
-            <>
-              <div className="flex flex-wrap items-center gap-2">
-                <Badge
-                  variant={
-                    activePitch.status === "APPROVED" ? "default" : "outline"
-                  }
-                >
-                  {activePitch.status}
-                </Badge>
-                {newerAuditAvailable ? (
-                  <span className="text-amber-700 dark:text-amber-400 text-xs">
-                    Newer audit available — regenerate?
-                  </span>
-                ) : null}
-              </div>
-              <div className="space-y-2">
-                <label className="text-xs text-muted-foreground">
-                  First line
-                </label>
-                <Textarea
-                  value={firstLine}
-                  onChange={(e) => setFirstLine(e.target.value)}
-                  rows={2}
-                />
-                <label className="text-xs text-muted-foreground">
-                  Short pitch
-                </label>
-                <Textarea
-                  value={shortPitch}
-                  onChange={(e) => setShortPitch(e.target.value)}
-                  rows={4}
-                />
-              </div>
-              {activePitch.status === "APPROVED" ? (
-                <p className="text-xs text-muted-foreground rounded-md border border-dashed p-2">
-                  Approved for the contact below. Outbound uses this pitch —
-                  enroll/queue on Autopilot → Outbound, then Process outbox (or
-                  wait for the Mon–Fri 8–11 prospect window). You can still edit
-                  + Save, or Regenerate if the audit changed.
-                </p>
-              ) : null}
-              <div className="flex flex-wrap gap-2">
-                {activePitch.status !== "APPROVED" ? (
-                  <Button
-                    size="sm"
-                    disabled={Boolean(busy)}
-                    onClick={() => pitchAction("approve")}
-                  >
-                    Approve
-                  </Button>
-                ) : null}
-                <Button
-                  size="sm"
-                  variant="outline"
-                  disabled={Boolean(busy)}
-                  onClick={() => pitchAction("edit")}
-                >
-                  Save edits
-                </Button>
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  disabled={Boolean(busy)}
-                  onClick={() => pitchAction("regenerate")}
-                >
-                  Regenerate
-                </Button>
-              </div>
-              <div className="pt-2">
-                <p className="mb-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                  Rendered email
-                </p>
-                <EmailPreview pitchId={activePitch.id} />
-              </div>
-            </>
-          )}
-
-          {emailPreview ? (
-            <div className="border-t pt-3 space-y-2">
-              <p className="font-medium text-xs uppercase tracking-wide text-muted-foreground">
-                Email preview
-                {emailPreview.sequenceName
-                  ? ` · ${emailPreview.sequenceName}`
-                  : " · default template"}
-              </p>
-              {emailPreview.subject ? (
-                <p className="text-xs">
-                  <span className="text-muted-foreground">Subject: </span>
-                  {emailPreview.subject}
-                </p>
-              ) : null}
-              <pre className="whitespace-pre-wrap rounded-md bg-muted/50 p-3 text-xs">
-                {emailPreview.body}
-              </pre>
-              {emailPreview.missingRequired.length > 0 ? (
-                <p className="text-xs text-amber-700 dark:text-amber-400">
-                  Fallback used for: {emailPreview.missingRequired.join(", ")}
-                </p>
-              ) : null}
-            </div>
-          ) : null}
-        </CardContent>
-      </Card>
+      <PowPitchReview companyId={companyId} />
     </div>
 
       <CompanyDeepAuditPanel companyId={companyId} showButton={false} />
+
+      <details className="rounded-md border">
+        <summary className="cursor-pointer px-4 py-3 text-sm font-medium">
+          Legacy pitch (Audit 1.0)
+        </summary>
+        <Card className="border-0 shadow-none">
+          <CardHeader>
+            <CardTitle className="text-base">Legacy pitch</CardTitle>
+            <CardDescription>
+              Audit 1.0 branded pitch. Unchanged by Proof of Work.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-3 text-sm">
+            {!activePitch ? (
+              <EmptyState
+                title="No legacy pitch yet"
+                description="A successful Audit 1.0 creates a DRAFT pitch for the primary contact."
+              />
+            ) : (
+              <>
+                <div className="flex flex-wrap items-center gap-2">
+                  <Badge
+                    variant={
+                      activePitch.status === "APPROVED" ? "default" : "outline"
+                    }
+                  >
+                    {activePitch.status}
+                  </Badge>
+                  {newerAuditAvailable ? (
+                    <span className="text-amber-700 dark:text-amber-400 text-xs">
+                      Newer audit available — regenerate?
+                    </span>
+                  ) : null}
+                </div>
+                <div className="space-y-2">
+                  <label className="text-xs text-muted-foreground">
+                    First line
+                  </label>
+                  <Textarea
+                    value={firstLine}
+                    onChange={(e) => setFirstLine(e.target.value)}
+                    rows={2}
+                  />
+                  <label className="text-xs text-muted-foreground">
+                    Short pitch
+                  </label>
+                  <Textarea
+                    value={shortPitch}
+                    onChange={(e) => setShortPitch(e.target.value)}
+                    rows={4}
+                  />
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  {activePitch.status !== "APPROVED" ? (
+                    <Button
+                      size="sm"
+                      disabled={Boolean(busy)}
+                      onClick={() => pitchAction("approve")}
+                    >
+                      Approve
+                    </Button>
+                  ) : null}
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    disabled={Boolean(busy)}
+                    onClick={() => pitchAction("edit")}
+                  >
+                    Save edits
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    disabled={Boolean(busy)}
+                    onClick={() => pitchAction("regenerate")}
+                  >
+                    Regenerate
+                  </Button>
+                </div>
+                <div className="pt-2">
+                  <p className="mb-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                    Rendered email
+                  </p>
+                  <EmailPreview pitchId={activePitch.id} />
+                </div>
+              </>
+            )}
+
+            {emailPreview ? (
+              <div className="border-t pt-3 space-y-2">
+                <p className="font-medium text-xs uppercase tracking-wide text-muted-foreground">
+                  Email preview
+                  {emailPreview.sequenceName
+                    ? ` · ${emailPreview.sequenceName}`
+                    : " · default template"}
+                </p>
+                {emailPreview.subject ? (
+                  <p className="text-xs">
+                    <span className="text-muted-foreground">Subject: </span>
+                    {emailPreview.subject}
+                  </p>
+                ) : null}
+                <pre className="whitespace-pre-wrap rounded-md bg-muted/50 p-3 text-xs">
+                  {emailPreview.body}
+                </pre>
+              </div>
+            ) : null}
+          </CardContent>
+        </Card>
+      </details>
     </div>
   );
 }

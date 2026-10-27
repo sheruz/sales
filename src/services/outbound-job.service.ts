@@ -1245,7 +1245,15 @@ export class OutboundJobService {
       include: {
         enrollment: {
           include: {
-            sequence: { select: { id: true, pausedAt: true, status: true } },
+            sequence: {
+              select: {
+                id: true,
+                pausedAt: true,
+                status: true,
+                name: true,
+                isProofOfWork: true,
+              },
+            },
             campaign: { select: { id: true, pausedAt: true, status: true } },
           },
         },
@@ -1256,6 +1264,26 @@ export class OutboundJobService {
       },
     });
     if (!item) return { id: outboxId, status: "error", reason: "missing" };
+
+    // PoW2: never deliver Proof of Work until POW_SEND_ENABLED
+    if (item.enrollment?.sequence) {
+      try {
+        const { assertPowSendAllowed } = await import("@/lib/pow/send-gate");
+        assertPowSendAllowed(item.enrollment.sequence);
+      } catch (err) {
+        const message =
+          err instanceof Error ? err.message : "PoW send blocked";
+        await prisma.emailOutbox.update({
+          where: { id: outboxId },
+          data: {
+            status: EmailOutboxStatus.HELD,
+            heldReason: "pow_send_disabled",
+            lastError: message,
+          },
+        });
+        return { id: outboxId, status: "held", reason: "pow_send_disabled" };
+      }
+    }
 
     // Tenant compliance: never send without business name + physical address (no Delvix fallback)
     if (!cfg.physicalAddress.trim() || !cfg.businessName.trim()) {

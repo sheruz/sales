@@ -201,6 +201,30 @@ export class SequenceExecutorService {
 
     const orgId = enrollment.organizationId;
 
+    // PoW2: Proof of Work sequences cannot send until POW_SEND_ENABLED (PoW3)
+    try {
+      const { assertPowSendAllowed } = await import("@/lib/pow/send-gate");
+      assertPowSendAllowed(enrollment.sequence);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "PoW send blocked";
+      await prisma.sequenceEnrollment.updateMany({
+        where: { id: enrollment.id, claimToken, organizationId: orgId },
+        data: {
+          status: SequenceEnrollmentStatus.ACTIVE,
+          claimToken: null,
+          claimedAt: null,
+          lastError: message,
+          nextRunAt: new Date(Date.now() + 24 * 60 * 60_000),
+        },
+      });
+      return {
+        enrollmentId: enrollment.id,
+        organizationId: orgId,
+        status: "skipped",
+        reason: "pow_send_disabled",
+      };
+    }
+
     // Phase 4 autopilot enrollments are sent via EmailOutbox — never double-send here
     if (enrollment.source === SequenceEnrollmentSource.AUTOPILOT) {
       await prisma.sequenceEnrollment.updateMany({

@@ -218,12 +218,28 @@ export class SequenceEnrollmentService {
     const contact = await prisma.contact.findFirst({
       where: { id: input.contactId, organizationId },
       include: {
-        company: { select: { id: true, metadata: true } },
+        company: { select: { id: true, metadata: true, country: true } },
       },
     });
     if (!contact) throw new ValidationError("Contact not found in your organization");
     if (!contact.email?.trim()) {
       throw new ValidationError("Contact must have an email to enroll");
+    }
+
+    // PoW2 CASL: Canadian contacts need emailSource=published for Proof of Work
+    if (sequence.isProofOfWork) {
+      const { assertCaslPowEnroll } = await import("@/lib/pow/casl");
+      try {
+        assertCaslPowEnroll({
+          emailSource: contact.emailSource,
+          companyCountry: contact.company?.country,
+          metadata: contact.metadata,
+        });
+      } catch (err) {
+        throw new ValidationError(
+          err instanceof Error ? err.message : "CASL enroll blocked"
+        );
+      }
     }
     const { isOutreachExcluded } = await import(
       "@/lib/crm/import/outreach-exclude"

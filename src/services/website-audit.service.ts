@@ -948,11 +948,13 @@ export class WebsiteAuditService {
   }
 
   async activePitchForCompany(organizationId: string, companyId: string) {
+    // Audit 1.0 legacy only — PoW drafts live in kind=pow
     const approved = await prisma.pitch.findFirst({
       where: {
         organizationId,
         companyId,
         status: PitchStatus.APPROVED,
+        kind: "legacy",
       },
       orderBy: { updatedAt: "desc" },
       include: {
@@ -974,6 +976,7 @@ export class WebsiteAuditService {
         organizationId,
         companyId,
         status: PitchStatus.DRAFT,
+        kind: "legacy",
       },
       orderBy: { updatedAt: "desc" },
       include: {

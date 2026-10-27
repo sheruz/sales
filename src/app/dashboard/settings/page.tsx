@@ -93,8 +93,12 @@ export default async function SettingsPage({
                 tab: "services" as const,
               },
               {
+                label: "Starter offers",
+                href: appHome("/starter-offers"),
+              },
+              {
                 label: "Case studies",
-                href: appHome("/business-brain#documents"),
+                href: appHome("/case-studies"),
               },
               { label: "Target customers", href: appHome("/icp") },
             ]
