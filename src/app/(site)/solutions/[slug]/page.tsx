@@ -1,6 +1,7 @@
 import Link from "next/link";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
+import { PageVisual } from "@/components/marketing/page-visual";
 import { SectionCta } from "@/components/marketing/section-cta";
 import {
   getService,
@@ -9,6 +10,7 @@ import {
   siteConfig,
   solutions,
 } from "@/content/site";
+import { visualForSolution } from "@/lib/marketing/page-visuals";
 
 type Props = { params: Promise<{ slug: string }> };
 
@@ -51,24 +53,33 @@ export default async function SolutionDetailPage({ params }: Props) {
       />
 
       <section className="mkt-section mkt-section--dark">
-        <div className="mkt-wrap max-w-3xl space-y-4">
-          <p className="mkt-eyebrow">Solution</p>
-          <h1 className="text-4xl font-extrabold sm:text-5xl">{s.headline}</h1>
-          <p className="mkt-muted text-lg">{s.short}</p>
-          <div className="flex flex-wrap gap-3 pt-2">
-            <Link
-              href={siteConfig.contact.bookingUrl}
-              className="mkt-btn mkt-btn--primary"
-              data-mkt-schedule
-            >
-              Book a free call
-            </Link>
-            <Link href="/pricing" className="mkt-btn mkt-btn--secondary">
-              See pricing models
-            </Link>
-            <Link href="/contact" className="mkt-btn mkt-btn--secondary">
-              Get a quote
-            </Link>
+        <div className="mkt-wrap space-y-8">
+          <div className="grid items-center gap-10 lg:grid-cols-[1.2fr_0.8fr]">
+            <div className="space-y-4">
+              <p className="mkt-eyebrow">Solution</p>
+              <h1 className="text-4xl font-extrabold sm:text-5xl">{s.headline}</h1>
+              <p className="mkt-muted text-lg">{s.short}</p>
+              <div className="flex flex-wrap gap-3 pt-2">
+                <Link
+                  href={siteConfig.contact.bookingUrl}
+                  className="mkt-btn mkt-btn--primary"
+                  data-mkt-schedule
+                >
+                  Book a free call
+                </Link>
+                <Link href="/pricing" className="mkt-btn mkt-btn--secondary">
+                  See pricing models
+                </Link>
+                <Link href="/contact" className="mkt-btn mkt-btn--secondary">
+                  Get a quote
+                </Link>
+              </div>
+            </div>
+            <PageVisual
+              visual={visualForSolution(s.slug)}
+              alt={`${s.name} solution mockup`}
+              priority
+            />
           </div>
         </div>
       </section>

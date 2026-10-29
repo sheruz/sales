@@ -47,7 +47,7 @@ export default function AutopilotPage() {
           </div>
           <BrowserFrame
             src="/marketing/screenshots/revenue-os-dashboard.svg"
-            alt="Autopilot dashboard placeholder"
+            alt="Autopilot dashboard"
           />
         </div>
       </section>
@@ -85,7 +85,7 @@ export default function AutopilotPage() {
           </div>
           <BrowserFrame
             src="/marketing/screenshots/revenue-os-audit.svg"
-            alt="Deep audit findings placeholder"
+            alt="Deep audit findings"
           />
         </div>
       </section>

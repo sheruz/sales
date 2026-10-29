@@ -13,7 +13,7 @@ export async function sendMarketingNotify(opts: {
   const resend = new Resend(apiKey);
   const from =
     process.env.RESEND_FROM_EMAIL ||
-    "Delvix Studio <hello@delvixstudio.com>";
+    "Delvix Studio <info@delvixstudio.com>";
 
   const result = await resend.emails.send({
     from,

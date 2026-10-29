@@ -2,13 +2,13 @@ import Link from "next/link";
 import type { Metadata } from "next";
 import { BrowserFrame } from "@/components/marketing/browser-frame";
 import { AuditForm } from "@/components/marketing/audit-form";
+import { PageVisual } from "@/components/marketing/page-visual";
+import { VisualThumb } from "@/components/marketing/visual-thumb";
 import {
   engagementModels,
   faq,
   featuredCaseStudy,
-  industries,
   processSteps,
-  services,
   siteConfig,
   solutions,
   techStack,
@@ -17,6 +17,24 @@ import {
   verifiedCaseStudies,
   whyDelvixRows,
 } from "@/content/site";
+import { industryPages, servicePages } from "@/content/pages";
+import {
+  visualForIndustry,
+  visualForService,
+  visualForSolution,
+} from "@/lib/marketing/page-visuals";
+
+/** Home highlights — “what we build” slice, not every engagement model */
+const homeServices = [
+  "web-applications",
+  "mobile-apps",
+  "erp-development",
+  "crm-development",
+  "saas-development",
+  "automation-integrations",
+]
+  .map((slug) => servicePages.find((s) => s.slug === slug))
+  .filter(Boolean) as typeof servicePages;
 
 const stats = siteConfig.stats;
 
@@ -105,7 +123,8 @@ export default function MarketingHomePage() {
             <div className="mkt-glow -right-10 top-10" aria-hidden />
             <BrowserFrame
               src="/marketing/screenshots/revenue-os-dashboard.svg"
-              alt="Revenue OS product dashboard placeholder"
+              alt="Revenue OS product dashboard"
+              priority
             />
           </div>
         </div>
@@ -137,32 +156,42 @@ export default function MarketingHomePage() {
             </p>
           </div>
           <div className="mkt-grid-3">
-            {services.map((s) => (
+            {homeServices.map((s) => (
               <Link key={s.slug} href={`/services/${s.slug}`} className="mkt-card block">
-                <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-[var(--mkt-accent)]">
-                  {s.name.split(" ")[0]}
-                </p>
-                <h3 className="mb-2 text-xl font-bold">{s.name}</h3>
-                <p className="mkt-muted mb-4 text-sm leading-relaxed">{s.short}</p>
+                <VisualThumb
+                  visual={visualForService(s.slug)}
+                  alt={s.seoTitle.split("|")[0].trim()}
+                  className="mkt-card-thumb mb-3"
+                />
+                <h3 className="mb-2 text-xl font-bold">
+                  {s.seoTitle.split("|")[0].trim()}
+                </h3>
+                <p className="mkt-muted mb-4 text-sm leading-relaxed">{s.subline}</p>
                 <span className="mkt-link text-sm">Learn more →</span>
               </Link>
             ))}
           </div>
+          <Link href="/services" className="mkt-link text-sm">
+            All services →
+          </Link>
         </div>
       </section>
 
       {/* Free audit */}
       <section className="mkt-section mkt-section--dark" id="audit">
-        <div className="mkt-wrap grid gap-10 lg:grid-cols-2">
-          <div className="space-y-3">
-            <p className="mkt-eyebrow">Offer</p>
-            <h2 className="text-3xl font-bold sm:text-4xl">
-              Free website &amp; systems audit
-            </h2>
-            <p className="mkt-muted text-lg">
-              Tell us what you are running on. We reply with a short written
-              read of the gaps — no pitch deck.
-            </p>
+        <div className="mkt-wrap grid gap-10 lg:grid-cols-2 lg:items-start">
+          <div className="space-y-6">
+            <div className="space-y-3">
+              <p className="mkt-eyebrow">Offer</p>
+              <h2 className="text-3xl font-bold sm:text-4xl">
+                Free website &amp; systems audit
+              </h2>
+              <p className="mkt-muted text-lg">
+                Tell us what you are running on. We reply with a short written
+                read of the gaps — no pitch deck.
+              </p>
+            </div>
+            <PageVisual visual="audit-report" alt="Sample audit report" />
           </div>
           <AuditForm />
         </div>
@@ -171,14 +200,17 @@ export default function MarketingHomePage() {
       {/* Process */}
       <section className="mkt-section mkt-section--light" id="process">
         <div className="mkt-wrap space-y-8">
-          <div className="flex flex-wrap items-end justify-between gap-4">
-            <div className="max-w-2xl space-y-3">
-              <p className="mkt-eyebrow">How we work</p>
-              <h2 className="text-3xl font-bold sm:text-4xl">From call to launch</h2>
+          <div className="grid items-end gap-8 lg:grid-cols-[1.2fr_0.8fr]">
+            <div className="flex flex-wrap items-end justify-between gap-4">
+              <div className="max-w-2xl space-y-3">
+                <p className="mkt-eyebrow">How we work</p>
+                <h2 className="text-3xl font-bold sm:text-4xl">From call to launch</h2>
+              </div>
+              <Link href="/process" className="mkt-link">
+                Full process →
+              </Link>
             </div>
-            <Link href="/process" className="mkt-link">
-              Full process →
-            </Link>
+            <PageVisual visual="process-timeline" alt="Delivery process timeline" />
           </div>
           <ol className="mkt-grid-3 list-none p-0">
             {processSteps.map((step) => (
@@ -215,6 +247,11 @@ export default function MarketingHomePage() {
           <div className="mkt-grid-2">
             {solutions.map((s) => (
               <Link key={s.slug} href={`/solutions/${s.slug}`} className="mkt-card block">
+                <VisualThumb
+                  visual={visualForSolution(s.slug)}
+                  alt={s.name}
+                  className="mkt-card-thumb mb-3"
+                />
                 <h3 className="mb-2 text-xl font-bold">{s.name}</h3>
                 <p className="mkt-muted mb-4 text-sm leading-relaxed">{s.short}</p>
                 <span className="mkt-link text-sm">Learn more →</span>
@@ -292,10 +329,15 @@ export default function MarketingHomePage() {
             </h2>
           </div>
           <div className="mkt-grid-3">
-            {industries.map((i) => (
+            {industryPages.map((i) => (
               <Link key={i.slug} href={`/industries/${i.slug}`} className="mkt-card block">
+                <VisualThumb
+                  visual={visualForIndustry(i.slug)}
+                  alt={i.name}
+                  className="mkt-card-thumb mb-3"
+                />
                 <h3 className="mb-2 text-lg font-bold">{i.name}</h3>
-                <p className="mkt-muted mb-4 text-sm">{i.short}</p>
+                <p className="mkt-muted mb-4 text-sm">{i.subline}</p>
                 <span className="mkt-link text-sm">Learn more →</span>
               </Link>
             ))}
@@ -385,23 +427,28 @@ export default function MarketingHomePage() {
       {/* Tech stack */}
       <section className="mkt-section mkt-section--light">
         <div className="mkt-wrap space-y-8">
-          <div className="max-w-2xl space-y-3">
-            <p className="mkt-eyebrow">Stack</p>
-            <h2 className="text-3xl font-bold sm:text-4xl">Technologies we ship with</h2>
-          </div>
-          <div className="space-y-5">
-            {Object.entries(techStack).map(([group, items]) => (
-              <div key={group}>
-                <p className="mb-2 text-sm font-semibold">{group}</p>
-                <div className="flex flex-wrap gap-2">
-                  {items.map((item) => (
-                    <span key={item} className="mkt-badge">
-                      {item}
-                    </span>
-                  ))}
-                </div>
+          <div className="grid items-center gap-10 lg:grid-cols-[1.1fr_0.9fr]">
+            <div className="space-y-8">
+              <div className="max-w-2xl space-y-3">
+                <p className="mkt-eyebrow">Stack</p>
+                <h2 className="text-3xl font-bold sm:text-4xl">Technologies we ship with</h2>
               </div>
-            ))}
+              <div className="space-y-5">
+                {Object.entries(techStack).map(([group, items]) => (
+                  <div key={group}>
+                    <p className="mb-2 text-sm font-semibold">{group}</p>
+                    <div className="flex flex-wrap gap-2">
+                      {items.map((item) => (
+                        <span key={item} className="mkt-badge">
+                          {item}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+            <PageVisual visual="code-stack" alt="Technology stack we ship with" />
           </div>
         </div>
       </section>
@@ -427,7 +474,7 @@ export default function MarketingHomePage() {
           </div>
           <BrowserFrame
             src="/marketing/screenshots/revenue-os-pipeline.svg"
-            alt="Autopilot pipeline placeholder"
+            alt="Autopilot sales pipeline"
           />
         </div>
       </section>

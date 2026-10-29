@@ -1,108 +1,127 @@
 import Link from "next/link";
 import type { Metadata } from "next";
+import { PageBreadcrumb } from "@/components/marketing/page-breadcrumb";
+import { PageVisual } from "@/components/marketing/page-visual";
+import { RelatedPages } from "@/components/marketing/related-pages";
 import { SectionCta } from "@/components/marketing/section-cta";
-import { services, siteConfig, solutions } from "@/content/site";
+import { VisualThumb } from "@/components/marketing/visual-thumb";
+import { servicePages } from "@/content/pages";
+import { mainNav } from "@/content/navigation";
+import { buildPageMetadata } from "@/lib/marketing/page-metadata";
+import { getNavMeta } from "@/lib/marketing/nav-lookup";
+import { visualForPath, visualForService } from "@/lib/marketing/page-visuals";
 
-export const metadata: Metadata = {
-  title: "Services",
+export const metadata: Metadata = buildPageMetadata({
+  title: "Software Development Services | Delvix Studio",
   description:
-    "Web apps, mobile apps, custom ERP & CRM, AI integrations, automation and project rescue from Delvix Studio.",
-  alternates: { canonical: `${siteConfig.url}/services` },
-};
+    "Fixed-price projects, dedicated developers, web and mobile apps, ERP, CRM, automation and project rescue. See every way Delvix Studio can help you build.",
+  path: "/services",
+});
+
+type Card = { slug: string; title: string; short: string };
+
+function buildGroups(): Array<{ heading: string; cards: Card[] }> {
+  const bySlug = new Map(servicePages.map((s) => [s.slug, s]));
+  const used = new Set<string>();
+  const groups: Array<{ heading: string; cards: Card[] }> = [];
+
+  const servicesNav = mainNav.find((t) => t.id === "services");
+  for (const section of servicesNav?.sections ?? []) {
+    const cards: Card[] = [];
+    for (const link of section.links) {
+      const match = link.href.match(/^\/services\/([^/?#]+)$/);
+      const page = match ? bySlug.get(match[1]) : undefined;
+      if (!page || used.has(page.slug)) continue;
+      used.add(page.slug);
+      cards.push({ slug: page.slug, title: link.title, short: page.subline });
+    }
+    if (cards.length > 0) groups.push({ heading: section.heading, cards });
+  }
+
+  // Anything not in the navigation still gets listed.
+  const rest = servicePages
+    .filter((s) => !used.has(s.slug))
+    .map((s) => ({
+      slug: s.slug,
+      title: getNavMeta(`/services/${s.slug}`)?.title ?? s.h1,
+      short: s.subline,
+    }));
+  if (rest.length > 0) groups.push({ heading: "More services", cards: rest });
+  return groups;
+}
 
 export default function ServicesIndexPage() {
+  const groups = buildGroups();
+
   return (
     <>
       <section className="mkt-section mkt-section--dark">
-        <div className="mkt-wrap space-y-4">
-          <p className="mkt-eyebrow">Services</p>
-          <h1 className="text-4xl font-extrabold sm:text-5xl">What we build</h1>
-          <p className="mkt-muted max-w-2xl text-lg">
-            Each card below is a full inner page — open any service for problem,
-            approach, capabilities, use cases, process, stack and FAQ.
-          </p>
-        </div>
-      </section>
-
-      <section className="mkt-section mkt-section--light">
-        <div className="mkt-wrap space-y-10">
-          {services.map((s) => (
-            <article
-              key={s.slug}
-              className="mkt-card grid gap-6 lg:grid-cols-[1.1fr_0.9fr]"
-            >
-              <div className="space-y-4">
-                <p className="text-xs font-semibold uppercase tracking-wider text-[var(--mkt-accent)]">
-                  /services/{s.slug}
-                </p>
-                <h2 className="text-2xl font-extrabold sm:text-3xl">{s.name}</h2>
-                <p className="text-lg font-medium text-[var(--mkt-ink)]">
-                  {s.headline}
-                </p>
-                <p className="mkt-muted text-sm leading-relaxed">{s.short}</p>
-                <p className="text-sm leading-relaxed text-[var(--mkt-ink)]">
-                  {s.approach}
-                </p>
-                <ul className="space-y-1 text-sm">
-                  {s.outcomes.slice(0, 3).map((o) => (
-                    <li key={o} className="mkt-muted">
-                      · {o}
-                    </li>
-                  ))}
-                </ul>
-                <Link href={`/services/${s.slug}`} className="mkt-btn mkt-btn--primary inline-flex">
-                  Open full page →
+        <div className="mkt-wrap space-y-8">
+          <PageBreadcrumb current="Services" currentPath="/services" />
+          <div className="grid items-center gap-10 lg:grid-cols-[1.2fr_0.8fr]">
+            <div className="space-y-6">
+              <p className="mkt-eyebrow">Services</p>
+              <h1 className="max-w-3xl text-4xl font-extrabold sm:text-5xl">
+                Software services for businesses that have outgrown spreadsheets
+              </h1>
+              <p className="mkt-muted max-w-2xl text-lg">
+                Choose how you want to work with us, what you want built, or where
+                your project is today. Every page explains the problem, what you
+                receive, how it runs, and what it typically takes.
+              </p>
+              <div className="flex flex-wrap gap-3">
+                <Link href="/contact" className="mkt-btn mkt-btn--primary">
+                  Talk to us
+                </Link>
+                <Link href="/free-audit" className="mkt-btn mkt-btn--secondary">
+                  Get a free audit
                 </Link>
               </div>
-              <div className="space-y-3">
-                <p className="text-xs font-semibold uppercase tracking-wider text-[var(--mkt-accent)]">
-                  Capabilities on this page
-                </p>
-                <ul className="space-y-2">
-                  {s.capabilities.map((c) => (
-                    <li key={c.title} className="rounded-xl border border-[var(--mkt-line)] bg-[var(--mkt-navy)]/40 px-3 py-2 sm:bg-white/80">
-                      <p className="text-sm font-semibold text-[var(--mkt-ink)]">
-                        {c.title}
-                      </p>
-                      <p className="mkt-muted mt-0.5 text-xs leading-snug">
-                        {c.body}
-                      </p>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            </article>
-          ))}
+            </div>
+            <PageVisual visual={visualForPath("/services")} alt="Services overview" priority />
+          </div>
         </div>
       </section>
 
-      <section className="mkt-section mkt-section--dark">
-        <div className="mkt-wrap space-y-6">
-          <div className="max-w-2xl space-y-3">
-            <p className="mkt-eyebrow">Also see</p>
-            <h2 className="text-3xl font-extrabold">Solutions</h2>
-            <p className="mkt-muted">
-              Engagement shapes — each has its own full inner page too.
-            </p>
+      {groups.map((g, i) => (
+        <section
+          key={g.heading}
+          className={`mkt-section mkt-section--${i % 2 === 0 ? "light" : "dark"}`}
+        >
+          <div className="mkt-wrap space-y-8">
+            <h2 className="text-3xl font-extrabold">{g.heading}</h2>
+            <div className="mkt-grid-3">
+              {g.cards.map((c) => (
+                <Link
+                  key={c.slug}
+                  href={`/services/${c.slug}`}
+                  className="mkt-card block"
+                >
+                  <VisualThumb
+                    visual={visualForService(c.slug)}
+                    alt={c.title}
+                    className="mkt-card-thumb mb-3"
+                  />
+                  <h3 className="mb-2 text-lg font-bold">{c.title}</h3>
+                  <p className="mkt-muted mb-3 text-sm leading-relaxed">
+                    {c.short}
+                  </p>
+                  <span className="mkt-link text-sm">Learn more →</span>
+                </Link>
+              ))}
+            </div>
           </div>
-          <div className="mkt-grid-2">
-            {solutions.map((s) => (
-              <Link
-                key={s.slug}
-                href={`/solutions/${s.slug}`}
-                className="mkt-card block"
-              >
-                <p className="mb-1 text-xs text-[var(--mkt-accent)]">
-                  /solutions/{s.slug}
-                </p>
-                <h3 className="mb-2 font-bold">{s.name}</h3>
-                <p className="mkt-muted mb-3 text-sm">{s.short}</p>
-                <span className="mkt-link text-sm">Open →</span>
-              </Link>
-            ))}
-          </div>
-        </div>
-      </section>
+        </section>
+      ))}
+
+      <RelatedPages
+        tone={groups.length % 2 === 0 ? "light" : "dark"}
+        links={[
+          { href: "/ai", label: "AI services" },
+          { href: "/pricing", label: "Pricing and engagement models" },
+          { href: "/process", label: "How we work" },
+        ]}
+      />
       <SectionCta />
     </>
   );

@@ -74,7 +74,7 @@ export async function POST(request: Request) {
         {
           success: false,
           error:
-            "We could not join the list right now. Email hello@delvixstudio.com with subject Autopilot early access.",
+            "We could not join the list right now. Email info@delvixstudio.com with subject Autopilot early access.",
         },
         { status: 502 }
       );

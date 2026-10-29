@@ -1,27 +1,160 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useId, useState } from "react";
+import dynamic from "next/dynamic";
+import { ChevronDown, Menu } from "lucide-react";
+import { useCallback, useEffect, useId, useRef, useState } from "react";
 import { SiteLogo } from "@/components/marketing/site-logo";
-import { getMainNav, siteConfig, type NavItem } from "@/content/site";
+import {
+  headerCtas,
+  mainNav,
+  type NavTop,
+} from "@/content/navigation";
+import { siteConfig } from "@/content/site";
+
+/** Icons + mega panel load only when a menu opens — keeps initial JS small for LCP. */
+const MegaPanel = dynamic(
+  () =>
+    import("@/components/marketing/site-mega-menu").then((m) => m.MegaPanel),
+  { ssr: false }
+);
+const MobileMenu = dynamic(
+  () =>
+    import("@/components/marketing/site-mega-menu").then((m) => m.MobileMenu),
+  { ssr: false }
+);
+
+const HOVER_CLOSE_DELAY_MS = 140;
 
 export function SiteHeader() {
-  const nav = getMainNav();
+  const baseId = useId();
+  const headerRef = useRef<HTMLElement>(null);
+  const topRefs = useRef<Array<HTMLElement | null>>([]);
+  const menuButtonRef = useRef<HTMLButtonElement>(null);
+  const closeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const [openId, setOpenId] = useState<string | null>(null);
+  const [pinned, setPinned] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
-  const [openMenu, setOpenMenu] = useState<string | null>(null);
-  const [mobileSection, setMobileSection] = useState<string | null>(null);
-  const panelId = useId();
+
+  const clearCloseTimer = useCallback(() => {
+    if (closeTimer.current) {
+      clearTimeout(closeTimer.current);
+      closeTimer.current = null;
+    }
+  }, []);
+
+  const closeMenu = useCallback(() => {
+    clearCloseTimer();
+    setOpenId(null);
+    setPinned(false);
+  }, [clearCloseTimer]);
+
+  useEffect(() => clearCloseTimer, [clearCloseTimer]);
 
   useEffect(() => {
+    if (!openId) return;
+
     function onKey(e: KeyboardEvent) {
-      if (e.key === "Escape") {
-        setOpenMenu(null);
-        setMobileOpen(false);
-      }
+      if (e.key !== "Escape") return;
+      const index = mainNav.findIndex((t) => t.id === openId);
+      closeMenu();
+      topRefs.current[index]?.focus();
+    }
+    function onPointerDown(e: PointerEvent) {
+      if (!headerRef.current?.contains(e.target as Node)) closeMenu();
     }
     document.addEventListener("keydown", onKey);
-    return () => document.removeEventListener("keydown", onKey);
-  }, []);
+    document.addEventListener("pointerdown", onPointerDown);
+    return () => {
+      document.removeEventListener("keydown", onKey);
+      document.removeEventListener("pointerdown", onPointerDown);
+    };
+  }, [openId, closeMenu]);
+
+  useEffect(() => {
+    if (!mobileOpen) return;
+    const prevOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+
+    function onKey(e: KeyboardEvent) {
+      if (e.key === "Escape") {
+        setMobileOpen(false);
+        menuButtonRef.current?.focus();
+      }
+    }
+    function onResize() {
+      if (window.innerWidth >= 1024) setMobileOpen(false);
+    }
+    document.addEventListener("keydown", onKey);
+    window.addEventListener("resize", onResize);
+    return () => {
+      document.body.style.overflow = prevOverflow;
+      document.removeEventListener("keydown", onKey);
+      window.removeEventListener("resize", onResize);
+    };
+  }, [mobileOpen]);
+
+  function openOnHover(id: string) {
+    clearCloseTimer();
+    if (pinned && openId && openId !== id) {
+      setOpenId(id);
+      setPinned(false);
+      return;
+    }
+    if (!pinned) setOpenId(id);
+  }
+
+  function scheduleHoverClose() {
+    if (pinned) return;
+    clearCloseTimer();
+    closeTimer.current = setTimeout(() => {
+      setOpenId(null);
+    }, HOVER_CLOSE_DELAY_MS);
+  }
+
+  function toggleByClick(id: string) {
+    clearCloseTimer();
+    if (openId === id && pinned) {
+      closeMenu();
+    } else {
+      setOpenId(id);
+      setPinned(true);
+    }
+  }
+
+  function onTopKeyDown(e: React.KeyboardEvent, index: number, top: NavTop) {
+    const count = mainNav.length;
+    if (e.key === "ArrowRight" || e.key === "ArrowLeft") {
+      e.preventDefault();
+      const next =
+        (index + (e.key === "ArrowRight" ? 1 : -1) + count) % count;
+      const nextTop = mainNav[next];
+      if (openId && nextTop.sections?.length) {
+        setOpenId(nextTop.id);
+        setPinned(true);
+      } else if (openId) {
+        closeMenu();
+      }
+      topRefs.current[next]?.focus();
+    } else if (e.key === "ArrowDown" && top.sections?.length) {
+      e.preventDefault();
+      setOpenId(top.id);
+      setPinned(true);
+      requestAnimationFrame(() => {
+        document
+          .querySelector<HTMLElement>(`#${CSS.escape(`${baseId}-${top.id}`)} a`)
+          ?.focus();
+      });
+    }
+  }
+
+  function onItemBlur(e: React.FocusEvent<HTMLDivElement>) {
+    const next = e.relatedTarget as Node | null;
+    if (next && !e.currentTarget.contains(next)) closeMenu();
+  }
+
+  const closeMobile = () => setMobileOpen(false);
 
   return (
     <>
@@ -44,211 +177,124 @@ export function SiteHeader() {
           </div>
         </div>
       </div>
-      <header className="mkt-header">
+
+      <header className="mkt-header" ref={headerRef}>
         <div className="mkt-wrap flex items-center justify-between gap-4 py-3">
           <SiteLogo />
+
           <nav
-            className="mkt-nav hidden items-center gap-1 xl:gap-2 lg:flex"
+            className="mkt-nav hidden items-center gap-1 lg:flex"
             aria-label="Primary"
-            onMouseLeave={() => setOpenMenu(null)}
           >
-            {nav.map((item) => (
-              <DesktopItem
-                key={item.href + item.label}
-                item={item}
-                open={openMenu === item.label}
-                onOpen={() => setOpenMenu(item.label)}
-                onClose={() => setOpenMenu(null)}
-                panelId={`${panelId}-${item.label}`}
-              />
-            ))}
+            {mainNav.map((top, index) => {
+              const panelId = `${baseId}-${top.id}`;
+              const hasMenu = Boolean(top.sections?.length);
+
+              if (!hasMenu) {
+                return (
+                  <Link
+                    key={top.id}
+                    href={top.href ?? "/"}
+                    className="mkt-nav__top"
+                    ref={(el) => {
+                      topRefs.current[index] = el;
+                    }}
+                    onKeyDown={(e) => onTopKeyDown(e, index, top)}
+                    onMouseEnter={() => {
+                      if (!pinned) scheduleHoverClose();
+                    }}
+                    onClick={closeMenu}
+                  >
+                    {top.label}
+                  </Link>
+                );
+              }
+
+              const open = openId === top.id;
+              return (
+                <div
+                  key={top.id}
+                  className="mkt-nav__item"
+                  onMouseEnter={() => openOnHover(top.id)}
+                  onMouseLeave={scheduleHoverClose}
+                  onBlur={onItemBlur}
+                >
+                  <button
+                    type="button"
+                    className="mkt-nav__top mkt-nav__top--btn"
+                    aria-expanded={open}
+                    aria-controls={open ? panelId : undefined}
+                    aria-haspopup="true"
+                    data-open={open || undefined}
+                    ref={(el) => {
+                      topRefs.current[index] = el;
+                    }}
+                    onClick={() => toggleByClick(top.id)}
+                    onKeyDown={(e) => onTopKeyDown(e, index, top)}
+                  >
+                    {top.label}
+                    <ChevronDown
+                      className="mkt-nav__chev"
+                      size={14}
+                      aria-hidden="true"
+                    />
+                  </button>
+                  {open ? (
+                    <MegaPanel
+                      id={panelId}
+                      label={top.label}
+                      sections={top.sections ?? []}
+                      highlight={top.highlight}
+                      onNavigate={closeMenu}
+                    />
+                  ) : null}
+                </div>
+              );
+            })}
           </nav>
+
           <div className="ml-auto hidden items-center gap-2 lg:flex">
-            <Link href="/pricing" className="mkt-btn mkt-btn--secondary">
-              Get pricing
+            <Link
+              href={headerCtas.secondary.href}
+              className="mkt-btn mkt-btn--secondary hidden xl:inline-flex"
+              onClick={closeMenu}
+            >
+              {headerCtas.secondary.label}
             </Link>
             <Link
-              href={siteConfig.contact.bookingUrl}
+              href={headerCtas.primary.href}
               className="mkt-btn mkt-btn--primary"
               data-mkt-schedule
+              onClick={closeMenu}
             >
-              Book a free call
+              {headerCtas.primary.label}
             </Link>
           </div>
+
           <button
             type="button"
-            className="mkt-btn mkt-btn--secondary min-w-[2.75rem] lg:!hidden"
+            ref={menuButtonRef}
+            className="mkt-btn mkt-btn--secondary mkt-menu-btn lg:!hidden"
             aria-expanded={mobileOpen}
             aria-controls="mkt-mobile-nav"
-            aria-label={mobileOpen ? "Close menu" : "Open menu"}
-            onClick={() => setMobileOpen((v) => !v)}
+            aria-label="Open menu"
+            onClick={() => setMobileOpen(true)}
           >
-            Menu
+            <Menu size={18} aria-hidden="true" />
+            <span>Menu</span>
           </button>
         </div>
-
-        {mobileOpen ? (
-          <div
-            id="mkt-mobile-nav"
-            className="max-h-[75vh] overflow-y-auto border-t border-[var(--mkt-line)] lg:hidden"
-          >
-            <nav className="mkt-wrap flex flex-col gap-1 py-4" aria-label="Mobile">
-              {nav.map((item) => (
-                <MobileItem
-                  key={item.href + item.label}
-                  item={item}
-                  open={mobileSection === item.label}
-                  onToggle={() =>
-                    setMobileSection((cur) =>
-                      cur === item.label ? null : item.label
-                    )
-                  }
-                  onNavigate={() => setMobileOpen(false)}
-                />
-              ))}
-              <Link
-                href="/contact"
-                className="mkt-btn mkt-btn--secondary mt-3"
-                onClick={() => setMobileOpen(false)}
-              >
-                Get a quote
-              </Link>
-              <Link
-                href={siteConfig.contact.bookingUrl}
-                className="mkt-btn mkt-btn--primary"
-                data-mkt-schedule
-                onClick={() => setMobileOpen(false)}
-              >
-                Book a free call
-              </Link>
-            </nav>
-          </div>
-        ) : null}
       </header>
+
+      {mobileOpen ? (
+        <MobileMenu
+          onClose={() => {
+            closeMobile();
+            menuButtonRef.current?.focus();
+          }}
+          onNavigate={closeMobile}
+        />
+      ) : null}
     </>
-  );
-}
-
-function DesktopItem({
-  item,
-  open,
-  onOpen,
-  onClose,
-  panelId,
-}: {
-  item: NavItem;
-  open: boolean;
-  onOpen: () => void;
-  onClose: () => void;
-  panelId: string;
-}) {
-  if (!item.children?.length) {
-    return (
-      <Link href={item.href} className="mkt-nav__top">
-        {item.label}
-      </Link>
-    );
-  }
-
-  return (
-    <div
-      className="mkt-nav__item"
-      onMouseEnter={onOpen}
-      onFocus={onOpen}
-    >
-      <button
-        type="button"
-        className="mkt-nav__top mkt-nav__top--btn"
-        aria-expanded={open}
-        aria-controls={panelId}
-        onClick={() => (open ? onClose() : onOpen())}
-      >
-        {item.label}
-        <span className="mkt-nav__chev" aria-hidden>
-          ▾
-        </span>
-      </button>
-      {open ? (
-        <div id={panelId} className="mkt-nav__panel" role="region" aria-label={item.label}>
-          <div className="mkt-nav__panel-inner">
-            <Link href={item.href} className="mkt-nav__panel-head" onClick={onClose}>
-              Browse all {item.label.toLowerCase()} →
-            </Link>
-            <ul className="mkt-nav__grid">
-              {item.children.map((child) => (
-                <li key={child.href + child.label}>
-                  <Link href={child.href} className="mkt-nav__card" onClick={onClose}>
-                    <span className="mkt-nav__card-label">{child.label}</span>
-                    {child.description ? (
-                      <span className="mkt-nav__card-desc">{child.description}</span>
-                    ) : null}
-                  </Link>
-                </li>
-              ))}
-            </ul>
-          </div>
-        </div>
-      ) : null}
-    </div>
-  );
-}
-
-function MobileItem({
-  item,
-  open,
-  onToggle,
-  onNavigate,
-}: {
-  item: NavItem;
-  open: boolean;
-  onToggle: () => void;
-  onNavigate: () => void;
-}) {
-  if (!item.children?.length) {
-    return (
-      <Link
-        href={item.href}
-        className="rounded-lg px-2 py-2.5 text-[var(--mkt-ink)]"
-        onClick={onNavigate}
-      >
-        {item.label}
-      </Link>
-    );
-  }
-
-  return (
-    <div className="border-b border-[var(--mkt-line)] pb-2">
-      <button
-        type="button"
-        className="flex w-full items-center justify-between px-2 py-2.5 text-left font-semibold text-[var(--mkt-ink)]"
-        aria-expanded={open}
-        onClick={onToggle}
-      >
-        {item.label}
-        <span aria-hidden>{open ? "−" : "+"}</span>
-      </button>
-      {open ? (
-        <ul className="space-y-1 pb-2 pl-3">
-          {item.children.map((child) => (
-            <li key={child.href + child.label}>
-              <Link
-                href={child.href}
-                className="block rounded-md px-2 py-2 text-sm text-[var(--mkt-muted)]"
-                onClick={onNavigate}
-              >
-                <span className="block font-medium text-[var(--mkt-ink)]">
-                  {child.label}
-                </span>
-                {child.description ? (
-                  <span className="mt-0.5 block text-xs leading-snug">
-                    {child.description}
-                  </span>
-                ) : null}
-              </Link>
-            </li>
-          ))}
-        </ul>
-      ) : null}
-    </div>
   );
 }

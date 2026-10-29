@@ -1,13 +1,20 @@
 import Link from "next/link";
 import type { Metadata } from "next";
-import { engagementModels, siteConfig } from "@/content/site";
+import { FaqBlock } from "@/components/marketing/faq-block";
+import { PageBreadcrumb } from "@/components/marketing/page-breadcrumb";
+import { PageVisual } from "@/components/marketing/page-visual";
+import { RelatedPages } from "@/components/marketing/related-pages";
+import { SectionCta } from "@/components/marketing/section-cta";
+import { pricingPage } from "@/content/pages";
+import { siteConfig } from "@/content/site";
+import { buildPageMetadata } from "@/lib/marketing/page-metadata";
+import { visualForPath } from "@/lib/marketing/page-visuals";
 
-export const metadata: Metadata = {
-  title: "Pricing",
-  description:
-    "Fixed-price projects, monthly retainers and dedicated developers. Prices published when set.",
-  alternates: { canonical: `${siteConfig.url}/pricing` },
-};
+export const metadata: Metadata = buildPageMetadata({
+  title: pricingPage.seoTitle,
+  description: pricingPage.seoDescription,
+  path: "/pricing",
+});
 
 function formatFrom(priceFrom?: number, currency?: string) {
   if (priceFrom == null || !Number.isFinite(priceFrom)) return null;
@@ -25,51 +32,93 @@ function formatFrom(priceFrom?: number, currency?: string) {
 
 export default function PricingPage() {
   const offers = siteConfig.offers;
+  const hasOffers = offers.length > 0;
 
   return (
     <>
       <section className="mkt-section mkt-section--dark">
-        <div className="mkt-wrap max-w-3xl space-y-4">
-          <p className="mkt-eyebrow">Pricing</p>
-          <h1 className="text-4xl font-extrabold sm:text-5xl">
-            Engagement models
-          </h1>
-          <p className="mkt-muted text-lg">
-            Pick how you want to work. Detailed numbers appear only when published
-            in config — we do not invent rates here.
-          </p>
+        <div className="mkt-wrap space-y-8">
+          <PageBreadcrumb current="Pricing" currentPath="/pricing" />
+          <div className="grid items-center gap-10 lg:grid-cols-[1.2fr_0.8fr]">
+            <div className="space-y-6">
+              <p className="mkt-eyebrow">Pricing</p>
+              <h1 className="text-4xl font-extrabold sm:text-5xl">{pricingPage.h1}</h1>
+              <p className="mkt-muted text-lg leading-relaxed">{pricingPage.intro}</p>
+              <p className="mkt-muted text-sm leading-relaxed">
+                {pricingPage.noPricesNote}
+              </p>
+            </div>
+            <PageVisual visual={visualForPath("/pricing")} alt="Scoped project milestones" priority />
+          </div>
         </div>
       </section>
 
       <section className="mkt-section mkt-section--light">
-        <div className="mkt-wrap mkt-grid-3">
-          {engagementModels.map((m) => (
-            <div key={m.name} className="mkt-card">
-              <h2 className="mb-2 text-xl font-bold">{m.name}</h2>
-              <p className="mkt-muted mb-4 text-sm">Fits: {m.fits}</p>
-              <ul className="mb-5 space-y-2 text-sm">
-                {m.includes.map((line) => (
-                  <li key={line}>· {line}</li>
-                ))}
-              </ul>
-              <Link
-                href={siteConfig.contact.bookingUrl}
-                className="mkt-link text-sm"
-                data-mkt-schedule
-              >
-                Get pricing →
-              </Link>
+        <div className="mkt-wrap space-y-8">
+          <div className="grid items-center gap-10 lg:grid-cols-[1fr_1fr]">
+            <div className="max-w-2xl space-y-3">
+              <p className="mkt-eyebrow">Engagement models</p>
+              <h2 className="text-3xl font-extrabold">Choose how you want to work</h2>
             </div>
-          ))}
+            <PageVisual visual={visualForPath("/pricing")} alt="Scoped milestones and pricing models" />
+          </div>
+          <div className="mkt-grid-3">
+            {pricingPage.models.map((m) => (
+              <div key={m.id} className="mkt-card flex flex-col">
+                <h3 className="mb-1 text-xl font-bold">{m.name}</h3>
+                <p className="mb-3 text-sm font-medium text-[var(--mkt-accent)]">
+                  {m.tagline}
+                </p>
+                <p className="mkt-muted mb-3 text-sm leading-relaxed">
+                  <strong>Best for:</strong> {m.bestFor}
+                </p>
+                <p className="mb-4 text-sm leading-relaxed">{m.howItWorks}</p>
+                <ul className="mb-4 list-disc space-y-1 pl-5 text-sm">
+                  {m.includes.map((line) => (
+                    <li key={line}>{line}</li>
+                  ))}
+                </ul>
+                <p className="mkt-muted mb-5 text-sm leading-relaxed">
+                  <strong>Trade-offs:</strong> {m.tradeOffs}
+                </p>
+                <Link
+                  href={siteConfig.contact.bookingUrl}
+                  className="mkt-link mt-auto text-sm"
+                  data-mkt-schedule
+                >
+                  Talk through this model →
+                </Link>
+              </div>
+            ))}
+          </div>
         </div>
       </section>
 
-      {offers.length > 0 ? (
-        <section className="mkt-section mkt-section--dark">
+      <section className="mkt-section mkt-section--dark">
+        <div className="mkt-wrap max-w-3xl space-y-4">
+          <p className="mkt-eyebrow">What affects the price</p>
+          <h2 className="text-3xl font-extrabold">
+            What moves a quote up or down
+          </h2>
+          <ul className="m-0 list-none space-y-2 p-0">
+            {pricingPage.whatAffectsPrice.map((line) => (
+              <li key={line} className="mkt-card text-sm leading-relaxed">
+                {line}
+              </li>
+            ))}
+          </ul>
+        </div>
+      </section>
+
+      {hasOffers ? (
+        <section className="mkt-section mkt-section--light">
           <div className="mkt-wrap space-y-8">
             <div className="max-w-2xl space-y-3">
               <p className="mkt-eyebrow">Starter offers</p>
               <h2 className="text-3xl font-extrabold">Fixed packages</h2>
+              <p className="mkt-muted leading-relaxed">
+                {pricingPage.starterOffersNote}
+              </p>
             </div>
             <div className="mkt-grid-3">
               {offers.map((o) => {
@@ -89,7 +138,7 @@ export default function PricingPage() {
                       className="mkt-link text-sm"
                       data-mkt-schedule={o.href ? undefined : true}
                     >
-                      Get started →
+                      {o.href ? "Learn more →" : "Get started →"}
                     </Link>
                   </div>
                 );
@@ -99,17 +148,19 @@ export default function PricingPage() {
         </section>
       ) : null}
 
-      <section className="mkt-section mkt-section--cta">
-        <div className="mkt-wrap text-center">
-          <Link
-            href={siteConfig.contact.bookingUrl}
-            className="mkt-btn mkt-btn--primary"
-            data-mkt-schedule
-          >
-            Book a free call
-          </Link>
-        </div>
-      </section>
+      <FaqBlock items={pricingPage.faq} tone={hasOffers ? "dark" : "light"} />
+      <RelatedPages
+        tone={hasOffers ? "light" : "dark"}
+        links={[
+          { href: "/process", label: "How we work" },
+          { href: "/services/fixed-price-projects", label: "Fixed-price projects" },
+          { href: "/free-audit", label: "Get a free website audit" },
+        ]}
+      />
+      <SectionCta
+        title="Get a quote for your project"
+        sub="Tell us what you need and we will reply with a written scope and price."
+      />
     </>
   );
 }

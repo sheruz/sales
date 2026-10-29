@@ -4,9 +4,12 @@ import { siteConfig, valueTags } from "@/content/site";
 export function SectionCta({
   title = "Tell us what you're running on today",
   sub,
+  showAuditLink = true,
 }: {
   title?: string;
   sub?: string;
+  /** Soft link to /free-audit under the buttons. Disable on the audit page itself. */
+  showAuditLink?: boolean;
 }) {
   return (
     <section className="mkt-section mkt-section--cta">
@@ -34,6 +37,13 @@ export function SectionCta({
             Get a quote
           </Link>
         </div>
+        {showAuditLink ? (
+          <p className="text-sm">
+            <Link href="/free-audit" className="mkt-link">
+              Get a free audit
+            </Link>
+          </p>
+        ) : null}
         <ul className="flex flex-wrap justify-center gap-2 pt-1">
           {valueTags.map((t) => (
             <li key={t} className="mkt-badge">

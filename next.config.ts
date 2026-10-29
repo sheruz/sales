@@ -32,10 +32,28 @@ const securityHeaders = [
 
 
 const nextConfig: NextConfig = {
+  images: {
+    // Marketing mockups are local SVGs; allow them through next/image.
+    dangerouslyAllowSVG: true,
+    contentDispositionType: "inline",
+    contentSecurityPolicy: "default-src 'self'; script-src 'none'; sandbox;",
+  },
   experimental: {
     serverActions: {
       bodySizeLimit: "2mb",
     },
+  },
+  async redirects() {
+    return [
+      { source: "/services/web-apps", destination: "/services/web-applications", permanent: true },
+      { source: "/services/erp-crm", destination: "/services/erp-development", permanent: true },
+      { source: "/services/ai-integrations", destination: "/ai/ai-integrations", permanent: true },
+      { source: "/services/automation", destination: "/services/automation-integrations", permanent: true },
+      { source: "/industries/logistics", destination: "/industries/logistics-trucking", permanent: true },
+      { source: "/industries/clinics", destination: "/industries/healthcare-clinics", permanent: true },
+      { source: "/industries/construction", destination: "/industries/construction-trades", permanent: true },
+      { source: "/industries/retail", destination: "/industries/retail-inventory", permanent: true },
+    ];
   },
   async headers() {
     return [

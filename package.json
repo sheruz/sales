@@ -8,6 +8,7 @@
     "start": "node scripts/start.js",
     "lint": "eslint",
     "typecheck": "tsc --noEmit",
+    "check:nav": "npx tsx scripts/check-nav-links.ts",
     "test": "vitest run",
     "test:watch": "vitest",
     "test:isolation": "node scripts/run-with-env.js npx tsx scripts/phase1-isolation-test.ts",

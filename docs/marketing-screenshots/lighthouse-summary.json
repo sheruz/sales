@@ -1,0 +1,18 @@
+{
+  "mode": "production (next start, mobile form-factor)",
+  "build": "green via node scripts/build.js (npm run build can EPERM on prisma generate while dev server locks the engine DLL)",
+  "bestObserved": {
+    "home": { "perf": 95, "a11y": 96, "bp": 100, "seo": 92, "lcp": "2.8s" },
+    "service": { "perf": 92, "a11y": 96, "bp": 100, "seo": 92, "lcp": "3.2s" },
+    "industry": { "perf": 92, "a11y": 96, "bp": 100, "seo": 92, "lcp": "3.1s" }
+  },
+  "latestRun": {
+    "home": { "perf": 85, "a11y": 96, "bp": 100, "seo": 92, "lcp": "3.9s" },
+    "service": { "perf": 87, "a11y": 96, "bp": 100, "seo": 92, "lcp": "3.9s" },
+    "industry": { "perf": 88, "a11y": 96, "bp": 100, "seo": 92, "lcp": "3.8s" }
+  },
+  "notes": [
+    "Scores vary with lab CPU; LCP is dominated by render delay from shared client chrome (ThemeProvider + header hydration), not document TTFB (pages respond in <50ms).",
+    "Perf fixes shipped: Meta Pixel DB lookup 1.5s timeout, GA strategy lazyOnload, mega-menu/icons code-split, hero image priority, mobile topbar hidden, H1 system-ui font first."
+  ]
+}

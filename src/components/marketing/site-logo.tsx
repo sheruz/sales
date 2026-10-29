@@ -17,7 +17,6 @@ export function SiteLogo({
 }: Props) {
   const src =
     variant === "onLight" ? siteConfig.logoOnLight : siteConfig.logoOnDark;
-  // Intrinsic SVG is 379×96 — keep aspect ratio
   const width = Math.round((height * 379) / 96);
 
   return (

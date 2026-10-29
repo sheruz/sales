@@ -11,12 +11,14 @@ const display = Bricolage_Grotesque({
   subsets: ["latin"],
   variable: "--font-mkt-display",
   display: "swap",
+  preload: true,
 });
 
 const body = Figtree({
   subsets: ["latin"],
   variable: "--font-mkt-body",
   display: "swap",
+  preload: true,
 });
 
 export const metadata: Metadata = {
@@ -29,7 +31,7 @@ export const metadata: Metadata = {
     "Delvix Studio builds web apps, mobile apps, custom ERP/CRM, AI integrations and automation. Fixed scope. Weekly demos. You own the code.",
   icons: {
     icon: [{ url: siteConfig.icon, type: "image/svg+xml" }],
-    apple: [{ url: "/delvix-icon-dark-192.png" }],
+    apple: [{ url: "/delvix-icon-dark.svg", type: "image/svg+xml" }],
   },
   openGraph: {
     type: "website",

@@ -1,7 +1,9 @@
 import Link from "next/link";
 import type { Metadata } from "next";
+import { PageVisual } from "@/components/marketing/page-visual";
 import { SectionCta } from "@/components/marketing/section-cta";
 import { forAgenciesPage, siteConfig } from "@/content/site";
+import { visualForPath } from "@/lib/marketing/page-visuals";
 
 export const metadata: Metadata = {
   title: "For agencies",
@@ -14,12 +16,17 @@ export default function ForAgenciesPage() {
   return (
     <>
       <section className="mkt-section mkt-section--dark">
-        <div className="mkt-wrap max-w-3xl space-y-4">
-          <p className="mkt-eyebrow">For agencies</p>
-          <h1 className="text-4xl font-extrabold sm:text-5xl">
-            {forAgenciesPage.headline}
-          </h1>
-          <p className="mkt-muted text-lg">{forAgenciesPage.intro}</p>
+        <div className="mkt-wrap space-y-8">
+          <div className="grid items-center gap-10 lg:grid-cols-[1.2fr_0.8fr]">
+            <div className="space-y-4">
+              <p className="mkt-eyebrow">For agencies</p>
+              <h1 className="text-4xl font-extrabold sm:text-5xl">
+                {forAgenciesPage.headline}
+              </h1>
+              <p className="mkt-muted text-lg">{forAgenciesPage.intro}</p>
+            </div>
+            <PageVisual visual={visualForPath("/for-agencies")} alt="Agency partner workspace" priority />
+          </div>
         </div>
       </section>
       <section className="mkt-section mkt-section--light">

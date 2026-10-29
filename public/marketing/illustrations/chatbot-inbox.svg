@@ -1,0 +1,27 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="750" viewBox="0 0 1200 750" role="img" aria-label="Support chatbot inbox">
+  <defs>
+    <linearGradient id="g" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#5B63F5" stop-opacity="0.18"/>
+      <stop offset="100%" stop-color="#FF6B3D" stop-opacity="0.08"/>
+    </linearGradient>
+  </defs>
+  <rect width="1200" height="750" fill="#0B1220"/>
+  <rect width="1200" height="750" fill="url(#g)"/>
+<rect x="60" y="50" width="340" height="650" rx="12" fill="#141C2E" stroke="#243044"/>
+  <rect x="90" y="90" width="280" height="40" rx="10" fill="#1A2438"/>
+  <rect x="90" y="150" width="280" height="50" rx="10" fill="#1A2438"/>
+  <rect x="90" y="220" width="280" height="50" rx="10" fill="#1A2438"/>
+  <rect x="90" y="290" width="280" height="50" rx="10" fill="#1A2438"/>
+  <rect x="90" y="360" width="280" height="50" rx="10" fill="#1A2438"/>
+  <rect x="90" y="620" width="280" height="40" rx="20" fill="#5B63F5"/>
+  <rect x="420" y="50" width="720" height="650" rx="12" fill="#141C2E" stroke="#243044"/>
+  <rect x="460" y="100" width="520" height="70" rx="10" fill="#1A2438"/>
+  <rect x="460" y="200" width="420" height="90" rx="10" fill="#1A2438"/>
+  <rect x="620" y="320" width="480" height="90" rx="10" fill="#1A2438"/>
+  <rect x="460" y="440" width="400" height="70" rx="10" fill="#1A2438"/>
+  <rect x="490" y="130" width="200" height="14" rx="4" fill="#8E9CFF"/>
+  <rect x="490" y="240" width="280" height="12" rx="4" fill="#9AA6BF"/>
+  <rect x="660" y="360" width="280" height="12" rx="4" fill="#EEF2FF"/>
+  <rect x="460" y="560" width="640" height="80" rx="10" fill="#1A2438"/>
+  <rect x="980" y="580" width="100" height="40" rx="20" fill="#5B63F5"/>
+</svg>

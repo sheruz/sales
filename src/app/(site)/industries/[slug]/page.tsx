@@ -1,218 +1,213 @@
 import Link from "next/link";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
+import { FaqBlock, JsonLd } from "@/components/marketing/faq-block";
+import { PageBreadcrumb } from "@/components/marketing/page-breadcrumb";
+import { PageVisual } from "@/components/marketing/page-visual";
+import { RelatedPages } from "@/components/marketing/related-pages";
 import { SectionCta } from "@/components/marketing/section-cta";
-import {
-  getCaseStudy,
-  getIndustry,
-  getService,
-  industries,
-  processSteps,
-  siteConfig,
-} from "@/content/site";
+import { getIndustryPage, industryPages } from "@/content/pages";
+import { siteConfig } from "@/content/site";
+import { buildPageMetadata } from "@/lib/marketing/page-metadata";
+import { visualForIndustry } from "@/lib/marketing/page-visuals";
 
 type Props = { params: Promise<{ slug: string }> };
 
+export const dynamicParams = false;
+
 export function generateStaticParams() {
-  return industries.map((i) => ({ slug: i.slug }));
+  return industryPages.map((i) => ({ slug: i.slug }));
 }
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { slug } = await params;
-  const i = getIndustry(slug);
-  if (!i) return {};
-  return {
-    title: i.name,
-    description: i.short,
-    alternates: { canonical: `${siteConfig.url}/industries/${i.slug}` },
-  };
+  const page = getIndustryPage(slug);
+  if (!page) return {};
+  return buildPageMetadata({
+    title: page.seoTitle,
+    description: page.seoDescription,
+    path: `/industries/${page.slug}`,
+  });
 }
 
 export default async function IndustryDetailPage({ params }: Props) {
   const { slug } = await params;
-  const i = getIndustry(slug);
-  if (!i) notFound();
-  const related = i.relatedCaseStudySlug
-    ? getCaseStudy(i.relatedCaseStudySlug)
-    : null;
-  const relatedServices = (i.relatedServiceSlugs || [])
-    .map((id) => getService(id))
+  const page = getIndustryPage(slug);
+  if (!page) notFound();
+
+  const path = `/industries/${page.slug}`;
+  const visual = visualForIndustry(page.slug);
+  const introParagraphs = page.intro
+    .split(/\n\s*\n/)
+    .map((p) => p.trim())
     .filter(Boolean);
 
   return (
     <>
+      <JsonLd
+        data={{
+          "@context": "https://schema.org",
+          "@type": "Service",
+          name: page.h1,
+          description: page.seoDescription,
+          url: `${siteConfig.url}${path}`,
+          provider: {
+            "@type": "Organization",
+            name: siteConfig.name,
+            url: siteConfig.url,
+          },
+        }}
+      />
+
+      {/* Hero + breadcrumb */}
       <section className="mkt-section mkt-section--dark">
-        <div className="mkt-wrap max-w-3xl space-y-4">
-          <p className="mkt-eyebrow">Industry</p>
-          <h1 className="text-4xl font-extrabold sm:text-5xl">{i.headline}</h1>
-          <p className="mkt-muted text-lg">{i.short}</p>
-          <p className="leading-relaxed text-[var(--mkt-ink)]">{i.approach}</p>
-          <div className="flex flex-wrap gap-3 pt-2">
-            <Link
-              href={siteConfig.contact.bookingUrl}
-              className="mkt-btn mkt-btn--primary"
-              data-mkt-schedule
-            >
-              Book a free call
-            </Link>
-            <Link href="/contact" className="mkt-btn mkt-btn--secondary">
-              Get a quote
-            </Link>
+        <div className="mkt-wrap space-y-8">
+          <PageBreadcrumb
+            section={{ label: "Industries", href: "/industries" }}
+            current={page.name}
+            currentPath={path}
+          />
+          <div className="grid items-center gap-10 lg:grid-cols-[1.2fr_0.8fr]">
+            <div className="space-y-6">
+              <p className="mkt-eyebrow">Industry</p>
+              <h1 className="text-4xl font-extrabold sm:text-5xl">{page.h1}</h1>
+              <p className="mkt-muted text-lg">{page.subline}</p>
+              <div className="flex flex-wrap gap-3">
+                <Link
+                  href={siteConfig.contact.bookingUrl}
+                  className="mkt-btn mkt-btn--primary"
+                  data-mkt-schedule
+                >
+                  Book a free call
+                </Link>
+                <Link href="/free-audit" className="mkt-btn mkt-btn--secondary">
+                  Get a free audit
+                </Link>
+              </div>
+            </div>
+            <PageVisual visual={visual} alt={`${page.name} software mockup`} priority />
           </div>
         </div>
       </section>
 
+      {/* Intro */}
       <section className="mkt-section mkt-section--light">
-        <div className="mkt-wrap grid gap-10 lg:grid-cols-2">
-          <div>
-            <p className="mkt-eyebrow mb-3">Common problems</p>
-            <ul className="space-y-2">
-              {i.problems.map((p) => (
-                <li key={p} className="mkt-card text-sm">
-                  {p}
-                </li>
-              ))}
-            </ul>
+        <div className="mkt-wrap grid items-center gap-10 lg:grid-cols-[1fr_1fr]">
+          <div className="space-y-4">
+            {introParagraphs.map((p) => (
+              <p key={p} className="text-lg leading-relaxed">
+                {p}
+              </p>
+            ))}
           </div>
-          <div>
-            <p className="mkt-eyebrow mb-3">What we build</p>
-            <ul className="space-y-2">
-              {i.whatWeBuild.map((p) => (
-                <li key={p} className="mkt-card text-sm">
-                  {p}
-                </li>
-              ))}
-            </ul>
-          </div>
+          <PageVisual visual={visual} alt={`${page.name} workflow overview`} />
         </div>
       </section>
 
+      {/* Common problems */}
       <section className="mkt-section mkt-section--dark">
         <div className="mkt-wrap space-y-8">
           <div className="max-w-2xl space-y-3">
-            <p className="mkt-eyebrow">Capabilities</p>
+            <p className="mkt-eyebrow">Common problems</p>
             <h2 className="text-3xl font-extrabold">
-              What we typically ship for {i.name.toLowerCase()}
+              What {page.name.toLowerCase()} teams tell us
             </h2>
           </div>
-          <div className="mkt-grid-2">
-            {i.capabilities.map((c) => (
-              <div key={c.title} className="mkt-card">
-                <h3 className="mb-2 text-lg font-bold">{c.title}</h3>
-                <p className="mkt-muted text-sm leading-relaxed">{c.body}</p>
+          <ul className="m-0 grid list-none gap-4 p-0 md:grid-cols-2">
+            {page.problems.map((p) => (
+              <li key={p} className="mkt-card text-sm leading-relaxed">
+                {p}
+              </li>
+            ))}
+          </ul>
+        </div>
+      </section>
+
+      {/* What we build */}
+      <section className="mkt-section mkt-section--light">
+        <div className="mkt-wrap space-y-8">
+          <div className="max-w-2xl space-y-3">
+            <p className="mkt-eyebrow">What we build</p>
+            <h2 className="text-3xl font-extrabold">
+              Tools built around your workflow
+            </h2>
+          </div>
+          <div className="mkt-grid-3">
+            {page.whatWeBuild.map((b) => (
+              <div key={b.title} className="mkt-card">
+                <h3 className="mb-2 text-lg font-bold">{b.title}</h3>
+                <p className="mkt-muted text-sm leading-relaxed">{b.body}</p>
               </div>
             ))}
           </div>
         </div>
       </section>
 
-      <section className="mkt-section mkt-section--light">
-        <div className="mkt-wrap space-y-8">
-          <div className="max-w-2xl space-y-3">
-            <p className="mkt-eyebrow">Modules</p>
-            <h2 className="text-3xl font-extrabold">Typical building blocks</h2>
-            <p className="mkt-muted">
-              Exact modules are written into your scope — this is the usual menu.
-            </p>
-          </div>
-          <ul className="mkt-grid-3">
-            {i.modules.map((m) => (
-              <li key={m} className="mkt-card text-sm font-medium">
-                {m}
-              </li>
-            ))}
-          </ul>
-        </div>
-      </section>
-
+      {/* Before / after */}
       <section className="mkt-section mkt-section--dark">
         <div className="mkt-wrap space-y-8">
-          <p className="mkt-eyebrow">Outcomes</p>
-          <ul className="mkt-grid-3">
-            {i.outcomes.map((o) => (
-              <li key={o} className="mkt-card text-sm leading-relaxed">
-                {o}
-              </li>
-            ))}
-          </ul>
+          <div className="max-w-2xl space-y-3">
+            <p className="mkt-eyebrow">Before and after</p>
+            <h2 className="text-3xl font-extrabold">
+              How the day-to-day workflow changes
+            </h2>
+          </div>
+          <div className="mkt-card overflow-x-auto">
+            <table className="mkt-table">
+              <thead>
+                <tr>
+                  <th scope="col">Before</th>
+                  <th scope="col">After</th>
+                </tr>
+              </thead>
+              <tbody>
+                {page.beforeAfter.map((row) => (
+                  <tr key={row.before}>
+                    <td>{row.before}</td>
+                    <td>{row.after}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </div>
       </section>
 
-      <section className="mkt-section mkt-section--light">
-        <div className="mkt-wrap space-y-8">
-          <div className="flex flex-wrap items-end justify-between gap-4">
-            <div>
-              <p className="mkt-eyebrow mb-2">Process</p>
-              <h2 className="text-3xl font-extrabold">How we engage</h2>
-            </div>
-            <Link href="/process" className="mkt-link text-sm">
-              Full process →
-            </Link>
-          </div>
-          <ol className="mkt-grid-3 list-none p-0">
-            {processSteps.slice(0, 3).map((step) => (
-              <li key={step.n} className="mkt-card">
-                <p className="mb-2 font-mono text-sm text-[var(--mkt-accent)]">
-                  {step.n}
-                </p>
-                <h3 className="mb-1 font-bold">{step.title}</h3>
-                <p className="mkt-muted text-sm">{step.body}</p>
-              </li>
-            ))}
-          </ol>
-        </div>
-      </section>
-
-      {relatedServices.length > 0 ? (
-        <section className="mkt-section mkt-section--dark">
-          <div className="mkt-wrap space-y-6">
-            <p className="mkt-eyebrow">Related services</p>
-            <div className="mkt-grid-3">
-              {relatedServices.map((s) =>
-                s ? (
-                  <Link
-                    key={s.slug}
-                    href={`/services/${s.slug}`}
-                    className="mkt-card block"
-                  >
-                    <h3 className="mb-2 font-bold">{s.name}</h3>
-                    <p className="mkt-muted mb-3 text-sm">{s.short}</p>
-                    <span className="mkt-link text-sm">Learn more →</span>
-                  </Link>
-                ) : null
-              )}
-            </div>
-          </div>
-        </section>
-      ) : null}
-
-      {related ? (
+      {/* Integrations */}
+      {page.integrations.length > 0 ? (
         <section className="mkt-section mkt-section--light">
-          <div className="mkt-wrap">
-            <Link href={`/work/${related.slug}`} className="mkt-card block max-w-2xl">
-              <p className="mkt-eyebrow mb-2">Related work</p>
-              <h2 className="text-2xl font-bold">{related.title}</h2>
-              <p className="mkt-muted mt-2 text-sm">{related.clientType}</p>
-            </Link>
+          <div className="mkt-wrap space-y-6">
+            <p className="mkt-eyebrow">Integrations</p>
+            <h2 className="text-2xl font-bold">Works with tools you already use</h2>
+            <ul className="m-0 flex list-none flex-wrap gap-2 p-0">
+              {page.integrations.map((i) => (
+                <li key={i} className="mkt-badge">
+                  {i}
+                </li>
+              ))}
+            </ul>
           </div>
         </section>
       ) : null}
 
-      {i.faq.length > 0 ? (
-        <section className="mkt-section mkt-section--dark">
-          <div className="mkt-wrap max-w-3xl space-y-4">
-            <p className="mkt-eyebrow">FAQ</p>
-            {i.faq.map((f) => (
-              <details key={f.q} className="mkt-card">
-                <summary className="cursor-pointer font-semibold">{f.q}</summary>
-                <p className="mkt-muted mt-3 text-sm">{f.a}</p>
-              </details>
-            ))}
-          </div>
-        </section>
-      ) : null}
+      {/* Free audit CTA */}
+      <section className="mkt-section mkt-section--dark">
+        <div className="mkt-wrap max-w-3xl space-y-4">
+          <p className="mkt-eyebrow">Free audit</p>
+          <h2 className="text-3xl font-extrabold">{page.auditCta.title}</h2>
+          <p className="mkt-muted text-lg leading-relaxed">{page.auditCta.body}</p>
+          <Link href="/free-audit" className="mkt-btn mkt-btn--primary inline-flex">
+            Get a free audit
+          </Link>
+        </div>
+      </section>
 
-      <SectionCta title={`Building for ${i.name.toLowerCase()}?`} />
+      <FaqBlock items={page.faq} tone="light" />
+      <RelatedPages links={page.relatedPages} tone="dark" />
+      <SectionCta
+        title={`Talk to us about software for ${page.name.toLowerCase()}`}
+        sub="A short call, then a written scope in plain language before any build starts."
+      />
     </>
   );
 }

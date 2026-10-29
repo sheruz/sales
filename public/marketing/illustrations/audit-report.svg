@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="750" viewBox="0 0 1200 750" role="img" aria-label="Website audit report">
+  <defs>
+    <linearGradient id="g" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#5B63F5" stop-opacity="0.18"/>
+      <stop offset="100%" stop-color="#FF6B3D" stop-opacity="0.08"/>
+    </linearGradient>
+  </defs>
+  <rect width="1200" height="750" fill="#0B1220"/>
+  <rect width="1200" height="750" fill="url(#g)"/>
+<rect x="80" y="50" width="1040" height="650" rx="12" fill="#141C2E" stroke="#243044"/>
+  <text x="130" y="130" fill="#EEF2FF" font-family="system-ui,sans-serif" font-size="30" font-weight="700">Website audit report</text>
+  <text x="130" y="175" fill="#9AA6BF" font-family="system-ui,sans-serif" font-size="18" font-weight="600">Annotated findings · prioritized fixes</text>
+  <rect x="130" y="220" width="300" height="160" rx="10" fill="#1A2438"/>
+  <rect x="460" y="220" width="300" height="160" rx="10" fill="#1A2438"/>
+  <rect x="790" y="220" width="280" height="160" rx="10" fill="#1A2438"/>
+  <text x="160" y="290" fill="#9AA6BF" font-family="system-ui,sans-serif" font-size="18" font-weight="600">Mobile</text>
+  <text x="160" y="340" fill="#FF6B3D" font-family="system-ui,sans-serif" font-size="28" font-weight="700">Needs work</text>
+  <text x="490" y="290" fill="#9AA6BF" font-family="system-ui,sans-serif" font-size="18" font-weight="600">Forms</text>
+  <text x="490" y="340" fill="#FF6B3D" font-family="system-ui,sans-serif" font-size="28" font-weight="700">Broken</text>
+  <text x="820" y="290" fill="#9AA6BF" font-family="system-ui,sans-serif" font-size="18" font-weight="600">SSL</text>
+  <text x="820" y="340" fill="#8E9CFF" font-family="system-ui,sans-serif" font-size="28" font-weight="700">OK</text>
+  <rect x="130" y="420" width="940" height="80" rx="10" fill="#1A2438"/>
+  <rect x="130" y="530" width="940" height="80" rx="10" fill="#1A2438"/>
+  <rect x="160" y="455" width="400" height="14" rx="4" fill="#5B63F5"/>
+  <rect x="160" y="565" width="520" height="14" rx="4" fill="#FF6B3D"/>
+</svg>

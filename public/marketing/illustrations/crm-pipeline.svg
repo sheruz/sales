@@ -1,0 +1,36 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="750" viewBox="0 0 1200 750" role="img" aria-label="CRM pipeline board">
+  <defs>
+    <linearGradient id="g" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#5B63F5" stop-opacity="0.18"/>
+      <stop offset="100%" stop-color="#FF6B3D" stop-opacity="0.08"/>
+    </linearGradient>
+  </defs>
+  <rect width="1200" height="750" fill="#0B1220"/>
+  <rect width="1200" height="750" fill="url(#g)"/>
+<rect x="40" y="40" width="1120" height="80" rx="12" fill="#141C2E" stroke="#243044"/>
+  <text x="70" y="90" fill="#EEF2FF" font-family="system-ui,sans-serif" font-size="26" font-weight="700">Sales pipeline</text>
+  <rect x="40" y="150" width="270" height="520" rx="12" fill="#141C2E" stroke="#243044"/>
+  <text x="64" y="200" fill="#9AA6BF" font-family="system-ui,sans-serif" font-size="18" font-weight="600">New</text>
+  <rect x="64" y="240" width="222" height="80" rx="10" fill="#1A2438"/>
+  <rect x="64" y="340" width="222" height="80" rx="10" fill="#1A2438"/>
+  <rect x="64" y="440" width="222" height="80" rx="10" fill="#1A2438"/>
+  <rect x="80" y="270" width="140" height="10" rx="4" fill="#5B63F5"/>
+  <rect x="330" y="150" width="270" height="520" rx="12" fill="#141C2E" stroke="#243044"/>
+  <text x="354" y="200" fill="#9AA6BF" font-family="system-ui,sans-serif" font-size="18" font-weight="600">Qualified</text>
+  <rect x="354" y="240" width="222" height="80" rx="10" fill="#1A2438"/>
+  <rect x="354" y="340" width="222" height="80" rx="10" fill="#1A2438"/>
+  <rect x="354" y="440" width="222" height="80" rx="10" fill="#1A2438"/>
+  <rect x="370" y="270" width="140" height="10" rx="4" fill="#8E9CFF"/>
+  <rect x="620" y="150" width="270" height="520" rx="12" fill="#141C2E" stroke="#243044"/>
+  <text x="644" y="200" fill="#9AA6BF" font-family="system-ui,sans-serif" font-size="18" font-weight="600">Proposal</text>
+  <rect x="644" y="240" width="222" height="80" rx="10" fill="#1A2438"/>
+  <rect x="644" y="340" width="222" height="80" rx="10" fill="#1A2438"/>
+  <rect x="644" y="440" width="222" height="80" rx="10" fill="#1A2438"/>
+  <rect x="660" y="270" width="140" height="10" rx="4" fill="#FF6B3D"/>
+  <rect x="910" y="150" width="270" height="520" rx="12" fill="#141C2E" stroke="#243044"/>
+  <text x="934" y="200" fill="#9AA6BF" font-family="system-ui,sans-serif" font-size="18" font-weight="600">Won</text>
+  <rect x="934" y="240" width="222" height="80" rx="10" fill="#1A2438"/>
+  <rect x="934" y="340" width="222" height="80" rx="10" fill="#1A2438"/>
+  <rect x="934" y="440" width="222" height="80" rx="10" fill="#1A2438"/>
+  <rect x="950" y="270" width="140" height="10" rx="4" fill="#5B63F5"/>
+</svg>

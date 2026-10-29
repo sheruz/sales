@@ -1,48 +1,92 @@
 import type { Metadata } from "next";
+import { FaqBlock } from "@/components/marketing/faq-block";
+import { PageBreadcrumb } from "@/components/marketing/page-breadcrumb";
+import { PageVisual } from "@/components/marketing/page-visual";
+import { RelatedPages } from "@/components/marketing/related-pages";
 import { SectionCta } from "@/components/marketing/section-cta";
-import { securityPage, siteConfig } from "@/content/site";
+import { securityPageDetailed } from "@/content/pages";
+import { buildPageMetadata } from "@/lib/marketing/page-metadata";
+import { visualForPath } from "@/lib/marketing/page-visuals";
 
-export const metadata: Metadata = {
-  title: "Security",
-  description:
-    "How Delvix Studio handles tenant isolation, secrets, auth and handover on client builds.",
-  alternates: { canonical: `${siteConfig.url}/security` },
-};
+export const metadata: Metadata = buildPageMetadata({
+  title: securityPageDetailed.seoTitle,
+  description: securityPageDetailed.seoDescription,
+  path: "/security",
+});
 
 export default function SecurityPage() {
+  const page = securityPageDetailed;
+
   return (
     <>
       <section className="mkt-section mkt-section--dark">
-        <div className="mkt-wrap max-w-3xl space-y-4">
-          <p className="mkt-eyebrow">Security</p>
-          <h1 className="text-4xl font-extrabold sm:text-5xl">
-            {securityPage.headline}
-          </h1>
-          <p className="mkt-muted text-lg">{securityPage.intro}</p>
-        </div>
-      </section>
-      <section className="mkt-section mkt-section--light">
-        <div className="mkt-wrap mkt-grid-2">
-          {securityPage.practices.map((p) => (
-            <div key={p.title} className="mkt-card">
-              <h2 className="mb-2 text-xl font-bold">{p.title}</h2>
-              <p className="mkt-muted text-sm leading-relaxed">{p.body}</p>
+        <div className="mkt-wrap space-y-8">
+          <PageBreadcrumb current="Security" currentPath="/security" />
+          <div className="grid items-center gap-10 lg:grid-cols-[1.2fr_0.8fr]">
+            <div className="space-y-6">
+              <p className="mkt-eyebrow">Security</p>
+              <h1 className="text-4xl font-extrabold sm:text-5xl">{page.h1}</h1>
+              <p className="mkt-muted text-lg leading-relaxed">{page.intro}</p>
             </div>
-          ))}
+            <PageVisual visual={visualForPath("/security")} alt="Secure stack overview" priority />
+          </div>
         </div>
       </section>
+
+      <section className="mkt-section mkt-section--light">
+        <div className="mkt-wrap space-y-8">
+          <div className="grid items-center gap-10 lg:grid-cols-[1fr_1fr]">
+            <div className="max-w-2xl space-y-3">
+              <p className="mkt-eyebrow">Our commitments</p>
+              <h2 className="text-3xl font-extrabold">How we handle your data</h2>
+            </div>
+            <PageVisual visual={visualForPath("/security")} alt="Access and audit controls" />
+          </div>
+          <div className="mkt-grid-2">
+            {page.commitments.map((c) => (
+              <div key={c.title} className="mkt-card">
+                <h3 className="mb-2 text-lg font-bold">{c.title}</h3>
+                <p className="mkt-muted text-sm leading-relaxed">{c.body}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
       <section className="mkt-section mkt-section--dark">
-        <div className="mkt-wrap max-w-3xl space-y-4">
-          <p className="mkt-eyebrow">FAQ</p>
-          {securityPage.faq.map((f) => (
-            <details key={f.q} className="mkt-card">
-              <summary className="cursor-pointer font-semibold">{f.q}</summary>
-              <p className="mkt-muted mt-3 text-sm">{f.a}</p>
-            </details>
-          ))}
+        <div className="mkt-wrap grid gap-10 lg:grid-cols-2">
+          <div className="space-y-3">
+            <p className="mkt-eyebrow">Honest note</p>
+            <h2 className="text-2xl font-bold">{page.honestyNote.title}</h2>
+            <p className="leading-relaxed">{page.honestyNote.body}</p>
+          </div>
+          <div className="space-y-3">
+            <p className="mkt-eyebrow">Your side</p>
+            <h2 className="text-2xl font-bold">What we ask of you</h2>
+            <ul className="m-0 list-none space-y-2 p-0">
+              {page.yourResponsibilities.map((line) => (
+                <li key={line} className="mkt-card text-sm leading-relaxed">
+                  {line}
+                </li>
+              ))}
+            </ul>
+          </div>
         </div>
       </section>
-      <SectionCta title="Need security notes in your scope?" />
+
+      <FaqBlock items={page.faq} tone="light" />
+      <RelatedPages
+        tone="dark"
+        links={[
+          { href: "/about", label: "About Delvix Studio" },
+          { href: "/ai", label: "AI services and your data" },
+          { href: "/contact", label: "Ask us a security question" },
+        ]}
+      />
+      <SectionCta
+        title="Have security or compliance requirements?"
+        sub="Tell us up front and we will say honestly whether we can meet them."
+      />
     </>
   );
 }

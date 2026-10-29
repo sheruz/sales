@@ -1,0 +1,29 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="750" viewBox="0 0 1200 750" role="img" aria-label="Automation workflow">
+  <defs>
+    <linearGradient id="g" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#5B63F5" stop-opacity="0.18"/>
+      <stop offset="100%" stop-color="#FF6B3D" stop-opacity="0.08"/>
+    </linearGradient>
+  </defs>
+  <rect width="1200" height="750" fill="#0B1220"/>
+  <rect width="1200" height="750" fill="url(#g)"/>
+<rect x="80" y="260" width="240" height="160" rx="12" fill="#141C2E" stroke="#243044"/>
+  <rect x="480" y="260" width="240" height="160" rx="12" fill="#141C2E" stroke="#243044"/>
+  <rect x="880" y="260" width="240" height="160" rx="12" fill="#141C2E" stroke="#243044"/>
+  <text x="110" y="330" fill="#9AA6BF" font-family="system-ui,sans-serif" font-size="18" font-weight="600">Trigger</text>
+  <text x="110" y="370" fill="#EEF2FF" font-family="system-ui,sans-serif" font-size="24" font-weight="700">New lead</text>
+  <text x="510" y="330" fill="#9AA6BF" font-family="system-ui,sans-serif" font-size="18" font-weight="600">Enrich</text>
+  <text x="510" y="370" fill="#EEF2FF" font-family="system-ui,sans-serif" font-size="22" font-weight="700">Lookup + score</text>
+  <text x="910" y="330" fill="#9AA6BF" font-family="system-ui,sans-serif" font-size="18" font-weight="600">Action</text>
+  <text x="910" y="370" fill="#EEF2FF" font-family="system-ui,sans-serif" font-size="24" font-weight="700">Create task</text>
+  <path d="M320 340 H480" stroke="#5B63F5" stroke-width="4" fill="none"/>
+  <path d="M720 340 H880" stroke="#5B63F5" stroke-width="4" fill="none"/>
+  <circle cx="400" cy="340" r="8" fill="#5B63F5"/>
+  <circle cx="800" cy="340" r="8" fill="#5B63F5"/>
+  <rect x="80" y="100" width="1040" height="80" rx="16" fill="#1A2438"/>
+  <text x="120" y="150" fill="#EEF2FF" font-family="system-ui,sans-serif" font-size="22" font-weight="600">Automation run · 24 events · 0 failed</text>
+  <rect x="80" y="500" width="1040" height="160" rx="16" fill="#1A2438"/>
+  <rect x="120" y="560" width="220" height="14" rx="4" fill="#5B63F5"/>
+  <rect x="120" y="600" width="160" height="14" rx="4" fill="#8E9CFF"/>
+  <rect x="400" y="560" width="280" height="14" rx="4" fill="#FF6B3D"/>
+</svg>

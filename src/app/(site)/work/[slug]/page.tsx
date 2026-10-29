@@ -1,7 +1,7 @@
-import Image from "next/image";
 import Link from "next/link";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
+import { BrowserFrame } from "@/components/marketing/browser-frame";
 import {
   caseStudies,
   getCaseStudy,
@@ -33,11 +33,22 @@ export default async function CaseStudyPage({ params }: Props) {
   return (
     <>
       <section className="mkt-section mkt-section--dark">
-        <div className="mkt-wrap max-w-3xl space-y-4">
-          <p className="mkt-eyebrow">Case study</p>
-          <h1 className="text-4xl font-extrabold sm:text-5xl">{c.title}</h1>
-          <p className="text-[var(--mkt-accent)]">{c.clientType}</p>
-          <p className="mkt-muted">{c.status}</p>
+        <div className="mkt-wrap space-y-8">
+          <div className="grid items-center gap-10 lg:grid-cols-[1.2fr_0.8fr]">
+            <div className="space-y-4">
+              <p className="mkt-eyebrow">Case study</p>
+              <h1 className="text-4xl font-extrabold sm:text-5xl">{c.title}</h1>
+              <p className="text-[var(--mkt-accent)]">{c.clientType}</p>
+              <p className="mkt-muted">{c.status}</p>
+            </div>
+            {c.screenshots[0] ? (
+              <BrowserFrame
+                src={c.screenshots[0].src}
+                alt={c.screenshots[0].alt.replace(/\s*placeholder\s*/gi, " ").trim()}
+                priority
+              />
+            ) : null}
+          </div>
         </div>
       </section>
 
@@ -125,15 +136,10 @@ export default async function CaseStudyPage({ params }: Props) {
             <div className="mkt-grid-2">
               {c.screenshots.map((shot) => (
                 <figure key={shot.src} className="space-y-2">
-                  <div className="overflow-hidden rounded-xl border border-black/10 bg-white">
-                    <Image
-                      src={shot.src}
-                      alt={shot.alt}
-                      width={960}
-                      height={600}
-                      className="h-auto w-full"
-                    />
-                  </div>
+                  <BrowserFrame
+                    src={shot.src}
+                    alt={shot.alt.replace(/\s*placeholder\s*/gi, " ").trim()}
+                  />
                   <figcaption className="text-sm text-[var(--mkt-ink-muted)]">
                     {shot.label}
                   </figcaption>

@@ -3,6 +3,8 @@
  * Empty arrays → section hidden. Case studies / testimonials need verified: true.
  */
 
+import { mainNav } from "./navigation";
+
 export const siteConfig = {
   name: "Delvix Studio",
   legalName: "Delvix Studio",
@@ -15,9 +17,9 @@ export const siteConfig = {
   logoOnLight: "/delvix-logo-on-light.svg",
   icon: "/delvix-icon-dark.svg",
   contact: {
-    email: "hello@delvixstudio.com",
-    phone: "+971581177638",
-    phoneDisplay: "+971 58 117 7638",
+    email: "info@delvixstudio.com",
+    phone: "+16096916966",
+    phoneDisplay: "+1 609 691 6966",
     whatsapp: "https://wa.me/971581177638",
     bookingUrl: "https://cal.com/delvix/intro", // replace when ready
   },
@@ -1181,22 +1183,22 @@ export const caseStudies: CaseStudy[] = [
       {
         label: "Dashboard",
         src: "/marketing/screenshots/revenue-os-dashboard.svg",
-        alt: "Revenue OS dashboard placeholder",
+        alt: "Revenue OS dashboard",
       },
       {
         label: "Deep audit findings",
         src: "/marketing/screenshots/revenue-os-audit.svg",
-        alt: "Deep audit findings placeholder",
+        alt: "Deep audit findings",
       },
       {
         label: "Super Admin packages",
         src: "/marketing/screenshots/revenue-os-packages.svg",
-        alt: "Super Admin packages placeholder",
+        alt: "Super Admin packages",
       },
       {
         label: "Pipeline",
         src: "/marketing/screenshots/revenue-os-pipeline.svg",
-        alt: "Pipeline placeholder",
+        alt: "Sales pipeline",
       },
     ],
   },
@@ -2020,84 +2022,22 @@ export type NavItem = {
   children?: NavChild[];
 };
 
-/** Full marketing nav — every inner page is listed under its parent (Software Pro–style). */
+/**
+ * Flat nav adapter kept so older imports (e.g. the footer) keep working.
+ * The source of truth is `@/content/navigation`.
+ */
 export function getMainNav(): NavItem[] {
-  return [
-    {
-      href: "/services",
-      label: "Services",
-      children: [
-        { href: "/services", label: "All services", description: "Overview of what we build" },
-        ...services.map((s) => ({
-          href: `/services/${s.slug}`,
-          label: s.name,
-          description: s.short,
-        })),
-      ],
-    },
-    {
-      href: "/solutions",
-      label: "Solutions",
-      children: [
-        { href: "/solutions", label: "All solutions", description: "How engagements are shaped" },
-        ...solutions.map((s) => ({
-          href: `/solutions/${s.slug}`,
-          label: s.name,
-          description: s.short,
-        })),
-        {
-          href: "/for-agencies",
-          label: "For agencies",
-          description: "Studio builds + Autopilot for agencies",
-        },
-      ],
-    },
-    {
-      href: "/industries",
-      label: "Industries",
-      children: [
-        { href: "/industries", label: "All industries", description: "Operational businesses we serve" },
-        ...industries.map((i) => ({
-          href: `/industries/${i.slug}`,
-          label: i.name,
-          description: i.short,
-        })),
-      ],
-    },
-    {
-      href: "/technologies",
-      label: "Technologies",
-      children: [
-        { href: "/technologies", label: "All technologies", description: "Stacks we ship with" },
-        ...technologies.map((t) => ({
-          href: `/technologies/${t.slug}`,
-          label: t.name,
-          description: t.short,
-        })),
-      ],
-    },
-    {
-      href: "/work",
-      label: "Work",
-      children: [
-        { href: "/work", label: "Case studies", description: "Verified engagements only" },
-        { href: "/work/revenue-os", label: "Delvix Revenue OS", description: "Our multi-tenant acquisition platform" },
-      ],
-    },
-    {
-      href: "/about",
-      label: "Company",
-      children: [
-        { href: "/about", label: "About", description: "How Delvix works" },
-        { href: "/process", label: "Process", description: "Discovery to launch" },
-        { href: "/pricing", label: "Pricing", description: "Engagement models" },
-        { href: "/faq", label: "FAQ", description: "Common questions" },
-        { href: "/security", label: "Security", description: "How we handle risk" },
-        { href: "/contact", label: "Contact", description: "Book a call or send a brief" },
-      ],
-    },
-    { href: "/autopilot", label: "Autopilot" },
-  ];
+  return mainNav.map((top) => ({
+    href: top.href ?? top.sections?.[0]?.links[0]?.href ?? "/",
+    label: top.label,
+    children: top.sections?.flatMap((section) =>
+      section.links.map((link) => ({
+        href: link.href,
+        label: link.title,
+        description: link.description,
+      }))
+    ),
+  }));
 }
 
 export const forAgenciesPage = {

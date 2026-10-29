@@ -1,7 +1,10 @@
 import Link from "next/link";
 import type { Metadata } from "next";
+import { PageVisual } from "@/components/marketing/page-visual";
 import { SectionCta } from "@/components/marketing/section-cta";
+import { VisualThumb } from "@/components/marketing/visual-thumb";
 import { siteConfig, solutions } from "@/content/site";
+import { visualForPath, visualForSolution } from "@/lib/marketing/page-visuals";
 
 export const metadata: Metadata = {
   title: "Solutions",
@@ -14,16 +17,21 @@ export default function SolutionsIndexPage() {
   return (
     <>
       <section className="mkt-section mkt-section--dark">
-        <div className="mkt-wrap max-w-3xl space-y-4">
-          <p className="mkt-eyebrow">Solutions</p>
-          <h1 className="text-4xl font-extrabold sm:text-5xl">
-            How the engagement is shaped
-          </h1>
-          <p className="mkt-muted text-lg">
-            Services are what we build. Solutions are how we package the work.
-            Every card below expands to a full page with problem, approach,
-            capabilities, use cases, deliverables and FAQ.
-          </p>
+        <div className="mkt-wrap space-y-8">
+          <div className="grid items-center gap-10 lg:grid-cols-[1.2fr_0.8fr]">
+            <div className="space-y-4">
+              <p className="mkt-eyebrow">Solutions</p>
+              <h1 className="text-4xl font-extrabold sm:text-5xl">
+                How the engagement is shaped
+              </h1>
+              <p className="mkt-muted text-lg">
+                Services are what we build. Solutions are how we package the work.
+                Every card below expands to a full page with problem, approach,
+                capabilities, use cases, deliverables and FAQ.
+              </p>
+            </div>
+            <PageVisual visual={visualForPath("/solutions")} alt="Solutions overview" priority />
+          </div>
         </div>
       </section>
 
@@ -60,7 +68,12 @@ export default function SolutionsIndexPage() {
                   Open full page →
                 </Link>
               </div>
-              <div className="space-y-3">
+              <div className="space-y-4">
+                <VisualThumb
+                  visual={visualForSolution(s.slug)}
+                  alt={s.name}
+                  aspect="wide"
+                />
                 <p className="text-xs font-semibold uppercase tracking-wider text-[var(--mkt-accent)]">
                   On the inner page
                 </p>

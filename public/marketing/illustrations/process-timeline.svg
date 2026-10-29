@@ -1,0 +1,52 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="750" viewBox="0 0 1200 750" role="img" aria-label="Delivery process timeline">
+  <defs>
+    <linearGradient id="g" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#5B63F5" stop-opacity="0.18"/>
+      <stop offset="100%" stop-color="#FF6B3D" stop-opacity="0.08"/>
+    </linearGradient>
+  </defs>
+  <rect width="1200" height="750" fill="#0B1220"/>
+  <rect width="1200" height="750" fill="url(#g)"/>
+<circle cx="110" cy="220" r="28" fill="#1A2438" stroke="#5B63F5" stroke-width="3"/>
+  <text x="98" y="228" fill="#8E9CFF" font-family="system-ui,sans-serif" font-size="16" font-weight="700">01</text>
+  <path d="M140 220 H260" stroke="#243044" stroke-width="3"/>
+  <rect x="70" y="320" width="150" height="200" rx="16" fill="#1A2438"/>
+  <text x="90" y="380" fill="#EEF2FF" font-family="system-ui,sans-serif" font-size="18" font-weight="700">Call</text>
+  <rect x="90" y="420" width="100" height="10" rx="4" fill="#5B63F5"/>
+  <rect x="90" y="450" width="80" height="10" rx="4" fill="#9AA6BF"/>
+  <circle cx="300" cy="220" r="28" fill="#1A2438" stroke="#5B63F5" stroke-width="3"/>
+  <text x="288" y="228" fill="#8E9CFF" font-family="system-ui,sans-serif" font-size="16" font-weight="700">02</text>
+  <path d="M330 220 H450" stroke="#243044" stroke-width="3"/>
+  <rect x="260" y="320" width="150" height="200" rx="16" fill="#1A2438"/>
+  <text x="280" y="380" fill="#EEF2FF" font-family="system-ui,sans-serif" font-size="18" font-weight="700">Scope</text>
+  <rect x="280" y="420" width="100" height="10" rx="4" fill="#5B63F5"/>
+  <rect x="280" y="450" width="80" height="10" rx="4" fill="#9AA6BF"/>
+  <circle cx="490" cy="220" r="28" fill="#1A2438" stroke="#5B63F5" stroke-width="3"/>
+  <text x="478" y="228" fill="#8E9CFF" font-family="system-ui,sans-serif" font-size="16" font-weight="700">03</text>
+  <path d="M520 220 H640" stroke="#243044" stroke-width="3"/>
+  <rect x="450" y="320" width="150" height="200" rx="16" fill="#1A2438"/>
+  <text x="470" y="380" fill="#EEF2FF" font-family="system-ui,sans-serif" font-size="18" font-weight="700">Design</text>
+  <rect x="470" y="420" width="100" height="10" rx="4" fill="#5B63F5"/>
+  <rect x="470" y="450" width="80" height="10" rx="4" fill="#9AA6BF"/>
+  <circle cx="680" cy="220" r="28" fill="#1A2438" stroke="#5B63F5" stroke-width="3"/>
+  <text x="668" y="228" fill="#8E9CFF" font-family="system-ui,sans-serif" font-size="16" font-weight="700">04</text>
+  <path d="M710 220 H830" stroke="#243044" stroke-width="3"/>
+  <rect x="640" y="320" width="150" height="200" rx="16" fill="#1A2438"/>
+  <text x="660" y="380" fill="#EEF2FF" font-family="system-ui,sans-serif" font-size="18" font-weight="700">Build</text>
+  <rect x="660" y="420" width="100" height="10" rx="4" fill="#5B63F5"/>
+  <rect x="660" y="450" width="80" height="10" rx="4" fill="#9AA6BF"/>
+  <circle cx="870" cy="220" r="28" fill="#1A2438" stroke="#5B63F5" stroke-width="3"/>
+  <text x="858" y="228" fill="#8E9CFF" font-family="system-ui,sans-serif" font-size="16" font-weight="700">05</text>
+  <path d="M900 220 H1020" stroke="#243044" stroke-width="3"/>
+  <rect x="830" y="320" width="150" height="200" rx="16" fill="#1A2438"/>
+  <text x="850" y="380" fill="#EEF2FF" font-family="system-ui,sans-serif" font-size="18" font-weight="700">Launch</text>
+  <rect x="850" y="420" width="100" height="10" rx="4" fill="#5B63F5"/>
+  <rect x="850" y="450" width="80" height="10" rx="4" fill="#9AA6BF"/>
+  <circle cx="1060" cy="220" r="28" fill="#1A2438" stroke="#5B63F5" stroke-width="3"/>
+  <text x="1048" y="228" fill="#8E9CFF" font-family="system-ui,sans-serif" font-size="16" font-weight="700">06</text>
+  
+  <rect x="1020" y="320" width="150" height="200" rx="16" fill="#1A2438"/>
+  <text x="1040" y="380" fill="#EEF2FF" font-family="system-ui,sans-serif" font-size="18" font-weight="700">Handover</text>
+  <rect x="1040" y="420" width="100" height="10" rx="4" fill="#5B63F5"/>
+  <rect x="1040" y="450" width="80" height="10" rx="4" fill="#9AA6BF"/>
+</svg>

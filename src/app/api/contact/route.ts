@@ -84,7 +84,7 @@ export async function POST(request: Request) {
         {
           success: false,
           error:
-            "We could not send your brief right now. Email hello@delvixstudio.com directly.",
+            "We could not send your brief right now. Email info@delvixstudio.com directly.",
         },
         { status: 502 }
       );

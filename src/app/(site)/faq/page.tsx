@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
+import { PageVisual } from "@/components/marketing/page-visual";
 import { SectionCta } from "@/components/marketing/section-cta";
 import { faq, siteConfig } from "@/content/site";
+import { visualForPath } from "@/lib/marketing/page-visuals";
 
 export const metadata: Metadata = {
   title: "FAQ",
@@ -27,14 +29,19 @@ export default function FaqPage() {
         dangerouslySetInnerHTML={{ __html: JSON.stringify(faqLd) }}
       />
       <section className="mkt-section mkt-section--dark">
-        <div className="mkt-wrap max-w-3xl space-y-4">
-          <p className="mkt-eyebrow">FAQ</p>
-          <h1 className="text-4xl font-extrabold sm:text-5xl">
-            Common questions
-          </h1>
-          <p className="mkt-muted text-lg">
-            Straight answers. If yours is missing, book a call and ask.
-          </p>
+        <div className="mkt-wrap space-y-8">
+          <div className="grid items-center gap-10 lg:grid-cols-[1.2fr_0.8fr]">
+            <div className="space-y-4">
+              <p className="mkt-eyebrow">FAQ</p>
+              <h1 className="text-4xl font-extrabold sm:text-5xl">
+                Common questions
+              </h1>
+              <p className="mkt-muted text-lg">
+                Straight answers. If yours is missing, book a call and ask.
+              </p>
+            </div>
+            <PageVisual visual={visualForPath("/faq")} alt="FAQ overview" priority />
+          </div>
         </div>
       </section>
       <section className="mkt-section mkt-section--light">

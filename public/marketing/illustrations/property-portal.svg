@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="750" viewBox="0 0 1200 750" role="img" aria-label="Real estate portal">
+  <defs>
+    <linearGradient id="g" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#5B63F5" stop-opacity="0.18"/>
+      <stop offset="100%" stop-color="#FF6B3D" stop-opacity="0.08"/>
+    </linearGradient>
+  </defs>
+  <rect width="1200" height="750" fill="#0B1220"/>
+  <rect width="1200" height="750" fill="url(#g)"/>
+<rect x="40" y="40" width="1120" height="80" rx="12" fill="#141C2E" stroke="#243044"/>
+  <text x="70" y="90" fill="#EEF2FF" font-family="system-ui,sans-serif" font-size="26" font-weight="700">Listings & showings</text>
+  <rect x="40" y="150" width="560" height="520" rx="12" fill="#141C2E" stroke="#243044"/>
+  <rect x="640" y="150" width="520" height="240" rx="12" fill="#141C2E" stroke="#243044"/>
+  <rect x="640" y="420" width="520" height="250" rx="12" fill="#141C2E" stroke="#243044"/>
+  <rect x="80" y="200" width="480" height="180" rx="10" fill="#1A2438"/>
+  <rect x="80" y="410" width="220" height="180" rx="10" fill="#1A2438"/>
+  <rect x="300" y="410" width="260" height="180" rx="10" fill="#1A2438"/>
+  <rect x="680" y="200" width="440" height="50" rx="10" fill="#1A2438"/>
+  <rect x="680" y="280" width="300" height="30" rx="10" fill="#1A2438"/>
+  <rect x="680" y="330" width="360" height="30" rx="10" fill="#1A2438"/>
+  <rect x="680" y="470" width="440" height="50" rx="10" fill="#1A2438"/>
+  <rect x="680" y="550" width="360" height="30" rx="10" fill="#1A2438"/>
+  <rect x="680" y="600" width="300" height="30" rx="10" fill="#1A2438"/>
+</svg>

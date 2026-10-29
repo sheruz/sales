@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="750" viewBox="0 0 1200 750" role="img" aria-label="Construction job board">
+  <defs>
+    <linearGradient id="g" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#5B63F5" stop-opacity="0.18"/>
+      <stop offset="100%" stop-color="#FF6B3D" stop-opacity="0.08"/>
+    </linearGradient>
+  </defs>
+  <rect width="1200" height="750" fill="#0B1220"/>
+  <rect width="1200" height="750" fill="url(#g)"/>
+<rect x="40" y="40" width="1120" height="80" rx="12" fill="#141C2E" stroke="#243044"/>
+  <text x="70" y="90" fill="#EEF2FF" font-family="system-ui,sans-serif" font-size="26" font-weight="700">Jobs · estimates · crew schedule</text>
+  <rect x="40" y="150" width="560" height="520" rx="12" fill="#141C2E" stroke="#243044"/>
+  <rect x="80" y="200" width="480" height="70" rx="10" fill="#1A2438"/>
+  <rect x="80" y="300" width="480" height="70" rx="10" fill="#1A2438"/>
+  <rect x="80" y="400" width="480" height="70" rx="10" fill="#1A2438"/>
+  <rect x="80" y="500" width="480" height="70" rx="10" fill="#1A2438"/>
+  <rect x="100" y="230" width="200" height="14" rx="4" fill="#5B63F5"/>
+  <rect x="100" y="330" width="160" height="14" rx="4" fill="#FF6B3D"/>
+  <rect x="640" y="150" width="520" height="250" rx="12" fill="#141C2E" stroke="#243044"/>
+  <rect x="640" y="430" width="520" height="240" rx="12" fill="#141C2E" stroke="#243044"/>
+  <rect x="680" y="200" width="440" height="50" rx="10" fill="#1A2438"/>
+  <rect x="680" y="280" width="300" height="30" rx="10" fill="#1A2438"/>
+  <rect x="680" y="480" width="440" height="50" rx="10" fill="#1A2438"/>
+  <rect x="680" y="560" width="360" height="30" rx="10" fill="#1A2438"/>
+</svg>

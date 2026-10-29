@@ -1,12 +1,18 @@
 import Link from "next/link";
 import { SiteLogo } from "@/components/marketing/site-logo";
-import {
-  getMainNav,
-  industries,
-  services,
-  siteConfig,
-  solutions,
-} from "@/content/site";
+import { getMainNav, siteConfig } from "@/content/site";
+import { industryPages, servicePages } from "@/content/pages";
+
+const footerServices = [
+  "web-applications",
+  "mobile-apps",
+  "erp-development",
+  "saas-development",
+  "mvp-development",
+  "project-rescue",
+]
+  .map((slug) => servicePages.find((s) => s.slug === slug))
+  .filter(Boolean) as typeof servicePages;
 
 export function SiteFooter() {
   const company =
@@ -45,23 +51,16 @@ export function SiteFooter() {
             <li>
               <Link href="/services">All services</Link>
             </li>
-            {services.map((s) => (
+            {footerServices.map((s) => (
               <li key={s.slug}>
-                <Link href={`/services/${s.slug}`}>{s.name}</Link>
-              </li>
-            ))}
-          </ul>
-          <p className="mb-3 mt-6 text-sm font-semibold text-[var(--mkt-ink)]">
-            Solutions
-          </p>
-          <ul className="space-y-2 text-sm">
-            {solutions.map((s) => (
-              <li key={s.slug}>
-                <Link href={`/solutions/${s.slug}`}>{s.name}</Link>
+                <Link href={`/services/${s.slug}`}>{s.seoTitle.split("|")[0].trim()}</Link>
               </li>
             ))}
             <li>
-              <Link href="/for-agencies">For agencies</Link>
+              <Link href="/ai">AI services</Link>
+            </li>
+            <li>
+              <Link href="/free-audit">Free audit</Link>
             </li>
           </ul>
         </div>
@@ -70,7 +69,7 @@ export function SiteFooter() {
             Industries
           </p>
           <ul className="space-y-2 text-sm">
-            {industries.map((i) => (
+            {industryPages.map((i) => (
               <li key={i.slug}>
                 <Link href={`/industries/${i.slug}`}>{i.name}</Link>
               </li>

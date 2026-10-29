@@ -1,13 +1,20 @@
 import Image from "next/image";
 
+function isSvg(src: string) {
+  return /\.svg(?:$|\?)/i.test(src);
+}
+
 export function BrowserFrame({
   src,
   alt,
   className = "",
+  priority = false,
 }: {
   src: string;
   alt: string;
   className?: string;
+  /** Set true for above-the-fold hero screenshots (avoids lazy LCP). */
+  priority?: boolean;
 }) {
   return (
     <div className={`mkt-browser relative z-[1] ${className}`}>
@@ -23,7 +30,10 @@ export function BrowserFrame({
           fill
           className="object-cover object-top"
           sizes="(max-width: 768px) 100vw, 720px"
-          priority={false}
+          priority={priority}
+          fetchPriority={priority ? "high" : "auto"}
+          /* Local marketing SVGs must skip the optimizer (Next blocks SVG by default). */
+          unoptimized={isSvg(src)}
         />
       </div>
     </div>
