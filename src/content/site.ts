@@ -8,7 +8,7 @@ import { mainNav } from "./navigation";
 export const siteConfig = {
   name: "Delvix Studio",
   legalName: "Delvix Studio",
-  tagline: "We build the systems behind growing businesses.",
+  tagline: "We build the systems your business runs on.",
   url: "https://delvixstudio.com",
   locale: "en_US",
   /** Wordmark for dark backgrounds (header / footer / dark hero chrome) */
@@ -23,6 +23,15 @@ export const siteConfig = {
     whatsapp: "https://wa.me/971581177638",
     bookingUrl: "https://cal.com/delvix/intro", // replace when ready
   },
+  /** Empty string → founder quote card hidden */
+  founderName: "",
+  founderQuote: "",
+  /** Empty → audit turnaround line hidden */
+  auditTurnaround: "",
+  /** Empty → contact SLA line uses generic copy without a number */
+  contactSla: "",
+  /** Empty → about founded year omitted */
+  foundedYear: "",
   socials: [] as Array<{ label: string; href: string }>,
   /** Leave empty → stats strip hidden */
   stats: [] as Array<{ label: string; value: string }>,
@@ -42,6 +51,15 @@ export const siteConfig = {
     href?: string;
   }>,
 } as const;
+
+/** True when a string has real copy (not empty / still a [BRACKET] placeholder). */
+export function hasRealCopy(value: string | null | undefined): boolean {
+  if (!value) return false;
+  const t = value.trim();
+  if (!t) return false;
+  if (/^\[[^\]]+\]$/.test(t)) return false;
+  return true;
+}
 
 export type ServiceSlug =
   | "web-apps"
@@ -1218,30 +1236,33 @@ export const testimonials: Testimonial[] = [];
 export const engagementModels = [
   {
     name: "Fixed-price project",
-    fits: "Clear deliverable and a real deadline.",
+    fits: "Best when the scope is clear: a new app, portal or system.",
     includes: [
-      "Written scope before build",
-      "Milestone demos",
-      "Source handover on launch",
+      "Written scope and fixed price",
+      "Milestone payments",
+      "Weekly demos",
     ],
+    featured: false,
   },
   {
     name: "Monthly retainer",
-    fits: "Ongoing product work after launch.",
+    fits: "Best for a live product that keeps improving every month.",
     includes: [
-      "Agreed capacity each month",
-      "Backlog you prioritize",
-      "Same team week to week",
+      "Planned work each month",
+      "Priority fixes",
+      "Monthly report and roadmap",
     ],
+    featured: true,
   },
   {
     name: "Dedicated developer",
-    fits: "You need a senior engineer inside your cadence.",
+    fits: "Best when you need extra hands inside your own team.",
     includes: [
-      "Embedded in your tools and standups",
-      "Clear ownership of a workstream",
-      "Flexible month-to-month",
+      "Full-time or part-time",
+      "Works in your tools",
+      "Overlap with your hours",
     ],
+    featured: false,
   },
 ] as const;
 
@@ -1249,84 +1270,76 @@ export const processSteps = [
   {
     n: "01",
     title: "Discovery call",
-    body: "We learn what you run today, what hurts and what “done” looks like.",
+    body: "30 minutes to understand the problem and your goals.",
   },
   {
     n: "02",
-    title: "Written scope in 3 days",
-    body: "Fixed scope, milestones and assumptions — before any build starts.",
+    title: "Written scope",
+    body: "Features, price and timeline on paper within 3 days.",
   },
   {
     n: "03",
     title: "Design",
-    body: "Flows and UI that match how your team actually works.",
+    body: "Clickable screens you approve before we build.",
   },
   {
     n: "04",
-    title: "Build with weekly demos",
-    body: "Working software every week. You see progress, not status decks.",
+    title: "Build + weekly demos",
+    body: "See working software every week, not just updates.",
   },
   {
     n: "05",
     title: "Launch",
-    body: "Cutover plan, training notes and credentials in your hands.",
+    body: "Deployment, data migration and team handover.",
   },
   {
     n: "06",
     title: "Support & grow",
-    body: "Retainer or project follow-ons when you are ready to extend.",
+    body: "Fixes, improvements and new features on a retainer.",
   },
 ] as const;
 
 export const whyDelvixRows = [
-  { label: "Fixed written scope", delvix: "Yes, before build", typical: "Often verbal or shifting" },
-  { label: "Weekly demos", delvix: "Every week", typical: "Status email or late reveal" },
-  { label: "Code ownership", delvix: "Yours from day one", typical: "Hosted on their stack" },
-  { label: "Developer access", delvix: "Direct", typical: "Account manager only" },
-  { label: "Scope turnaround", delvix: "Written in 3 days", typical: "Weeks of discovery" },
-  { label: "Timezone overlap", delvix: "US / UK / EU / Gulf", typical: "Overnight handoffs" },
+  { label: "Scope", delvix: "Written and fixed in 3 days", typical: "Vague estimate" },
+  { label: "Progress", delvix: "Working demo every week", typical: "Status emails" },
+  { label: "Price", delvix: "Agreed before work starts", typical: "Changes as you go" },
+  { label: "Code ownership", delvix: "Yours on final payment", typical: "Often unclear" },
+  { label: "Who you talk to", delvix: "The developers building it", typical: "An account manager" },
+  { label: "Working hours", delvix: "Overlap with your timezone", typical: "Their timezone" },
 ] as const;
 
 export const techStack = {
-  Frontend: ["Next.js", "React"],
-  Backend: ["Node.js", "PHP/Laravel", "Python"],
+  Frontend: ["Next.js", "React", "Tailwind"],
+  Backend: ["Node.js", "Laravel / PHP", "Python"],
   Mobile: ["React Native", "Flutter"],
-  "Data / Cloud": ["PostgreSQL", "AWS"],
-  AI: ["OpenAI", "Anthropic"],
+  "Data & cloud": ["PostgreSQL", "AWS"],
+  AI: ["OpenAI", "Anthropic Claude"],
 } as const;
 
 export const faq: Array<{ q: string; a: string }> = [
   {
     q: "How fast can you start?",
-    a: "After a discovery call we send a written scope within three days. Build starts when you approve that scope.",
+    a: "Usually within a week of the discovery call. You get a written scope within 3 days of that call.",
   },
   {
     q: "How does pricing work?",
-    a: "Fixed-price for defined projects. Monthly retainers or a dedicated developer for ongoing work. Prices appear on /pricing when published.",
-  },
-  {
-    q: "What are your working hours and timezones?",
-    a: "We keep overlap with US, UK, EU and Gulf hours so reviews happen in real time, not only overnight.",
+    a: "Fixed price for clearly scoped projects, a monthly fee for retainers, and a monthly rate for dedicated developers. The price is agreed in writing before any work starts.",
   },
   {
     q: "Who owns the code?",
-    a: "You do. Source, documentation and credentials transfer at handover. We do not lock you into a proprietary host.",
+    a: "You do. Full source code and IP transfer to you with the final payment.",
   },
   {
-    q: "Do you sign NDAs?",
-    a: "Yes. We sign a mutual NDA before sensitive materials are shared.",
+    q: "Which timezones do you work with?",
+    a: "We work remotely with clients in the US, UK, Europe and the Gulf and agree fixed overlap hours with each client.",
   },
   {
-    q: "How do we communicate during the build?",
-    a: "Shared channel plus weekly demos of working software. Decisions are written down.",
+    q: "Will you sign an NDA?",
+    a: "Yes, before we see any confidential details.",
   },
   {
-    q: "What support do you offer after launch?",
-    a: "Stabilization window on fixed projects, then optional retainer for changes and monitoring.",
-  },
-  {
-    q: "How do we pay?",
-    a: "Invoice by milestone or monthly. Card and bank options are confirmed in the proposal.",
+    q: "What happens after launch?",
+    a: "We fix issues found after launch and can continue on a monthly retainer for improvements and new features.",
   },
 ];
 
@@ -1336,13 +1349,160 @@ export const valueTags = [
   "You own the code",
 ] as const;
 
+export const promiseMarquee = [
+  "Written scope in 3 days",
+  "A working demo every week",
+  "Fixed price, agreed up front",
+  "Your code and IP on final payment",
+  "Overlap with your working hours",
+  "Direct line to the developers",
+] as const;
+
+export const homeAiPoints = [
+  {
+    title: "Document processing",
+    body: "Read invoices, forms and contracts and put the data where it belongs.",
+  },
+  {
+    title: "Sales & outreach automation",
+    body: "Research, personalized emails and reply handling, with you in control.",
+  },
+  {
+    title: "Website & WhatsApp assistants",
+    body: "Answer common questions and capture leads around the clock.",
+  },
+  {
+    title: "Agents on your systems",
+    body: "AI that reads your CRM or database and drafts the next action for approval.",
+  },
+] as const;
+
+export const auditChecks = [
+  "Mobile speed",
+  "Broken pages and links",
+  "Contact and quote forms",
+  "SSL and security basics",
+  "Mobile layout",
+  "Calls to action",
+] as const;
+
 export const auditProblemOptions = [
-  { value: "spreadsheets", label: "Spreadsheets everywhere" },
+  { value: "spreadsheets", label: "Running on spreadsheets" },
   { value: "manual_work", label: "Too much manual work" },
   { value: "outdated_website", label: "Outdated website" },
   { value: "need_an_app", label: "Need an app" },
-  { value: "other", label: "Other" },
+  { value: "other", label: "Something else" },
 ] as const;
+
+export const homeServices = [
+  {
+    slug: "web-applications",
+    title: "Web applications",
+    text: "Portals, dashboards and internal tools that replace spreadsheets and email threads.",
+    href: "/services/web-applications",
+  },
+  {
+    slug: "mobile-apps",
+    title: "Mobile apps",
+    text: "iOS and Android apps for your customers, drivers or field teams.",
+    href: "/services/mobile-apps",
+  },
+  {
+    slug: "erp-development",
+    title: "Custom ERP",
+    text: "Inventory, orders, billing and operations in one system built around your process.",
+    href: "/services/erp-development",
+  },
+  {
+    slug: "crm-development",
+    title: "Custom CRM",
+    text: "Pipelines, follow-ups and client history the way your team actually sells.",
+    href: "/services/crm-development",
+  },
+  {
+    slug: "saas-development",
+    title: "SaaS platforms",
+    text: "Multi-tenant products with billing, roles and admin from day one.",
+    href: "/services/saas-development",
+  },
+  {
+    slug: "automation-integrations",
+    title: "Automation & integrations",
+    text: "Connect your CRM, payments, email and calendar so work moves on its own.",
+    href: "/services/automation-integrations",
+  },
+  {
+    slug: "ai-integrations",
+    title: "AI integrations",
+    text: "Assistants, document processing and agents connected to your own data.",
+    href: "/ai/ai-integrations",
+  },
+  {
+    slug: "project-rescue",
+    title: "Project rescue",
+    text: "Stalled build or missing developer? We review, plan and get it shipped.",
+    href: "/services/project-rescue",
+  },
+] as const;
+
+export const homeIndustries = [
+  {
+    title: "Logistics & trucking",
+    text: "Dispatch, driver applications, quotes and documents.",
+    img: "HOME-IND-1",
+    href: "/industries/logistics-trucking",
+  },
+  {
+    title: "Real estate",
+    text: "Tenant portals, maintenance requests and owner reports.",
+    img: "HOME-IND-2",
+    href: "/industries/real-estate",
+  },
+  {
+    title: "Clinics & healthcare",
+    text: "Bookings, patient intake and reminders.",
+    img: "HOME-IND-3",
+    href: "/industries/healthcare-clinics",
+  },
+  {
+    title: "Construction & trades",
+    text: "Quotes, job scheduling and site reports.",
+    img: "HOME-IND-4",
+    href: "/industries/construction-trades",
+  },
+  {
+    title: "Retail & inventory",
+    text: "Stock, orders and multi-location sales.",
+    img: "HOME-IND-5",
+    href: "/industries/retail-inventory",
+  },
+  {
+    title: "Professional services",
+    text: "Client portals, intake and billing.",
+    img: "HOME-IND-6",
+    href: "/industries/professional-services",
+  },
+  {
+    title: "Education & training",
+    text: "Course portals, enrolment and progress tracking.",
+    img: "HOME-IND-7",
+    href: "/industries/education",
+  },
+  {
+    title: "Startups & SaaS",
+    text: "MVPs and SaaS products ready to sell.",
+    img: "HOME-IND-8",
+    href: "/industries/startups-saas",
+  },
+] as const;
+
+export const featuredWork = {
+  tags: ["Featured", "B2B SaaS", "AI + automation"],
+  title: "Delvix Revenue OS",
+  lead: "A multi-tenant SaaS that finds businesses, audits their websites in a real browser, writes evidence-based outreach and handles replies with AI. Billing, credits and a Super Admin console included.",
+  stack: ["Next.js", "TypeScript", "PostgreSQL", "Playwright", "Paddle", "OpenAI / Claude"],
+  href: "/work/revenue-os",
+} as const;
 
 export function verifiedCaseStudies() {
   return caseStudies.filter((c) => c.verified);
@@ -1867,7 +2027,7 @@ export const technologies: Technology[] = [
   {
     slug: "postgresql",
     name: "PostgreSQL",
-    group: "Data / Cloud",
+    group: "Data & cloud",
     short: "Relational source of truth with migrations you can review.",
     whenWeUseIt: [
       "Multi-tenant data with row-level discipline",
@@ -1911,7 +2071,7 @@ export const technologies: Technology[] = [
   {
     slug: "aws",
     name: "AWS",
-    group: "Data / Cloud",
+    group: "Data & cloud",
     short: "Hosting, object storage, queues and secrets for production systems.",
     whenWeUseIt: [
       "Production deploys with clear ownership",

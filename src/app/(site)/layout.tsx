@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Bricolage_Grotesque, Figtree } from "next/font/google";
+import { Inter, Plus_Jakarta_Sans } from "next/font/google";
 import { SiteHeader } from "@/components/marketing/site-header";
 import { SiteFooter } from "@/components/marketing/site-footer";
 import { MetaPixel } from "@/components/marketing/meta-pixel";
@@ -7,15 +7,17 @@ import { getMetaPixelId } from "@/lib/marketing/meta-pixel-id";
 import { siteConfig } from "@/content/site";
 import "../marketing.css";
 
-const display = Bricolage_Grotesque({
+const display = Plus_Jakarta_Sans({
   subsets: ["latin"],
+  weight: ["500", "600", "700", "800"],
   variable: "--font-mkt-display",
   display: "swap",
   preload: true,
 });
 
-const body = Figtree({
+const body = Inter({
   subsets: ["latin"],
+  weight: ["400", "500", "600"],
   variable: "--font-mkt-body",
   display: "swap",
   preload: true,

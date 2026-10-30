@@ -3,9 +3,11 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { ProductShot } from "@/components/marketing/product-shot";
 import { BrowserFrame } from "@/components/marketing/browser-frame";
+import { SlotImage } from "@/components/marketing/slot-image";
 import {
   caseStudies,
   getCaseStudy,
+  hasRealCopy,
   siteConfig,
 } from "@/content/site";
 import type { ProductShotName } from "@/lib/marketing/product-shots";
@@ -45,44 +47,75 @@ export default async function CaseStudyPage({ params }: Props) {
     <>
       <section className="mkt-section mkt-section--dark">
         <div className="mkt-wrap space-y-8">
-          <div className="mkt-split">
-            <div className="space-y-4">
-              <p className="mkt-eyebrow">Case study</p>
-              <h1 className="text-4xl font-extrabold text-balance sm:text-5xl">
-                {c.title}
-              </h1>
-              <p className="text-[var(--mkt-accent)]">{c.clientType}</p>
-              <p className="mkt-muted">{c.status}</p>
-              {c.platformFeatures?.length ? (
-                <ul className="m-0 list-none space-y-1.5 p-0 text-sm">
-                  {c.platformFeatures.slice(0, 3).map((f) => (
-                    <li key={f} className="flex gap-2">
-                      <span className="text-[var(--mkt-accent)]" aria-hidden>
-                        ✓
-                      </span>
-                      <span>{f}</span>
-                    </li>
+          {c.slug === "revenue-os" ? (
+            <div className="flex flex-col gap-8 items-center text-center max-w-5xl mx-auto">
+              <div className="space-y-4">
+                <div className="flex flex-wrap gap-2 justify-center">
+                  <span className="mkt-badge">Case study</span>
+                  <span className="mkt-badge">{c.clientType}</span>
+                  {c.platformFeatures?.slice(0, 2).map((f) => (
+                    <span key={f} className="mkt-badge">
+                      {f}
+                    </span>
                   ))}
-                </ul>
-              ) : null}
-              <div className="flex flex-wrap gap-2">
-                {c.stack.slice(0, 6).map((s) => (
-                  <span key={s} className="mkt-badge">
-                    {s}
-                  </span>
-                ))}
+                </div>
+                <h1 className="text-4xl font-extrabold text-balance sm:text-5xl lg:text-6xl">
+                  {c.title}
+                </h1>
+                <p className="mkt-muted text-lg max-w-2xl mx-auto">{c.problem}</p>
+              </div>
+              <div className="w-full rounded-2xl overflow-hidden border border-[var(--mkt-border)] shadow-2xl">
+                <SlotImage
+                  slot="CS-01"
+                  alt={c.title}
+                  width={2200}
+                  height={1100}
+                  aspectRatio="2/1"
+                  className="w-full"
+                  priority
+                />
               </div>
             </div>
-            {heroShot ? (
-              <ProductShot name={heroShot} alt={c.title} priority hero />
-            ) : c.screenshots[0] ? (
-              <BrowserFrame
-                src={c.screenshots[0].src}
-                alt={c.screenshots[0].alt}
-                priority
-              />
-            ) : null}
-          </div>
+          ) : (
+            <div className="mkt-split">
+              <div className="space-y-4">
+                <p className="mkt-eyebrow">Case study</p>
+                <h1 className="text-4xl font-extrabold text-balance sm:text-5xl">
+                  {c.title}
+                </h1>
+                <p className="text-[var(--mkt-accent)]">{c.clientType}</p>
+                <p className="mkt-muted">{c.status}</p>
+                {c.platformFeatures?.length ? (
+                  <ul className="m-0 list-none space-y-1.5 p-0 text-sm">
+                    {c.platformFeatures.slice(0, 3).map((f) => (
+                      <li key={f} className="flex gap-2">
+                        <span className="text-[var(--mkt-accent)]" aria-hidden>
+                          ✓
+                        </span>
+                        <span>{f}</span>
+                      </li>
+                    ))}
+                  </ul>
+                ) : null}
+                <div className="flex flex-wrap gap-2">
+                  {c.stack.slice(0, 6).map((s) => (
+                    <span key={s} className="mkt-badge">
+                      {s}
+                    </span>
+                  ))}
+                </div>
+              </div>
+              {heroShot ? (
+                <ProductShot name={heroShot} alt={c.title} priority hero />
+              ) : c.screenshots[0] ? (
+                <BrowserFrame
+                  src={c.screenshots[0].src}
+                  alt={c.screenshots[0].alt}
+                  priority
+                />
+              ) : null}
+            </div>
+          )}
         </div>
       </section>
 
@@ -135,12 +168,12 @@ export default async function CaseStudyPage({ params }: Props) {
         </section>
       ) : null}
 
-      {c.results.length > 0 ? (
+      {c.results.filter((r) => hasRealCopy(r)).length > 0 ? (
         <section className="mkt-section mkt-section--dark">
           <div className="mkt-wrap mkt-prose space-y-4">
             <p className="mkt-eyebrow">Results</p>
             <ul className="m-0 list-none space-y-2 p-0">
-              {c.results.map((r) => (
+              {c.results.filter((r) => hasRealCopy(r)).map((r) => (
                 <li key={r} className="mkt-card text-sm">
                   {r}
                 </li>
@@ -153,24 +186,51 @@ export default async function CaseStudyPage({ params }: Props) {
       {c.screenshots.length > 0 ? (
         <section className="mkt-section mkt-section--light">
           <div className="mkt-wrap space-y-8">
-            <p className="mkt-eyebrow">Screenshots</p>
-            <div className="mkt-grid-2">
-              {c.screenshots.map((shot) => {
-                const name = SHOT_BY_LABEL[shot.label];
-                return (
-                  <figure key={shot.src} className="space-y-2">
-                    {name ? (
-                      <ProductShot name={name} alt={shot.alt} />
-                    ) : (
-                      <BrowserFrame src={shot.src} alt={shot.alt} />
-                    )}
-                    <figcaption className="text-sm text-[var(--mkt-ink-muted)]">
-                      {shot.label}
+            <h2 className="text-3xl font-extrabold">Inside the product</h2>
+            {c.slug === "revenue-os" ? (
+              <div className="mkt-grid-2">
+                {[
+                  { slot: "CS-02", label: "Deep audit with real evidence" },
+                  { slot: "CS-03", label: "Pipeline from sourced to won" },
+                  { slot: "CS-04", label: "Packages and credits in Super Admin" },
+                  { slot: "CS-05", label: "Every email reviewed before sending" },
+                ].map(({ slot, label }) => (
+                  <figure key={slot} className="space-y-3">
+                    <div className="rounded-xl overflow-hidden border border-[var(--mkt-border)]">
+                      <SlotImage
+                        slot={slot}
+                        alt={label}
+                        width={1600}
+                        height={1000}
+                        aspectRatio="16/10"
+                        className="w-full"
+                      />
+                    </div>
+                    <figcaption className="text-sm font-semibold">
+                      {label}
                     </figcaption>
                   </figure>
-                );
-              })}
-            </div>
+                ))}
+              </div>
+            ) : (
+              <div className="mkt-grid-2">
+                {c.screenshots.map((shot) => {
+                  const name = SHOT_BY_LABEL[shot.label];
+                  return (
+                    <figure key={shot.src} className="space-y-2">
+                      {name ? (
+                        <ProductShot name={name} alt={shot.alt} />
+                      ) : (
+                        <BrowserFrame src={shot.src} alt={shot.alt} />
+                      )}
+                      <figcaption className="text-sm text-[var(--mkt-ink-muted)]">
+                        {shot.label}
+                      </figcaption>
+                    </figure>
+                  );
+                })}
+              </div>
+            )}
           </div>
         </section>
       ) : null}

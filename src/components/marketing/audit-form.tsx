@@ -4,10 +4,22 @@ import { useState } from "react";
 import { auditProblemOptions } from "@/content/site";
 import { trackMetaLead } from "@/components/marketing/meta-pixel";
 
-export function AuditForm() {
+export function AuditForm({
+  variant = "dark",
+  submitLabel = "Send me the audit",
+}: {
+  /** Embed on light cards without nested navy mkt-card chrome */
+  variant?: "dark" | "light";
+  submitLabel?: string;
+} = {}) {
   const [busy, setBusy] = useState(false);
   const [done, setDone] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const light = variant === "light";
+  const fieldClass = light
+    ? "mkt-input h-12 w-full rounded-[10px] border border-[#C9CEDB] bg-white px-3.5 text-[15px] text-[#0B1220]"
+    : "mkt-input h-12 w-full rounded-xl border border-[var(--mkt-line)] bg-[var(--mkt-navy)] px-3";
+  const labelMuted = light ? "text-[#4B5568]" : "text-[var(--mkt-muted)]";
 
   async function onSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -72,7 +84,11 @@ export function AuditForm() {
   }
 
   return (
-    <form onSubmit={onSubmit} className="mkt-card space-y-4" noValidate>
+    <form
+      onSubmit={onSubmit}
+      className={light ? "space-y-3.5" : "mkt-card space-y-4"}
+      noValidate
+    >
       <input
         type="text"
         name="website_url"
@@ -81,54 +97,43 @@ export function AuditForm() {
         className="hidden"
         aria-hidden
       />
-      <div className="grid gap-4 sm:grid-cols-2">
-        <label className="block text-sm">
-          <span className="mb-1.5 block font-medium text-[var(--mkt-muted)]">
-            Name
-          </span>
-          <input
-            required
-            name="name"
-            autoComplete="name"
-            className="mkt-input h-12 w-full rounded-xl border border-[var(--mkt-line)] bg-[var(--mkt-navy)] px-3"
-          />
-        </label>
-        <label className="block text-sm">
-          <span className="mb-1.5 block font-medium text-[var(--mkt-muted)]">
-            Email
-          </span>
-          <input
-            required
-            type="email"
-            name="email"
-            autoComplete="email"
-            className="mkt-input h-12 w-full rounded-xl border border-[var(--mkt-line)] bg-[var(--mkt-navy)] px-3"
-          />
-        </label>
-      </div>
       <label className="block text-sm">
-        <span className="mb-1.5 block font-medium text-[var(--mkt-muted)]">
-          Website
-        </span>
+        <span className={`mb-1.5 block font-medium ${labelMuted}`}>Name</span>
+        <input
+          required
+          name="name"
+          autoComplete="name"
+          placeholder="Your name"
+          className={fieldClass}
+        />
+      </label>
+      <label className="block text-sm">
+        <span className={`mb-1.5 block font-medium ${labelMuted}`}>Work email</span>
+        <input
+          required
+          type="email"
+          name="email"
+          autoComplete="email"
+          placeholder="you@company.com"
+          className={fieldClass}
+        />
+      </label>
+      <label className="block text-sm">
+        <span className={`mb-1.5 block font-medium ${labelMuted}`}>Website</span>
         <input
           name="website"
           type="url"
           inputMode="url"
           autoComplete="url"
-          placeholder="https://"
-          className="mkt-input h-12 w-full rounded-xl border border-[var(--mkt-line)] bg-[var(--mkt-navy)] px-3"
+          placeholder="https://yourcompany.com"
+          className={fieldClass}
         />
       </label>
       <label className="block text-sm">
-        <span className="mb-1.5 block font-medium text-[var(--mkt-muted)]">
+        <span className={`mb-1.5 block font-medium ${labelMuted}`}>
           Biggest problem
         </span>
-        <select
-          name="problem"
-          required
-          className="mkt-input h-12 w-full rounded-xl border border-[var(--mkt-line)] bg-[var(--mkt-navy)] px-3"
-          defaultValue=""
-        >
+        <select name="problem" required className={fieldClass} defaultValue="">
           <option value="" disabled>
             Select one
           </option>
@@ -140,24 +145,30 @@ export function AuditForm() {
         </select>
       </label>
       {error ? (
-        <p className="text-sm text-red-300" role="alert">
+        <p className={`text-sm ${light ? "text-red-600" : "text-red-300"}`} role="alert">
           {error}
         </p>
       ) : null}
       <button
         type="submit"
-        className="mkt-btn mkt-btn--primary w-full sm:w-auto"
+        className={
+          light
+            ? "mt-1 w-full rounded-[12px] border-0 bg-[#0B1220] px-5 py-3.5 text-base font-semibold text-white disabled:opacity-60"
+            : "mkt-btn mkt-btn--primary w-full sm:w-auto"
+        }
         disabled={busy}
       >
-        {busy ? "Sending…" : "Request free audit"}
+        {busy ? "Sending…" : submitLabel}
       </button>
-      <p className="mkt-muted text-xs leading-relaxed">
-        We use your details only to reply about this audit. See our{" "}
-        <a href="/privacy" className="mkt-link">
-          privacy policy
-        </a>
-        .
-      </p>
+      {!light ? (
+        <p className="mkt-muted text-xs leading-relaxed">
+          We use your details only to reply about this audit. See our{" "}
+          <a href="/privacy" className="mkt-link">
+            privacy policy
+          </a>
+          .
+        </p>
+      ) : null}
     </form>
   );
 }

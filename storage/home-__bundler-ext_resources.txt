@@ -1,0 +1,3 @@
+
+[{"id":"./Header.dc.html","uuid":"c9d9838e-37e2-4c24-bbb2-31e59f0d246b"},{"id":"https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@500;600;700;800&family=Inter:wght@400;500;600&display=swap","uuid":"1f9c6560-da66-4412-9540-e01d9f7a0ad8"},{"id":"./Footer.dc.html","uuid":"d956e6ea-f8cb-4314-9be2-952e9bc7b4b7"},{"id":"https://cdn.jsdelivr.net/npm/react@18.3.1/umd/react.production.min.js","uuid":"a410137b-6ce5-46af-8061-fbf5982c3743"},{"id":"https://cdn.jsdelivr.net/npm/react-dom@18.3.1/umd/react-dom.production.min.js","uuid":"09ff51e2-7358-4fa6-a3d0-e870cf4cf044"}]
+  

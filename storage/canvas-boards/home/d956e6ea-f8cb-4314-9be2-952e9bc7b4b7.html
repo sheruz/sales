@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Delvix Studio: Footer</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@500;600;700;800&amp;family=Inter:wght@400;500;600&amp;display=swap" rel="stylesheet">
+<style>body{margin:0}</style>
+</helmet>
+<footer style="width: 100%; background: #080E1A; color: #A3ADC2; font-family: Inter, system-ui, sans-serif; border-top: 1px solid #1E2738">
+<div style="max-width: 1200px; margin: 0 auto; padding: 72px 24px 32px; display: flex; flex-direction: column; gap: 48px">
+<div style="display: flex; flex-wrap: wrap; gap: 48px">
+<div style="flex: 1 1 280px; min-width: 0; display: flex; flex-direction: column; gap: 16px">
+<a href="/" style="display: inline-flex; align-items: center; gap: 10px; color: #F5F7FB; text-decoration: none" aria-label="Delvix Studio home">
+<span style="width: 36px; height: 36px; border-radius: 10px; background: #6366F1; display: flex; align-items: center; justify-content: center"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 4h6a8 8 0 0 1 0 16H6zM6 4v16"></path></svg></span>
+<span style="font-family: 'Plus Jakarta Sans', sans-serif; font-size: 20px; font-weight: 800">Delvix<span style="color: #A5B4FC"> Studio</span></span>
+</a>
+<p style="margin: 0; font-size: 15px; line-height: 1.65; max-width: 320px">A remote software studio building web apps, mobile apps, ERP, CRM and AI automation for growing businesses.</p>
+<div style="display: flex; flex-direction: column; gap: 8px; font-size: 15px">
+<a href="mailto:info@delvixstudio.com" style="color: #D5DBE8; text-decoration: none">info@delvixstudio.com</a>
+<a href="tel:+16096916966" style="color: #D5DBE8; text-decoration: none">+1 609 691 6966</a>
+<a href="#" style="color: #D5DBE8; text-decoration: none">WhatsApp</a>
+</div>
+<div style="display: flex; gap: 10px">
+<sc-for list="{{socials}}" as="s" hint-placeholder-count="3">
+<a href="#" aria-label="{{s.label}}" style="width: 40px; height: 40px; border-radius: 10px; border: 1px solid #1E2738; display: flex; align-items: center; justify-content: center; color: #D5DBE8"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="{{s.icon}}"></path></svg></a>
+</sc-for>
+</div>
+</div>
+<div style="flex: 3 1 600px; min-width: 0; display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 32px">
+<sc-for list="{{cols}}" as="c" hint-placeholder-count="4">
+<div style="display: flex; flex-direction: column; gap: 12px">
+<strong style="color: #F5F7FB; font-size: 14px; letter-spacing: 0.06em; text-transform: uppercase">{{c.title}}</strong>
+<sc-for list="{{c.links}}" as="l" hint-placeholder-count="5"><a href="#" style="color: #A3ADC2; font-size: 15px; text-decoration: none">{{l}}</a></sc-for>
+</div>
+</sc-for>
+</div>
+</div>
+<div style="display: flex; flex-wrap: wrap; justify-content: space-between; gap: 12px; padding-top: 24px; border-top: 1px solid #1E2738; font-size: 14px">
+<span>© 2026 Delvix Studio. All rights reserved.</span>
+<span>Working with clients in the US, UK, Europe and the Gulf.</span>
+</div>
+</div>
+</footer>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":560}}'>
+class Component extends DCLogic {
+  renderVals() {
+    return {
+      socials: [
+        { label: 'LinkedIn', icon: 'M4 9h4v11H4zM6 4a2 2 0 1 0 0 4a2 2 0 0 0 0-4zM10 9h4v1.5c.6-1 2-1.8 3.5-1.8 2.6 0 3.5 1.7 3.5 4.3V20h-4v-6c0-1.2-.4-2-1.6-2s-1.4 1-1.4 2v6h-4z' },
+        { label: 'Instagram', icon: 'M7 3h10a4 4 0 0 1 4 4v10a4 4 0 0 1-4 4H7a4 4 0 0 1-4-4V7a4 4 0 0 1 4-4zM12 8a4 4 0 1 0 0 8a4 4 0 0 0 0-8zM17.5 6.5h.01' },
+        { label: 'Facebook', icon: 'M15 3h-2a4 4 0 0 0-4 4v3H7v4h2v7h4v-7h3l1-4h-4V7a1 1 0 0 1 1-1h2z' }
+      ],
+      cols: [
+        { title: 'Services', links: ['Web applications', 'Mobile apps', 'Custom ERP', 'Custom CRM', 'SaaS platforms', 'Project rescue'] },
+        { title: 'AI', links: ['AI integrations', 'AI agents', 'Document processing', 'Chatbots', 'Delvix Autopilot'] },
+        { title: 'Industries', links: ['Logistics & trucking', 'Real estate', 'Clinics', 'Construction', 'Retail', 'All industries'] },
+        { title: 'Company', links: ['About', 'How we work', 'Work', 'Pricing', 'Security', 'Contact'] },
+        { title: 'Legal', links: ['Privacy', 'Terms', 'Cookies'] }
+      ]
+    };
+  }
+}
+</script>
+</body>
+</html>

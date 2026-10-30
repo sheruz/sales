@@ -4,6 +4,7 @@ import { notFound } from "next/navigation";
 import { FaqBlock, JsonLd } from "@/components/marketing/faq-block";
 import { PageBreadcrumb } from "@/components/marketing/page-breadcrumb";
 import { PageVisual } from "@/components/marketing/page-visual";
+import { SlotImage } from "@/components/marketing/slot-image";
 import { RelatedPages } from "@/components/marketing/related-pages";
 import { SectionCta } from "@/components/marketing/section-cta";
 import { getIndustryPage, industryPages } from "@/content/pages";
@@ -64,7 +65,24 @@ export default async function IndustryDetailPage({ params }: Props) {
       />
 
       {/* Hero + breadcrumb */}
-      <section className="mkt-section mkt-section--dark">
+      <section className="relative mkt-section mkt-section--dark overflow-hidden">
+        {page.slug === "logistics-trucking" && (
+          <div className="absolute inset-0 -z-10">
+            <SlotImage
+              slot="IND-01"
+              alt="Logistics and trucking operations"
+              fill
+              priority
+              sizes="100vw"
+            />
+            <div
+              className="absolute inset-0"
+              style={{
+                background: "rgba(11, 18, 32, 0.7)",
+              }}
+            />
+          </div>
+        )}
         <div className="mkt-wrap space-y-8">
           <PageBreadcrumb
             section={{ label: "Industries", href: "/industries" }}
@@ -91,7 +109,13 @@ export default async function IndustryDetailPage({ params }: Props) {
                 </Link>
               </div>
             </div>
-            <PageVisual visual={visual} alt={`${page.name} software mockup`} priority />
+            {page.slug !== "logistics-trucking" && (
+              <PageVisual
+                visual={visual}
+                alt={`${page.name} software mockup`}
+                priority
+              />
+            )}
           </div>
         </div>
       </section>
@@ -131,21 +155,54 @@ export default async function IndustryDetailPage({ params }: Props) {
 
       {/* What we build */}
       <section className="mkt-section mkt-section--light">
-        <div className="mkt-wrap space-y-8">
+        <div className="mkt-wrap space-y-16">
           <div className="max-w-2xl space-y-3">
             <p className="mkt-eyebrow">What we build</p>
             <h2 className="text-3xl font-extrabold">
               Tools built around your workflow
             </h2>
           </div>
-          <div className="mkt-grid-3">
-            {page.whatWeBuild.map((b) => (
-              <div key={b.title} className="mkt-card">
-                <h3 className="mb-2 text-lg font-bold">{b.title}</h3>
-                <p className="mkt-muted text-sm leading-relaxed">{b.body}</p>
-              </div>
-            ))}
-          </div>
+          {page.slug === "logistics-trucking" ? (
+            <div className="space-y-20">
+              {page.whatWeBuild.map((b, i) => {
+                const slots = ["IND-02", "IND-03", "IND-04", "IND-05"];
+                const slot = slots[i] || "IND-02";
+                const isEven = i % 2 === 0;
+                return (
+                  <div
+                    key={b.title}
+                    className={`flex flex-wrap items-center gap-8 lg:gap-12 ${
+                      isEven ? "" : "lg:flex-row-reverse"
+                    }`}
+                  >
+                    <div className="min-w-0 flex-[1_1_280px]">
+                      <SlotImage
+                        slot={slot}
+                        alt={b.title}
+                        width={1600}
+                        height={1100}
+                        aspectRatio="16/11"
+                        className="w-full rounded-2xl"
+                      />
+                    </div>
+                    <div className="min-w-0 flex-[1_1_260px] space-y-4">
+                      <h3 className="text-2xl font-extrabold sm:text-3xl">{b.title}</h3>
+                      <p className="mkt-muted text-base leading-relaxed">{b.body}</p>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          ) : (
+            <div className="mkt-grid-3">
+              {page.whatWeBuild.map((b) => (
+                <div key={b.title} className="mkt-card">
+                  <h3 className="mb-2 text-lg font-bold">{b.title}</h3>
+                  <p className="mkt-muted text-sm leading-relaxed">{b.body}</p>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       </section>
 

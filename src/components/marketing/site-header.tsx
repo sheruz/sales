@@ -152,23 +152,36 @@ export function SiteHeader() {
 
   return (
     <>
-      <div className="mkt-topbar">
-        <div className="mkt-wrap flex flex-wrap items-center justify-between gap-2 py-2">
-          <a href={`mailto:${siteConfig.contact.email}`}>
-            {siteConfig.contact.email}
-          </a>
-          <div className="flex flex-wrap gap-4">
+      <div className="mkt-contact-bar">
+        <div className="mkt-wrap flex flex-wrap items-center justify-between gap-3 py-2.5">
+          <div className="flex flex-wrap items-center gap-x-5 gap-y-2">
+            <a
+              href={`mailto:${siteConfig.contact.email}`}
+              className="inline-flex items-center gap-2"
+            >
+              {siteConfig.contact.email}
+            </a>
             <a
               href={siteConfig.contact.whatsapp}
               target="_blank"
               rel="noopener noreferrer"
+              className="inline-flex items-center gap-2"
             >
               WhatsApp
             </a>
-            <a href={`tel:${siteConfig.contact.phone}`}>
+            <a
+              href={`tel:${siteConfig.contact.phone}`}
+              className="inline-flex items-center gap-2"
+            >
               {siteConfig.contact.phoneDisplay}
             </a>
           </div>
+          <Link
+            href="/free-audit"
+            className="font-semibold text-[#C7D2FE] no-underline hover:text-white"
+          >
+            Free website audit →
+          </Link>
         </div>
       </div>
 

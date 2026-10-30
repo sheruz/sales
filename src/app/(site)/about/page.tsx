@@ -1,143 +1,152 @@
 import type { Metadata } from "next";
-import { PageBreadcrumb } from "@/components/marketing/page-breadcrumb";
-import { PageVisual } from "@/components/marketing/page-visual";
-import { RelatedPages } from "@/components/marketing/related-pages";
-import { SectionCta } from "@/components/marketing/section-cta";
-import { aboutPage } from "@/content/pages";
-import { siteConfig } from "@/content/site";
+import Link from "next/link";
+import { SlotImage } from "@/components/marketing/slot-image";
+import { hasRealCopy, siteConfig } from "@/content/site";
+import { hasSlotImage } from "@/lib/marketing/slot-images";
 import { buildPageMetadata } from "@/lib/marketing/page-metadata";
-import { bodyVisualFor, visualForPath } from "@/lib/marketing/page-visuals";
 
 export const metadata: Metadata = buildPageMetadata({
-  title: aboutPage.seoTitle,
-  description: aboutPage.seoDescription,
+  title: "About Delvix Studio | Remote Software Studio",
+  description:
+    "A small studio that builds software the way we'd want it built for us. Working remotely with businesses in the US, UK, Europe and the Gulf.",
   path: "/about",
 });
 
+const principles = [
+  {
+    n: "01",
+    title: "Scope in writing",
+    text: "Before any code, you get features, price and timeline on paper.",
+  },
+  {
+    n: "02",
+    title: "Show, don't tell",
+    text: "A working demo every week instead of status reports.",
+  },
+  {
+    n: "03",
+    title: "Talk to builders",
+    text: "You speak directly with the developers on your project.",
+  },
+  {
+    n: "04",
+    title: "You own it",
+    text: "Code, data and accounts are yours on final payment.",
+  },
+  {
+    n: "05",
+    title: "Honest advice",
+    text: "If a ready-made tool fits better, we'll tell you.",
+  },
+];
+
+const photoSlots = [
+  { id: "ABOUT-02", note: "Your workspace / desk setup · 1200×900", required: true },
+  { id: "ABOUT-03", note: "You on a client call or whiteboarding · 1200×900", required: true },
+  {
+    id: "ABOUT-04",
+    note: "Team photo (only if you have a team) · 1200×900",
+    required: false,
+  },
+] as const;
+
 export default function AboutPage() {
-  const { founderStory, workingHours } = aboutPage;
-  const showStory = founderStory.enabled && founderStory.body.trim().length > 0;
-  const showTeam = siteConfig.team.length > 0;
-  const heroVisual = visualForPath("/about");
-  const bodyVisual = bodyVisualFor(heroVisual, "process-timeline");
+  const story = hasRealCopy(siteConfig.founderQuote) ? siteConfig.founderQuote : "";
+  const name = hasRealCopy(siteConfig.founderName) ? siteConfig.founderName : "";
+  const showStory = Boolean(story && name);
+  const photos = photoSlots.filter((p) => p.required || hasSlotImage(p.id));
 
   return (
     <>
       <section className="mkt-section mkt-section--dark">
-        <div className="mkt-wrap space-y-8">
-          <PageBreadcrumb current="About" currentPath="/about" />
-          <div className="mkt-split">
+        <div className="mkt-wrap">
+          <div className="grid gap-14 lg:grid-cols-2">
             <div className="space-y-6">
-              <p className="mkt-eyebrow">About</p>
-              <h1 className="text-4xl font-extrabold text-balance sm:text-5xl">
-                {aboutPage.h1}
+              <p className="mkt-eyebrow">About Delvix Studio</p>
+              <h1 className="text-4xl font-extrabold text-balance leading-tight sm:text-5xl lg:text-6xl">
+                A small studio that builds software the way we&apos;d want it built for us.
               </h1>
-              <p className="mkt-muted text-lg leading-relaxed">{aboutPage.intro}</p>
+              <p className="mkt-muted text-lg leading-relaxed">
+                We work remotely with growing businesses in the US, UK, Europe and the Gulf. No
+                layers of account managers: you talk to the people writing the code.
+              </p>
             </div>
-            <PageVisual visual={heroVisual} alt="How Delvix Studio works" priority />
+            <SlotImage
+              slot="ABOUT-01"
+              alt="Founder portrait"
+              width={1200}
+              height={1500}
+              aspectRatio="4/5"
+              className="w-full rounded-2xl"
+              note="Founder portrait · 1200×1500"
+            />
           </div>
-        </div>
-      </section>
-
-      <section className="mkt-section mkt-section--light">
-        <div className="mkt-wrap mkt-split">
-          <div className="mkt-prose space-y-3">
-            <p className="mkt-eyebrow">Mission</p>
-            <h2 className="text-3xl font-extrabold text-balance">
-              {aboutPage.mission.title}
-            </h2>
-            <p className="text-lg leading-relaxed">{aboutPage.mission.body}</p>
-          </div>
-          <PageVisual visual={bodyVisual} alt="Delivery process" />
         </div>
       </section>
 
       {showStory ? (
-        <section className="mkt-section mkt-section--dark">
-          <div className="mkt-wrap max-w-3xl space-y-4">
-            <p className="mkt-eyebrow">Founder</p>
-            <p className="whitespace-pre-line leading-relaxed">
-              {founderStory.body}
+        <section className="mkt-section mkt-section--light">
+          <div className="mkt-wrap mx-auto max-w-4xl space-y-5">
+            <p className="mkt-eyebrow">Our story</p>
+            <h2 className="text-3xl font-extrabold text-balance sm:text-4xl">Why Delvix exists</h2>
+            <p className="text-lg leading-loose text-[var(--mkt-light-muted)]">{story}</p>
+            <p className="font-semibold">
+              {name}, Founder
             </p>
           </div>
         </section>
       ) : null}
 
-      <section className="mkt-section mkt-section--dark">
-        <div className="mkt-wrap space-y-8">
-          <div className="max-w-2xl space-y-3">
-            <p className="mkt-eyebrow">Principles</p>
-            <h2 className="text-3xl font-extrabold">How we like to work</h2>
+      <section className="mkt-section bg-[var(--mkt-light)] text-[var(--mkt-light-ink)]">
+        <div className="mkt-wrap space-y-11">
+          <div className="max-w-3xl space-y-4">
+            <p className="mkt-eyebrow !text-[#4F46E5]">How we work</p>
+            <h2 className="text-3xl font-extrabold text-balance sm:text-4xl">
+              Five principles behind every project.
+            </h2>
           </div>
-          <div className="mkt-grid-3">
-            {aboutPage.principles.map((p) => (
-              <div key={p.title} className="mkt-card">
-                <h3 className="mb-2 text-lg font-bold">{p.title}</h3>
-                <p className="mkt-muted text-sm leading-relaxed">{p.body}</p>
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
+            {principles.map((p) => (
+              <div
+                key={p.n}
+                className="space-y-3 rounded-2xl border border-[var(--mkt-light-line)] bg-white p-6"
+              >
+                <span className="text-sm font-extrabold text-[var(--mkt-accent)]">{p.n}</span>
+                <h3 className="text-lg font-bold">{p.title}</h3>
+                <p className="text-sm leading-relaxed text-[var(--mkt-light-muted)]">{p.text}</p>
               </div>
             ))}
           </div>
         </div>
       </section>
 
-      <section className="mkt-section mkt-section--light">
-        <div className="mkt-wrap grid gap-10 lg:grid-cols-2">
-          <div className="space-y-4">
-            <p className="mkt-eyebrow">Working hours</p>
-            <h2 className="text-3xl font-extrabold">{workingHours.title}</h2>
-            <p className="leading-relaxed">{workingHours.body}</p>
-            <ul className="m-0 flex list-none flex-wrap gap-2 p-0">
-              {workingHours.regions.map((r) => (
-                <li key={r} className="mkt-badge">
-                  {r}
-                </li>
-              ))}
-            </ul>
-            <p className="mkt-muted text-sm leading-relaxed">
-              {workingHours.overlapNote}
-            </p>
-          </div>
-          <ul className="m-0 list-none space-y-3 p-0">
-            {workingHours.points.map((pt) => (
-              <li key={pt} className="mkt-card text-sm leading-relaxed">
-                {pt}
-              </li>
-            ))}
-          </ul>
+      <section className="mkt-section mkt-section--dark">
+        <div className="mkt-wrap grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          {photos.map((photo) => (
+            <SlotImage
+              key={photo.id}
+              slot={photo.id}
+              alt={photo.note}
+              width={1200}
+              height={900}
+              aspectRatio="4/3"
+              className="w-full rounded-2xl"
+              note={photo.note}
+            />
+          ))}
         </div>
       </section>
 
-      {showTeam ? (
-        <section className="mkt-section mkt-section--dark">
-          <div className="mkt-wrap space-y-8">
-            <p className="mkt-eyebrow">Team</p>
-            <div className="mkt-grid-3">
-              {siteConfig.team.map((m) => (
-                <div key={m.name} className="mkt-card">
-                  <h3 className="font-bold">{m.name}</h3>
-                  <p className="text-sm text-[var(--mkt-accent)]">{m.role}</p>
-                  {m.bio ? (
-                    <p className="mkt-muted mt-2 text-sm">{m.bio}</p>
-                  ) : null}
-                </div>
-              ))}
-            </div>
-          </div>
-        </section>
-      ) : null}
-
-      <RelatedPages
-        tone={showTeam ? "light" : "dark"}
-        links={[
-          { href: "/process", label: "How we work" },
-          { href: "/security", label: "Security and data handling" },
-          { href: "/careers", label: "Careers at Delvix Studio" },
-        ]}
-      />
-      <SectionCta
-        title="Want to see how we would approach your project?"
-        sub="Book a short call and we will tell you plainly what we would do."
-      />
+      <section className="mkt-section mkt-section--dark">
+        <div className="mkt-wrap mx-auto flex max-w-4xl flex-col items-center gap-5 text-center">
+          <h2 className="text-3xl font-extrabold text-balance sm:text-4xl">
+            Let&apos;s talk about what you&apos;re building.
+          </h2>
+          <Link href={siteConfig.contact.bookingUrl} className="mkt-btn mkt-btn--primary">
+            Book a free call
+          </Link>
+        </div>
+      </section>
     </>
   );
 }

@@ -205,12 +205,12 @@ export const mainNav: NavTop[] = [
       },
     ],
     highlight: {
-      title: "Free website & systems audit",
-      body: "Send us your site or stack and get a written review of speed, SEO and quick wins.",
-      ctaLabel: "Request the audit",
+      title: "Find what's costing you customers",
+      body: "A short report with screenshots: what's broken and what to fix first.",
+      ctaLabel: "Get my free audit",
       href: "/free-audit",
-      imageSrc: "/marketing/illustrations/audit-report.svg",
-      imageAlt: "Website audit report preview",
+      imageSrc: "/marketing/menu-01.webp",
+      imageAlt: "Sample audit report",
     },
   },
   {

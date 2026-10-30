@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Delvix Studio: Header</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@500;600;700;800&amp;family=Inter:wght@400;500;600&amp;display=swap" rel="stylesheet">
+<style>body{margin:0}</style>
+</helmet>
+<header style="width: 100%; background: #0B1220; color: #F5F7FB; font-family: Inter, system-ui, sans-serif; border-bottom: 1px solid #1E2738">
+<div style="border-bottom: 1px solid #1E2738; background: #080E1A">
+<div style="max-width: 1200px; margin: 0 auto; padding: 9px 24px; display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 12px; font-size: 13px; color: #A3ADC2">
+<div style="display: flex; flex-wrap: wrap; gap: 22px; align-items: center">
+<a href="mailto:info@delvixstudio.com" style="display: inline-flex; gap: 8px; align-items: center; color: #A3ADC2; text-decoration: none"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 5h18v14H3zM3 6l9 7 9-7"></path></svg>info@delvixstudio.com</a>
+<a href="#" style="display: inline-flex; gap: 8px; align-items: center; color: #A3ADC2; text-decoration: none"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg>WhatsApp</a>
+<a href="tel:+16096916966" style="display: inline-flex; gap: 8px; align-items: center; color: #A3ADC2; text-decoration: none"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 2h10a2 2 0 0 1 2 2v16a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2zM11 18h2"></path></svg>+1 609 691 6966</a>
+</div>
+<a href="/free-audit" style="color: #C7D2FE; font-weight: 600; text-decoration: none">Free website audit →</a>
+</div>
+</div>
+<div style="max-width: 1200px; margin: 0 auto; padding: 16px 24px; display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 16px">
+<a href="/" style="display: inline-flex; align-items: center; gap: 10px; color: #F5F7FB; text-decoration: none" aria-label="Delvix Studio home">
+<span style="width: 36px; height: 36px; border-radius: 10px; background: #6366F1; display: flex; align-items: center; justify-content: center"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 4h6a8 8 0 0 1 0 16H6zM6 4v16"></path></svg></span>
+<span style="font-family: 'Plus Jakarta Sans', sans-serif; font-size: 20px; font-weight: 800; letter-spacing: -0.02em">Delvix<span style="color: #A5B4FC"> Studio</span></span>
+</a>
+<nav aria-label="Main" style="display: flex; flex-wrap: wrap; gap: 4px; align-items: center">
+<sc-for list="{{nav}}" as="n" hint-placeholder-count="6">
+<button type="button" aria-expanded="false" style="display: inline-flex; align-items: center; gap: 6px; padding: 10px 14px; border: 0; border-radius: 10px; background: transparent; color: #D5DBE8; font-size: 15px; font-weight: 500; font-family: Inter, sans-serif; cursor: pointer">{{n.label}}<sc-if value="{{n.drop}}" hint-placeholder-val="{{ true }}"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"></path></svg></sc-if></button>
+</sc-for>
+</nav>
+<div style="display: flex; gap: 10px; align-items: center">
+<a href="/contact?type=quote" style="padding: 11px 18px; border-radius: 10px; border: 1px solid #2A3550; color: #F5F7FB; font-size: 15px; font-weight: 600; text-decoration: none">Get a quote</a>
+<a href="#book" style="padding: 11px 18px; border-radius: 10px; background: #6366F1; color: #FFFFFF; font-size: 15px; font-weight: 600; text-decoration: none">Book a free call</a>
+</div>
+</div>
+</header>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":124}}'>
+class Component extends DCLogic {
+  renderVals() {
+    return {
+      nav: [
+        { label: 'Services', drop: true },
+        { label: 'AI', drop: true },
+        { label: 'Industries', drop: true },
+        { label: 'Technologies', drop: true },
+        { label: 'Work', drop: false },
+        { label: 'Company', drop: true }
+      ]
+    };
+  }
+}
+</script>
+</body>
+</html>

@@ -8,9 +8,16 @@ const footerServiceSlugs = [
   "web-applications",
   "mobile-apps",
   "erp-development",
+  "crm-development",
   "saas-development",
-  "mvp-development",
   "project-rescue",
+] as const;
+
+const footerAISlugs = [
+  "ai-integrations",
+  "ai-agents",
+  "document-processing",
+  "chatbots",
 ] as const;
 
 export function SiteFooter() {
@@ -23,7 +30,7 @@ export function SiteFooter() {
         <div className="space-y-3 sm:col-span-2 lg:col-span-1">
           <SiteLogo height={36} />
           <p className="max-w-xs text-sm leading-relaxed">
-            {siteConfig.tagline} Fixed scope, weekly demos, and you own the code.
+            A remote software studio building web apps, mobile apps, ERP, CRM and AI automation for growing businesses.
           </p>
           <div className="space-y-1 text-sm">
             <a href={`mailto:${siteConfig.contact.email}`} className="block">
@@ -32,6 +39,11 @@ export function SiteFooter() {
             <a href={`tel:${siteConfig.contact.phone}`} className="block">
               {siteConfig.contact.phoneDisplay}
             </a>
+            {siteConfig.contact.whatsapp ? (
+              <a href={siteConfig.contact.whatsapp} className="block">
+                WhatsApp
+              </a>
+            ) : null}
           </div>
         </div>
 
@@ -40,19 +52,26 @@ export function SiteFooter() {
             Services
           </p>
           <ul className="m-0 list-none space-y-2 p-0 text-sm">
-            <li>
-              <Link href="/services">All services</Link>
-            </li>
             {footerServiceSlugs.map((slug) => (
               <li key={slug}>
                 <Link href={`/services/${slug}`}>{serviceCardTitle(slug)}</Link>
               </li>
             ))}
+          </ul>
+        </div>
+
+        <div>
+          <p className="mb-3 text-sm font-semibold text-[var(--mkt-ink)]">
+            AI
+          </p>
+          <ul className="m-0 list-none space-y-2 p-0 text-sm">
+            {footerAISlugs.map((slug) => (
+              <li key={slug}>
+                <Link href={`/ai/${slug}`}>{serviceCardTitle(slug)}</Link>
+              </li>
+            ))}
             <li>
-              <Link href="/ai">AI services</Link>
-            </li>
-            <li>
-              <Link href="/free-audit">Free audit</Link>
+              <Link href="/autopilot">Delvix Autopilot</Link>
             </li>
           </ul>
         </div>
@@ -62,7 +81,7 @@ export function SiteFooter() {
             Industries
           </p>
           <ul className="m-0 list-none space-y-2 p-0 text-sm">
-            {industryPages.slice(0, 6).map((i) => (
+            {industryPages.slice(0, 5).map((i) => (
               <li key={i.slug}>
                 <Link href={`/industries/${i.slug}`}>{i.name}</Link>
               </li>
@@ -78,19 +97,23 @@ export function SiteFooter() {
             Company
           </p>
           <ul className="m-0 list-none space-y-2 p-0 text-sm">
-            {company.map((c) => (
-              <li key={c.href}>
-                <Link href={c.href}>{c.label}</Link>
-              </li>
-            ))}
+            <li>
+              <Link href="/about">About</Link>
+            </li>
+            <li>
+              <Link href="/process">How we work</Link>
+            </li>
             <li>
               <Link href="/work">Work</Link>
             </li>
             <li>
-              <Link href="/technologies">Technologies</Link>
+              <Link href="/pricing">Pricing</Link>
             </li>
             <li>
-              <Link href="/autopilot">Autopilot</Link>
+              <Link href="/security">Security</Link>
+            </li>
+            <li>
+              <Link href="/contact">Contact</Link>
             </li>
           </ul>
         </div>
@@ -115,13 +138,11 @@ export function SiteFooter() {
 
       <div className="mkt-wrap mt-10 flex flex-wrap items-center justify-between gap-3 border-t border-[var(--mkt-line)] pt-6 text-xs">
         <p>
-          © {new Date().getFullYear()} {siteConfig.legalName}
+          © {new Date().getFullYear()} {siteConfig.legalName}. All rights reserved.
         </p>
-        <div className="flex flex-wrap gap-4">
-          <Link href="/privacy">Privacy</Link>
-          <Link href="/terms">Terms</Link>
-          <Link href="/cookies">Cookies</Link>
-        </div>
+        <p className="text-muted-foreground">
+          Working with clients in the US, UK, Europe and the Gulf.
+        </p>
       </div>
     </footer>
   );

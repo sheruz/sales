@@ -2,6 +2,7 @@ import Link from "next/link";
 import { FaqBlock, JsonLd } from "@/components/marketing/faq-block";
 import { PageBreadcrumb } from "@/components/marketing/page-breadcrumb";
 import { PageVisual } from "@/components/marketing/page-visual";
+import { SlotImage } from "@/components/marketing/slot-image";
 import { RelatedPages } from "@/components/marketing/related-pages";
 import { SectionCta } from "@/components/marketing/section-cta";
 import { getTechnologyPage } from "@/content/pages";
@@ -89,7 +90,19 @@ export function ServicePageView({ page, basePath, sectionLabel, eyebrow }: Props
                 </Link>
               </div>
             </div>
-            <PageVisual visual={visual} alt={`${page.h1} product mockup`} priority />
+            {page.slug === "web-applications" ? (
+              <SlotImage
+                slot="SVC-01"
+                alt="Web application dashboard"
+                width={1600}
+                height={1100}
+                aspectRatio="16/11"
+                className="w-full"
+                priority
+              />
+            ) : (
+              <PageVisual visual={visual} alt={`${page.h1} product mockup`} priority />
+            )}
           </div>
         </div>
       </section>
@@ -129,17 +142,33 @@ export function ServicePageView({ page, basePath, sectionLabel, eyebrow }: Props
       {/* What you get */}
       <section className={`mkt-section mkt-section--${tone()}`}>
         <div className="mkt-wrap space-y-8">
-          <div className="max-w-2xl space-y-3">
-            <p className="mkt-eyebrow">What you get</p>
-            <h2 className="text-3xl font-extrabold">Deliverables</h2>
-          </div>
-          <div className="mkt-grid-3">
-            {page.deliverables.map((b) => (
-              <div key={b.title} className="mkt-card">
-                <h3 className="mb-2 text-lg font-bold">{b.title}</h3>
-                <p className="mkt-muted text-sm leading-relaxed">{b.body}</p>
+          <div className="flex flex-wrap gap-12 items-center">
+            <div className="flex-1 min-w-0 space-y-8">
+              <div className="max-w-2xl space-y-3">
+                <p className="mkt-eyebrow">What you get</p>
+                <h2 className="text-3xl font-extrabold">Deliverables</h2>
               </div>
-            ))}
+              <div className="mkt-grid-3">
+                {page.deliverables.map((b) => (
+                  <div key={b.title} className="mkt-card">
+                    <h3 className="mb-2 text-lg font-bold">{b.title}</h3>
+                    <p className="mkt-muted text-sm leading-relaxed">{b.body}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+            {page.slug === "web-applications" && (
+              <div className="flex-1 min-w-0">
+                <SlotImage
+                  slot="SVC-02"
+                  alt="Mobile responsive view"
+                  width={1000}
+                  height={1250}
+                  aspectRatio="4/5"
+                  className="w-full"
+                />
+              </div>
+            )}
           </div>
         </div>
       </section>
@@ -281,16 +310,46 @@ export function ServicePageView({ page, basePath, sectionLabel, eyebrow }: Props
       {/* Related case study (verified only) */}
       {caseStudy ? (
         <section className={`mkt-section mkt-section--${tone()}`}>
-          <div className="mkt-wrap max-w-3xl space-y-4">
-            <p className="mkt-eyebrow">Related case study</p>
-            <Link href={`/work/${caseStudy.slug}`} className="mkt-card block">
-              <p className="mkt-muted mb-1 text-xs">{caseStudy.clientType}</p>
-              <h3 className="mb-2 text-xl font-bold">{caseStudy.title}</h3>
-              <p className="mkt-muted mb-3 text-sm leading-relaxed">
-                {caseStudy.problem}
-              </p>
-              <span className="mkt-link text-sm">Read the case study →</span>
-            </Link>
+          <div className="mkt-wrap space-y-4">
+            <p className="mkt-eyebrow">Related work</p>
+            {page.slug === "web-applications" ? (
+              <Link
+                href={`/work/${caseStudy.slug}`}
+                className="flex flex-wrap gap-6 items-center rounded-2xl border border-[var(--mkt-border)] bg-[var(--mkt-surface)] p-0 overflow-hidden hover:border-[var(--mkt-accent)] transition-colors"
+              >
+                <div className="flex-1 min-w-[16rem] min-h-60">
+                  <SlotImage
+                    slot="SVC-03"
+                    alt={caseStudy.title}
+                    width={1000}
+                    height={700}
+                    aspectRatio="10/7"
+                    fill
+                  />
+                </div>
+                <div className="flex-1 min-w-[17.5rem] p-7 space-y-3">
+                  <p className="mkt-muted text-xs uppercase tracking-wider">
+                    Related work
+                  </p>
+                  <h3 className="text-2xl font-bold">{caseStudy.title}</h3>
+                  <p className="mkt-muted text-sm leading-relaxed">
+                    {caseStudy.problem}
+                  </p>
+                  <span className="mkt-link mt-auto">Read the case study →</span>
+                </div>
+              </Link>
+            ) : (
+              <div className="max-w-3xl">
+                <Link href={`/work/${caseStudy.slug}`} className="mkt-card block">
+                  <p className="mkt-muted mb-1 text-xs">{caseStudy.clientType}</p>
+                  <h3 className="mb-2 text-xl font-bold">{caseStudy.title}</h3>
+                  <p className="mkt-muted mb-3 text-sm leading-relaxed">
+                    {caseStudy.problem}
+                  </p>
+                  <span className="mkt-link text-sm">Read the case study →</span>
+                </Link>
+              </div>
+            )}
           </div>
         </section>
       ) : null}

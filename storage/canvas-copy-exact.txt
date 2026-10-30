@@ -1,0 +1,743 @@
+
+========== home ==========
+Delvix Studio: Home
+Remote software studio · US, UK, EU and Gulf hours
+We build the systems your business runs on.
+Web apps, mobile apps, ERP, CRM and AI automation. Scoped in writing, demoed every week, and handed over with full code ownership.
+Book a free call
+See our work
+{{p}}
+HOME-01 · Hero product shot
+Revenue OS dashboard, real screenshot · 1600×1000 · blur client names
+Written scope
+Delivered in 3 days
+Demo every week
+See real progress
+{{m.text}}
+What we build
+One studio for the software behind your operations.
+All services
+{{s.title}}
+{{s.text}}
+Learn more →
+HOME-02 · AI in action
+Screenshot: Revenue OS deep audit findings or an AI reply draft · 1500×1200
+AI development
+AI that works on your data, inside your tools.
+We connect OpenAI and Claude to your CRM, inbox, documents and databases, with clear limits on what the AI can do on its own.
+{{a.title}}
+{{a.text}}
+Explore AI services
+How we work
+From first call to launch, with no surprises.
+You always know what is being built, what it costs and what you will see next Friday.
+{{st.n}}
+{{st.title}}
+{{st.text}}
+Ways to work together
+Pick the model that fits the work.
+Most common
+{{md.title}}
+{{md.text}}
+{{pt}}
+Get pricing
+Why Delvix
+Clearer than a typical agency.
+Delvix Studio Typical agency
+{{c.row}} {{c.us}} {{c.them}}
+HOME-03 · Founder portrait
+Real photo of you at your desk, natural light · 1200×1500
+“[FOUNDER QUOTE: one or two sentences on why you run Delvix this way.]” [Founder name], Founder, Delvix Studio
+Industries
+Built for businesses that run on operations.
+{{i.img}}
+{{i.imgNote}}
+{{i.title}}
+{{i.text}}
+Our work
+Real projects, real screenshots.
+All case studies →
+Featured
+B2B SaaS
+AI + automation
+Delvix Revenue OS
+A multi-tenant SaaS that finds businesses, audits their websites in a real browser, writes evidence-based outreach and handles replies with AI. Billing, credits and a Super Admin console included.
+{{t}}
+Read the case study
+HOME-04 · Revenue OS pipeline
+Real screenshot of the pipeline or Super Admin packages · 1400×1000
+Free, no sales pitch
+Get a free website & systems audit.
+We open your site on a real phone and desktop browser and send you a short report with screenshots: what's broken, what's slowing you down, and what to fix first.
+{{ac}}
+Request your audit
+Name
+Work email
+Website
+Biggest problem Running on spreadsheets Too much manual work Outdated website Need an app Something else
+Send me the audit
+Report in your inbox within [2 business days].
+Technology
+A modern stack, chosen for your project.
+{{g.group}}
+{{it}}
+FAQ
+Questions we hear before every project.
+{{f.q}}
+{{f.a}}
+Tell us what you're running on today.
+A free 30-minute call. You leave with a clear next step, whether or not you work with us.
+Chat on WhatsApp
+HOME-05 · You on a call
+Real photo: you on a video call with a client or demoing on screen · 1200×900
+
+--- renderVals ---
+
+class Component extends DCLogic {
+  renderVals() {
+    const I = {
+      globe: 'M12 2a10 10 0 1 0 0 20a10 10 0 1 0 0-20zM2 12h20M12 2c3 3 3 17 0 20M12 2c-3 3-3 17 0 20',
+      phone: 'M7 2h10a2 2 0 0 1 2 2v16a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2zM11 18h2',
+      boxes: 'M3 7l9-4 9 4-9 4-9-4zM3 7v10l9 4 9-4V7M12 11v10',
+      users: 'M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2M9 11a4 4 0 1 0 0-8a4 4 0 0 0 0 8zM22 21v-2a4 4 0 0 0-3-3.9M16 3.1a4 4 0 0 1 0 7.8',
+      cloud: 'M17.5 19H7a5 5 0 1 1 1-9.9A6 6 0 0 1 19.5 11 4 4 0 0 1 17.5 19z',
+      flow: 'M4 4h6v6H4zM14 14h6v6h-6zM7 10v4a3 3 0 0 0 3 3h4',
+      spark: 'M12 3l1.8 4.7L18.5 9.5l-4.7 1.8L12 16l-1.8-4.7L5.5 9.5l4.7-1.8zM19 15l.8 2.2L22 18l-2.2.8L19 21l-.8-2.2L16 18l2.2-.8z',
+      buoy: 'M12 2a10 10 0 1 0 0 20a10 10 0 1 0 0-20zM12 8a4 4 0 1 0 0 8a4 4 0 1 0 0-8zM4.9 4.9l4.3 4.3M14.8 14.8l4.3 4.3M14.8 9.2l4.3-4.3M4.9 19.1l4.3-4.3',
+      file: 'M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8zM14 2v6h6M8 13h8M8 17h6',
+      play: 'M6 4l14 8-14 8z',
+      shield: 'M12 2l8 3v6c0 5-3.5 9-8 11-4.5-2-8-6-8-11V5zM9 12l2 2 4-4',
+      clock: 'M12 2a10 10 0 1 0 0 20a10 10 0 1 0 0-20zM12 6v6l4 2',
+      tag: 'M20 12l-8 8-9-9V3h8zM7.5 8a.5.5 0 1 0 0-1a.5.5 0 0 0 0 1z',
+      msg: 'M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z',
+      send: 'M22 2L11 13M22 2l-7 20-4-9-9-4z',
+      bot: 'M5 8h14v12H5zM12 4v4M9 13h.01M15 13h.01M9 17h6',
+      truck: 'M1 4h14v12H1zM15 9h4l3 3v4h-7M5.5 19a1.5 1.5 0 1 0 0-3a1.5 1.5 0 0 0 0 3zM18.5 19a1.5 1.5 0 1 0 0-3a1.5 1.5 0 0 0 0 3z',
+      home: 'M3 11l9-8 9 8M5 10v10h14V10',
+      steth: 'M6 3v6a4 4 0 0 0 8 0V3M10 13v3a5 5 0 0 0 10 0v-2M20 12a2 2 0 1 0 0-4a2 2 0 0 0 0 4z',
+      hat: 'M2 18h20M4 18v-3a8 8 0 0 1 16 0v3M10 7V4h4v3',
+      cart: 'M3 3h2l2.4 12h11.2L21 7H6M9 20a1 1 0 1 0 0-2a1 1 0 0 0 0 2zM18 20a1 1 0 1 0 0-2a1 1 0 0 0 0 2z',
+      brief: 'M3 7h18v13H3zM8 7V4h8v3M3 13h18',
+      cap: 'M2 9l10-5 10 5-10 5-10-5zM6 11v5c3 2 9 2 12 0v-5',
+      rocket: 'M5 15c-1.5 1.5-2 5-2 5s3.5-.5 5-2M14 4c3-1 6-1 6-1s0 3-1 6l-7 7-5-5 7-7zM15 9a1 1 0 1 0 0-2a1 1 0 0 0 0 2z'
+    };
+    const promisesShort = ['Fixed scope', 'Weekly demos', 'You own the code'];
+    const mq = [
+      { icon: I.file, text: 'Written scope in 3 days' },
+      { icon: I.play, text: 'A working demo every week' },
+      { icon: I.tag, text: 'Fixed price, agreed up front' },
+      { icon: I.shield, text: 'Your code and IP on final payment' },
+      { icon: I.clock, text: 'Overlap with your working hours' },
+      { icon: I.msg, text: 'Direct line to the developers' }
+    ];
+    return {
+      promisesShort,
+      marquee: mq.concat(mq),
+      services: [
+        { icon: I.globe, title: 'Web applications', text: 'Portals, dashboards and internal tools that replace spreadsheets and email threads.', href: '/services/web-applications' },
+        { icon: I.phone, title: 'Mobile apps', text: 'iOS and Android apps for your customers, drivers or field teams.', href: '/services/mobile-apps' },
+        { icon: I.boxes, title: 'Custom ERP', text: 'Inventory, orders, billing and operations in one system built around your process.', href: '/services/erp-development' },
+        { icon: I.users, title: 'Custom CRM', text: 'Pipelines, follow-ups and client history the way your team actually sells.', href: '/services/crm-development' },
+        { icon: I.cloud, title: 'SaaS platforms', text: 'Multi-tenant products with billing, roles and admin from day one.', href: '/services/saas-development' },
+        { icon: I.flow, title: 'Automation & integrations', text: 'Connect your CRM, payments, email and calendar so work moves on its own.', href: '/services/automation-integrations' },
+        { icon: I.spark, title: 'AI integrations', text: 'Assistants, document processing and agents connected to your own data.', href: '/ai/ai-integrations' },
+        { icon: I.buoy, title: 'Project rescue', text: 'Stalled build or missing developer? We review, plan and get it shipped.', href: '/services/project-rescue' }
+      ],
+      aiPoints: [
+        { icon: I.file, title: 'Document processing', text: 'Read invoices, forms and contracts and put the data where it belongs.' },
+        { icon: I.send, title: 'Sales & outreach automation', text: 'Research, personalized emails and reply handling, with you in control.' },
+        { icon: I.msg, title: 'Website & WhatsApp assistants', text: 'Answer common questions and capture leads around the clock.' },
+        { icon: I.bot, title: 'Agents on your systems', text: 'AI that reads your CRM or database and drafts the next action for approval.' }
+      ],
+      steps: [
+        { n: '01', title: 'Discovery call', text: '30 minutes to understand the problem and your goals.' },
+        { n: '02', title: 'Written scope', text: 'Features, price and timeline on paper within 3 days.' },
+        { n: '03', title: 'Design', text: 'Clickable screens you approve before we build.' },
+        { n: '04', title: 'Build + weekly demos', text: 'See working software every week, not just updates.' },
+        { n: '05', title: 'Launch', text: 'Deployment, data migration and team handover.' },
+        { n: '06', title: 'Support & grow', text: 'Fixes, improvements and new features on a retainer.' }
+      ],
+      models: [
+        { title: 'Fixed-price project', text: 'Best when the scope is clear: a new app, portal or system.', points: ['Written scope and fixed price', 'Milestone payments', 'Weekly demos'], featured: false, border: '1px solid #E4E7EF', bg: '#FFFFFF', fg: '#0B1220', muted: '#4B5568', btnBg: '#F5F7FB', btnFg: '#0B1220' },
+        { title: 'Monthly retainer', text: 'Best for a live product that keeps improving every month.', points: ['Planned work each month', 'Priority fixes', 'Monthly report and roadmap'], featured: true, border: '1px solid #0B1220', bg: '#0B1220', fg: '#F5F7FB', muted: '#A3ADC2', btnBg: '#6366F1', btnFg: '#FFFFFF' },
+        { title: 'Dedicated developer', text: 'Best when you need extra hands inside your own team.', points: ['Full-time or part-time', 'Works in your tools', 'Overlap with your hours'], featured: false, border: '1px solid #E4E7EF', bg: '#FFFFFF', fg: '#0B1220', muted: '#4B5568', btnBg: '#F5F7FB', btnFg: '#0B1220' }
+      ],
+      compare: [
+        { row: 'Scope', us: 'Written and fixed in 3 days', them: 'Vague estimate' },
+        { row: 'Progress', us: 'Working demo every week', them: 'Status emails' },
+        { row: 'Price', us: 'Agreed before work starts', them: 'Changes as you go' },
+        { row: 'Code ownership', us: 'Yours on final payment', them: 'Often unclear' },
+        { row: 'Who you talk to', us: 'The developers building it', them: 'An account manager' },
+        { row: 'Working hours', us: 'Overlap with your timezone', them: 'Their timezone' }
+      ],
+      industries: [
+        { icon: I.truck, title: 'Logistics & trucking', text: 'Dispatch, driver applications, quotes and documents.', img: 'HOME-IND-1', imgNote: 'Photo: truck yard or dispatcher at a screen', href: '/industries/logistics-trucking' },
+        { icon: I.home, title: 'Real estate', text: 'Tenant portals, maintenance requests and owner reports.', img: 'HOME-IND-2', imgNote: 'Photo: apartment building or property manager', href: '/industries/real-estate' },
+        { icon: I.steth, title: 'Clinics & healthcare', text: 'Bookings, patient intake and reminders.', img: 'HOME-IND-3', imgNote: 'Photo: clinic reception', href: '/industries/healthcare-clinics' },
+        { icon: I.hat, title: 'Construction & trades', text: 'Quotes, job scheduling and site reports.', img: 'HOME-IND-4', imgNote: 'Photo: site crew with tablet', href: '/industries/construction-trades' },
+        { icon: I.cart, title: 'Retail & inventory', text: 'Stock, orders and multi-location sales.', img: 'HOME-IND-5', imgNote: 'Photo: warehouse shelves', href: '/industries/retail-inventory' },
+        { icon: I.brief, title: 'Professional services', text: 'Client portals, intake and billing.', img: 'HOME-IND-6', imgNote: 'Photo: small office team', href: '/industries/professional-services' },
+        { icon: I.cap, title: 'Education & training', text: 'Course portals, enrolment and progress tracking.', img: 'HOME-IND-7', imgNote: 'Photo: classroom or online class', href: '/industries/education' },
+        { icon: I.rocket, title: 'Startups & SaaS', text: 'MVPs and SaaS products ready to sell.', img: 'HOME-IND-8', imgNote: 'Photo: founders at a whiteboard', href: '/industries/startups-saas' }
+      ],
+      csStack: ['Next.js', 'TypeScript', 'PostgreSQL', 'Playwright', 'Paddle', 'OpenAI / Claude'],
+      auditChecks: ['Mobile speed', 'Broken pages and links', 'Contact and quote forms', 'SSL and security basics', 'Mobile layout', 'Calls to action'],
+      stack: [
+        { group: 'Frontend', items: ['Next.js', 'React', 'Tailwind'] },
+        { group: 'Backend', items: ['Node.js', 'Laravel / PHP', 'Python'] },
+        { group: 'Mobile', items: ['React Native', 'Flutter'] },
+        { group: 'Data & cloud', items: ['PostgreSQL', 'AWS'] },
+        { group: 'AI', items: ['OpenAI', 'Anthropic Claude'] }
+      ],
+      faq: [
+        { q: 'How fast can you start?', a: 'Usually within a week of the discovery call. You get a written scope within 3 days of that call.' },
+        { q: 'How does pricing work?', a: 'Fixed price for clearly scoped projects, a monthly fee for retainers, and a monthly rate for dedicated developers. The price is agreed in writing before any work starts.' },
+        { q: 'Who owns the code?', a: 'You do. Full source code and IP transfer to you with the final payment.' },
+        { q: 'Which timezones do you work with?', a: 'We work remotely with clients in the US, UK, Europe and the Gulf and agree fixed overlap hours with each client.' },
+        { q: 'Will you sign an NDA?', a: 'Yes, before we see any confidential details.' },
+        { q: 'What happens after launch?', a: 'We fix issues found after launch and can continue on a monthly retainer for improvements and new features.' }
+      ]
+    };
+  }
+}
+
+
+========== header ==========
+Delvix Studio: Header
+info@delvixstudio.com
+WhatsApp
++1 609 691 6966
+Free website audit →
+Delvix Studio
+{{n.label}}
+Get a quote
+Book a free call
+
+--- renderVals ---
+
+class Component extends DCLogic {
+  renderVals() {
+    return {
+      nav: [
+        { label: 'Services', drop: true },
+        { label: 'AI', drop: true },
+        { label: 'Industries', drop: true },
+        { label: 'Technologies', drop: true },
+        { label: 'Work', drop: false },
+        { label: 'Company', drop: true }
+      ]
+    };
+  }
+}
+
+
+========== footer ==========
+Delvix Studio: Footer
+Delvix Studio
+A remote software studio building web apps, mobile apps, ERP, CRM and AI automation for growing businesses.
+info@delvixstudio.com
++1 609 691 6966
+WhatsApp
+{{c.title}}
+{{l}}
+© 2026 Delvix Studio. All rights reserved.
+Working with clients in the US, UK, Europe and the Gulf.
+
+--- renderVals ---
+
+class Component extends DCLogic {
+  renderVals() {
+    return {
+      socials: [
+        { label: 'LinkedIn', icon: 'M4 9h4v11H4zM6 4a2 2 0 1 0 0 4a2 2 0 0 0 0-4zM10 9h4v1.5c.6-1 2-1.8 3.5-1.8 2.6 0 3.5 1.7 3.5 4.3V20h-4v-6c0-1.2-.4-2-1.6-2s-1.4 1-1.4 2v6h-4z' },
+        { label: 'Instagram', icon: 'M7 3h10a4 4 0 0 1 4 4v10a4 4 0 0 1-4 4H7a4 4 0 0 1-4-4V7a4 4 0 0 1 4-4zM12 8a4 4 0 1 0 0 8a4 4 0 0 0 0-8zM17.5 6.5h.01' },
+        { label: 'Facebook', icon: 'M15 3h-2a4 4 0 0 0-4 4v3H7v4h2v7h4v-7h3l1-4h-4V7a1 1 0 0 1 1-1h2z' }
+      ],
+      cols: [
+        { title: 'Services', links: ['Web applications', 'Mobile apps', 'Custom ERP', 'Custom CRM', 'SaaS platforms', 'Project rescue'] },
+        { title: 'AI', links: ['AI integrations', 'AI agents', 'Document processing', 'Chatbots', 'Delvix Autopilot'] },
+        { title: 'Industries', links: ['Logistics & trucking', 'Real estate', 'Clinics', 'Construction', 'Retail', 'All industries'] },
+        { title: 'Company', links: ['About', 'How we work', 'Work', 'Pricing', 'Security', 'Contact'] },
+        { title: 'Legal', links: ['Privacy', 'Terms', 'Cookies'] }
+      ]
+    };
+  }
+}
+
+
+========== mega-menu ==========
+Delvix Studio: Services mega menu
+{{g.title}}
+{{it.title}}
+{{it.desc}}
+MENU-01
+Screenshot of an audit report page · 800×600
+Free website & systems audit
+A short report with screenshots: what's broken and what to fix first.
+Get my audit
+
+--- renderVals ---
+
+class Component extends DCLogic {
+  renderVals() {
+    const it = (icon, title, desc, href, active) => ({ icon, title, desc, href, bg: active ? '#F5F7FB' : 'transparent' });
+    return {
+      groups: [
+        { title: 'What we build', items: [
+          it('M12 2a10 10 0 1 0 0 20a10 10 0 1 0 0-20zM2 12h20M12 2c3 3 3 17 0 20M12 2c-3 3-3 17 0 20', 'Web applications', 'Portals, dashboards, internal tools', '/services/web-applications', true),
+          it('M7 2h10a2 2 0 0 1 2 2v16a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2zM11 18h2', 'Mobile apps', 'iOS and Android', '/services/mobile-apps'),
+          it('M3 7l9-4 9 4-9 4-9-4zM3 7v10l9 4 9-4V7M12 11v10', 'Custom ERP', 'Operations in one system', '/services/erp-development'),
+          it('M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2M9 11a4 4 0 1 0 0-8a4 4 0 0 0 0 8z', 'Custom CRM', 'Your sales process, built in', '/services/crm-development'),
+          it('M17.5 19H7a5 5 0 1 1 1-9.9A6 6 0 0 1 19.5 11 4 4 0 0 1 17.5 19z', 'SaaS platforms', 'Multi-tenant, billing-ready', '/services/saas-development')
+        ] },
+        { title: 'How we work', items: [
+          it('M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8zM14 2v6h6', 'Fixed-price projects', 'Written scope, agreed price', '/services/fixed-price-projects'),
+          it('M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2M9 11a4 4 0 1 0 0-8a4 4 0 0 0 0 8zM17 11l2 2 4-4', 'Dedicated developers', 'Extra hands in your team', '/services/dedicated-developers'),
+          it('M21 12a9 9 0 1 1-3-6.7M21 4v5h-5', 'Product retainer', 'Monthly improvements', '/services/product-retainer'),
+          it('M12 2a10 10 0 1 0 0 20a10 10 0 1 0 0-20zM12 8a4 4 0 1 0 0 8a4 4 0 1 0 0-8z', 'Project rescue', 'Take over a stalled build', '/services/project-rescue'),
+          it('M12 2a10 10 0 1 0 0 20a10 10 0 1 0 0-20zM16 8l-2 6-6 2 2-6z', 'Technical consulting', 'A senior view on your plan', '/services/technical-consulting')
+        ] },
+        { title: 'By stage', items: [
+          it('M5 15c-1.5 1.5-2 5-2 5s3.5-.5 5-2M14 4c3-1 6-1 6-1s0 3-1 6l-7 7-5-5 7-7z', 'MVP development', 'Launch the first version', '/services/mvp-development'),
+          it('M11 4a7 7 0 1 0 0 14a7 7 0 0 0 0-14zM21 21l-5-5', 'Discovery & scoping', 'Plan before you spend', '/services/discovery'),
+          it('M14.7 6.3a4 4 0 0 0-5.4 5.4L3 18l3 3 6.3-6.3a4 4 0 0 0 5.4-5.4l-2.5 2.5-2.4-.6-.6-2.4z', 'Legacy modernization', 'Replace old systems safely', '/services/legacy-modernization'),
+          it('M4 4h6v6H4zM14 14h6v6h-6zM7 10v4a3 3 0 0 0 3 3h4', 'Automation & integrations', 'Connect your tools', '/services/automation-integrations'),
+          it('M3 4h18v12H3zM8 20h8M12 16v4', 'Website development', 'Fast, clear business sites', '/services/website-development')
+        ] }
+      ]
+    };
+  }
+}
+
+
+========== service-web ==========
+Delvix Studio: Web applications
+Home
+/ Services
+/ Web applications
+Web application development
+Web apps that replace your spreadsheets and email threads.
+Customer portals, admin dashboards and internal tools, built around how your team already works and handed over with full code ownership.
+Book a free call
+Get a free audit
+SVC-01 · Web app screenshot
+A real dashboard or portal you built, in a browser frame · 1600×1100
+Sound familiar?
+Signs you've outgrown spreadsheets and off-the-shelf tools.
+{{p.title}}
+{{p.text}}
+What you get
+Everything a production web app needs.
+{{g.title}}
+{{g.text}}
+SVC-02 · Mobile view
+The same app on a phone screen (shows responsive work) · 1000×1250
+How a web app project runs
+Five steps, with something to see every week.
+{{st.n}}
+{{st.title}}
+{{st.text}}
+You get: {{st.out}}
+A good fit if…
+{{f}}
+Probably not a fit if…
+SVC-03
+Revenue OS screenshot · 1000×700
+Related work
+Delvix Revenue OS
+A multi-tenant SaaS with billing, credits, a Super Admin console and AI automation.
+Read the case study →
+Tech we use for web apps
+{{t}}
+Web app questions
+{{f.q}}
+{{f.a}}
+Have a process that lives in spreadsheets?
+Show us how it works today. You'll get a written scope and price within 3 days.
+Get a quote
+
+--- renderVals ---
+
+class Component extends DCLogic {
+  renderVals() {
+    return {
+      problems: [
+        { title: 'Data in five places', text: 'The same customer or order is typed into a sheet, an email and a WhatsApp group.' },
+        { title: 'Nobody knows the status', text: 'Your team asks "where is this?" because there is no single screen to check.' },
+        { title: 'Tools that almost fit', text: 'You pay for software that covers 70% of the job and work around the rest by hand.' },
+        { title: 'Customers wait on you', text: 'Clients email for updates, quotes or documents they could see themselves in a portal.' }
+      ],
+      gets: [
+        { icon: 'M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2M9 11a4 4 0 1 0 0-8a4 4 0 0 0 0 8z', title: 'Roles and permissions', text: 'Admin, staff and customer access, each seeing only what they should.' },
+        { icon: 'M3 3v18h18M7 15l4-4 3 3 5-6', title: 'Dashboards and reports', text: 'The numbers you check every morning, on one screen.' },
+        { icon: 'M4 4h6v6H4zM14 14h6v6h-6zM7 10v4a3 3 0 0 0 3 3h4', title: 'Integrations', text: 'Payments, email, calendar, accounting and your existing tools.' },
+        { icon: 'M7 2h10a2 2 0 0 1 2 2v16a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2zM11 18h2', title: 'Works on every screen', text: 'Responsive layouts for desktop, tablet and phone.' },
+        { icon: 'M12 2l8 3v6c0 5-3.5 9-8 11-4.5-2-8-6-8-11V5zM9 12l2 2 4-4', title: 'Security basics built in', text: 'Encrypted credentials, access control, audit logs and backups.' },
+        { icon: 'M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8zM14 2v6h6', title: 'Handover docs', text: 'Source code, setup guide and admin training on launch.' }
+      ],
+      process: [
+        { n: '01', title: 'Discovery call', text: 'We walk through your current process, the people involved and what success looks like.', out: 'A clear problem statement' },
+        { n: '02', title: 'Written scope', text: 'Screens, features, integrations, price and timeline, on paper.', out: 'Scope + fixed price in 3 days' },
+        { n: '03', title: 'Design', text: 'Clickable screens for the main flows, approved before any code.', out: 'Clickable prototype' },
+        { n: '04', title: 'Build', text: 'We build in weekly cycles and show you working software every week.', out: 'A demo link every week' },
+        { n: '05', title: 'Launch & handover', text: 'Deployment, data import, team training and source code transfer.', out: 'Live app + full code ownership' }
+      ],
+      fit: ['Your team repeats the same manual steps every day', 'You know the process and want software built around it', 'You want to own the code and data'],
+      notFit: ['A ready-made tool already does exactly what you need', 'You need a simple marketing website only', 'The process is still changing every week'],
+      tech: ['Next.js', 'React', 'TypeScript', 'Node.js', 'Laravel', 'PostgreSQL', 'AWS'],
+      faq: [
+        { q: 'Can you work with our existing tools?', a: 'Yes. Most web apps we build connect to tools you already use, such as accounting, email, payments or calendars.' },
+        { q: 'Do we need a designer?', a: 'No. Design is part of the project: you approve clickable screens before we build.' },
+        { q: 'Can we start small?', a: 'Yes. We often build the first version around one workflow and add more once it is in use.' },
+        { q: 'Where is it hosted?', a: 'On your own cloud account (for example AWS) or ours, your choice. You keep full access either way.' },
+        { q: 'What does it cost?', a: 'It depends on the screens and integrations. You get a fixed price in the written scope before any work starts.' }
+      ]
+    };
+  }
+}
+
+
+========== industry-logistics ==========
+Delvix Studio: Logistics & trucking software
+IND-01 · Full-width photo: trucks at a yard or loading dock at dusk · 2400×1200 · add a dark overlay (navy, 70%)
+Home
+/ Industries
+/ Logistics & trucking
+Software for logistics & trucking
+Run dispatch, drivers and quotes from one system, not five spreadsheets.
+Custom software for small and mid-size carriers and freight companies: dispatch boards, driver applications, customer quote forms and document management.
+Book a free call
+Audit my website
+Where time gets lost
+The problems we hear from trucking companies.
+{{p.n}}
+{{p.title}}
+{{p.text}}
+What we build
+Systems built for how carriers actually work.
+{{b.img}}
+{{b.imgNote}}
+{{b.title}}
+{{b.text}}
+{{pt}}
+Before and after
+A typical load, start to finish.
+Step Today With your own system
+{{r.step}} {{r.before}} {{r.after}}
+Connects with:
+{{g}}
+Is your quote form losing loads?
+We'll test your website's quote and driver application forms on a real phone and send you a short report with screenshots. Free.
+Get my free audit
+Trucking software questions
+{{f.q}}
+{{f.a}}
+
+--- renderVals ---
+
+class Component extends DCLogic {
+  renderVals() {
+    return {
+      pains: [
+        { n: '01', title: 'Dispatch on spreadsheets', text: 'Loads, drivers and trucks tracked in sheets that only one person understands.' },
+        { n: '02', title: 'Driver applications by email', text: 'Paper or PDF forms, missing documents and slow follow-up while good drivers go elsewhere.' },
+        { n: '03', title: 'Quote requests that wait', text: 'Shippers send requests by phone or email and the fastest carrier wins.' },
+        { n: '04', title: 'Documents everywhere', text: 'BOLs, PODs and insurance papers in inboxes, phones and folders.' },
+        { n: '05', title: '"Where is my load?" calls', text: 'Customers call for updates your team has to chase drivers for.' }
+      ],
+      builds: [
+        { dir: 'row', title: 'Dispatch board', text: 'See every load, driver and truck on one screen and assign work in a few clicks.', points: ['Drag-and-drop load assignment', 'Driver and truck availability', 'Status updates from the driver app'], img: 'IND-02 · Dispatch board', imgNote: 'Screenshot or mockup of a dispatch board · 1600×1100' },
+        { dir: 'row-reverse', title: 'Driver application portal', text: 'A mobile-friendly application that collects licenses and documents and tracks each applicant.', points: ['Works on any phone', 'Document upload and checklists', 'Applicant status for your team'], img: 'IND-03 · Driver application on a phone', imgNote: 'Phone mockup of the application form · 1200×1100' },
+        { dir: 'row', title: 'Customer quote form', text: 'Shippers request a quote in under a minute and your team gets every detail in one place.', points: ['Lanes, freight type and dates', 'Instant notification to sales', 'Quote history per customer'], img: 'IND-04 · Quote form', imgNote: 'Screenshot of a quote request flow · 1600×1100' },
+        { dir: 'row-reverse', title: 'Document management', text: 'Every BOL, POD and insurance file attached to the right load and customer.', points: ['Upload from the driver app', 'Search by load or customer', 'Expiry reminders for insurance'], img: 'IND-05 · Document library', imgNote: 'Screenshot of documents linked to a load · 1600×1100' }
+      ],
+      flow: [
+        { step: 'Quote request', before: 'Phone call or email, typed into a sheet', after: 'Web form straight into your system' },
+        { step: 'Load assigned', before: 'Calls and texts to find a driver', after: 'Assigned on the dispatch board' },
+        { step: 'Status updates', before: 'Customer calls to ask', after: 'Driver updates status in the app' },
+        { step: 'Paperwork', before: 'Photos sent on WhatsApp', after: 'POD uploaded and attached to the load' },
+        { step: 'Invoice', before: 'Built by hand at month end', after: 'Generated from the completed load' }
+      ],
+      integrations: ['GPS / ELD data feeds', 'QuickBooks', 'Google Workspace', 'Microsoft 365', 'WhatsApp', 'Email'],
+      faq: [
+        { q: 'Can you connect to our ELD or GPS provider?', a: 'In most cases, yes, if your provider offers an API or data export. We confirm this during the discovery call.' },
+        { q: 'Do drivers need to install an app?', a: 'Not always. Many driver features work as a mobile web app that opens from a link.' },
+        { q: 'Can we start with one part, like driver applications?', a: 'Yes. Starting with one workflow is common, and the rest can be added later.' },
+        { q: 'Who owns the system?', a: 'You do. The source code and data are yours on final payment.' },
+        { q: 'How do we start?', a: 'Book a free call. You get a written scope and fixed price within 3 days.' }
+      ]
+    };
+  }
+}
+
+
+========== case-revenue-os ==========
+Delvix Studio: Revenue OS case study
+Home
+/ Work
+/ Revenue OS
+Case study
+B2B SaaS
+AI + automation
+Revenue OS: an AI platform that finds clients and starts the conversation.
+We designed and built a multi-tenant SaaS for agencies and freelancers, and we use it every day for our own client acquisition.
+CS-01 · Main dashboard
+Full-width Revenue OS dashboard screenshot · 2200×1100 · blur client data
+{{f.k}} {{f.v}}
+The problem
+Finding clients took more time than doing the work.
+Agencies and freelancers spend hours researching prospects, guessing who to contact and sending generic emails that get ignored. Follow-ups slip, and there is no single place to see what's working.
+The approach
+Lead with proof, not a pitch.
+Instead of sending a generic offer, the platform opens each prospect's website in a real browser, records what's actually broken with screenshots, and writes a short email about that one real problem.
+What we built
+From a search query to a booked conversation.
+{{m.n}} {{m.title}}
+{{m.text}}
+Inside the product
+{{s.id}}
+{{s.note}}
+{{s.caption}}
+Engineering
+Built to be sold, not just demoed.
+Multi-tenancy, billing and security were designed in from the start, so each customer's data, keys and branding stay separate.
+{{t}}
+{{e.title}}
+{{e.text}}
+Results
+{{r.v}}
+{{r.k}}
+Hide this section until you have real numbers.
+Need a platform like this?
+Book a free call
+Request Autopilot early access
+
+--- renderVals ---
+
+class Component extends DCLogic {
+  renderVals() {
+    return {
+      facts: [
+        { k: 'Client', v: 'Delvix (our own product)' },
+        { k: 'Type', v: 'Multi-tenant B2B SaaS' },
+        { k: 'Our role', v: 'Product design, engineering, launch' },
+        { k: 'Status', v: 'In production · early access for agencies' },
+        { k: 'Billing', v: 'Paddle subscriptions + credits' }
+      ],
+      modules: [
+        { n: '01', title: 'Prospect sourcing', text: 'Finds businesses by industry and location through Google Places, with duplicates removed.' },
+        { n: '02', title: 'Website crawl + enrichment', text: 'Collects public contact details and finds decision makers through a provider waterfall.' },
+        { n: '03', title: 'Deep website audit', text: 'A headless browser checks each site on desktop and mobile and stores screenshot evidence.' },
+        { n: '04', title: 'Evidence-based outreach', text: 'AI writes a short email about one verified problem. Nothing invented.' },
+        { n: '05', title: 'AI reply agent', text: 'Classifies replies and drafts answers, handing off to a human when needed.' },
+        { n: '06', title: 'Packages, credits, Super Admin', text: 'Versioned plans, usage credits, Paddle billing and full platform control.' }
+      ],
+      shots: [
+        { id: 'CS-02', note: 'Deep audit findings with screenshots · 1600×1000', caption: 'Deep audit with real evidence' },
+        { id: 'CS-03', note: 'Pipeline / opportunities view · 1600×1000', caption: 'Pipeline from sourced to won' },
+        { id: 'CS-04', note: 'Super Admin packages screen · 1600×1000', caption: 'Packages and credits in Super Admin' },
+        { id: 'CS-05', note: 'Pitch review: finding next to the email draft · 1600×1000', caption: 'Every email reviewed before sending' }
+      ],
+      stack: ['Next.js', 'TypeScript', 'PostgreSQL', 'Prisma', 'Playwright', 'Paddle', 'OpenAI / Claude', 'AWS'],
+      eng: [
+        { title: 'Tenant isolation', text: 'Every query scoped to the organization.' },
+        { title: 'Encrypted credentials', text: 'Per-tenant API keys stored encrypted.' },
+        { title: 'SSRF protection', text: 'Audits can never reach internal addresses.' },
+        { title: 'Credit ledger', text: 'Reserve, commit and refund, charged exactly once.' },
+        { title: '2FA + audit logs', text: 'Every Super Admin action is recorded.' },
+        { title: 'Isolated audit worker', text: 'Browser jobs run apart from the web app.' }
+      ],
+      results: [
+        { v: '[ADD]', k: 'Companies audited' },
+        { v: '[ADD]', k: 'Reply rate' },
+        { v: '[ADD]', k: 'Meetings booked' }
+      ]
+    };
+  }
+}
+
+
+========== free-audit ==========
+Delvix Studio: Free website audit
+Free · No sales pitch
+Find out what your website is costing you.
+We open your site in a real browser on desktop and iPhone, check the things that lose customers, and send you a short report with screenshots.
+AUDIT-01 · Sample report
+Screenshot of a real audit report (your own site or a demo site) · 1600×1000
+Request your free audit
+Name
+Work email
+Website
+Industry Logistics & trucking Real estate Clinics & healthcare Construction & trades Retail Other
+Anything we should look at? (optional)
+Send me the audit
+We only use your details to send the report. No mailing list.
+What we check
+The things that quietly lose customers.
+{{c.title}}
+{{c.text}}
+How it works
+{{h.n}}
+{{h.title}}
+{{h.text}}
+
+--- renderVals ---
+
+class Component extends DCLogic {
+  renderVals() {
+    return {
+      checks: [
+        { icon: 'M12 14l4-4M3.3 19a10 10 0 1 1 17.4 0', title: 'Mobile speed', text: 'How long your pages take to show content on a phone, measured with Google PageSpeed.' },
+        { icon: 'M10 13a5 5 0 0 0 7.5.5l3-3a5 5 0 0 0-7-7l-1.7 1.7M14 11a5 5 0 0 0-7.5-.5l-3 3a5 5 0 0 0 7 7l1.7-1.7', title: 'Broken pages and links', text: 'Pages and menu links that return errors or lead nowhere.' },
+        { icon: 'M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8zM14 2v6h6M8 13h8M8 17h6', title: 'Forms', text: 'Whether contact, quote and booking forms load and work on mobile.' },
+        { icon: 'M5 11h14v10H5zM8 11V7a4 4 0 0 1 8 0v4', title: 'SSL and security basics', text: 'Certificate status, HTTPS redirects and mixed content warnings.' },
+        { icon: 'M7 2h10a2 2 0 0 1 2 2v16a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2zM11 18h2', title: 'Mobile layout', text: 'Sideways scrolling, overlapping elements and buttons too small to tap.' },
+        { icon: 'M15 15l-2 5L9 9l11 4-5 2zM3 3l4 4', title: 'Calls to action', text: 'Whether visitors can call, book or ask for a quote without searching.' }
+      ],
+      how: [
+        { n: '01', title: 'Send your website', text: 'Fill in the form. It takes under a minute.' },
+        { n: '02', title: 'We run the checks', text: 'A real browser opens your site on desktop and iPhone and records evidence.' },
+        { n: '03', title: 'Get your report', text: 'A short email with the top issues, screenshots and what to fix first.' }
+      ]
+    };
+  }
+}
+
+
+========== about ==========
+Delvix Studio: About
+About Delvix Studio
+A small studio that builds software the way we'd want it built for us.
+We work remotely with growing businesses in the US, UK, Europe and the Gulf. No layers of account managers: you talk to the people writing the code.
+ABOUT-01 · Founder portrait
+Real, natural-light photo · 1200×1500
+Our story
+Why Delvix exists
+[FOUNDER STORY: 2–3 short paragraphs. Who you are, how many years you've been building software, what kind of projects, why you started Delvix, and what you do differently. Write it in your own voice.]
+[Second paragraph: a real project or moment that shaped how you work, such as the client whose stalled project you rescued.]
+[Founder name], Founder
+How we work
+Five principles behind every project.
+{{p.n}}
+{{p.title}}
+{{p.text}}
+{{ph.id}}
+{{ph.note}}
+Let's talk about what you're building.
+Book a free call
+
+--- renderVals ---
+
+class Component extends DCLogic {
+  renderVals() {
+    return {
+      principles: [
+        { n: '01', title: 'Scope in writing', text: 'Before any code, you get features, price and timeline on paper.' },
+        { n: '02', title: 'Show, don’t tell', text: 'A working demo every week instead of status reports.' },
+        { n: '03', title: 'Talk to builders', text: 'You speak directly with the developers on your project.' },
+        { n: '04', title: 'You own it', text: 'Code, data and accounts are yours on final payment.' },
+        { n: '05', title: 'Honest advice', text: 'If a ready-made tool fits better, we’ll tell you.' }
+      ],
+      photos: [
+        { id: 'ABOUT-02', note: 'Your workspace / desk setup · 1200×900' },
+        { id: 'ABOUT-03', note: 'You on a client call or whiteboarding · 1200×900' },
+        { id: 'ABOUT-04', note: 'Team photo (only if you have a team) · 1200×900' }
+      ]
+    };
+  }
+}
+
+
+========== pricing ==========
+Delvix Studio: Pricing
+Pricing
+Clear pricing, agreed before we start.
+Every project gets a written scope and a fixed price. No hourly surprises.
+Most common
+{{m.title}}
+{{m.price}}
+{{m.unit}}
+{{m.text}}
+{{pt}}
+{{m.cta}}
+Starter offers
+Small, fixed packages to get started.
+{{o.name}}
+{{o.price}}
+{{o.text}}
+Fill these from your Business Brain starter offers, or hide the section.
+What affects the price
+{{f.t}}
+{{f.d}}
+Pricing questions
+{{q.q}}
+{{q.a}}
+
+--- renderVals ---
+
+class Component extends DCLogic {
+  renderVals() {
+    const light = { border: '1px solid #1E2738', bg: '#121A2B', fg: '#F5F7FB', muted: '#A3ADC2', btnBg: '#1B2340', btnFg: '#F5F7FB', featured: false };
+    return {
+      models: [
+        Object.assign({}, light, { title: 'Fixed-price project', price: '[From $X]', unit: 'per project', text: 'A defined app, portal or system with a written scope.', points: ['Written scope in 3 days', 'Milestone payments', 'Weekly demos', 'Full code ownership'], cta: 'Get a quote' }),
+        Object.assign({}, light, { title: 'Monthly retainer', price: '[From $X]', unit: '/ month', text: 'Ongoing improvements to a live product.', points: ['Planned work each month', 'Priority fixes', 'Monthly report', 'Cancel with 30 days notice'], cta: 'Discuss a retainer', featured: true, border: '1px solid #6366F1', bg: '#F5F7FB', fg: '#0B1220', muted: '#4B5568', btnBg: '#6366F1', btnFg: '#FFFFFF' }),
+        Object.assign({}, light, { title: 'Dedicated developer', price: '[From $X]', unit: '/ month', text: 'A developer working inside your team and tools.', points: ['Full-time or part-time', 'Overlap with your hours', 'Your tools and process', 'Replace if not a fit'], cta: 'Hire a developer' })
+      ],
+      offers: [
+        { name: '[Offer name, e.g. Website fix + speed-up]', price: '[$X]', text: '[What is included and delivery days]' },
+        { name: '[Offer name, e.g. Mobile quote form]', price: '[$X]', text: '[What is included and delivery days]' },
+        { name: '[Offer name, e.g. Discovery & scope]', price: '[$X]', text: '[What is included and delivery days]' }
+      ],
+      factors: [
+        { t: 'Number of screens and user roles', d: 'More user types and screens mean more design and build time.' },
+        { t: 'Integrations', d: 'Each connected system (payments, accounting, ELD) adds work.' },
+        { t: 'Data migration', d: 'Moving existing spreadsheets or old systems into the new one.' },
+        { t: 'Mobile apps', d: 'A native app on top of a web app adds a second front end.' },
+        { t: 'AI features', d: 'AI usage costs are billed by the provider on your own account.' }
+      ],
+      faq: [
+        { q: 'Do you charge by the hour?', a: 'No. Projects are fixed price based on the written scope. Retainers and dedicated developers are monthly.' },
+        { q: 'How do payments work?', a: 'Fixed-price projects are paid in milestones. Monthly plans are paid at the start of each month.' },
+        { q: 'What if we need changes during the project?', a: 'Small changes fit into weekly demos. Bigger changes get a written estimate before we do them.' },
+        { q: 'Which payment methods do you accept?', a: '[CONFIRM: e.g. bank transfer, card, Payoneer]' }
+      ]
+    };
+  }
+}
+
+
+========== contact ==========
+Delvix Studio: Contact
+Contact
+Tell us what you need.
+Send a few lines about your project. We reply within [1 business day] with next steps or a time for a call.
+{{c.title}}
+{{c.value}}
+I want to…
+Get a quote
+Book a call
+Rescue a project
+Partnership
+Name
+Work email
+Company
+Budget Under $5,000 $5,000–$15,000 $15,000–$50,000 $50,000+ Monthly retainer
+What are you building or fixing?
+Send message
+Happy to sign an NDA before you share details.
+
+--- renderVals ---
+
+class Component extends DCLogic {
+  renderVals() {
+    return {
+      channels: [
+        { title: 'Book a free 30-minute call', value: 'Pick a time that suits you', href: '#', icon: 'M3 5h18v16H3zM16 3v4M8 3v4M3 10h18' },
+        { title: 'WhatsApp', value: 'Quickest for short questions', href: '#', icon: 'M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z' },
+        { title: 'Email', value: 'info@delvixstudio.com', href: 'mailto:info@delvixstudio.com', icon: 'M3 5h18v14H3zM3 6l9 7 9-7' },
+        { title: 'Phone', value: '+1 609 691 6966', href: 'tel:+16096916966', icon: 'M7 2h10a2 2 0 0 1 2 2v16a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2zM11 18h2' }
+      ]
+    };
+  }
+}

@@ -1,0 +1,77 @@
+
+========== home (6d510255-af8a-4cb2-8e81-4ab59efe6123) ==========
+
+Delvix Studio: Home
+This page requires JavaScript to display.
+Loading Delvix Studio: Home...
+Unpacking...
+
+========== header (92fa6215-cec2-44bb-bc21-b1e571dea13b) ==========
+
+Delvix Studio: Header
+This page requires JavaScript to display.
+Loading Delvix Studio: Header...
+Unpacking...
+
+========== footer (6724f06b-4780-4c73-8c6c-fa19ec3f33ab) ==========
+
+Delvix Studio: Footer
+This page requires JavaScript to display.
+Loading Delvix Studio: Footer...
+Unpacking...
+
+========== mega-menu (dd11de45-3bef-4ad9-be76-71199631d359) ==========
+
+Delvix Studio: Services mega menu
+This page requires JavaScript to display.
+Loading Delvix Studio: Services mega menu...
+Unpacking...
+
+========== service-web (37892657-c982-4c69-acae-e2d3549920b6) ==========
+
+Delvix Studio: Web applications
+This page requires JavaScript to display.
+Loading Delvix Studio: Web applications...
+Unpacking...
+
+========== industry-logistics (33137144-5750-49be-9e98-56f6b7cc5f41) ==========
+
+Delvix Studio: Logistics & trucking software
+This page requires JavaScript to display.
+Loading Delvix Studio: Logistics & trucking software...
+Unpacking...
+
+========== case-revenue-os (671d0c0d-c970-4cf7-9b7b-88220c1e9106) ==========
+
+Delvix Studio: Revenue OS case study
+This page requires JavaScript to display.
+Loading Delvix Studio: Revenue OS case study...
+Unpacking...
+
+========== free-audit (85923307-f3f5-46e8-9e89-a47cb18c00c6) ==========
+
+Delvix Studio: Free website audit
+This page requires JavaScript to display.
+Loading Delvix Studio: Free website audit...
+Unpacking...
+
+========== about (d9d6d607-3074-420f-aa65-4e3fed4f0a80) ==========
+
+Delvix Studio: About
+This page requires JavaScript to display.
+Loading Delvix Studio: About...
+Unpacking...
+
+========== pricing (b84b93b0-0bb8-4418-b1c2-f2268c89dfc1) ==========
+
+Delvix Studio: Pricing
+This page requires JavaScript to display.
+Loading Delvix Studio: Pricing...
+Unpacking...
+
+========== contact (eaef4c24-133e-41bc-b135-e4a68bd17371) ==========
+
+Delvix Studio: Contact
+This page requires JavaScript to display.
+Loading Delvix Studio: Contact...
+Unpacking...

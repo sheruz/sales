@@ -1,130 +1,84 @@
-import Link from "next/link";
 import type { Metadata } from "next";
+import { Calendar, Mail, MessageSquare, Phone } from "lucide-react";
 import { ContactForm } from "@/components/marketing/contact-form";
-import { PageBreadcrumb } from "@/components/marketing/page-breadcrumb";
-import { PageVisual } from "@/components/marketing/page-visual";
-import { RelatedPages } from "@/components/marketing/related-pages";
-import { SectionCta } from "@/components/marketing/section-cta";
-import { contactPageExtras } from "@/content/pages";
 import { siteConfig } from "@/content/site";
 import { buildPageMetadata } from "@/lib/marketing/page-metadata";
-import { visualForPath } from "@/lib/marketing/page-visuals";
 
 export const metadata: Metadata = buildPageMetadata({
-  title: "Contact Delvix Studio | Book a Call or Send a Brief",
-  description:
-    "Book a free call, message us on WhatsApp, email, or send a short project brief. Delvix Studio replies within one business day.",
+  title: "Contact Delvix Studio | Book a Call or Send a Message",
+  description: "Tell us what you need. We reply within [1 business day] with next steps or a time for a call.",
   path: "/contact",
 });
 
+const channels = [
+  {
+    icon: Calendar,
+    title: "Book a free 30-minute call",
+    value: "Pick a time that suits you",
+    href: siteConfig.contact.bookingUrl,
+  },
+  {
+    icon: MessageSquare,
+    title: "WhatsApp",
+    value: "Quickest for short questions",
+    href: siteConfig.contact.whatsapp,
+  },
+  {
+    icon: Mail,
+    title: "Email",
+    value: siteConfig.contact.email,
+    href: `mailto:${siteConfig.contact.email}`,
+  },
+  {
+    icon: Phone,
+    title: "Phone",
+    value: siteConfig.contact.phoneDisplay,
+    href: `tel:${siteConfig.contact.phone}`,
+  },
+];
+
 export default function ContactPage() {
-  const { email, phone, phoneDisplay, whatsapp, bookingUrl } = siteConfig.contact;
-  const extras = contactPageExtras;
-
   return (
-    <>
-      <section className="mkt-section mkt-section--dark">
-        <div className="mkt-wrap grid gap-12 lg:grid-cols-2">
+    <section className="mkt-section mkt-section--dark mkt-grid-bg">
+      <div className="mkt-wrap">
+        <div className="grid gap-14 lg:grid-cols-2">
           <div className="space-y-6">
-            <PageBreadcrumb current="Contact" currentPath="/contact" />
-            <div className="space-y-3">
-              <p className="mkt-eyebrow">Contact</p>
-              <h1 className="text-4xl font-extrabold sm:text-5xl">
-                Tell us what you&apos;re running on
-              </h1>
-              <p className="mkt-muted text-lg">
-                Prefer a call, chat or a short written brief? All fine. We reply{" "}
-                {extras.responseTime}.
-              </p>
-              <p className="mkt-muted text-sm leading-relaxed">
-                {extras.responseTimeNote}
-              </p>
-            </div>
-            <ul className="m-0 list-none space-y-3 p-0 text-sm">
-              <li>
-                <a className="mkt-link" href={`mailto:${email}`}>
-                  {email}
-                </a>
-              </li>
-              <li>
-                <a className="mkt-link" href={`tel:${phone}`}>
-                  {phoneDisplay}
-                </a>
-              </li>
-              <li>
+            <p className="mkt-eyebrow">Contact</p>
+            <h1 className="text-4xl font-extrabold text-balance leading-tight sm:text-5xl lg:text-6xl">
+              Tell us what you need.
+            </h1>
+            <p className="text-lg leading-relaxed text-muted-foreground">
+              Send a few lines about your project. We reply within [1 business day] with next steps or a time for a call.
+            </p>
+
+            <div className="mt-8 space-y-3">
+              {channels.map((channel) => (
                 <a
-                  className="mkt-link"
-                  href={whatsapp}
-                  target="_blank"
-                  rel="noopener noreferrer"
+                  key={channel.title}
+                  href={channel.href}
+                  className="mkt-card flex items-center gap-4 transition-all hover:scale-[1.02] hover:border-[var(--mkt-accent)]"
+                  target={channel.href.startsWith("http") ? "_blank" : undefined}
+                  rel={channel.href.startsWith("http") ? "noopener noreferrer" : undefined}
                 >
-                  WhatsApp
+                  <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-[var(--mkt-bg-subtle)]">
+                    <channel.icon className="h-5 w-5 text-[var(--mkt-accent)]" />
+                  </div>
+                  <div>
+                    <p className="font-semibold">{channel.title}</p>
+                    <p className="text-sm text-muted-foreground">
+                      {channel.value}
+                    </p>
+                  </div>
                 </a>
-              </li>
-            </ul>
-            <div className="flex flex-wrap gap-3">
-              <Link
-                href={bookingUrl}
-                className="mkt-btn mkt-btn--primary"
-                data-mkt-schedule
-              >
-                Book a free call
-              </Link>
-              <Link href="/free-audit" className="mkt-btn mkt-btn--secondary">
-                Get a free audit
-              </Link>
+              ))}
             </div>
           </div>
-          <div className="space-y-3">
+
+          <div className="mkt-card mkt-card--light">
             <ContactForm />
-            <p className="mkt-muted text-xs leading-relaxed">{extras.afterSubmit}</p>
           </div>
         </div>
-      </section>
-
-      <section className="mkt-section mkt-section--light">
-        <div className="mkt-wrap space-y-8">
-          <div className="grid items-center gap-10 lg:grid-cols-[1fr_1fr]">
-            <div className="max-w-2xl space-y-3">
-              <p className="mkt-eyebrow">How can we help?</p>
-              <h2 className="text-3xl font-extrabold">Pick the kind of message</h2>
-              <p className="mkt-muted leading-relaxed">
-                A little context up front means a more useful first reply.
-              </p>
-            </div>
-            <PageVisual visual={visualForPath("/contact")} alt="Contact Delvix Studio" />
-          </div>
-          <div className="mkt-grid-3">
-            {extras.types.map((t) => (
-              <div key={t.id} id={t.id} className="mkt-card">
-                <h3 className="mb-2 text-lg font-bold">{t.label}</h3>
-                <p className="mkt-muted mb-3 text-sm leading-relaxed">
-                  {t.description}
-                </p>
-                <p className="mb-1 text-sm font-semibold">Helpful to include:</p>
-                <ul className="m-0 list-disc space-y-1 pl-5 text-sm">
-                  {t.suggestedInfo.map((info) => (
-                    <li key={info}>{info}</li>
-                  ))}
-                </ul>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      <RelatedPages
-        tone="dark"
-        links={[
-          { href: "/pricing", label: "Pricing and engagement models" },
-          { href: "/process", label: "How we work" },
-          { href: "/free-audit", label: "Get a free website audit" },
-        ]}
-      />
-      <SectionCta
-        title="Rather speak to someone now?"
-        sub="Book a free call and pick a time that suits you."
-      />
-    </>
+      </div>
+    </section>
   );
 }

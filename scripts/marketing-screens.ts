@@ -20,6 +20,7 @@ const PATHS = [
   "/work/revenue-os",
   "/pricing",
   "/contact",
+  "/about",
 ] as const;
 
 function slug(p: string) {
