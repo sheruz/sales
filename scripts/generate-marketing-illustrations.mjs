@@ -36,8 +36,13 @@ const soft = (x, y, w, h, rx = 10) =>
   `<rect x="${x}" y="${y}" width="${w}" height="${h}" rx="${rx}" fill="${panel2}"/>`;
 const bar = (x, y, w, h = 8, c = accent) =>
   `<rect x="${x}" y="${y}" width="${w}" height="${h}" rx="4" fill="${c}"/>`;
+const esc = (t) =>
+  String(t)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;");
 const txt = (x, y, t, size = 18, c = ink, weight = 600) =>
-  `<text x="${x}" y="${y}" fill="${c}" font-family="system-ui,sans-serif" font-size="${size}" font-weight="${weight}">${t}</text>`;
+  `<text x="${x}" y="${y}" fill="${c}" font-family="system-ui,sans-serif" font-size="${size}" font-weight="${weight}">${esc(t)}</text>`;
 const pill = (x, y, w, h, c = accent) =>
   `<rect x="${x}" y="${y}" width="${w}" height="${h}" rx="${h / 2}" fill="${c}"/>`;
 
