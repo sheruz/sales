@@ -22,13 +22,13 @@ export function AuditForm() {
       company: "",
       needs: ["free_audit", problem].filter(Boolean),
       message: [
-        "Free website & systems audit request.",
+        "Free website and systems audit request.",
         website ? `Website: ${website}` : null,
         problem ? `Biggest problem: ${problem}` : null,
       ]
         .filter(Boolean)
         .join("\n"),
-      website_url: "", // honeypot left empty
+      website_url: "",
       formType: "audit",
     };
     try {
@@ -51,15 +51,28 @@ export function AuditForm() {
 
   if (done) {
     return (
-      <p className="rounded-[var(--mkt-radius)] border border-[var(--mkt-line)] bg-[var(--mkt-panel)] p-4 text-sm">
-        Thanks — we received your audit request and will reply by email.
-      </p>
+      <div
+        className="mkt-card space-y-2"
+        role="status"
+        aria-live="polite"
+      >
+        <p className="font-semibold">Request received</p>
+        <p className="mkt-muted text-sm leading-relaxed">
+          Thanks — we will reply by email with a short written read of your site.
+        </p>
+        <button
+          type="button"
+          className="mkt-link text-sm"
+          onClick={() => setDone(false)}
+        >
+          Send another request
+        </button>
+      </div>
     );
   }
 
   return (
-    <form onSubmit={onSubmit} className="space-y-3" noValidate>
-      {/* honeypot */}
+    <form onSubmit={onSubmit} className="mkt-card space-y-4" noValidate>
       <input
         type="text"
         name="website_url"
@@ -68,40 +81,52 @@ export function AuditForm() {
         className="hidden"
         aria-hidden
       />
-      <div className="grid gap-3 sm:grid-cols-2">
+      <div className="grid gap-4 sm:grid-cols-2">
         <label className="block text-sm">
-          <span className="mb-1 block text-[var(--mkt-muted)]">Name</span>
+          <span className="mb-1.5 block font-medium text-[var(--mkt-muted)]">
+            Name
+          </span>
           <input
             required
             name="name"
-            className="w-full rounded-xl border border-[var(--mkt-line)] bg-[var(--mkt-navy)] px-3 py-2.5"
+            autoComplete="name"
+            className="mkt-input h-12 w-full rounded-xl border border-[var(--mkt-line)] bg-[var(--mkt-navy)] px-3"
           />
         </label>
         <label className="block text-sm">
-          <span className="mb-1 block text-[var(--mkt-muted)]">Email</span>
+          <span className="mb-1.5 block font-medium text-[var(--mkt-muted)]">
+            Email
+          </span>
           <input
             required
             type="email"
             name="email"
-            className="w-full rounded-xl border border-[var(--mkt-line)] bg-[var(--mkt-navy)] px-3 py-2.5"
+            autoComplete="email"
+            className="mkt-input h-12 w-full rounded-xl border border-[var(--mkt-line)] bg-[var(--mkt-navy)] px-3"
           />
         </label>
       </div>
       <label className="block text-sm">
-        <span className="mb-1 block text-[var(--mkt-muted)]">Website</span>
+        <span className="mb-1.5 block font-medium text-[var(--mkt-muted)]">
+          Website
+        </span>
         <input
           name="website"
           type="url"
+          inputMode="url"
+          autoComplete="url"
           placeholder="https://"
-          className="w-full rounded-xl border border-[var(--mkt-line)] bg-[var(--mkt-navy)] px-3 py-2.5"
+          className="mkt-input h-12 w-full rounded-xl border border-[var(--mkt-line)] bg-[var(--mkt-navy)] px-3"
         />
       </label>
       <label className="block text-sm">
-        <span className="mb-1 block text-[var(--mkt-muted)]">Biggest problem</span>
+        <span className="mb-1.5 block font-medium text-[var(--mkt-muted)]">
+          Biggest problem
+        </span>
         <select
           name="problem"
           required
-          className="w-full rounded-xl border border-[var(--mkt-line)] bg-[var(--mkt-navy)] px-3 py-2.5"
+          className="mkt-input h-12 w-full rounded-xl border border-[var(--mkt-line)] bg-[var(--mkt-navy)] px-3"
           defaultValue=""
         >
           <option value="" disabled>
@@ -114,10 +139,25 @@ export function AuditForm() {
           ))}
         </select>
       </label>
-      {error ? <p className="text-sm text-red-300">{error}</p> : null}
-      <button type="submit" className="mkt-btn mkt-btn--primary" disabled={busy}>
+      {error ? (
+        <p className="text-sm text-red-300" role="alert">
+          {error}
+        </p>
+      ) : null}
+      <button
+        type="submit"
+        className="mkt-btn mkt-btn--primary w-full sm:w-auto"
+        disabled={busy}
+      >
         {busy ? "Sending…" : "Request free audit"}
       </button>
+      <p className="mkt-muted text-xs leading-relaxed">
+        We use your details only to reply about this audit. See our{" "}
+        <a href="/privacy" className="mkt-link">
+          privacy policy
+        </a>
+        .
+      </p>
     </form>
   );
 }

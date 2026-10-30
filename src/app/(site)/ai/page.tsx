@@ -1,10 +1,10 @@
 import Link from "next/link";
 import type { Metadata } from "next";
+import { MarketingCard } from "@/components/marketing/marketing-card";
 import { PageBreadcrumb } from "@/components/marketing/page-breadcrumb";
 import { PageVisual } from "@/components/marketing/page-visual";
 import { RelatedPages } from "@/components/marketing/related-pages";
 import { SectionCta } from "@/components/marketing/section-cta";
-import { VisualThumb } from "@/components/marketing/visual-thumb";
 import { aiPages } from "@/content/pages";
 import { buildPageMetadata } from "@/lib/marketing/page-metadata";
 import { getNavMeta } from "@/lib/marketing/nav-lookup";
@@ -23,10 +23,10 @@ export default function AiIndexPage() {
       <section className="mkt-section mkt-section--dark">
         <div className="mkt-wrap space-y-8">
           <PageBreadcrumb current="AI" currentPath="/ai" />
-          <div className="grid items-center gap-10 lg:grid-cols-[1.2fr_0.8fr]">
+          <div className="mkt-split">
             <div className="space-y-6">
               <p className="mkt-eyebrow">AI services</p>
-              <h1 className="max-w-3xl text-4xl font-extrabold sm:text-5xl">
+              <h1 className="max-w-3xl text-4xl font-extrabold text-balance sm:text-5xl">
                 AI features that do a specific job in your business
               </h1>
               <p className="mkt-muted max-w-2xl text-lg">
@@ -43,30 +43,25 @@ export default function AiIndexPage() {
                 </Link>
               </div>
             </div>
-            <PageVisual visual={visualForPath("/ai")} alt="AI workspace mockup" priority />
+            <PageVisual visual={visualForPath("/ai")} alt="AI workspace" priority />
           </div>
         </div>
       </section>
 
       <section className="mkt-section mkt-section--light">
         <div className="mkt-wrap space-y-8">
-          <h2 className="text-3xl font-extrabold">What we build with AI</h2>
+          <h2 className="text-3xl font-extrabold text-balance">What we build with AI</h2>
           <div className="mkt-grid-3">
             {aiPages.map((p) => {
               const nav = getNavMeta(`/ai/${p.slug}`);
               return (
-                <Link key={p.slug} href={`/ai/${p.slug}`} className="mkt-card block">
-                  <VisualThumb
-                    visual={visualForAi(p.slug)}
-                    alt={nav?.title ?? p.h1}
-                    className="mkt-card-thumb mb-3"
-                  />
-                  <h3 className="mb-2 text-lg font-bold">{nav?.title ?? p.h1}</h3>
-                  <p className="mkt-muted mb-3 text-sm leading-relaxed">
-                    {p.subline}
-                  </p>
-                  <span className="mkt-link text-sm">Learn more →</span>
-                </Link>
+                <MarketingCard
+                  key={p.slug}
+                  href={`/ai/${p.slug}`}
+                  title={nav?.title ?? p.h1}
+                  description={p.subline}
+                  visual={visualForAi(p.slug)}
+                />
               );
             })}
           </div>

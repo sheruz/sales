@@ -8,7 +8,7 @@ import { SectionCta } from "@/components/marketing/section-cta";
 import { pricingPage } from "@/content/pages";
 import { siteConfig } from "@/content/site";
 import { buildPageMetadata } from "@/lib/marketing/page-metadata";
-import { visualForPath } from "@/lib/marketing/page-visuals";
+import { bodyVisualFor, visualForPath } from "@/lib/marketing/page-visuals";
 
 export const metadata: Metadata = buildPageMetadata({
   title: pricingPage.seoTitle,
@@ -33,34 +33,40 @@ function formatFrom(priceFrom?: number, currency?: string) {
 export default function PricingPage() {
   const offers = siteConfig.offers;
   const hasOffers = offers.length > 0;
+  const heroVisual = visualForPath("/pricing");
+  const bodyVisual = bodyVisualFor(heroVisual, "process-timeline");
 
   return (
     <>
       <section className="mkt-section mkt-section--dark">
         <div className="mkt-wrap space-y-8">
           <PageBreadcrumb current="Pricing" currentPath="/pricing" />
-          <div className="grid items-center gap-10 lg:grid-cols-[1.2fr_0.8fr]">
+          <div className="mkt-split">
             <div className="space-y-6">
               <p className="mkt-eyebrow">Pricing</p>
-              <h1 className="text-4xl font-extrabold sm:text-5xl">{pricingPage.h1}</h1>
+              <h1 className="text-4xl font-extrabold text-balance sm:text-5xl">
+                {pricingPage.h1}
+              </h1>
               <p className="mkt-muted text-lg leading-relaxed">{pricingPage.intro}</p>
               <p className="mkt-muted text-sm leading-relaxed">
                 {pricingPage.noPricesNote}
               </p>
             </div>
-            <PageVisual visual={visualForPath("/pricing")} alt="Scoped project milestones" priority />
+            <PageVisual visual={heroVisual} alt="Scoped project milestones" priority />
           </div>
         </div>
       </section>
 
       <section className="mkt-section mkt-section--light">
         <div className="mkt-wrap space-y-8">
-          <div className="grid items-center gap-10 lg:grid-cols-[1fr_1fr]">
+          <div className="mkt-split">
             <div className="max-w-2xl space-y-3">
               <p className="mkt-eyebrow">Engagement models</p>
-              <h2 className="text-3xl font-extrabold">Choose how you want to work</h2>
+              <h2 className="text-3xl font-extrabold text-balance">
+                Choose how you want to work
+              </h2>
             </div>
-            <PageVisual visual={visualForPath("/pricing")} alt="Scoped milestones and pricing models" />
+            <PageVisual visual={bodyVisual} alt="Delivery process for pricing models" />
           </div>
           <div className="mkt-grid-3">
             {pricingPage.models.map((m) => (

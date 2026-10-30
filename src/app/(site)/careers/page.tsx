@@ -16,16 +16,19 @@ export const metadata: Metadata = buildPageMetadata({
 
 export default function CareersPage() {
   const { howToApply } = careersPage;
+  const heroVisual = visualForPath("/careers");
 
   return (
     <>
       <section className="mkt-section mkt-section--dark">
         <div className="mkt-wrap space-y-8">
           <PageBreadcrumb current="Careers" currentPath="/careers" />
-          <div className="grid items-center gap-10 lg:grid-cols-[1.2fr_0.8fr]">
+          <div className="mkt-split">
             <div className="space-y-6">
               <p className="mkt-eyebrow">Careers</p>
-              <h1 className="text-4xl font-extrabold sm:text-5xl">{careersPage.h1}</h1>
+              <h1 className="text-4xl font-extrabold text-balance sm:text-5xl">
+                {careersPage.h1}
+              </h1>
               <p className="mkt-muted text-lg leading-relaxed">{careersPage.intro}</p>
               <p className="mkt-muted text-sm leading-relaxed">{careersPage.note}</p>
               <a
@@ -35,15 +38,12 @@ export default function CareersPage() {
                 Email {howToApply.email}
               </a>
             </div>
-            <PageVisual visual={visualForPath("/careers")} alt="Working with Delvix Studio" priority />
+            <PageVisual visual={heroVisual} alt="Working with Delvix Studio" priority />
           </div>
         </div>
       </section>
 
       <section className="mkt-section mkt-section--light">
-        <div className="mkt-wrap mb-10">
-          <PageVisual visual={visualForPath("/careers")} alt="Working with the studio team" />
-        </div>
         <div className="mkt-wrap grid gap-10 lg:grid-cols-2">
           <div className="space-y-4">
             <p className="mkt-eyebrow">How to apply</p>

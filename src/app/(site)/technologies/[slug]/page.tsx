@@ -10,7 +10,10 @@ import { getTechnologyPage, technologyPages } from "@/content/pages";
 import { siteConfig } from "@/content/site";
 import { buildPageMetadata } from "@/lib/marketing/page-metadata";
 import { firstSentence } from "@/lib/marketing/nav-lookup";
-import { visualForTechnology } from "@/lib/marketing/page-visuals";
+import {
+  bodyVisualForTechnology,
+  visualForTechnology,
+} from "@/lib/marketing/page-visuals";
 
 type Props = { params: Promise<{ slug: string }> };
 
@@ -38,6 +41,7 @@ export default async function TechnologyDetailPage({ params }: Props) {
 
   const path = `/technologies/${page.slug}`;
   const visual = visualForTechnology(page.slug);
+  const bodyVisual = bodyVisualForTechnology(page.slug);
   const whyParagraphs = page.whyWeUseIt
     .split(/\n\s*\n/)
     .map((p) => p.trim())
@@ -68,10 +72,12 @@ export default async function TechnologyDetailPage({ params }: Props) {
             current={page.name}
             currentPath={path}
           />
-          <div className="grid items-center gap-10 lg:grid-cols-[1.2fr_0.8fr]">
+          <div className="mkt-split">
             <div className="space-y-6">
               <p className="mkt-eyebrow">{page.group}</p>
-              <h1 className="text-4xl font-extrabold sm:text-5xl">{page.h1}</h1>
+              <h1 className="text-4xl font-extrabold text-balance sm:text-5xl">
+                {page.h1}
+              </h1>
               <p className="mkt-muted text-lg">{firstSentence(page.whyWeUseIt)}</p>
               <div className="flex flex-wrap gap-3">
                 <Link
@@ -93,10 +99,10 @@ export default async function TechnologyDetailPage({ params }: Props) {
 
       {/* Why we use it */}
       <section className="mkt-section mkt-section--light">
-        <div className="mkt-wrap grid items-center gap-10 lg:grid-cols-[1fr_1fr]">
-          <div className="space-y-4">
+        <div className="mkt-wrap mkt-split">
+          <div className="mkt-prose space-y-4">
             <p className="mkt-eyebrow">Why we use it</p>
-            <h2 className="text-3xl font-extrabold">
+            <h2 className="text-3xl font-extrabold text-balance">
               Why we build with {page.name}
             </h2>
             {whyParagraphs.map((p) => (
@@ -105,7 +111,7 @@ export default async function TechnologyDetailPage({ params }: Props) {
               </p>
             ))}
           </div>
-          <PageVisual visual={visual} alt={`${page.name} in production`} />
+          <PageVisual visual={bodyVisual} alt={`${page.name} in production`} />
         </div>
       </section>
 

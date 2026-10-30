@@ -6,7 +6,7 @@ import { RelatedPages } from "@/components/marketing/related-pages";
 import { SectionCta } from "@/components/marketing/section-cta";
 import { securityPageDetailed } from "@/content/pages";
 import { buildPageMetadata } from "@/lib/marketing/page-metadata";
-import { visualForPath } from "@/lib/marketing/page-visuals";
+import { bodyVisualFor, visualForPath } from "@/lib/marketing/page-visuals";
 
 export const metadata: Metadata = buildPageMetadata({
   title: securityPageDetailed.seoTitle,
@@ -16,31 +16,37 @@ export const metadata: Metadata = buildPageMetadata({
 
 export default function SecurityPage() {
   const page = securityPageDetailed;
+  const heroVisual = visualForPath("/security");
+  const bodyVisual = bodyVisualFor(heroVisual, "code-stack");
 
   return (
     <>
       <section className="mkt-section mkt-section--dark">
         <div className="mkt-wrap space-y-8">
           <PageBreadcrumb current="Security" currentPath="/security" />
-          <div className="grid items-center gap-10 lg:grid-cols-[1.2fr_0.8fr]">
+          <div className="mkt-split">
             <div className="space-y-6">
               <p className="mkt-eyebrow">Security</p>
-              <h1 className="text-4xl font-extrabold sm:text-5xl">{page.h1}</h1>
+              <h1 className="text-4xl font-extrabold text-balance sm:text-5xl">
+                {page.h1}
+              </h1>
               <p className="mkt-muted text-lg leading-relaxed">{page.intro}</p>
             </div>
-            <PageVisual visual={visualForPath("/security")} alt="Secure stack overview" priority />
+            <PageVisual visual={heroVisual} alt="Secure stack overview" priority />
           </div>
         </div>
       </section>
 
       <section className="mkt-section mkt-section--light">
         <div className="mkt-wrap space-y-8">
-          <div className="grid items-center gap-10 lg:grid-cols-[1fr_1fr]">
+          <div className="mkt-split">
             <div className="max-w-2xl space-y-3">
               <p className="mkt-eyebrow">Our commitments</p>
-              <h2 className="text-3xl font-extrabold">How we handle your data</h2>
+              <h2 className="text-3xl font-extrabold text-balance">
+                How we handle your data
+              </h2>
             </div>
-            <PageVisual visual={visualForPath("/security")} alt="Access and audit controls" />
+            <PageVisual visual={bodyVisual} alt="Stack and hosting overview" />
           </div>
           <div className="mkt-grid-2">
             {page.commitments.map((c) => (

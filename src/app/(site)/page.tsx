@@ -1,9 +1,9 @@
 import Link from "next/link";
 import type { Metadata } from "next";
-import { BrowserFrame } from "@/components/marketing/browser-frame";
 import { AuditForm } from "@/components/marketing/audit-form";
-import { PageVisual } from "@/components/marketing/page-visual";
-import { VisualThumb } from "@/components/marketing/visual-thumb";
+import { MarketingCard } from "@/components/marketing/marketing-card";
+import { ProductShot } from "@/components/marketing/product-shot";
+import { SectionHeader } from "@/components/marketing/section-header";
 import {
   engagementModels,
   faq,
@@ -12,19 +12,17 @@ import {
   siteConfig,
   solutions,
   techStack,
-  testimonials,
   valueTags,
   verifiedCaseStudies,
   whyDelvixRows,
 } from "@/content/site";
 import { industryPages, servicePages } from "@/content/pages";
+import { serviceCardTitle } from "@/lib/marketing/card-titles";
 import {
   visualForIndustry,
   visualForService,
-  visualForSolution,
 } from "@/lib/marketing/page-visuals";
 
-/** Home highlights — “what we build” slice, not every engagement model */
 const homeServices = [
   "web-applications",
   "mobile-apps",
@@ -36,7 +34,12 @@ const homeServices = [
   .map((slug) => servicePages.find((s) => s.slug === slug))
   .filter(Boolean) as typeof servicePages;
 
-const stats = siteConfig.stats;
+const homeIndustries = industryPages.slice(0, 8);
+
+const techGroups = Object.entries(techStack).map(([group, items]) => ({
+  group,
+  items,
+}));
 
 export const metadata: Metadata = {
   title: `${siteConfig.name} — Custom software for growing businesses`,
@@ -80,7 +83,6 @@ function JsonLd() {
 export default function MarketingHomePage() {
   const featured = featuredCaseStudy();
   const cases = verifiedCaseStudies();
-  const quotes = testimonials.filter((t) => t.verified);
 
   return (
     <>
@@ -89,10 +91,10 @@ export default function MarketingHomePage() {
       {/* Hero */}
       <section className="mkt-section mkt-section--dark relative overflow-hidden">
         <div className="mkt-glow left-1/2 top-0 -translate-x-1/2" aria-hidden />
-        <div className="mkt-wrap relative z-[1] grid items-center gap-10 lg:grid-cols-[1.05fr_0.95fr]">
+        <div className="mkt-wrap relative z-[1] mkt-split">
           <div className="mkt-fade space-y-6">
             <p className="mkt-eyebrow">Software house</p>
-            <h1 className="max-w-[16ch] text-4xl font-extrabold sm:text-5xl lg:text-6xl">
+            <h1 className="max-w-[16ch] text-4xl font-extrabold text-balance sm:text-5xl lg:text-6xl">
               We build the systems behind growing businesses
             </h1>
             <p className="mkt-muted max-w-[42ch] text-lg">
@@ -119,79 +121,68 @@ export default function MarketingHomePage() {
               </Link>
             </div>
           </div>
-          <div className="relative mkt-fade">
-            <div className="mkt-glow -right-10 top-10" aria-hidden />
-            <BrowserFrame
-              src="/marketing/screenshots/revenue-os-dashboard.svg"
-              alt="Revenue OS product dashboard"
-              priority
-            />
-          </div>
+          <ProductShot
+            name="revenue-os-dashboard"
+            alt="Revenue OS product dashboard"
+            priority
+            hero
+            className="mkt-fade"
+          />
         </div>
       </section>
-
-      {stats.length > 0 ? (
-        <section className="mkt-section mkt-section--dark border-t border-[var(--mkt-line)] py-10">
-          <div className="mkt-wrap grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
-            {stats.map((s) => (
-              <div key={s.label} className="text-center">
-                <p className="text-3xl font-extrabold text-[var(--mkt-accent)]">
-                  {s.value}
-                </p>
-                <p className="mkt-muted mt-1 text-sm">{s.label}</p>
-              </div>
-            ))}
-          </div>
-        </section>
-      ) : null}
 
       {/* Services */}
       <section className="mkt-section mkt-section--light" id="services">
         <div className="mkt-wrap space-y-8">
-          <div className="max-w-2xl space-y-3">
-            <p className="mkt-eyebrow">Services</p>
-            <h2 className="text-3xl font-bold sm:text-4xl">What we build</h2>
-            <p className="mkt-muted text-lg">
-              Six focused lines. Each engagement starts with a written scope.
-            </p>
-          </div>
+          <SectionHeader
+            eyebrow="Services"
+            title="What we build"
+            lead="Six focused lines. Each engagement starts with a written scope."
+            action={{ href: "/services", label: "All services →" }}
+          />
           <div className="mkt-grid-3">
             {homeServices.map((s) => (
-              <Link key={s.slug} href={`/services/${s.slug}`} className="mkt-card block">
-                <VisualThumb
-                  visual={visualForService(s.slug)}
-                  alt={s.seoTitle.split("|")[0].trim()}
-                  className="mkt-card-thumb mb-3"
-                />
-                <h3 className="mb-2 text-xl font-bold">
-                  {s.seoTitle.split("|")[0].trim()}
-                </h3>
-                <p className="mkt-muted mb-4 text-sm leading-relaxed">{s.subline}</p>
-                <span className="mkt-link text-sm">Learn more →</span>
-              </Link>
+              <MarketingCard
+                key={s.slug}
+                href={`/services/${s.slug}`}
+                title={serviceCardTitle(s.slug)}
+                description={s.subline}
+                visual={visualForService(s.slug)}
+              />
             ))}
           </div>
-          <Link href="/services" className="mkt-link text-sm">
-            All services →
-          </Link>
         </div>
       </section>
 
       {/* Free audit */}
       <section className="mkt-section mkt-section--dark" id="audit">
-        <div className="mkt-wrap grid gap-10 lg:grid-cols-2 lg:items-start">
-          <div className="space-y-6">
-            <div className="space-y-3">
-              <p className="mkt-eyebrow">Offer</p>
-              <h2 className="text-3xl font-bold sm:text-4xl">
-                Free website &amp; systems audit
-              </h2>
-              <p className="mkt-muted text-lg">
-                Tell us what you are running on. We reply with a short written
-                read of the gaps — no pitch deck.
-              </p>
+        <div className="mkt-wrap mkt-split">
+          <div className="space-y-5">
+            <p className="mkt-eyebrow">Offer</p>
+            <h2 className="text-4xl font-extrabold text-balance lg:text-5xl">
+              Free website &amp; systems audit
+            </h2>
+            <p className="mkt-muted text-lg max-w-xl">
+              Tell us what you are running on. We reply with a short written
+              read of the gaps — no pitch deck.
+            </p>
+            <div>
+              <p className="mb-2 text-sm font-semibold">What we check</p>
+              <ul className="m-0 list-none space-y-2 p-0 text-sm">
+                {[
+                  "Speed and Core Web Vitals basics",
+                  "Forms, mobile layout and SSL",
+                  "Broken pages and obvious SEO gaps",
+                ].map((line) => (
+                  <li key={line} className="flex gap-2">
+                    <span className="text-[var(--mkt-accent)]" aria-hidden>
+                      ✓
+                    </span>
+                    <span>{line}</span>
+                  </li>
+                ))}
+              </ul>
             </div>
-            <PageVisual visual="audit-report" alt="Sample audit report" />
           </div>
           <AuditForm />
         </div>
@@ -200,25 +191,19 @@ export default function MarketingHomePage() {
       {/* Process */}
       <section className="mkt-section mkt-section--light" id="process">
         <div className="mkt-wrap space-y-8">
-          <div className="grid items-end gap-8 lg:grid-cols-[1.2fr_0.8fr]">
-            <div className="flex flex-wrap items-end justify-between gap-4">
-              <div className="max-w-2xl space-y-3">
-                <p className="mkt-eyebrow">How we work</p>
-                <h2 className="text-3xl font-bold sm:text-4xl">From call to launch</h2>
-              </div>
-              <Link href="/process" className="mkt-link">
-                Full process →
-              </Link>
-            </div>
-            <PageVisual visual="process-timeline" alt="Delivery process timeline" />
-          </div>
+          <SectionHeader
+            eyebrow="How we work"
+            title="From call to launch"
+            lead="Six clear steps. You always know what comes next."
+            action={{ href: "/process", label: "Full process →" }}
+          />
           <ol className="mkt-grid-3 list-none p-0">
             {processSteps.map((step) => (
-              <li key={step.n} className="mkt-card">
-                <p className="mb-3 font-mono text-sm text-[var(--mkt-accent)]">
-                  {step.n}
-                </p>
-                <h3 className="mb-2 text-lg font-bold">{step.title}</h3>
+              <li key={step.n} className="mkt-card flex h-full flex-col">
+                <p className="mkt-step-num mb-3">{step.n}</p>
+                <h3 className="mb-2 text-xl font-semibold text-balance">
+                  {step.title}
+                </h3>
                 <p className="mkt-muted text-sm leading-relaxed">{step.body}</p>
               </li>
             ))}
@@ -226,62 +211,39 @@ export default function MarketingHomePage() {
         </div>
       </section>
 
-      {/* Solutions */}
-      <section className="mkt-section mkt-section--dark" id="solutions">
+      {/* How we can work together (merged engagement + solutions chips) */}
+      <section className="mkt-section mkt-section--dark" id="engagement">
         <div className="mkt-wrap space-y-8">
-          <div className="flex flex-wrap items-end justify-between gap-4">
-            <div className="max-w-2xl space-y-3">
-              <p className="mkt-eyebrow">Solutions</p>
-              <h2 className="text-3xl font-bold sm:text-4xl">
-                How the engagement is shaped
-              </h2>
-              <p className="mkt-muted text-lg">
-                MVP, SaaS platforms, dedicated capacity or discovery — pick the
-                shape, then the services.
-              </p>
-            </div>
-            <Link href="/solutions" className="mkt-link">
-              All solutions →
-            </Link>
-          </div>
-          <div className="mkt-grid-2">
-            {solutions.map((s) => (
-              <Link key={s.slug} href={`/solutions/${s.slug}`} className="mkt-card block">
-                <VisualThumb
-                  visual={visualForSolution(s.slug)}
-                  alt={s.name}
-                  className="mkt-card-thumb mb-3"
-                />
-                <h3 className="mb-2 text-xl font-bold">{s.name}</h3>
-                <p className="mkt-muted mb-4 text-sm leading-relaxed">{s.short}</p>
-                <span className="mkt-link text-sm">Learn more →</span>
-              </Link>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* Engagement */}
-      <section className="mkt-section mkt-section--dark">
-        <div className="mkt-wrap space-y-8">
-          <div className="max-w-2xl space-y-3">
-            <p className="mkt-eyebrow">Engagement</p>
-            <h2 className="text-3xl font-bold sm:text-4xl">How teams hire us</h2>
-          </div>
+          <SectionHeader
+            eyebrow="Engagement"
+            title="How we can work together"
+            lead="Pick the shape that fits your deadline and capacity. Solutions like MVP or SaaS sit on top of these models."
+            action={{ href: "/pricing", label: "See pricing →" }}
+          />
           <div className="mkt-grid-3">
             {engagementModels.map((m) => (
-              <div key={m.name} className="mkt-card">
-                <h3 className="mb-2 text-xl font-bold">{m.name}</h3>
+              <div key={m.name} className="mkt-card flex h-full flex-col">
+                <h3 className="mb-2 text-xl font-semibold text-balance">
+                  {m.name}
+                </h3>
                 <p className="mkt-muted mb-4 text-sm">Fits: {m.fits}</p>
                 <ul className="mb-5 space-y-2 text-sm">
                   {m.includes.map((line) => (
                     <li key={line}>· {line}</li>
                   ))}
                 </ul>
-                <Link href="/pricing" className="mkt-link text-sm">
+                <Link href="/pricing" className="mkt-link mt-auto text-sm">
                   Get pricing →
                 </Link>
               </div>
+            ))}
+          </div>
+          <div className="flex flex-wrap items-center gap-2 pt-2">
+            <span className="mkt-muted text-sm">Also exploring:</span>
+            {solutions.map((s) => (
+              <Link key={s.slug} href={`/solutions/${s.slug}`} className="mkt-badge">
+                {s.name}
+              </Link>
             ))}
           </div>
         </div>
@@ -290,190 +252,185 @@ export default function MarketingHomePage() {
       {/* Why Delvix */}
       <section className="mkt-section mkt-section--dark">
         <div className="mkt-wrap space-y-8">
-          <div className="max-w-2xl space-y-3">
-            <p className="mkt-eyebrow">Why Delvix</p>
-            <h2 className="text-3xl font-bold sm:text-4xl">
-              Clearer than a typical agency
-            </h2>
-          </div>
-          <div className="overflow-x-auto rounded-[var(--mkt-radius)] border border-[var(--mkt-line)]">
-            <table className="mkt-table">
-              <thead>
-                <tr>
-                  <th scope="col"> </th>
-                  <th scope="col">Delvix</th>
-                  <th scope="col">Typical agency</th>
-                </tr>
-              </thead>
-              <tbody>
-                {whyDelvixRows.map((row) => (
-                  <tr key={row.label}>
-                    <th scope="row">{row.label}</th>
-                    <td>{row.delvix}</td>
-                    <td className="mkt-muted">{row.typical}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      </section>
-
-      {/* Industries */}
-      <section className="mkt-section mkt-section--light" id="industries">
-        <div className="mkt-wrap space-y-8">
-          <div className="max-w-2xl space-y-3">
-            <p className="mkt-eyebrow">Industries</p>
-            <h2 className="text-3xl font-bold sm:text-4xl">
-              Built for operational businesses
-            </h2>
-          </div>
-          <div className="mkt-grid-3">
-            {industryPages.map((i) => (
-              <Link key={i.slug} href={`/industries/${i.slug}`} className="mkt-card block">
-                <VisualThumb
-                  visual={visualForIndustry(i.slug)}
-                  alt={i.name}
-                  className="mkt-card-thumb mb-3"
-                />
-                <h3 className="mb-2 text-lg font-bold">{i.name}</h3>
-                <p className="mkt-muted mb-4 text-sm">{i.subline}</p>
-                <span className="mkt-link text-sm">Learn more →</span>
-              </Link>
+          <SectionHeader
+            eyebrow="Why Delvix"
+            title="Clearer than a typical agency"
+            lead="Written scope, weekly demos and code you own — without the account-manager maze."
+          />
+          <div className="mkt-compare" role="table" aria-label="Delvix vs typical agency">
+            <div
+              className="mkt-compare__row hidden md:grid"
+              role="row"
+              style={{
+                background: "transparent",
+                border: "none",
+                paddingBottom: 0,
+              }}
+            >
+              <div role="columnheader" className="text-sm font-semibold opacity-70">
+                Topic
+              </div>
+              <div role="columnheader" className="text-sm font-semibold text-[var(--mkt-accent)]">
+                Delvix
+              </div>
+              <div role="columnheader" className="mkt-muted text-sm font-semibold">
+                Typical agency
+              </div>
+            </div>
+            {whyDelvixRows.map((row) => (
+              <div key={row.label} className="mkt-compare__row" role="row">
+                <div role="rowheader" className="font-semibold">
+                  {row.label}
+                </div>
+                <div className="mkt-compare__delvix" role="cell">
+                  <span className="mr-2 text-[var(--mkt-accent)]" aria-hidden>
+                    ✓
+                  </span>
+                  {row.delvix}
+                </div>
+                <div className="mkt-compare__typical" role="cell">
+                  <span className="mr-2 opacity-60" aria-hidden>
+                    −
+                  </span>
+                  {row.typical}
+                </div>
+              </div>
             ))}
           </div>
         </div>
       </section>
 
-      {/* Case studies — only if verified */}
-      {cases.length > 0 ? (
+      {/* Industries — 4×2 */}
+      <section className="mkt-section mkt-section--light" id="industries">
+        <div className="mkt-wrap space-y-8">
+          <SectionHeader
+            eyebrow="Industries"
+            title="Built for operational businesses"
+            lead="Software shaped by how your industry actually works."
+            action={{ href: "/industries", label: "All industries →" }}
+          />
+          <div className="mkt-grid-4">
+            {homeIndustries.map((i) => (
+              <MarketingCard
+                key={i.slug}
+                href={`/industries/${i.slug}`}
+                title={i.name}
+                description={i.subline}
+                visual={visualForIndustry(i.slug)}
+              />
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* Case studies */}
+      {cases.length > 0 && featured ? (
         <section className="mkt-section mkt-section--dark" id="work">
           <div className="mkt-wrap space-y-8">
-            <div className="flex flex-wrap items-end justify-between gap-4">
-              <div className="max-w-2xl space-y-3">
-                <p className="mkt-eyebrow">Work</p>
-                <h2 className="text-3xl font-bold sm:text-4xl">Case studies</h2>
-              </div>
-              <Link href="/work" className="mkt-link">
-                All work →
-              </Link>
-            </div>
-            {featured ? (
-              <Link
-                href={`/work/${featured.slug}`}
-                className="mkt-card grid gap-6 lg:grid-cols-2"
-              >
-                <div>
-                  <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-[var(--mkt-accent)]">
-                    Featured
-                  </p>
-                  <h3 className="mb-2 text-2xl font-bold">{featured.title}</h3>
-                  <p className="mkt-muted mb-3 text-sm">{featured.clientType}</p>
-                  <p className="mb-4 text-sm leading-relaxed">{featured.problem}</p>
-                  <span className="mkt-link text-sm">Read case study →</span>
-                </div>
-                <BrowserFrame
-                  src={featured.screenshots[0]?.src || "/marketing/screenshots/revenue-os-dashboard.svg"}
-                  alt={featured.screenshots[0]?.alt || featured.title}
-                />
-              </Link>
-            ) : null}
-            {cases.filter((c) => !c.featured).length > 0 ? (
-              <div className="mkt-grid-2">
-                {cases
-                  .filter((c) => !c.featured)
-                  .map((c) => (
-                    <Link key={c.slug} href={`/work/${c.slug}`} className="mkt-card block">
-                      <h3 className="mb-2 text-xl font-bold">{c.title}</h3>
-                      <p className="mkt-muted mb-3 text-sm">{c.clientType}</p>
-                      <span className="mkt-link text-sm">View →</span>
-                    </Link>
+            <SectionHeader
+              eyebrow="Work"
+              title="Case studies"
+              lead="Only verified engagements. No filler logos or invented results."
+              action={{ href: "/work", label: "All work →" }}
+            />
+            <Link
+              href={`/work/${featured.slug}`}
+              className="mkt-card mkt-card--link mkt-split !items-center"
+            >
+              <div className="flex h-full flex-col justify-center space-y-4">
+                <p className="text-xs font-semibold uppercase tracking-wider text-[var(--mkt-accent)]">
+                  Featured
+                </p>
+                <h3 className="text-2xl font-bold text-balance sm:text-3xl">
+                  {featured.title}
+                </h3>
+                <p className="mkt-muted text-sm">{featured.clientType}</p>
+                <p className="text-sm leading-relaxed">{featured.problem}</p>
+                {featured.platformFeatures?.length ? (
+                  <ul className="m-0 list-none space-y-1.5 p-0 text-sm">
+                    {featured.platformFeatures.slice(0, 3).map((f) => (
+                      <li key={f} className="flex gap-2">
+                        <span className="text-[var(--mkt-accent)]" aria-hidden>
+                          ✓
+                        </span>
+                        <span>{f}</span>
+                      </li>
+                    ))}
+                  </ul>
+                ) : null}
+                <div className="flex flex-wrap gap-2">
+                  {featured.stack.slice(0, 6).map((s) => (
+                    <span key={s} className="mkt-badge">
+                      {s}
+                    </span>
                   ))}
+                </div>
+                {featured.status ? (
+                  <p className="mkt-muted text-xs">{featured.status}</p>
+                ) : null}
+                <span className="mkt-link text-sm">Read case study →</span>
               </div>
-            ) : null}
+              <ProductShot
+                name="revenue-os-dashboard"
+                alt={featured.title}
+              />
+            </Link>
           </div>
         </section>
       ) : null}
 
-      {/* Testimonials — only verified */}
-      {quotes.length > 0 ? (
-        <section className="mkt-section mkt-section--light">
-          <div className="mkt-wrap space-y-8">
-            <div className="max-w-2xl space-y-3">
-              <p className="mkt-eyebrow">Testimonials</p>
-              <h2 className="text-3xl font-bold sm:text-4xl">What clients say</h2>
-            </div>
-            <div className="mkt-grid-2">
-              {quotes.map((t) => (
-                <blockquote key={t.name + t.quote.slice(0, 24)} className="mkt-card">
-                  <p className="mb-4 text-sm leading-relaxed">&ldquo;{t.quote}&rdquo;</p>
-                  <footer className="text-sm font-semibold">
-                    {t.name}
-                    {t.role ? (
-                      <span className="mkt-muted font-normal">
-                        {" "}
-                        · {t.role}
-                        {t.company ? `, ${t.company}` : ""}
-                      </span>
-                    ) : null}
-                  </footer>
-                </blockquote>
-              ))}
-            </div>
-          </div>
-        </section>
-      ) : null}
-
-      {/* Tech stack */}
+      {/* Tech stack — group cards, no redundant illustration */}
       <section className="mkt-section mkt-section--light">
         <div className="mkt-wrap space-y-8">
-          <div className="grid items-center gap-10 lg:grid-cols-[1.1fr_0.9fr]">
-            <div className="space-y-8">
-              <div className="max-w-2xl space-y-3">
-                <p className="mkt-eyebrow">Stack</p>
-                <h2 className="text-3xl font-bold sm:text-4xl">Technologies we ship with</h2>
+          <SectionHeader
+            eyebrow="Stack"
+            title="Technologies we ship with"
+            lead="Mainstream tools you can hire for and host anywhere."
+            action={{ href: "/technologies", label: "All technologies →" }}
+          />
+          <div className="mkt-grid-3">
+            {techGroups.map(({ group, items }) => (
+              <div key={group} className="mkt-card flex h-full flex-col">
+                <h3 className="mb-3 text-lg font-semibold">{group}</h3>
+                <div className="mt-auto flex flex-wrap gap-2">
+                  {items.map((item) => (
+                    <span key={item} className="mkt-badge">
+                      {item}
+                    </span>
+                  ))}
+                </div>
               </div>
-              <div className="space-y-5">
-                {Object.entries(techStack).map(([group, items]) => (
-                  <div key={group}>
-                    <p className="mb-2 text-sm font-semibold">{group}</p>
-                    <div className="flex flex-wrap gap-2">
-                      {items.map((item) => (
-                        <span key={item} className="mkt-badge">
-                          {item}
-                        </span>
-                      ))}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-            <PageVisual visual="code-stack" alt="Technology stack we ship with" />
+            ))}
           </div>
         </div>
       </section>
 
       {/* Autopilot */}
       <section className="mkt-section mkt-section--dark">
-        <div className="mkt-wrap mkt-card grid gap-6 lg:grid-cols-[1.2fr_0.8fr] lg:items-center">
-          <div className="space-y-3">
+        <div className="mkt-wrap mkt-card mkt-split !items-center">
+          <div className="space-y-4">
             <p className="mkt-eyebrow">Product</p>
-            <h2 className="text-3xl font-bold">Delvix Autopilot</h2>
+            <h2 className="text-3xl font-bold text-balance sm:text-4xl">
+              Delvix Autopilot
+            </h2>
             <p className="mkt-muted text-lg">
               Our own client-acquisition platform — separate from studio
               services. Early access for agencies.
             </p>
-            <div className="flex flex-wrap gap-3 pt-2">
+            <div className="flex flex-wrap gap-3 pt-1">
               <Link href="/autopilot" className="mkt-btn mkt-btn--primary">
                 Learn about Autopilot
               </Link>
-              <Link href="/work/revenue-os" className="mkt-btn mkt-btn--secondary">
+              <Link
+                href="/work/revenue-os"
+                className="mkt-btn mkt-btn--secondary"
+              >
                 How we built it
               </Link>
             </div>
           </div>
-          <BrowserFrame
-            src="/marketing/screenshots/revenue-os-pipeline.svg"
+          <ProductShot
+            name="revenue-os-pipeline"
             alt="Autopilot sales pipeline"
           />
         </div>
@@ -481,16 +438,37 @@ export default function MarketingHomePage() {
 
       {/* FAQ */}
       <section className="mkt-section mkt-section--light" id="faq">
-        <div className="mkt-wrap grid gap-10 lg:grid-cols-[0.8fr_1.2fr]">
-          <div className="space-y-3">
-            <p className="mkt-eyebrow">FAQ</p>
-            <h2 className="text-3xl font-bold sm:text-4xl">Common questions</h2>
-          </div>
-          <div className="space-y-3">
-            {faq.map((f) => (
-              <details key={f.q} className="mkt-card group">
-                <summary className="cursor-pointer list-none font-semibold">
-                  {f.q}
+        <div className="mkt-wrap mkt-faq-layout">
+          <aside className="mkt-faq-layout__aside space-y-5">
+            <div className="space-y-3">
+              <p className="mkt-eyebrow">FAQ</p>
+              <h2 className="text-4xl font-extrabold text-balance lg:text-5xl">
+                Common questions
+              </h2>
+              <p className="mkt-muted text-lg">
+                Straight answers about scope, ownership, timezones and support.
+              </p>
+            </div>
+            <div className="mkt-card space-y-3">
+              <p className="font-semibold">Still have a question?</p>
+              <p className="mkt-muted text-sm leading-relaxed">
+                Book a free call and ask an engineer directly.
+              </p>
+              <Link
+                href={siteConfig.contact.bookingUrl}
+                className="mkt-btn mkt-btn--primary inline-flex"
+                data-mkt-schedule
+              >
+                Book a free call
+              </Link>
+            </div>
+          </aside>
+          <div className="mkt-faq space-y-3">
+            {faq.map((f, i) => (
+              <details key={f.q} className="mkt-card" open={i === 0}>
+                <summary>
+                  <span className="font-semibold">{f.q}</span>
+                  <span className="mkt-faq__icon" aria-hidden />
                 </summary>
                 <p className="mkt-muted mt-3 text-sm leading-relaxed">{f.a}</p>
               </details>
@@ -503,7 +481,7 @@ export default function MarketingHomePage() {
       <section className="mkt-section mkt-section--dark">
         <div className="mkt-wrap max-w-3xl space-y-6 text-center">
           <p className="mkt-eyebrow justify-center">Next step</p>
-          <h2 className="text-3xl font-bold sm:text-5xl">
+          <h2 className="text-3xl font-bold text-balance sm:text-5xl">
             Tell us what you&apos;re running on today
           </h2>
           <div className="flex flex-wrap justify-center gap-3">

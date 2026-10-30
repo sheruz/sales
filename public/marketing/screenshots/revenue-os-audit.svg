@@ -1,6 +1,71 @@
-﻿<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="750" viewBox="0 0 1200 750" role="img">
+﻿<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="750" viewBox="0 0 1200 750" role="img" aria-label="Revenue OS Deep Audit">
   <rect width="1200" height="750" fill="#0B1220"/>
+  
+  <!-- Main Container -->
   <rect x="60" y="60" width="1080" height="630" rx="16" fill="#141C2E"/>
-  <text x="100" y="140" fill="#8E9CFF" font-family="system-ui,sans-serif" font-size="32">Revenue OS · audit placeholder</text>
-  <text x="100" y="190" fill="#9AA6BF" font-family="system-ui,sans-serif" font-size="18">Replace with real blurred screenshot</text>
+  
+  <!-- Header -->
+  <text x="100" y="120" fill="#EEF2FF" font-family="system-ui,sans-serif" font-size="30" font-weight="700">Deep Audit Findings</text>
+  <text x="100" y="155" fill="#9AA6BF" font-family="system-ui,sans-serif" font-size="16">Technical debt assessment and recommendations</text>
+  
+  <!-- Filter Pills -->
+  <rect x="100" y="180" width="90" height="32" rx="16" fill="#5B63F5" opacity="0.3"/>
+  <text x="125" y="201" fill="#8E9CFF" font-family="system-ui,sans-serif" font-size="13" font-weight="600">All</text>
+  <rect x="205" y="180" width="90" height="32" rx="16" fill="transparent" stroke="#9AA6BF" stroke-width="1"/>
+  <text x="227" y="201" fill="#9AA6BF" font-family="system-ui,sans-serif" font-size="13">High</text>
+  <rect x="310" y="180" width="110" height="32" rx="16" fill="transparent" stroke="#9AA6BF" stroke-width="1"/>
+  <text x="327" y="201" fill="#9AA6BF" font-family="system-ui,sans-serif" font-size="13">Medium</text>
+  <rect x="435" y="180" width="90" height="32" rx="16" fill="transparent" stroke="#9AA6BF" stroke-width="1"/>
+  <text x="462" y="201" fill="#9AA6BF" font-family="system-ui,sans-serif" font-size="13">Low</text>
+
+  <!-- Table Headers -->
+  <text x="100" y="260" fill="#9AA6BF" font-family="system-ui,sans-serif" font-size="12" font-weight="700">FINDING</text>
+  <text x="500" y="260" fill="#9AA6BF" font-family="system-ui,sans-serif" font-size="12" font-weight="700">AREA</text>
+  <text x="700" y="260" fill="#9AA6BF" font-family="system-ui,sans-serif" font-size="12" font-weight="700">SEVERITY</text>
+  <text x="880" y="260" fill="#9AA6BF" font-family="system-ui,sans-serif" font-size="12" font-weight="700">IMPACT</text>
+
+  <!-- Finding Row 1 -->
+  <rect x="100" y="280" width="1000" height="70" rx="10" fill="#1A2438"/>
+  <text x="120" y="308" fill="#EEF2FF" font-family="system-ui,sans-serif" font-size="15" font-weight="600">Authentication token expiry</text>
+  <text x="120" y="332" fill="#9AA6BF" font-family="system-ui,sans-serif" font-size="13">Session management needs refresh logic</text>
+  <text x="500" y="315" fill="#EEF2FF" font-family="system-ui,sans-serif" font-size="14">Security</text>
+  <rect x="700" y="302" width="65" height="24" rx="12" fill="#FF6B3D" opacity="0.25"/>
+  <text x="717" y="319" fill="#FF6B3D" font-family="system-ui,sans-serif" font-size="12" font-weight="700">High</text>
+  <text x="880" y="315" fill="#9AA6BF" font-family="system-ui,sans-serif" font-size="14">Critical</text>
+
+  <!-- Finding Row 2 -->
+  <rect x="100" y="365" width="1000" height="70" rx="10" fill="#1A2438"/>
+  <text x="120" y="393" fill="#EEF2FF" font-family="system-ui,sans-serif" font-size="15" font-weight="600">Database query optimization</text>
+  <text x="120" y="417" fill="#9AA6BF" font-family="system-ui,sans-serif" font-size="13">N+1 queries detected in reporting module</text>
+  <text x="500" y="400" fill="#EEF2FF" font-family="system-ui,sans-serif" font-size="14">Performance</text>
+  <rect x="700" y="387" width="65" height="24" rx="12" fill="#FF6B3D" opacity="0.25"/>
+  <text x="717" y="404" fill="#FF6B3D" font-family="system-ui,sans-serif" font-size="12" font-weight="700">High</text>
+  <text x="880" y="400" fill="#9AA6BF" font-family="system-ui,sans-serif" font-size="14">Major</text>
+
+  <!-- Finding Row 3 -->
+  <rect x="100" y="450" width="1000" height="70" rx="10" fill="#1A2438"/>
+  <text x="120" y="478" fill="#EEF2FF" font-family="system-ui,sans-serif" font-size="15" font-weight="600">API error handling inconsistent</text>
+  <text x="120" y="502" fill="#9AA6BF" font-family="system-ui,sans-serif" font-size="13">Missing standardized error responses</text>
+  <text x="500" y="485" fill="#EEF2FF" font-family="system-ui,sans-serif" font-size="14">API</text>
+  <rect x="700" y="472" width="75" height="24" rx="12" fill="#8E9CFF" opacity="0.25"/>
+  <text x="715" y="489" fill="#8E9CFF" font-family="system-ui,sans-serif" font-size="12" font-weight="700">Med</text>
+  <text x="880" y="485" fill="#9AA6BF" font-family="system-ui,sans-serif" font-size="14">Moderate</text>
+
+  <!-- Finding Row 4 -->
+  <rect x="100" y="535" width="1000" height="70" rx="10" fill="#1A2438"/>
+  <text x="120" y="563" fill="#EEF2FF" font-family="system-ui,sans-serif" font-size="15" font-weight="600">Mobile viewport adjustments</text>
+  <text x="120" y="587" fill="#9AA6BF" font-family="system-ui,sans-serif" font-size="13">Some layouts need responsive breakpoints</text>
+  <text x="500" y="570" fill="#EEF2FF" font-family="system-ui,sans-serif" font-size="14">Frontend</text>
+  <rect x="700" y="557" width="75" height="24" rx="12" fill="#9AA6BF" opacity="0.25"/>
+  <text x="718" y="574" fill="#9AA6BF" font-family="system-ui,sans-serif" font-size="12" font-weight="700">Low</text>
+  <text x="880" y="570" fill="#9AA6BF" font-family="system-ui,sans-serif" font-size="14">Minor</text>
+
+  <!-- Finding Row 5 -->
+  <rect x="100" y="620" width="1000" height="70" rx="10" fill="#1A2438"/>
+  <text x="120" y="648" fill="#EEF2FF" font-family="system-ui,sans-serif" font-size="15" font-weight="600">Documentation coverage gaps</text>
+  <text x="120" y="672" fill="#9AA6BF" font-family="system-ui,sans-serif" font-size="13">Internal APIs need inline documentation</text>
+  <text x="500" y="655" fill="#EEF2FF" font-family="system-ui,sans-serif" font-size="14">Code Quality</text>
+  <rect x="700" y="642" width="75" height="24" rx="12" fill="#9AA6BF" opacity="0.25"/>
+  <text x="718" y="659" fill="#9AA6BF" font-family="system-ui,sans-serif" font-size="12" font-weight="700">Low</text>
+  <text x="880" y="655" fill="#9AA6BF" font-family="system-ui,sans-serif" font-size="14">Minor</text>
 </svg>

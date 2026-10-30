@@ -9,6 +9,8 @@
     "lint": "eslint",
     "typecheck": "tsc --noEmit",
     "check:nav": "npx tsx scripts/check-nav-links.ts",
+    "check:marketing": "npx tsx scripts/check-marketing.ts",
+    "screens:marketing": "npx tsx scripts/marketing-screens.ts",
     "test": "vitest run",
     "test:watch": "vitest",
     "test:isolation": "node scripts/run-with-env.js npx tsx scripts/phase1-isolation-test.ts",

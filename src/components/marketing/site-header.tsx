@@ -5,6 +5,7 @@ import dynamic from "next/dynamic";
 import { ChevronDown, Menu } from "lucide-react";
 import { useCallback, useEffect, useId, useRef, useState } from "react";
 import { SiteLogo } from "@/components/marketing/site-logo";
+import { MegaPanel } from "@/components/marketing/site-mega-menu";
 import {
   headerCtas,
   mainNav,
@@ -12,19 +13,14 @@ import {
 } from "@/content/navigation";
 import { siteConfig } from "@/content/site";
 
-/** Icons + mega panel load only when a menu opens — keeps initial JS small for LCP. */
-const MegaPanel = dynamic(
-  () =>
-    import("@/components/marketing/site-mega-menu").then((m) => m.MegaPanel),
-  { ssr: false }
-);
+/** Mobile drawer stays lazy; desktop mega panel is eager so hover opens instantly. */
 const MobileMenu = dynamic(
   () =>
     import("@/components/marketing/site-mega-menu").then((m) => m.MobileMenu),
   { ssr: false }
 );
 
-const HOVER_CLOSE_DELAY_MS = 140;
+const HOVER_CLOSE_DELAY_MS = 280;
 
 export function SiteHeader() {
   const baseId = useId();
@@ -97,12 +93,9 @@ export function SiteHeader() {
 
   function openOnHover(id: string) {
     clearCloseTimer();
-    if (pinned && openId && openId !== id) {
-      setOpenId(id);
-      setPinned(false);
-      return;
-    }
-    if (!pinned) setOpenId(id);
+    // Always open on hover so menus work without a click (desktop).
+    setOpenId(id);
+    if (pinned && openId !== id) setPinned(false);
   }
 
   function scheduleHoverClose() {
@@ -110,6 +103,7 @@ export function SiteHeader() {
     clearCloseTimer();
     closeTimer.current = setTimeout(() => {
       setOpenId(null);
+      setPinned(false);
     }, HOVER_CLOSE_DELAY_MS);
   }
 

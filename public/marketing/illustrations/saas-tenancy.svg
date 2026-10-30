@@ -18,7 +18,7 @@
   <rect x="290" y="150" width="420" height="250" rx="12" fill="#141C2E" stroke="#243044"/>
   <rect x="740" y="150" width="420" height="250" rx="12" fill="#141C2E" stroke="#243044"/>
   <text x="320" y="200" fill="#9AA6BF" font-family="system-ui,sans-serif" font-size="16" font-weight="600">Active seats</text>
-  <text x="320" y="260" fill="#8E9CFF" font-family="system-ui,sans-serif" font-size="36" font-weight="800">42 / 50</text>
+  <text x="320" y="260" fill="#8E9CFF" font-family="system-ui,sans-serif" font-size="36" font-weight="800">In use</text>
   <text x="770" y="200" fill="#9AA6BF" font-family="system-ui,sans-serif" font-size="16" font-weight="600">Plan</text>
   <text x="770" y="260" fill="#EEF2FF" font-family="system-ui,sans-serif" font-size="36" font-weight="800">Growth</text>
   <rect x="290" y="430" width="870" height="280" rx="12" fill="#141C2E" stroke="#243044"/>

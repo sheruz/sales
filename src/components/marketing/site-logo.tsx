@@ -3,37 +3,42 @@ import Link from "next/link";
 import { siteConfig } from "@/content/site";
 
 type Props = {
-  /** Marketing chrome is dark — default on-dark wordmark */
   variant?: "onDark" | "onLight";
   className?: string;
-  /** Prefer compact height in header */
   height?: number;
 };
 
+/** Readable wordmark: icon mark + "Delvix Studio" text (avoids tiny SVG "STUDIO"). */
 export function SiteLogo({
   variant = "onDark",
   className = "",
-  height = 28,
+  height = 36,
 }: Props) {
-  const src =
-    variant === "onLight" ? siteConfig.logoOnLight : siteConfig.logoOnDark;
-  const width = Math.round((height * 379) / 96);
+  const icon =
+    variant === "onLight" ? "/delvix-icon-light.svg" : "/delvix-icon-dark.svg";
+  const ink = variant === "onLight" ? "text-[var(--mkt-light-ink)]" : "text-[var(--mkt-ink)]";
 
   return (
     <Link
       href="/"
-      className={`inline-flex items-center ${className}`}
+      className={`inline-flex items-center gap-2.5 ${className}`}
       aria-label={`${siteConfig.name} home`}
     >
       <Image
-        src={src}
-        alt={siteConfig.name}
-        width={width}
+        src={icon}
+        alt=""
+        width={height}
         height={height}
-        className="h-[1.75rem] w-auto sm:h-8"
+        className="h-9 w-9 shrink-0"
         priority
         unoptimized
       />
+      <span
+        className={`text-[1.125rem] font-semibold tracking-tight sm:text-[1.2rem] ${ink}`}
+        style={{ fontFamily: "var(--font-mkt-display), system-ui, sans-serif" }}
+      >
+        Delvix Studio
+      </span>
     </Link>
   );
 }

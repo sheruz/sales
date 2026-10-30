@@ -24,8 +24,8 @@ export function VisualThumb({
     aspect === "square"
       ? "aspect-square"
       : aspect === "wide"
-        ? "aspect-[2/1]"
-        : "aspect-video";
+        ? "aspect-[16/10]"
+        : "aspect-[16/10]";
 
   return (
     <div

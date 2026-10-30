@@ -13,11 +13,11 @@
   <rect x="420" y="150" width="360" height="250" rx="12" fill="#141C2E" stroke="#243044"/>
   <rect x="800" y="150" width="360" height="250" rx="12" fill="#141C2E" stroke="#243044"/>
   <text x="70" y="220" fill="#9AA6BF" font-family="system-ui,sans-serif" font-size="16" font-weight="600">SKUs</text>
-  <text x="70" y="275" fill="#8E9CFF" font-family="system-ui,sans-serif" font-size="40" font-weight="800">1,842</text>
+  <text x="70" y="275" fill="#8E9CFF" font-family="system-ui,sans-serif" font-size="40" font-weight="800">Tracked</text>
   <text x="450" y="220" fill="#9AA6BF" font-family="system-ui,sans-serif" font-size="16" font-weight="600">Low stock</text>
-  <text x="450" y="275" fill="#FF6B3D" font-family="system-ui,sans-serif" font-size="40" font-weight="800">23</text>
+  <text x="450" y="275" fill="#FF6B3D" font-family="system-ui,sans-serif" font-size="40" font-weight="800">Items</text>
   <text x="830" y="220" fill="#9AA6BF" font-family="system-ui,sans-serif" font-size="16" font-weight="600">Open POs</text>
-  <text x="830" y="275" fill="#5B63F5" font-family="system-ui,sans-serif" font-size="40" font-weight="800">9</text>
+  <text x="830" y="275" fill="#5B63F5" font-family="system-ui,sans-serif" font-size="40" font-weight="800">Active</text>
   <rect x="40" y="430" width="1120" height="240" rx="12" fill="#141C2E" stroke="#243044"/>
   <rect x="80" y="480" width="1040" height="50" rx="10" fill="#1A2438"/>
   <rect x="80" y="560" width="1040" height="50" rx="10" fill="#1A2438"/>

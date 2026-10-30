@@ -6,7 +6,7 @@ import { SectionCta } from "@/components/marketing/section-cta";
 import { aboutPage } from "@/content/pages";
 import { siteConfig } from "@/content/site";
 import { buildPageMetadata } from "@/lib/marketing/page-metadata";
-import { visualForPath } from "@/lib/marketing/page-visuals";
+import { bodyVisualFor, visualForPath } from "@/lib/marketing/page-visuals";
 
 export const metadata: Metadata = buildPageMetadata({
   title: aboutPage.seoTitle,
@@ -18,31 +18,37 @@ export default function AboutPage() {
   const { founderStory, workingHours } = aboutPage;
   const showStory = founderStory.enabled && founderStory.body.trim().length > 0;
   const showTeam = siteConfig.team.length > 0;
+  const heroVisual = visualForPath("/about");
+  const bodyVisual = bodyVisualFor(heroVisual, "process-timeline");
 
   return (
     <>
       <section className="mkt-section mkt-section--dark">
         <div className="mkt-wrap space-y-8">
           <PageBreadcrumb current="About" currentPath="/about" />
-          <div className="grid items-center gap-10 lg:grid-cols-[1.2fr_0.8fr]">
+          <div className="mkt-split">
             <div className="space-y-6">
               <p className="mkt-eyebrow">About</p>
-              <h1 className="text-4xl font-extrabold sm:text-5xl">{aboutPage.h1}</h1>
+              <h1 className="text-4xl font-extrabold text-balance sm:text-5xl">
+                {aboutPage.h1}
+              </h1>
               <p className="mkt-muted text-lg leading-relaxed">{aboutPage.intro}</p>
             </div>
-            <PageVisual visual={visualForPath("/about")} alt="How Delvix Studio works" priority />
+            <PageVisual visual={heroVisual} alt="How Delvix Studio works" priority />
           </div>
         </div>
       </section>
 
       <section className="mkt-section mkt-section--light">
-        <div className="mkt-wrap grid items-center gap-10 lg:grid-cols-[1fr_1fr]">
-          <div className="space-y-3">
+        <div className="mkt-wrap mkt-split">
+          <div className="mkt-prose space-y-3">
             <p className="mkt-eyebrow">Mission</p>
-            <h2 className="text-3xl font-extrabold">{aboutPage.mission.title}</h2>
+            <h2 className="text-3xl font-extrabold text-balance">
+              {aboutPage.mission.title}
+            </h2>
             <p className="text-lg leading-relaxed">{aboutPage.mission.body}</p>
           </div>
-          <PageVisual visual={visualForPath("/about")} alt="How the studio operates" />
+          <PageVisual visual={bodyVisual} alt="Delivery process" />
         </div>
       </section>
 

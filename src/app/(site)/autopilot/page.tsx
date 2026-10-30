@@ -1,6 +1,6 @@
 import Link from "next/link";
 import type { Metadata } from "next";
-import { BrowserFrame } from "@/components/marketing/browser-frame";
+import { ProductShot } from "@/components/marketing/product-shot";
 import { WaitlistForm } from "@/components/marketing/waitlist-form";
 import { siteConfig } from "@/content/site";
 
@@ -45,9 +45,11 @@ export default function AutopilotPage() {
               </Link>
             </div>
           </div>
-          <BrowserFrame
-            src="/marketing/screenshots/revenue-os-dashboard.svg"
+          <ProductShot
+            name="revenue-os-dashboard"
             alt="Autopilot dashboard"
+            priority
+            hero
           />
         </div>
       </section>
@@ -56,15 +58,17 @@ export default function AutopilotPage() {
         <div className="mkt-wrap space-y-8">
           <div className="max-w-2xl space-y-3">
             <p className="mkt-eyebrow">How it runs</p>
-            <h2 className="text-3xl font-extrabold">Six stages, one pipeline</h2>
+            <h2 className="text-3xl font-extrabold text-balance">
+              Six stages, one pipeline
+            </h2>
           </div>
           <ol className="mkt-grid-3 list-none p-0">
             {stages.map((label, i) => (
-              <li key={label} className="mkt-card">
-                <p className="mb-2 font-mono text-sm text-[var(--mkt-accent)]">
+              <li key={label} className="mkt-card flex h-full flex-col">
+                <p className="mkt-step-num mb-2">
                   {String(i + 1).padStart(2, "0")}
                 </p>
-                <h3 className="text-lg font-bold">{label}</h3>
+                <h3 className="text-lg font-semibold">{label}</h3>
               </li>
             ))}
           </ol>
@@ -72,10 +76,10 @@ export default function AutopilotPage() {
       </section>
 
       <section className="mkt-section mkt-section--dark">
-        <div className="mkt-wrap grid gap-10 lg:grid-cols-2 lg:items-center">
+        <div className="mkt-wrap mkt-split">
           <div className="space-y-4">
             <p className="mkt-eyebrow">Evidence, not guesses</p>
-            <h2 className="text-3xl font-extrabold">
+            <h2 className="text-3xl font-extrabold text-balance">
               Deep audits with screenshots and findings
             </h2>
             <p className="mkt-muted leading-relaxed">
@@ -83,8 +87,8 @@ export default function AutopilotPage() {
               issues. Outreach references what is actually on the site.
             </p>
           </div>
-          <BrowserFrame
-            src="/marketing/screenshots/revenue-os-audit.svg"
+          <ProductShot
+            name="revenue-os-deep-audit"
             alt="Deep audit findings"
           />
         </div>

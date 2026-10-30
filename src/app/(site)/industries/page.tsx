@@ -1,10 +1,10 @@
 import Link from "next/link";
 import type { Metadata } from "next";
+import { MarketingCard } from "@/components/marketing/marketing-card";
 import { PageBreadcrumb } from "@/components/marketing/page-breadcrumb";
 import { PageVisual } from "@/components/marketing/page-visual";
 import { RelatedPages } from "@/components/marketing/related-pages";
 import { SectionCta } from "@/components/marketing/section-cta";
-import { VisualThumb } from "@/components/marketing/visual-thumb";
 import { industryPages } from "@/content/pages";
 import { buildPageMetadata } from "@/lib/marketing/page-metadata";
 import { visualForIndustry, visualForPath } from "@/lib/marketing/page-visuals";
@@ -22,10 +22,10 @@ export default function IndustriesIndexPage() {
       <section className="mkt-section mkt-section--dark">
         <div className="mkt-wrap space-y-8">
           <PageBreadcrumb current="Industries" currentPath="/industries" />
-          <div className="grid items-center gap-10 lg:grid-cols-[1.2fr_0.8fr]">
+          <div className="mkt-split">
             <div className="space-y-6">
               <p className="mkt-eyebrow">Industries</p>
-              <h1 className="max-w-3xl text-4xl font-extrabold sm:text-5xl">
+              <h1 className="max-w-3xl text-4xl font-extrabold text-balance sm:text-5xl">
                 Software shaped by how your industry actually works
               </h1>
               <p className="mkt-muted max-w-2xl text-lg">
@@ -41,31 +41,26 @@ export default function IndustriesIndexPage() {
                 </Link>
               </div>
             </div>
-            <PageVisual visual={visualForPath("/industries")} alt="Industry operations board" priority />
+            <PageVisual
+              visual={visualForPath("/industries")}
+              alt="Industry operations board"
+              priority
+            />
           </div>
         </div>
       </section>
 
       <section className="mkt-section mkt-section--light">
         <div className="mkt-wrap">
-          <div className="mkt-grid-3">
+          <div className="mkt-grid-4">
             {industryPages.map((i) => (
-              <Link
+              <MarketingCard
                 key={i.slug}
                 href={`/industries/${i.slug}`}
-                className="mkt-card block"
-              >
-                <VisualThumb
-                  visual={visualForIndustry(i.slug)}
-                  alt={i.name}
-                  className="mkt-card-thumb mb-3"
-                />
-                <h2 className="mb-2 text-lg font-bold">{i.name}</h2>
-                <p className="mkt-muted mb-3 text-sm leading-relaxed">
-                  {i.subline}
-                </p>
-                <span className="mkt-link text-sm">Learn more →</span>
-              </Link>
+                title={i.name}
+                description={i.subline}
+                visual={visualForIndustry(i.slug)}
+              />
             ))}
           </div>
         </div>

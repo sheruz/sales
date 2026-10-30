@@ -21,11 +21,11 @@
   <rect x="590" y="190" width="280" height="160" rx="12" fill="#141C2E" stroke="#243044"/>
   <rect x="890" y="190" width="270" height="160" rx="12" fill="#141C2E" stroke="#243044"/>
   <text x="320" y="230" fill="#9AA6BF" font-family="system-ui,sans-serif" font-size="16" font-weight="600">Open jobs</text>
-  <text x="320" y="275" fill="#8E9CFF" font-family="system-ui,sans-serif" font-size="42" font-weight="800">128</text>
-  <text x="620" y="230" fill="#9AA6BF" font-family="system-ui,sans-serif" font-size="16" font-weight="600">Awaiting review</text>
-  <text x="620" y="275" fill="#FF6B3D" font-family="system-ui,sans-serif" font-size="42" font-weight="800">14</text>
-  <text x="920" y="230" fill="#9AA6BF" font-family="system-ui,sans-serif" font-size="16" font-weight="600">SLA on track</text>
-  <text x="920" y="275" fill="#8E9CFF" font-family="system-ui,sans-serif" font-size="42" font-weight="800">96%</text>
+  <text x="320" y="275" fill="#8E9CFF" font-family="system-ui,sans-serif" font-size="42" font-weight="800">Active</text>
+  <text x="620" y="230" fill="#9AA6BF" font-family="system-ui,sans-serif" font-size="16" font-weight="600">In review</text>
+  <text x="620" y="275" fill="#FF6B3D" font-family="system-ui,sans-serif" font-size="42" font-weight="800">Pending</text>
+  <text x="920" y="230" fill="#9AA6BF" font-family="system-ui,sans-serif" font-size="16" font-weight="600">On track</text>
+  <text x="920" y="275" fill="#8E9CFF" font-family="system-ui,sans-serif" font-size="42" font-weight="800">Good</text>
   <rect x="290" y="380" width="870" height="330" rx="12" fill="#141C2E" stroke="#243044"/>
   <rect x="320" y="420" width="810" height="48" rx="10" fill="#1A2438"/>
   <rect x="320" y="490" width="810" height="48" rx="10" fill="#1A2438"/>

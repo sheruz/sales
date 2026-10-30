@@ -157,3 +157,81 @@ export function visualForSolution(slug: string): PageVisualKey {
 export function visualForPath(path: string): PageVisualKey {
   return STATIC_VISUALS[path] ?? "website-marketing";
 }
+
+/** Second visual for body sections — never the same as the hero visual. */
+export function bodyVisualFor(
+  hero: PageVisualKey,
+  preferred?: PageVisualKey
+): PageVisualKey {
+  if (preferred && preferred !== hero) return preferred;
+  const pool: PageVisualKey[] = [
+    "web-dashboard",
+    "mvp-scope",
+    "automation-flow",
+    "process-timeline",
+    "code-stack",
+    "website-marketing",
+    "crm-pipeline",
+    "saas-tenancy",
+    "audit-report",
+    "ai-workspace",
+  ];
+  return pool.find((k) => k !== hero) ?? "website-marketing";
+}
+
+export function bodyVisualForService(slug: string): PageVisualKey {
+  const hero = visualForService(slug);
+  const preferred: Record<string, PageVisualKey> = {
+    "web-applications": "automation-flow",
+    "mobile-apps": "web-dashboard",
+    "erp-development": "dispatch-board",
+    "crm-development": "automation-flow",
+    "saas-development": "web-dashboard",
+    "automation-integrations": "crm-pipeline",
+    "website-development": "audit-report",
+    "mvp-development": "web-dashboard",
+    "fixed-price-projects": "process-timeline",
+    "dedicated-developers": "web-dashboard",
+    "product-retainer": "process-timeline",
+    "project-rescue": "mvp-scope",
+    "technical-consulting": "code-stack",
+    discovery: "mvp-scope",
+    "legacy-modernization": "web-dashboard",
+  };
+  return bodyVisualFor(hero, preferred[slug]);
+}
+
+export function bodyVisualForAi(slug: string): PageVisualKey {
+  const hero = visualForAi(slug);
+  const preferred: Record<string, PageVisualKey> = {
+    "ai-integrations": "automation-flow",
+    "ai-agents": "crm-pipeline",
+    "document-processing": "ai-workspace",
+    chatbots: "website-marketing",
+    "sales-automation": "ai-workspace",
+  };
+  return bodyVisualFor(hero, preferred[slug]);
+}
+
+export function bodyVisualForIndustry(slug: string): PageVisualKey {
+  const hero = visualForIndustry(slug);
+  const preferred: Record<string, PageVisualKey> = {
+    "logistics-trucking": "erp-board",
+    "real-estate": "crm-pipeline",
+    "healthcare-clinics": "website-marketing",
+    "construction-trades": "erp-board",
+    "retail-inventory": "saas-tenancy",
+    "professional-services": "web-dashboard",
+    education: "saas-tenancy",
+    "startups-saas": "mvp-scope",
+  };
+  return bodyVisualFor(hero, preferred[slug]);
+}
+
+export function bodyVisualForTechnology(slug: string): PageVisualKey {
+  const hero = visualForTechnology(slug);
+  return bodyVisualFor(
+    hero,
+    hero === "code-stack" ? "web-dashboard" : "code-stack"
+  );
+}

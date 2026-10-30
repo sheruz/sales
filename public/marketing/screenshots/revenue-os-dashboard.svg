@@ -1,11 +1,89 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="750" viewBox="0 0 1200 750" role="img" aria-label="Revenue OS dashboard placeholder">
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="750" viewBox="0 0 1200 750" role="img" aria-label="Revenue OS Dashboard">
   <rect width="1200" height="750" fill="#0B1220"/>
+  
+  <!-- Sidebar -->
   <rect x="40" y="40" width="220" height="670" rx="12" fill="#141C2E"/>
-  <rect x="290" y="40" width="870" height="120" rx="12" fill="#141C2E"/>
-  <rect x="290" y="190" width="280" height="160" rx="12" fill="#1A2438"/>
-  <rect x="590" y="190" width="280" height="160" rx="12" fill="#1A2438"/>
-  <rect x="890" y="190" width="270" height="160" rx="12" fill="#1A2438"/>
-  <rect x="290" y="380" width="870" height="330" rx="12" fill="#141C2E"/>
-  <text x="320" y="110" fill="#8E9CFF" font-family="system-ui,sans-serif" font-size="28">Dashboard placeholder</text>
-  <text x="320" y="150" fill="#9AA6BF" font-family="system-ui,sans-serif" font-size="18">Replace with real Revenue OS screenshot</text>
+  <text x="70" y="80" fill="#EEF2FF" font-family="system-ui,sans-serif" font-size="18" font-weight="700">Revenue OS</text>
+  <rect x="60" y="120" width="180" height="36" rx="8" fill="#1A2438"/>
+  <text x="75" y="143" fill="#9AA6BF" font-family="system-ui,sans-serif" font-size="14">Dashboard</text>
+  <rect x="60" y="170" width="180" height="32" rx="6" fill="transparent"/>
+  <text x="75" y="191" fill="#9AA6BF" font-family="system-ui,sans-serif" font-size="14">Jobs</text>
+  <rect x="60" y="212" width="180" height="32" rx="6" fill="transparent"/>
+  <text x="75" y="233" fill="#9AA6BF" font-family="system-ui,sans-serif" font-size="14">Customers</text>
+  <rect x="60" y="254" width="180" height="32" rx="6" fill="transparent"/>
+  <text x="75" y="275" fill="#9AA6BF" font-family="system-ui,sans-serif" font-size="14">Analytics</text>
+  <rect x="60" y="296" width="180" height="32" rx="6" fill="transparent"/>
+  <text x="75" y="317" fill="#9AA6BF" font-family="system-ui,sans-serif" font-size="14">Settings</text>
+  <rect x="60" y="660" width="180" height="36" rx="18" fill="#5B63F5"/>
+  <text x="105" y="683" fill="#EEF2FF" font-family="system-ui,sans-serif" font-size="14" font-weight="600">New Job</text>
+
+  <!-- Header -->
+  <rect x="290" y="40" width="870" height="100" rx="12" fill="#141C2E"/>
+  <text x="320" y="85" fill="#EEF2FF" font-family="system-ui,sans-serif" font-size="26" font-weight="700">Operations Dashboard</text>
+  <text x="320" y="115" fill="#9AA6BF" font-family="system-ui,sans-serif" font-size="16">Track jobs, reviews, and team performance</text>
+
+  <!-- KPI Cards -->
+  <rect x="290" y="160" width="280" height="160" rx="12" fill="#1A2438"/>
+  <text x="320" y="200" fill="#9AA6BF" font-family="system-ui,sans-serif" font-size="15">Open jobs</text>
+  <text x="320" y="250" fill="#8E9CFF" font-family="system-ui,sans-serif" font-size="44" font-weight="800">Active</text>
+  <rect x="320" y="275" width="100" height="8" rx="4" fill="#5B63F5" opacity="0.4"/>
+  <rect x="320" y="275" width="75" height="8" rx="4" fill="#5B63F5"/>
+
+  <rect x="590" y="160" width="280" height="160" rx="12" fill="#1A2438"/>
+  <text x="620" y="200" fill="#9AA6BF" font-family="system-ui,sans-serif" font-size="15">In review</text>
+  <text x="620" y="250" fill="#FF6B3D" font-family="system-ui,sans-serif" font-size="44" font-weight="800">Pending</text>
+  <rect x="620" y="275" width="100" height="8" rx="4" fill="#FF6B3D" opacity="0.4"/>
+  <rect x="620" y="275" width="45" height="8" rx="4" fill="#FF6B3D"/>
+
+  <rect x="890" y="160" width="270" height="160" rx="12" fill="#1A2438"/>
+  <text x="920" y="200" fill="#9AA6BF" font-family="system-ui,sans-serif" font-size="15">On track</text>
+  <text x="920" y="250" fill="#8E9CFF" font-family="system-ui,sans-serif" font-size="44" font-weight="800">Good</text>
+  <rect x="920" y="275" width="100" height="8" rx="4" fill="#5B63F5" opacity="0.4"/>
+  <rect x="920" y="275" width="85" height="8" rx="4" fill="#5B63F5"/>
+
+  <!-- Data Table -->
+  <rect x="290" y="340" width="870" height="370" rx="12" fill="#141C2E"/>
+  <text x="320" y="380" fill="#EEF2FF" font-family="system-ui,sans-serif" font-size="18" font-weight="700">Recent Activity</text>
+  
+  <!-- Table Headers -->
+  <text x="320" y="420" fill="#9AA6BF" font-family="system-ui,sans-serif" font-size="13" font-weight="600">JOB</text>
+  <text x="520" y="420" fill="#9AA6BF" font-family="system-ui,sans-serif" font-size="13" font-weight="600">CLIENT</text>
+  <text x="720" y="420" fill="#9AA6BF" font-family="system-ui,sans-serif" font-size="13" font-weight="600">STATUS</text>
+  <text x="920" y="420" fill="#9AA6BF" font-family="system-ui,sans-serif" font-size="13" font-weight="600">UPDATED</text>
+
+  <!-- Row 1 -->
+  <rect x="320" y="440" width="810" height="48" rx="8" fill="#1A2438"/>
+  <rect x="330" y="453" width="160" height="22" rx="6" fill="#5B63F5" opacity="0.2"/>
+  <text x="340" y="468" fill="#8E9CFF" font-family="system-ui,sans-serif" font-size="13" font-weight="600">Implementation</text>
+  <text x="520" y="468" fill="#EEF2FF" font-family="system-ui,sans-serif" font-size="14">Enterprise Co</text>
+  <rect x="720" y="453" width="80" height="22" rx="11" fill="#5B63F5" opacity="0.3"/>
+  <text x="735" y="468" fill="#8E9CFF" font-family="system-ui,sans-serif" font-size="12" font-weight="600">Active</text>
+  <text x="920" y="468" fill="#9AA6BF" font-family="system-ui,sans-serif" font-size="13">Today</text>
+
+  <!-- Row 2 -->
+  <rect x="320" y="500" width="810" height="48" rx="8" fill="#1A2438"/>
+  <rect x="330" y="513" width="140" height="22" rx="6" fill="#FF6B3D" opacity="0.2"/>
+  <text x="340" y="528" fill="#FF6B3D" font-family="system-ui,sans-serif" font-size="13" font-weight="600">Deep Audit</text>
+  <text x="520" y="528" fill="#EEF2FF" font-family="system-ui,sans-serif" font-size="14">Growth Startup</text>
+  <rect x="720" y="513" width="80" height="22" rx="11" fill="#FF6B3D" opacity="0.3"/>
+  <text x="730" y="528" fill="#FF6B3D" font-family="system-ui,sans-serif" font-size="12" font-weight="600">Review</text>
+  <text x="920" y="528" fill="#9AA6BF" font-family="system-ui,sans-serif" font-size="13">Yesterday</text>
+
+  <!-- Row 3 -->
+  <rect x="320" y="560" width="810" height="48" rx="8" fill="#1A2438"/>
+  <rect x="330" y="573" width="120" height="22" rx="6" fill="#8E9CFF" opacity="0.2"/>
+  <text x="340" y="588" fill="#8E9CFF" font-family="system-ui,sans-serif" font-size="13" font-weight="600">Discovery</text>
+  <text x="520" y="588" fill="#EEF2FF" font-family="system-ui,sans-serif" font-size="14">Tech Corp</text>
+  <rect x="720" y="573" width="80" height="22" rx="11" fill="#5B63F5" opacity="0.3"/>
+  <text x="735" y="588" fill="#8E9CFF" font-family="system-ui,sans-serif" font-size="12" font-weight="600">Active</text>
+  <text x="920" y="588" fill="#9AA6BF" font-family="system-ui,sans-serif" font-size="13">2 days ago</text>
+
+  <!-- Row 4 -->
+  <rect x="320" y="620" width="810" height="48" rx="8" fill="#1A2438"/>
+  <rect x="330" y="633" width="150" height="22" rx="6" fill="#5B63F5" opacity="0.2"/>
+  <text x="340" y="648" fill="#8E9CFF" font-family="system-ui,sans-serif" font-size="13" font-weight="600">Onboarding</text>
+  <text x="520" y="648" fill="#EEF2FF" font-family="system-ui,sans-serif" font-size="14">Finance Inc</text>
+  <rect x="720" y="633" width="80" height="22" rx="11" fill="#9AA6BF" opacity="0.2"/>
+  <text x="730" y="648" fill="#9AA6BF" font-family="system-ui,sans-serif" font-size="12" font-weight="600">Scheduled</text>
+  <text x="920" y="648" fill="#9AA6BF" font-family="system-ui,sans-serif" font-size="13">Last week</text>
 </svg>

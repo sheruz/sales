@@ -7,7 +7,12 @@ import { SectionCta } from "@/components/marketing/section-cta";
 import { getTechnologyPage } from "@/content/pages";
 import type { AiPageContent, ServicePageContent } from "@/content/pages";
 import { getCaseStudy, siteConfig } from "@/content/site";
-import { visualForAi, visualForService } from "@/lib/marketing/page-visuals";
+import {
+  bodyVisualForAi,
+  bodyVisualForService,
+  visualForAi,
+  visualForService,
+} from "@/lib/marketing/page-visuals";
 
 type Props = {
   page: ServicePageContent | AiPageContent;
@@ -36,6 +41,10 @@ export function ServicePageView({ page, basePath, sectionLabel, eyebrow }: Props
     .filter(Boolean);
   const visual =
     basePath === "/ai" ? visualForAi(page.slug) : visualForService(page.slug);
+  const bodyVisual =
+    basePath === "/ai"
+      ? bodyVisualForAi(page.slug)
+      : bodyVisualForService(page.slug);
 
   // Hero is dark; alternate from there.
   let n = 0;
@@ -87,15 +96,15 @@ export function ServicePageView({ page, basePath, sectionLabel, eyebrow }: Props
 
       {/* Intro */}
       <section className={`mkt-section mkt-section--${tone()}`}>
-        <div className="mkt-wrap grid items-center gap-10 lg:grid-cols-[1fr_1fr]">
-          <div className="space-y-4">
+        <div className="mkt-wrap mkt-split">
+          <div className="mkt-prose space-y-4">
             {introParagraphs.map((p) => (
               <p key={p} className="text-lg leading-relaxed">
                 {p}
               </p>
             ))}
           </div>
-          <PageVisual visual={visual} alt={`${page.h1} overview`} />
+          <PageVisual visual={bodyVisual} alt={`${page.h1} workflow`} />
         </div>
       </section>
 

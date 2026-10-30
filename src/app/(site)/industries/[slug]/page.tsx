@@ -9,7 +9,10 @@ import { SectionCta } from "@/components/marketing/section-cta";
 import { getIndustryPage, industryPages } from "@/content/pages";
 import { siteConfig } from "@/content/site";
 import { buildPageMetadata } from "@/lib/marketing/page-metadata";
-import { visualForIndustry } from "@/lib/marketing/page-visuals";
+import {
+  bodyVisualForIndustry,
+  visualForIndustry,
+} from "@/lib/marketing/page-visuals";
 
 type Props = { params: Promise<{ slug: string }> };
 
@@ -37,6 +40,7 @@ export default async function IndustryDetailPage({ params }: Props) {
 
   const path = `/industries/${page.slug}`;
   const visual = visualForIndustry(page.slug);
+  const bodyVisual = bodyVisualForIndustry(page.slug);
   const introParagraphs = page.intro
     .split(/\n\s*\n/)
     .map((p) => p.trim())
@@ -67,10 +71,12 @@ export default async function IndustryDetailPage({ params }: Props) {
             current={page.name}
             currentPath={path}
           />
-          <div className="grid items-center gap-10 lg:grid-cols-[1.2fr_0.8fr]">
+          <div className="mkt-split">
             <div className="space-y-6">
               <p className="mkt-eyebrow">Industry</p>
-              <h1 className="text-4xl font-extrabold sm:text-5xl">{page.h1}</h1>
+              <h1 className="text-4xl font-extrabold text-balance sm:text-5xl">
+                {page.h1}
+              </h1>
               <p className="mkt-muted text-lg">{page.subline}</p>
               <div className="flex flex-wrap gap-3">
                 <Link
@@ -92,15 +98,15 @@ export default async function IndustryDetailPage({ params }: Props) {
 
       {/* Intro */}
       <section className="mkt-section mkt-section--light">
-        <div className="mkt-wrap grid items-center gap-10 lg:grid-cols-[1fr_1fr]">
-          <div className="space-y-4">
+        <div className="mkt-wrap mkt-split">
+          <div className="mkt-prose space-y-4">
             {introParagraphs.map((p) => (
               <p key={p} className="text-lg leading-relaxed">
                 {p}
               </p>
             ))}
           </div>
-          <PageVisual visual={visual} alt={`${page.name} workflow overview`} />
+          <PageVisual visual={bodyVisual} alt={`${page.name} workflow`} />
         </div>
       </section>
 

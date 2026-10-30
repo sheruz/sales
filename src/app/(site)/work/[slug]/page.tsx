@@ -1,14 +1,23 @@
 import Link from "next/link";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
+import { ProductShot } from "@/components/marketing/product-shot";
 import { BrowserFrame } from "@/components/marketing/browser-frame";
 import {
   caseStudies,
   getCaseStudy,
   siteConfig,
 } from "@/content/site";
+import type { ProductShotName } from "@/lib/marketing/product-shots";
 
 type Props = { params: Promise<{ slug: string }> };
+
+const SHOT_BY_LABEL: Record<string, ProductShotName> = {
+  Dashboard: "revenue-os-dashboard",
+  "Deep audit findings": "revenue-os-deep-audit",
+  "Super Admin packages": "revenue-os-superadmin-packages",
+  Pipeline: "revenue-os-pipeline",
+};
 
 export function generateStaticParams() {
   return caseStudies.filter((c) => c.verified).map((c) => ({ slug: c.slug }));
@@ -30,21 +39,46 @@ export default async function CaseStudyPage({ params }: Props) {
   const c = getCaseStudy(slug);
   if (!c?.verified) notFound();
 
+  const heroShot = SHOT_BY_LABEL[c.screenshots[0]?.label ?? ""] ?? null;
+
   return (
     <>
       <section className="mkt-section mkt-section--dark">
         <div className="mkt-wrap space-y-8">
-          <div className="grid items-center gap-10 lg:grid-cols-[1.2fr_0.8fr]">
+          <div className="mkt-split">
             <div className="space-y-4">
               <p className="mkt-eyebrow">Case study</p>
-              <h1 className="text-4xl font-extrabold sm:text-5xl">{c.title}</h1>
+              <h1 className="text-4xl font-extrabold text-balance sm:text-5xl">
+                {c.title}
+              </h1>
               <p className="text-[var(--mkt-accent)]">{c.clientType}</p>
               <p className="mkt-muted">{c.status}</p>
+              {c.platformFeatures?.length ? (
+                <ul className="m-0 list-none space-y-1.5 p-0 text-sm">
+                  {c.platformFeatures.slice(0, 3).map((f) => (
+                    <li key={f} className="flex gap-2">
+                      <span className="text-[var(--mkt-accent)]" aria-hidden>
+                        ✓
+                      </span>
+                      <span>{f}</span>
+                    </li>
+                  ))}
+                </ul>
+              ) : null}
+              <div className="flex flex-wrap gap-2">
+                {c.stack.slice(0, 6).map((s) => (
+                  <span key={s} className="mkt-badge">
+                    {s}
+                  </span>
+                ))}
+              </div>
             </div>
-            {c.screenshots[0] ? (
+            {heroShot ? (
+              <ProductShot name={heroShot} alt={c.title} priority hero />
+            ) : c.screenshots[0] ? (
               <BrowserFrame
                 src={c.screenshots[0].src}
-                alt={c.screenshots[0].alt.replace(/\s*placeholder\s*/gi, " ").trim()}
+                alt={c.screenshots[0].alt}
                 priority
               />
             ) : null}
@@ -53,16 +87,16 @@ export default async function CaseStudyPage({ params }: Props) {
       </section>
 
       <section className="mkt-section mkt-section--light">
-        <div className="mkt-wrap grid gap-10 lg:grid-cols-2">
-          <div className="space-y-3">
+        <div className="mkt-wrap mkt-split">
+          <div className="mkt-prose space-y-3">
             <p className="mkt-eyebrow">Problem</p>
-            <p className="leading-relaxed text-[var(--mkt-ink)]">{c.problem}</p>
+            <p className="leading-relaxed">{c.problem}</p>
           </div>
           <div className="space-y-3">
             <p className="mkt-eyebrow">What we built</p>
-            <ul className="space-y-2">
+            <ul className="m-0 list-none space-y-2 p-0">
               {c.whatWeBuilt.map((item) => (
-                <li key={item} className="text-sm leading-relaxed text-[var(--mkt-ink)]">
+                <li key={item} className="text-sm leading-relaxed">
                   · {item}
                 </li>
               ))}
@@ -75,7 +109,7 @@ export default async function CaseStudyPage({ params }: Props) {
         <section className="mkt-section mkt-section--dark">
           <div className="mkt-wrap space-y-6">
             <p className="mkt-eyebrow">Platform features</p>
-            <ul className="mkt-grid-2">
+            <ul className="mkt-grid-2 m-0 list-none p-0">
               {c.platformFeatures.map((f) => (
                 <li key={f} className="mkt-card text-sm">
                   {f}
@@ -88,11 +122,11 @@ export default async function CaseStudyPage({ params }: Props) {
 
       {c.security && c.security.length > 0 ? (
         <section className="mkt-section mkt-section--light">
-          <div className="mkt-wrap max-w-3xl space-y-4">
+          <div className="mkt-wrap mkt-prose space-y-4">
             <p className="mkt-eyebrow">Security</p>
-            <ul className="space-y-2">
+            <ul className="m-0 list-none space-y-2 p-0">
               {c.security.map((n) => (
-                <li key={n} className="text-sm text-[var(--mkt-ink)]">
+                <li key={n} className="text-sm">
                   · {n}
                 </li>
               ))}
@@ -103,9 +137,9 @@ export default async function CaseStudyPage({ params }: Props) {
 
       {c.results.length > 0 ? (
         <section className="mkt-section mkt-section--dark">
-          <div className="mkt-wrap max-w-3xl space-y-4">
+          <div className="mkt-wrap mkt-prose space-y-4">
             <p className="mkt-eyebrow">Results</p>
-            <ul className="space-y-2">
+            <ul className="m-0 list-none space-y-2 p-0">
               {c.results.map((r) => (
                 <li key={r} className="mkt-card text-sm">
                   {r}
@@ -116,35 +150,26 @@ export default async function CaseStudyPage({ params }: Props) {
         </section>
       ) : null}
 
-      <section className="mkt-section mkt-section--dark">
-        <div className="mkt-wrap space-y-6">
-          <p className="mkt-eyebrow">Stack</p>
-          <div className="flex flex-wrap gap-2">
-            {c.stack.map((s) => (
-              <span key={s} className="mkt-badge">
-                {s}
-              </span>
-            ))}
-          </div>
-        </div>
-      </section>
-
       {c.screenshots.length > 0 ? (
         <section className="mkt-section mkt-section--light">
           <div className="mkt-wrap space-y-8">
             <p className="mkt-eyebrow">Screenshots</p>
             <div className="mkt-grid-2">
-              {c.screenshots.map((shot) => (
-                <figure key={shot.src} className="space-y-2">
-                  <BrowserFrame
-                    src={shot.src}
-                    alt={shot.alt.replace(/\s*placeholder\s*/gi, " ").trim()}
-                  />
-                  <figcaption className="text-sm text-[var(--mkt-ink-muted)]">
-                    {shot.label}
-                  </figcaption>
-                </figure>
-              ))}
+              {c.screenshots.map((shot) => {
+                const name = SHOT_BY_LABEL[shot.label];
+                return (
+                  <figure key={shot.src} className="space-y-2">
+                    {name ? (
+                      <ProductShot name={name} alt={shot.alt} />
+                    ) : (
+                      <BrowserFrame src={shot.src} alt={shot.alt} />
+                    )}
+                    <figcaption className="text-sm text-[var(--mkt-ink-muted)]">
+                      {shot.label}
+                    </figcaption>
+                  </figure>
+                );
+              })}
             </div>
           </div>
         </section>

@@ -21,10 +21,10 @@ export default function ProcessPage() {
       <section className="mkt-section mkt-section--dark">
         <div className="mkt-wrap space-y-8">
           <PageBreadcrumb current="How we work" currentPath="/process" />
-          <div className="grid items-center gap-10 lg:grid-cols-[1.2fr_0.8fr]">
+          <div className="mkt-split">
             <div className="space-y-6">
               <p className="mkt-eyebrow">Process</p>
-              <h1 className="text-4xl font-extrabold sm:text-5xl">
+              <h1 className="text-4xl font-extrabold text-balance sm:text-5xl">
                 {processPageDetailed.h1}
               </h1>
               <p className="mkt-muted text-lg leading-relaxed">
@@ -42,11 +42,6 @@ export default function ProcessPage() {
 
       <section className="mkt-section mkt-section--light">
         <div className="mkt-wrap space-y-8">
-          <PageVisual
-            visual={visualForPath("/process")}
-            alt="End-to-end delivery timeline"
-            className="max-w-4xl"
-          />
           <ol className="m-0 list-none space-y-6 p-0">
             {steps.map((s) => (
               <li key={s.number} className="mkt-card grid gap-6 lg:grid-cols-[0.8fr_1.2fr]">
