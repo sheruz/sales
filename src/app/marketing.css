@@ -65,18 +65,61 @@
   display: inline-flex;
   align-items: center;
   gap: 0.65rem;
-  font-size: 0.72rem;
+  font-size: 0.8125rem;
   font-weight: 600;
-  letter-spacing: 0.14em;
+  letter-spacing: 0.12em;
   text-transform: uppercase;
   color: var(--mkt-accent);
 }
 
-.mkt-eyebrow::before {
-  content: "";
-  width: 1.25rem;
-  height: 1px;
-  background: currentColor;
+/* Canvas boards: plain uppercase label, no hairline prefix */
+.mkt-label {
+  display: block;
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: #4f46e5;
+}
+
+.mkt-label--light {
+  color: #a5b4fc;
+}
+
+.mkt-label--on-indigo {
+  color: #e0e7ff;
+}
+
+.mkt-h2 {
+  margin: 0;
+  font-size: clamp(2rem, 3.6vw, 2.75rem);
+  line-height: 1.12;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+}
+
+.mkt-icon-box {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 48px;
+  height: 48px;
+  border-radius: 12px;
+  background: #eef0ff;
+  color: #4f46e5;
+  flex-shrink: 0;
+}
+
+.mkt-icon-box--dark {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  flex-shrink: 0;
+  border-radius: 10px;
+  background: #1b2340;
+  color: #a5b4fc;
 }
 
 .mkt-section {
@@ -1052,28 +1095,39 @@ html:not(.dark) .mkt-section--light {
 .mkt-slot-ph {
   display: flex;
   flex-direction: column;
-  align-items: flex-start;
-  justify-content: flex-end;
-  gap: 0.35rem;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
   width: 100%;
   min-height: 12rem;
-  padding: 1rem 1.1rem;
+  padding: 1.5rem 1.1rem;
   border-radius: 14px;
-  border: 1px dashed #2a3550;
+  border: 1.5px dashed #3a4660;
   background: #0e1626;
   color: #a3adc2;
-  font-size: 0.8rem;
+  font-size: 0.875rem;
   line-height: 1.4;
+  text-align: center;
+}
+
+.mkt-slot-ph--light {
+  border-color: #c9cedb;
+  background: #f5f7fb;
+  color: #4b5568;
 }
 
 .mkt-slot-ph__id {
   color: #f5f7fb;
   font-weight: 700;
-  font-size: 0.85rem;
+  font-size: 0.8125rem;
+}
+
+.mkt-slot-ph--light .mkt-slot-ph__id {
+  color: #0b1220;
 }
 
 .mkt-slot-ph__note {
-  max-width: 36ch;
+  max-width: 28ch;
 }
 
 .mkt-status {

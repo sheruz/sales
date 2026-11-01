@@ -16,11 +16,13 @@ type Props = {
   sizes?: string;
   /** Overlay label shown only on navy placeholder */
   note?: string;
+  /** Light placeholders for white sections (industry cards) */
+  tone?: "dark" | "light";
 };
 
 /**
  * Maps a canvas slot ID (e.g. HOME-01) to /public/marketing/{id}.webp.
- * Missing files render a neutral navy box — never a random stock image.
+ * Missing files render a neutral dashed box — never a random stock image.
  */
 export function SlotImage({
   slot,
@@ -34,6 +36,7 @@ export function SlotImage({
   priority,
   sizes,
   note,
+  tone = "dark",
 }: Props) {
   const src = resolveSlotSrc(slot);
   const ratio = aspectRatio ?? `${width} / ${height}`;
@@ -41,7 +44,7 @@ export function SlotImage({
   if (!src) {
     return (
       <div
-        className={`mkt-slot-ph ${className}`.trim()}
+        className={`mkt-slot-ph ${tone === "light" ? "mkt-slot-ph--light" : ""} ${className}`.trim()}
         style={fill ? undefined : { aspectRatio: ratio }}
         role="img"
         aria-label={alt}
