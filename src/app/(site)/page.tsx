@@ -563,51 +563,38 @@ export default function MarketingHomePage() {
       {/* 13. Final CTA */}
       <section id="book" className="bg-[#0B1220] px-6 py-28">
         <div className="mkt-wrap">
-          <div className="flex flex-wrap items-center gap-14 rounded-[28px] border border-[#1E2738] bg-[#121A2B] p-8 sm:p-14">
-            <div className="flex min-w-0 flex-[1_1_480px] flex-col gap-5">
-              <h2 className="m-0 text-[clamp(2rem,3.6vw,2.875rem)] font-extrabold leading-[1.1] text-[#F5F7FB]">
-                Tell us what you&apos;re running on today.
-              </h2>
-              <p className="m-0 text-[17px] leading-[1.65] text-[#A3ADC2]">
-                A free 30-minute call. You leave with a clear next step, whether or not you work with
-                us.
-              </p>
-              <div className="flex flex-wrap gap-3">
-                <Link
-                  href={siteConfig.contact.bookingUrl}
-                  className="inline-flex items-center gap-2.5 rounded-xl bg-[#6366F1] px-[26px] py-4 font-semibold text-white no-underline"
-                >
-                  Book a free call
-                </Link>
-                <a
-                  href={siteConfig.contact.whatsapp}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-flex items-center gap-2.5 rounded-xl border border-[#2A3550] px-[26px] py-4 font-semibold text-[#F5F7FB] no-underline"
-                >
-                  <PathIcon d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" size={18} />
-                  Chat on WhatsApp
-                </a>
-              </div>
-              <div className="flex flex-wrap gap-5">
-                {valueTags.map((t) => (
-                  <span key={t} className="inline-flex items-center gap-2 text-sm text-[#D5DBE8]">
-                    <Tick />
-                    {t}
-                  </span>
-                ))}
-              </div>
+          <div className="mx-auto flex max-w-3xl flex-col items-center gap-5 rounded-[28px] border border-[#1E2738] bg-[#121A2B] p-8 text-center sm:p-14">
+            <h2 className="m-0 text-[clamp(2rem,3.6vw,2.875rem)] font-extrabold leading-[1.1] text-[#F5F7FB]">
+              Tell us what you&apos;re running on today.
+            </h2>
+            <p className="m-0 text-[17px] leading-[1.65] text-[#A3ADC2]">
+              A free 30-minute call. You leave with a clear next step, whether or not you work with
+              us.
+            </p>
+            <div className="flex flex-wrap justify-center gap-3">
+              <Link
+                href={siteConfig.contact.bookingUrl}
+                className="inline-flex items-center gap-2.5 rounded-xl bg-[#6366F1] px-[26px] py-4 font-semibold text-white no-underline"
+              >
+                Book a free call
+              </Link>
+              <a
+                href={siteConfig.contact.whatsapp}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-2.5 rounded-xl border border-[#2A3550] px-[26px] py-4 font-semibold text-[#F5F7FB] no-underline"
+              >
+                <PathIcon d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" size={18} />
+                Chat on WhatsApp
+              </a>
             </div>
-            <div className="min-w-0 flex-[1_1_360px]">
-              <SlotImage
-                slot="HOME-05"
-                alt="On a call with a client"
-                width={1200}
-                height={900}
-                aspectRatio="4/3"
-                className="w-full rounded-[18px] object-cover"
-                note="Real photo: you on a video call with a client or demoing on screen · 1200×900"
-              />
+            <div className="flex flex-wrap justify-center gap-5">
+              {valueTags.map((t) => (
+                <span key={t} className="inline-flex items-center gap-2 text-sm text-[#D5DBE8]">
+                  <Tick />
+                  {t}
+                </span>
+              ))}
             </div>
           </div>
         </div>

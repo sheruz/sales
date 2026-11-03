@@ -10,7 +10,6 @@ export const SLOT_FILES: Record<string, string[]> = {
   "HOME-02": ["home-02.webp", "home-02-deep-audit-findings.webp"],
   "HOME-03": ["home-03.webp", "home-03-founder.webp"],
   "HOME-04": ["home-04.webp", "home-04-pipeline.webp"],
-  "HOME-05": ["home-05.webp", "home-05-on-call.webp"],
   "HOME-IND-1": ["home-ind-1.webp", "home-ind-1-trucking.webp"],
   "HOME-IND-2": ["home-ind-2.webp", "home-ind-2-real-estate.webp"],
   "HOME-IND-3": ["home-ind-3.webp", "home-ind-3-clinic.webp"],

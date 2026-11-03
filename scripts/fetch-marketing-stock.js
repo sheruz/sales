@@ -77,6 +77,16 @@ const SLOTS = [
     url: "https://images.unsplash.com/photo-1517245386807-bb43f82c33c4?auto=format&fit=crop&w=1200&h=750&q=80",
     files: ["home-ind-8.webp", "home-ind-8-startup.webp"],
   },
+  // Founder / About — stock stand-ins until real photos are dropped in
+  {
+    id: "HOME-03",
+    w: 1200,
+    h: 1500,
+    // Professional at desk, portrait
+    url: "https://images.unsplash.com/photo-1507679799987-c73779587ccf?auto=format&fit=crop&w=1200&h=1500&q=80",
+    files: ["home-03.jpg", "home-03.jpg"],
+  },
+  // About: node scripts/fetch-about-images.js (Pexels, navy-themed)
 ];
 
 async function fetchBuffer(url) {
