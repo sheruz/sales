@@ -7,7 +7,6 @@ import { NotificationType, SuppressionReason } from "@prisma/client";
 import prisma from "@/lib/db/prisma";
 import { BILLING_ACTIONS } from "@/lib/billing/actions";
 import { withCreditReservation } from "@/lib/billing/with-credits";
-import { isOutOfCreditsPause } from "@/lib/billing/with-credits";
 import {
   mintPowEvidenceUrl,
   powPreviewPageUrl,
@@ -115,13 +114,10 @@ export class PowPreviewPageService {
     });
 
     if (!charged.ok) {
-      if (isOutOfCreditsPause(charged)) {
-        throw new ValidationError(
-          "Out of credits — cannot create Proof of Work preview page"
-        );
-      }
       throw new ValidationError(
-        charged.message || "Cannot create Proof of Work preview page"
+        charged.reason === "out_of_credits"
+          ? "Out of credits — cannot create Proof of Work preview page"
+          : charged.message || "Cannot create Proof of Work preview page"
       );
     }
 
@@ -295,7 +291,7 @@ export class PowPreviewPageService {
         ? `mailto:${replyEmail}?subject=${encodeURIComponent(
             `Re: website notes for ${page.company.name}`
           )}`
-        : branding.bookingUrl || null,
+        : branding.ctaUrl || null,
     };
   }
 

@@ -34,8 +34,8 @@ export function ContactEmailSource({
   const [value, setValue] = useState(emailSource || "__clear__");
   const [pending, startTransition] = useTransition();
 
-  function onChange(next: string) {
-    if (!canEdit) return;
+  function onChange(next: string | null) {
+    if (!canEdit || next == null) return;
     const prev = value;
     setValue(next);
     startTransition(async () => {

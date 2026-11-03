@@ -75,7 +75,7 @@ export const aboutPage: AboutPageContent = {
     ],
   },
   // Keep disabled until a real founder story is written. UI should hide the section while enabled is false.
-  founderStory: { enabled: false, body: "" },
+  founderStory: { enabled: false, todoMarker: "", body: "" },
 };
 
 /* -------------------------------------------------------------------------- */

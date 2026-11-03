@@ -5,6 +5,7 @@
  * Reads env directly so unit tests don't need full env bootstrap.
  */
 
+import type { Prisma } from "@prisma/client";
 import prisma from "@/lib/db/prisma";
 
 const PLATFORM_KEY = "pow_send_enabled";
@@ -91,24 +92,25 @@ export async function setPowSendTenantOverride(
     where: { organizationId },
     select: { settings: true },
   });
-  const base =
+  const base: Record<string, Prisma.InputJsonValue> =
     existing?.settings &&
     typeof existing.settings === "object" &&
     !Array.isArray(existing.settings)
-      ? { ...(existing.settings as Record<string, unknown>) }
+      ? { ...(existing.settings as Record<string, Prisma.InputJsonValue>) }
       : {};
   if (enabled === null) {
     delete base.pow_send_enabled;
   } else {
     base.pow_send_enabled = enabled;
   }
+  const settings = base as Prisma.InputJsonValue;
   await prisma.organizationSettings.upsert({
     where: { organizationId },
     create: {
       organizationId,
-      settings: base,
+      settings,
     },
-    update: { settings: base },
+    update: { settings },
   });
   void actorUserId;
 }
