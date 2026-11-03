@@ -201,10 +201,13 @@ export class SequenceExecutorService {
 
     const orgId = enrollment.organizationId;
 
-    // PoW2: Proof of Work sequences cannot send until POW_SEND_ENABLED (PoW3)
+    // PoW: Super Admin send toggle (env can only force OFF)
     try {
       const { assertPowSendAllowed } = await import("@/lib/pow/send-gate");
-      assertPowSendAllowed(enrollment.sequence);
+      await assertPowSendAllowed({
+        ...enrollment.sequence,
+        organizationId: orgId,
+      });
     } catch (err) {
       const message = err instanceof Error ? err.message : "PoW send blocked";
       await prisma.sequenceEnrollment.updateMany({

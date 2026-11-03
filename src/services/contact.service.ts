@@ -18,10 +18,19 @@ export type ContactWriteInput = {
   phone?: string | null;
   linkedInUrl?: string | null;
   source?: string | null;
+  /** PoW2 / CASL — "published" required for Canadian PoW enroll */
+  emailSource?: string | null;
   status?: ContactStatus;
   /** LEGACY bridge only — optional */
   leadId?: string | null;
 };
+
+const EMAIL_SOURCE_VALUES = new Set([
+  "published",
+  "email",
+  "company_email",
+  "scraped",
+]);
 
 export type ContactListQuery = {
   page?: number;
@@ -260,6 +269,21 @@ export class ContactService {
     const firstName = input.firstName?.trim() ?? existing.firstName;
     const lastName = input.lastName?.trim() ?? existing.lastName;
 
+    let emailSource: string | null | undefined;
+    if (input.emailSource !== undefined) {
+      if (input.emailSource == null || input.emailSource === "") {
+        emailSource = null;
+      } else {
+        const normalized = input.emailSource.trim().toLowerCase();
+        if (!EMAIL_SOURCE_VALUES.has(normalized)) {
+          throw new ValidationError(
+            "emailSource must be published, email, company_email, or scraped"
+          );
+        }
+        emailSource = normalized;
+      }
+    }
+
     return prisma.contact.update({
       where: { id },
       data: {
@@ -279,6 +303,7 @@ export class ContactService {
         ...(input.linkedInUrl !== undefined
           ? { linkedInUrl: input.linkedInUrl || null }
           : {}),
+        ...(emailSource !== undefined ? { emailSource } : {}),
         ...(input.status !== undefined ? { status: input.status } : {}),
       },
       include: {

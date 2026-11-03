@@ -196,13 +196,29 @@ function trackBrokenImages(
   });
 }
 
+/**
+ * Playwright securityDetails().validTo is Unix seconds (number).
+ * Never pass that number straight into `new Date(n)` — JS treats it as ms → ~1970 → false "expired".
+ */
+export function sslDaysRemainingFromValidTo(
+  validTo: number | string | null | undefined
+): number | null {
+  if (validTo == null || validTo === "") return null;
+  let expiryMs: number;
+  if (typeof validTo === "number" && Number.isFinite(validTo)) {
+    // Seconds if < year ~2001 in ms; otherwise already ms
+    expiryMs = validTo < 1e12 ? validTo * 1000 : validTo;
+  } else {
+    expiryMs = new Date(validTo).getTime();
+  }
+  if (!Number.isFinite(expiryMs)) return null;
+  return Math.floor((expiryMs - Date.now()) / (24 * 60 * 60 * 1000));
+}
+
 async function collectSslDays(mainResp: Response | null): Promise<number | null> {
   try {
     const details = mainResp ? await mainResp.securityDetails() : null;
-    if (!details?.validTo) return null;
-    const expiry = new Date(details.validTo).getTime();
-    if (!Number.isFinite(expiry)) return null;
-    return Math.floor((expiry - Date.now()) / (24 * 60 * 60 * 1000));
+    return sslDaysRemainingFromValidTo(details?.validTo);
   } catch {
     return null;
   }
@@ -519,17 +535,29 @@ export async function runDeepBrowserAudit(
       );
     }
 
-    // Overlapping layout heuristic: fixed overlays covering most of content after consent dismiss
+    // Overlapping layout heuristic: only count overlays that are actually visible
+    // and blocking the viewport center (hidden off-canvas menus / opacity:0 drawers ≠ Severity A).
     const heavyOverlap = await mobile
       .evaluate(() => {
         const vw = window.innerWidth;
         const vh = window.innerHeight;
+        const cx = Math.floor(vw / 2);
+        const cy = Math.floor(vh / 2);
         const blockers = [...document.querySelectorAll("div, section, aside")].filter(
           (el) => {
             const s = window.getComputedStyle(el);
             if (s.position !== "fixed" && s.position !== "sticky") return false;
+            if (s.visibility === "hidden" || s.display === "none") return false;
+            if (Number.parseFloat(s.opacity || "1") < 0.2) return false;
+            if (s.pointerEvents === "none") return false;
+            if (el.getAttribute("aria-hidden") === "true") return false;
             const r = el.getBoundingClientRect();
-            return r.width > vw * 0.85 && r.height > vh * 0.5;
+            if (!(r.width > vw * 0.85 && r.height > vh * 0.5)) return false;
+            // Must cover the visual center — off-canvas drawers often keep full size
+            if (r.left > cx || r.right < cx || r.top > cy || r.bottom < cy) {
+              return false;
+            }
+            return true;
           }
         );
         return blockers.length > 0;

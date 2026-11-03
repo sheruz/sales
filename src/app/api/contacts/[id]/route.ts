@@ -20,6 +20,10 @@ const updateSchema = z.object({
   email: z.string().email().optional().nullable().or(z.literal("")),
   phone: z.string().max(50).optional().nullable(),
   linkedInUrl: z.string().max(500).optional().nullable(),
+  emailSource: z
+    .enum(["published", "email", "company_email", "scraped"])
+    .optional()
+    .nullable(),
   status: z.nativeEnum(ContactStatus).optional(),
 });
 

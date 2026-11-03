@@ -135,9 +135,24 @@ export function CompanyDeepAuditPanel({
         body: JSON.stringify({ companyId }),
       });
       const json = await res.json();
-      if (!json.success) throw new Error(json.error?.message);
+      if (!json.success) {
+        const code = String(json.error?.code || json.error?.reason || "");
+        if (code === "MODULE_LOCKED" || code === "PLAN_FEATURE_DISABLED") {
+          toast.error(
+            json.error?.message ||
+              "Proof of Work is on Pro and Agency — upgrade to run deep audits."
+          );
+          return;
+        }
+        throw new Error(json.error?.message);
+      }
       if (json.data?.status === "SKIPPED") {
         toast.message("Low ICP fit — skipped (no credits charged)");
+      } else if (json.data?.status === "LOCKED") {
+        toast.error(
+          json.data?.message ||
+            "Proof of Work is on Pro and Agency — upgrade to run deep audits."
+        );
       } else if (json.data?.status === "PAUSED") {
         toast.error("Out of credits");
       } else if (json.data?.reused) {
@@ -402,9 +417,24 @@ export function DeepAuditRowButton({
         body: JSON.stringify({ companyId }),
       });
       const json = await res.json();
-      if (!json.success) throw new Error(json.error?.message);
+      if (!json.success) {
+        const code = String(json.error?.code || json.error?.reason || "");
+        if (code === "MODULE_LOCKED" || code === "PLAN_FEATURE_DISABLED") {
+          toast.error(
+            json.error?.message ||
+              "Proof of Work is on Pro and Agency — upgrade to run deep audits."
+          );
+          return;
+        }
+        throw new Error(json.error?.message);
+      }
       if (json.data?.status === "SKIPPED") {
         toast.message("Low ICP fit — skipped (no credits charged)");
+      } else if (json.data?.status === "LOCKED") {
+        toast.error(
+          json.data?.message ||
+            "Proof of Work is on Pro and Agency — upgrade to run deep audits."
+        );
       } else if (json.data?.status === "PAUSED") {
         toast.error("Out of credits");
       } else {

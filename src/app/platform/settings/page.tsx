@@ -3,6 +3,7 @@ import { ProfileSettings } from "@/components/settings/profile-settings";
 import { EmailBrandingPanel } from "@/components/settings/email-branding-panel";
 import { MfaSettingsPanel } from "@/components/platform/mfa-settings-panel";
 import { PlatformPageHeader } from "@/components/platform/ui/page-header";
+import { PowSendToggleGlobal } from "@/components/platform/pow-send-toggle";
 import Link from "next/link";
 import { appOps } from "@/lib/app-paths";
 
@@ -22,6 +23,7 @@ export default async function PlatformSettingsPage() {
         </Link>{" "}
         to edit seller alert recipients.
       </p>
+      <PowSendToggleGlobal />
       <ProfileSettings
         user={{
           firstName: user.firstName,

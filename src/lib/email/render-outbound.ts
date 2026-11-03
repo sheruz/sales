@@ -406,6 +406,57 @@ export function renderOutboundEmail(
   return result;
 }
 
+/**
+ * PoW3 — send already-authored plain-text body (after {{pow_*}} merge).
+ * Does not rebuild from branded pitch HTML fields.
+ */
+export function renderPowPlainEmail(input: {
+  subject: string;
+  bodyText: string;
+  unsubscribeUrl: string;
+  track?: EmailTrackContext | null;
+}): RenderOutboundResult {
+  let text = input.bodyText.replace(/\r\n/g, "\n").trim();
+  if (!/unsubscribe:/i.test(text)) {
+    text = `${text}\n\nUnsubscribe: ${input.unsubscribeUrl}`;
+  }
+
+  const pixelUrl = input.track
+    ? openPixelUrl({
+        organizationId: input.track.organizationId,
+        outboxId: input.track.outboxId,
+      })
+    : "";
+
+  const pixel = pixelUrl
+    ? `<img src="${escapeHtml(pixelUrl)}" width="1" height="1" alt="" style="display:none;width:1px;height:1px;border:0;" />`
+    : "";
+
+  const html = `<div style="font-family:Helvetica,Arial,sans-serif;font-size:15px;line-height:1.6;color:#1d2033;">${text
+    .split("\n")
+    .map((line) =>
+      line === ""
+        ? "<br>"
+        : `<div>${escapeHtml(line).replace(
+            /(https?:\/\/[^\s]+)/g,
+            '<a href="$1" style="color:#5b63f5;">$1</a>'
+          )}</div>`
+    )
+    .join("")}${pixel}</div>`;
+
+  const check = validateOutboundHtml(html);
+  if (!check.ok) {
+    throw new Error(`Email HTML validation failed: ${check.errors.join("; ")}`);
+  }
+
+  return {
+    subject: input.subject.trim(),
+    html,
+    text,
+    style: "PLAIN",
+  };
+}
+
 /** True if finding_title looks like a raw audit check label. */
 export function looksLikeRawAuditLabel(
   title: string,

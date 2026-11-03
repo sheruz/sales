@@ -1,9 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
-import {
-  requireOrgPermission,
-  requireOrganizationContext,
-} from "@/lib/auth/api-auth";
+import { requireOrganizationContext } from "@/lib/auth/api-auth";
+import { requireModule } from "@/lib/auth/require-module";
+import { MODULE_KEYS } from "@/lib/billing/modules";
 import { apiSuccess } from "@/lib/api/response";
 import { handleApiError } from "@/lib/api/error-handler";
 import { powPitchService } from "@/services/pow-pitch.service";
@@ -15,8 +14,10 @@ const generateSchema = z.object({
 
 export async function GET(request: NextRequest) {
   try {
-    await requireOrgPermission("organization.view");
-    const user = await requireOrganizationContext();
+    const user = await requireModule(MODULE_KEYS.PROOF_OF_WORK, {
+      permission: "organization.view",
+    });
+    await requireOrganizationContext();
     const companyId = request.nextUrl.searchParams.get("companyId");
     if (!companyId) {
       return NextResponse.json(
@@ -36,8 +37,11 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    await requireOrgPermission("organization.view");
-    const user = await requireOrganizationContext();
+    const user = await requireModule(MODULE_KEYS.PROOF_OF_WORK, {
+      permission: "organization.view",
+      mutation: true,
+    });
+    await requireOrganizationContext();
     const input = generateSchema.parse(await request.json());
     const data = await powPitchService.generate(
       user.organizationId,

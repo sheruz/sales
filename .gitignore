@@ -26,6 +26,7 @@
 
 # Private audit evidence (PoW1) — never commit screenshots
 /storage/audit-evidence/
+/storage/pow1-live-audit/
 /storage/exports/
 
 # debug

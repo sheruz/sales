@@ -1,12 +1,16 @@
 import type { Metadata } from "next";
 import { Calendar, Mail, MessageSquare, Phone } from "lucide-react";
 import { ContactForm } from "@/components/marketing/contact-form";
-import { siteConfig } from "@/content/site";
+import { hasRealCopy, siteConfig } from "@/content/site";
 import { buildPageMetadata } from "@/lib/marketing/page-metadata";
+
+const replyWindow = hasRealCopy(siteConfig.contactSla)
+  ? siteConfig.contactSla
+  : "1 business day";
 
 export const metadata: Metadata = buildPageMetadata({
   title: "Contact Delvix Studio | Book a Call or Send a Message",
-  description: "Tell us what you need. We reply within [1 business day] with next steps or a time for a call.",
+  description: `Tell us what you need. We reply within ${replyWindow} with next steps or a time for a call.`,
   path: "/contact",
 });
 
@@ -48,7 +52,8 @@ export default function ContactPage() {
               Tell us what you need.
             </h1>
             <p className="text-lg leading-relaxed text-muted-foreground">
-              Send a few lines about your project. We reply within [1 business day] with next steps or a time for a call.
+              Send a few lines about your project. We reply within{" "}
+              {replyWindow} with next steps or a time for a call.
             </p>
 
             <div className="mt-8 space-y-3">

@@ -11,6 +11,7 @@ import {
 import prisma from "@/lib/db/prisma";
 import { ValidationError } from "@/lib/api/response";
 import { BILLING_ACTIONS } from "@/lib/billing/actions";
+import { BILLING_REASONS } from "@/lib/billing/reasons";
 import { billingGateway } from "@/services/billing-gateway.service";
 import { businessBrainService } from "@/services/business-brain.service";
 import { googlePlacesService } from "@/services/google-places.service";
@@ -277,6 +278,11 @@ export class DeepAuditService {
     | { status: "QUEUED"; jobId: string; websiteAuditId: string; reused?: boolean }
     | { status: "SKIPPED"; reason: "low_icp_fit"; fit: ReturnType<typeof scoreIcpFit> }
     | { status: "PAUSED"; reason: "out_of_credits" }
+    | {
+        status: "LOCKED";
+        reason: "plan_feature_disabled";
+        message: string;
+      }
   > {
     const company = await prisma.company.findFirst({
       where: { id: companyId, organizationId, deletedAt: null },
@@ -398,6 +404,18 @@ export class DeepAuditService {
     });
 
     if (!auth.allowed) {
+      if (
+        auth.reason === BILLING_REASONS.PLAN_FEATURE_DISABLED ||
+        auth.reason === BILLING_REASONS.MODULE_LOCKED
+      ) {
+        return {
+          status: "LOCKED",
+          reason: "plan_feature_disabled",
+          message:
+            auth.message ||
+            "Proof of Work is available on Pro and Agency plans.",
+        };
+      }
       return { status: "PAUSED", reason: "out_of_credits" };
     }
 

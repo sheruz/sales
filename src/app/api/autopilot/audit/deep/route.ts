@@ -5,6 +5,8 @@ import {
   requireAnyOrgPermission,
   requireOrganizationContext,
 } from "@/lib/auth/api-auth";
+import { requireModule } from "@/lib/auth/require-module";
+import { MODULE_KEYS } from "@/lib/billing/modules";
 import { apiSuccess } from "@/lib/api/response";
 import { handleApiError } from "@/lib/api/error-handler";
 
@@ -15,13 +17,16 @@ const postSchema = z.object({
 /** Enqueue Audit 2.0 (Playwright) — processed by sales-audit-worker only. */
 export async function POST(request: NextRequest) {
   try {
-    const user = await requireAnyOrgPermission([
-      "integrations.manage",
-      "campaigns.manage",
-      "business_brain.manage",
-      "opportunities.view",
-      "leads.view",
-    ]);
+    const user = await requireModule(MODULE_KEYS.PROOF_OF_WORK, {
+      anyOf: [
+        "integrations.manage",
+        "campaigns.manage",
+        "business_brain.manage",
+        "opportunities.view",
+        "leads.view",
+      ],
+      mutation: true,
+    });
     await requireOrganizationContext();
     const body = postSchema.parse(await request.json());
     const result = await deepAuditService.enqueue(

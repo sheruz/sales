@@ -6,6 +6,8 @@ export const CREDIT_ACTIONS = {
   AUDIT_PITCH: "audit_pitch",
   /** Audit 2.0 deep (Playwright evidence) — default 3 credits */
   AUDIT_DEEP: "audit_deep",
+  /** PoW personal preview page — default 3 credits, once per page */
+  PREVIEW_PAGE: "preview_page",
   AI_REPLY_CLASSIFICATION: "ai_reply_classification",
   AI_REPLY_DRAFT: "ai_reply_draft",
   EMAIL_SENT: "email_sent",
@@ -25,6 +27,7 @@ export const DEFAULT_CREDIT_PRICES: Array<{
   { actionType: CREDIT_ACTIONS.ENRICHMENT, byok: 2, managed: 2 },
   { actionType: CREDIT_ACTIONS.AUDIT_PITCH, byok: 2, managed: 2 },
   { actionType: CREDIT_ACTIONS.AUDIT_DEEP, byok: 3, managed: 3 },
+  { actionType: CREDIT_ACTIONS.PREVIEW_PAGE, byok: 3, managed: 3 },
   { actionType: CREDIT_ACTIONS.AI_REPLY_CLASSIFICATION, byok: 0, managed: 0 },
   { actionType: CREDIT_ACTIONS.AI_REPLY_DRAFT, byok: 1, managed: 1 },
   { actionType: CREDIT_ACTIONS.EMAIL_SENT, byok: 0, managed: 0 },
@@ -37,5 +40,6 @@ export const CREDIT_CONSUMING_ACTIONS = new Set<string>([
   CREDIT_ACTIONS.ENRICHMENT,
   CREDIT_ACTIONS.AUDIT_PITCH,
   CREDIT_ACTIONS.AUDIT_DEEP,
+  CREDIT_ACTIONS.PREVIEW_PAGE,
   CREDIT_ACTIONS.AI_REPLY_DRAFT,
 ]);

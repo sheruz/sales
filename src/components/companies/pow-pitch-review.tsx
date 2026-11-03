@@ -88,7 +88,17 @@ export function PowPitchReview({ companyId }: { companyId: string }) {
         body: JSON.stringify({ companyId }),
       });
       const json = await res.json();
-      if (!json.success) throw new Error(json.error?.message);
+      if (!json.success) {
+        const code = String(json.error?.code || json.error?.reason || "");
+        if (code === "MODULE_LOCKED" || code === "PLAN_FEATURE_DISABLED") {
+          toast.error(
+            json.error?.message ||
+              "Proof of Work is on Pro and Agency — upgrade to unlock."
+          );
+          return;
+        }
+        throw new Error(json.error?.message);
+      }
       if (json.data?.status === "no_usable_finding") {
         toast.message("No usable finding");
       } else {
@@ -122,7 +132,7 @@ export function PowPitchReview({ companyId }: { companyId: string }) {
       if (!json.success) throw new Error(json.error?.message);
       toast.success(
         actionName === "approve"
-          ? "Approved (send still blocked until PoW3)"
+          ? "Approved — enrolled in Proof of Work (send waits for POW_SEND_ENABLED)"
           : actionName === "regenerate"
             ? "Regenerated"
             : "Saved"
@@ -147,8 +157,8 @@ export function PowPitchReview({ companyId }: { companyId: string }) {
         <div>
           <CardTitle className="text-base">Proof of Work draft</CardTitle>
           <CardDescription>
-            Plain-text sequence (Day 0 / 3 / 7 / 14). Drafts only — sending is
-            disabled until PoW3.
+            Plain-text sequence (Day 0 / 3 / 7 / 14). Approve enrolls the contact;
+            delivery stays off until POW_SEND_ENABLED is set on the server.
           </CardDescription>
         </div>
         <Button

@@ -12,6 +12,7 @@ const MODULE_KEYS = [
   "autopilot_sourcing",
   "autopilot_enrichment",
   "autopilot_audit",
+  "proof_of_work",
   "outreach",
   "inbox",
   "ai_replies",
@@ -83,6 +84,7 @@ const STARTER_MODULES = {
   autopilot_sourcing: feat(true),
   autopilot_enrichment: feat(true),
   autopilot_audit: feat(true),
+  proof_of_work: off(),
   outreach: feat(true),
   inbox: feat(true),
   ai_replies: feat(true),
@@ -120,6 +122,7 @@ const STARTER_LIMITS = {
 
 const GROWTH_MODULES = {
   ...STARTER_MODULES,
+  proof_of_work: off(), // explicit — PoW starts at Pro
   ai_auto_send: feat(true),
   meetings: feat(true),
   meta_lead_ads: feat(true),
@@ -153,7 +156,7 @@ const GROWTH_LIMITS = {
 
 const PRO_MODULES = {
   ...GROWTH_MODULES,
-  // personal audit pages (Signal engine) — later; not a seeded key yet → leave off
+  proof_of_work: feat(true),
   white_label: off(),
   api_access: off(),
 };
@@ -186,6 +189,7 @@ const AGENCY_MODULES = {
   autopilot_sourcing: feat(true),
   autopilot_enrichment: feat(true),
   autopilot_audit: feat(true),
+  proof_of_work: feat(true),
   outreach: feat(true),
   inbox: feat(true),
   ai_replies: feat(true),

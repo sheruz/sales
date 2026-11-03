@@ -73,8 +73,9 @@ export function middleware(request: NextRequest) {
   );
   const isBrandingAsset = pathname.startsWith("/branding/");
   const isEmailTrack = pathname.startsWith("/t/");
+  const isPowPreview = pathname.startsWith("/for/");
 
-  if (isBrandingAsset || isEmailTrack) {
+  if (isBrandingAsset || isEmailTrack || isPowPreview) {
     return nextWithPath(request);
   }
 

@@ -14,7 +14,7 @@ type Props = {
   imgClassName?: string;
   priority?: boolean;
   sizes?: string;
-  /** Overlay label shown only on navy placeholder */
+  /** Overlay label shown only when the slot has no image on disk */
   note?: string;
   /** Light placeholders for white sections (industry cards) */
   tone?: "dark" | "light";

@@ -11,6 +11,8 @@ export const MODULE_KEYS = {
   AUTOPILOT_SOURCING: "autopilot_sourcing",
   AUTOPILOT_ENRICHMENT: "autopilot_enrichment",
   AUTOPILOT_AUDIT: "autopilot_audit",
+  /** PoW deep audit + draft/send outreach (Pro / Agency) */
+  PROOF_OF_WORK: "proof_of_work",
   OUTREACH: "outreach",
   INBOX: "inbox",
   AI_REPLIES: "ai_replies",
@@ -94,6 +96,15 @@ export const MODULE_CATALOG: ModuleDef[] = [
     pagePrefixes: [],
     apiPrefixes: ["/api/audits", "/api/pitches", "/api/website-audit"],
     jobTags: ["audit"],
+  },
+  {
+    key: MODULE_KEYS.PROOF_OF_WORK,
+    label: "Proof-of-work outreach",
+    navLabel: "Proof of Work",
+    availableOn: "Pro",
+    pagePrefixes: ["/hot-leads"],
+    apiPrefixes: ["/api/pow", "/api/autopilot/audit/deep"],
+    jobTags: ["deep_audit"],
   },
   {
     key: MODULE_KEYS.OUTREACH,

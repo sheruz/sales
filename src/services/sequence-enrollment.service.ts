@@ -37,6 +37,8 @@ export type EnrollInput = {
   startImmediately?: boolean;
   /** Sticky mailbox for Phase 4 autopilot */
   emailAccountId?: string | null;
+  /** PoW3: { kind: "pow", pitchId } etc. */
+  metadata?: Record<string, unknown> | null;
 };
 
 export type EnrollmentListQuery = {
@@ -74,8 +76,8 @@ export function snapshotSteps(
     subjectTemplate: s.subjectTemplate,
     bodyTemplate: s.bodyTemplate,
     isActive: s.isActive,
-    // Always BRANDED — plain-text outreach is disabled
-    emailStyle: "BRANDED",
+    // Preserve PLAIN for Proof of Work; cold/inbound stay BRANDED
+    emailStyle: s.emailStyle === "PLAIN" ? "PLAIN" : "BRANDED",
   }));
 }
 
@@ -346,6 +348,9 @@ export class SequenceEnrollmentService {
           startedAt: now,
           enrolledById: input.enrolledById ?? null,
           emailAccountId: input.emailAccountId ?? null,
+          metadata: (input.metadata ?? undefined) as
+            | Prisma.InputJsonValue
+            | undefined,
           idempotencyKey: `enroll:${organizationId}:${sequence.id}:${contact.id}:${randomUUID()}`,
         },
         include: {

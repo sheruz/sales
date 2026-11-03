@@ -23,13 +23,13 @@ export const siteConfig = {
     whatsapp: "https://wa.me/971581177638",
     bookingUrl: "https://cal.com/delvix/intro", // replace when ready
   },
-  /** Empty string → founder quote card hidden */
+  /** Empty string → founder quote card hidden (needs real founder photo + quote) */
   founderName: "",
   founderQuote: "",
-  /** Empty → audit turnaround line hidden */
-  auditTurnaround: "",
-  /** Empty → contact SLA line uses generic copy without a number */
-  contactSla: "",
+  /** Shown as “Report in your inbox within {auditTurnaround}.” */
+  auditTurnaround: "2 business days",
+  /** Shown on contact as response-time promise */
+  contactSla: "1 business day",
   /** Empty → about founded year omitted */
   foundedYear: "",
   socials: [] as Array<{ label: string; href: string }>,
@@ -52,7 +52,7 @@ export const siteConfig = {
   }>,
 } as const;
 
-/** True when a string has real copy (not empty / still a [BRACKET] placeholder). */
+/** True when a string has real copy (not empty / still a [BRACKET] stub). */
 export function hasRealCopy(value: string | null | undefined): boolean {
   if (!value) return false;
   const t = value.trim();

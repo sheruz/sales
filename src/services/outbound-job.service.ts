@@ -53,10 +53,20 @@ import {
 } from "@/lib/sequences/runtime";
 import { unsubscribeUrl } from "@/services/unsubscribe.service";
 import { resolveEnrollmentSteps } from "@/services/sequence-enrollment.service";
-import { renderOutboundEmail } from "@/lib/email/render-outbound";
+import {
+  renderOutboundEmail,
+  renderPowPlainEmail,
+} from "@/lib/email/render-outbound";
 import { emailBrandingService } from "@/services/email-branding.service";
 import { assertOutboundFromAllowed } from "@/lib/email/free-mail";
-import { EmailStyle } from "@prisma/client";
+import {
+  buildPowFooter,
+  buildPowTemplateVars,
+  powRequiredVarsForTemplate,
+} from "@/lib/pow/merge-vars";
+import { mintPowPreview } from "@/lib/pow/preview-token";
+import type { PowDraftPayload } from "@/services/pow-pitch.service";
+import { AuditEvidenceKind, EmailStyle } from "@prisma/client";
 
 function startOfUtcDay() {
   const d = new Date();
@@ -439,6 +449,8 @@ export class OutboundJobService {
       where: {
         organizationId,
         status: PitchStatus.APPROVED,
+        // PoW3: Proof of Work pitches enroll via powPitchService.approve only
+        NOT: { kind: "pow" },
       },
       orderBy: { approvedAt: "asc" },
       take: Math.min(50, limit * 5),
@@ -716,6 +728,16 @@ export class OutboundJobService {
     );
     if (!step) return null;
 
+    const isPow = Boolean(enrollment.sequence.isProofOfWork);
+    const enrollMeta =
+      enrollment.metadata &&
+      typeof enrollment.metadata === "object" &&
+      !Array.isArray(enrollment.metadata)
+        ? (enrollment.metadata as Record<string, unknown>)
+        : {};
+    const powPitchId =
+      typeof enrollMeta.pitchId === "string" ? enrollMeta.pitchId : null;
+
     const idempotencyKey = enrollmentStepIdempotencyKey(
       enrollment.id,
       step.stepOrder
@@ -727,7 +749,10 @@ export class OutboundJobService {
     const rebuildHeld =
       existing?.status === EmailOutboxStatus.HELD &&
       (existing.heldReason === "timezone_needed" ||
-        existing.heldReason === "missing_approved_pitch");
+        existing.heldReason === "missing_approved_pitch" ||
+        existing.heldReason === "pow_send_disabled" ||
+        existing.heldReason === "pow_stale" ||
+        existing.heldReason === "pow_missing_vars");
     if (
       existing &&
       !rebuildHeld &&
@@ -743,15 +768,36 @@ export class OutboundJobService {
       enrollment.opportunity?.company ?? enrollment.contact.company;
     // Enroll marks the pitch SUPERSEDED so it won't re-enroll — still use it to send
     const pitch = await prisma.pitch.findFirst({
-      where: {
-        organizationId,
-        contactId: enrollment.contactId,
-        status: { in: [PitchStatus.APPROVED, PitchStatus.SUPERSEDED] },
-      },
+      where: isPow
+        ? {
+            organizationId,
+            ...(powPitchId
+              ? { id: powPitchId }
+              : { contactId: enrollment.contactId, kind: "pow" }),
+            status: { in: [PitchStatus.APPROVED, PitchStatus.SUPERSEDED] },
+          }
+        : {
+            organizationId,
+            contactId: enrollment.contactId,
+            status: { in: [PitchStatus.APPROVED, PitchStatus.SUPERSEDED] },
+            NOT: { kind: "pow" },
+          },
       orderBy: [{ approvedAt: "desc" }, { updatedAt: "desc" }],
     });
 
-    // Always BRANDED HTML template — never queue/send plain-text outreach.
+    if (isPow) {
+      return this.queuePowStep({
+        organizationId,
+        enrollment,
+        step,
+        pitch,
+        company,
+        cfg,
+        idempotencyKey,
+      });
+    }
+
+    // Cold / inbound: always BRANDED HTML template
     const emailStyle = "BRANDED" as const;
 
     const vars = buildSequenceTemplateVars({
@@ -1001,6 +1047,341 @@ export class OutboundJobService {
                 }
               : {}),
           },
+        } as Prisma.InputJsonValue,
+      },
+    });
+  }
+
+  /** PoW3 — queue a Proof of Work PLAIN step with merge vars + preview URL. */
+  private async queuePowStep(opts: {
+    organizationId: string;
+    enrollment: {
+      id: string;
+      contactId: string;
+      opportunityId: string | null;
+      emailAccountId: string | null;
+      contact: {
+        email: string | null;
+        firstName: string | null;
+        company: {
+          id: string;
+          name: string;
+          domain: string | null;
+          timezone: string | null;
+          country: string | null;
+        } | null;
+      };
+      organization: { timezone: string; name?: string | null };
+      emailAccount: { email: string } | null;
+    };
+    step: {
+      stepOrder: number;
+      delayMinutes: number;
+      subjectTemplate: string | null;
+      bodyTemplate: string;
+    };
+    pitch: {
+      id: string;
+      powDraft: unknown;
+      websiteAuditId: string | null;
+    } | null;
+    company: {
+      id: string;
+      name: string;
+      domain: string | null;
+      timezone: string | null;
+      country: string | null;
+    } | null;
+    cfg: OutboundConfig;
+    idempotencyKey: string;
+  }) {
+    const {
+      organizationId,
+      enrollment,
+      step,
+      pitch,
+      company,
+      cfg,
+      idempotencyKey,
+    } = opts;
+
+    const heldBase = {
+      id: randomUUID(),
+      organizationId,
+      enrollmentId: enrollment.id,
+      stepOrder: step.stepOrder,
+      contactId: enrollment.contactId,
+      companyId: company?.id ?? null,
+      opportunityId: enrollment.opportunityId,
+      emailAccountId: enrollment.emailAccountId!,
+      status: EmailOutboxStatus.HELD,
+      toEmail: enrollment.contact.email!,
+      subject: step.subjectTemplate || "(pow)",
+      bodyText: "",
+      idempotencyKey,
+      shadowMode: cfg.shadowMode,
+    };
+
+    if (!pitch) {
+      return prisma.emailOutbox.create({
+        data: {
+          ...heldBase,
+          bodyText: "(missing pow pitch)",
+          heldReason: "missing_approved_pitch",
+        },
+      });
+    }
+
+    const draft = pitch.powDraft as PowDraftPayload | null;
+    if (!draft || draft.status === "no_usable_finding" || draft.status === "rejected") {
+      return prisma.emailOutbox.create({
+        data: {
+          ...heldBase,
+          bodyText: "(pow draft not ready)",
+          heldReason: "missing_approved_pitch",
+        },
+      });
+    }
+
+    const evidenceId =
+      draft.evidenceIds?.[0] ||
+      (
+        await prisma.auditEvidence.findFirst({
+          where: {
+            organizationId,
+            websiteAuditId: pitch.websiteAuditId || undefined,
+            kind: AuditEvidenceKind.SCREENSHOT_DESKTOP,
+          },
+          orderBy: { createdAt: "desc" },
+          select: { id: true, expiresAt: true },
+        })
+      )?.id;
+
+    const evidenceRow = evidenceId
+      ? await prisma.auditEvidence.findFirst({
+          where: { id: evidenceId, organizationId },
+          select: { id: true, expiresAt: true },
+        })
+      : null;
+
+    const outboxId = randomUUID();
+    let preview: { url: string; token: string; exp: number } = {
+      url: "",
+      token: "",
+      exp: 0,
+    };
+    if (evidenceRow) {
+      try {
+        const { powPreviewPageService } = await import(
+          "@/services/pow-preview-page.service"
+        );
+        const page = await powPreviewPageService.ensureForPitch({
+          organizationId,
+          pitchId: pitch.id,
+          outboxId,
+        });
+        preview = mintPowPreview({
+          organizationId,
+          evidenceId: evidenceRow.id,
+          pitchId: pitch.id,
+          outboxId,
+          expiresAt: evidenceRow.expiresAt,
+          publicSlug: page.publicSlug,
+        });
+      } catch {
+        preview = mintPowPreview({
+          organizationId,
+          evidenceId: evidenceRow.id,
+          pitchId: pitch.id,
+          outboxId,
+          expiresAt: evidenceRow.expiresAt,
+        });
+      }
+    }
+
+    if (!preview.url) {
+      return prisma.emailOutbox.create({
+        data: {
+          ...heldBase,
+          id: outboxId,
+          bodyText: "(missing preview evidence)",
+          heldReason: "pow_missing_vars",
+        },
+      });
+    }
+
+    const unsub = unsubscribeUrl(organizationId, enrollment.contact.email!);
+    const sender = await emailBrandingService.resolveForSend(
+      organizationId,
+      (
+        await prisma.outboundMailbox.findFirst({
+          where: {
+            organizationId,
+            emailAccountId: enrollment.emailAccountId!,
+          },
+          select: { id: true },
+        })
+      )?.id
+    );
+
+    const footer = buildPowFooter({
+      senderName: sender.senderName || cfg.businessName || "Team",
+      businessName: cfg.businessName || sender.companyLegalName,
+      businessAddress: cfg.physicalAddress || sender.businessAddress,
+      unsubscribeUrl: unsub,
+    });
+
+    const vars = buildPowTemplateVars({
+      draft,
+      previewUrl: preview.url,
+      footer,
+    });
+    // Also allow contact/company fallbacks for any extra tokens
+    Object.assign(
+      vars,
+      buildSequenceTemplateVars({
+        contact: enrollment.contact,
+        company,
+        organization: { name: enrollment.organization.name ?? "" },
+      })
+    );
+
+    const subjectRequired = powRequiredVarsForTemplate(
+      step.subjectTemplate || "{{pow_subject_day0}}"
+    );
+    const bodyRequired = powRequiredVarsForTemplate(step.bodyTemplate);
+    const subjectRendered = renderSequenceTemplateDetailed(
+      step.subjectTemplate || "{{pow_subject_day0}}",
+      vars,
+      subjectRequired
+    );
+    const bodyRendered = renderSequenceTemplateDetailed(
+      step.bodyTemplate,
+      vars,
+      bodyRequired
+    );
+
+    if (
+      subjectRendered.missingRequired.length ||
+      bodyRendered.missingRequired.length
+    ) {
+      return prisma.emailOutbox.create({
+        data: {
+          ...heldBase,
+          id: outboxId,
+          subject: subjectRendered.text,
+          bodyText: "(missing pow template vars)",
+          heldReason: `pow_missing_vars:${[
+            ...subjectRendered.missingRequired,
+            ...bodyRendered.missingRequired,
+          ].join(",")}`,
+        },
+      });
+    }
+
+    if (!isCountryAllowed(company?.country, cfg.countryAllowList)) {
+      return prisma.emailOutbox.create({
+        data: {
+          ...heldBase,
+          id: outboxId,
+          bodyText: "(country blocked)",
+          heldReason: "country_blocked",
+        },
+      });
+    }
+
+    const pool = await prisma.outboundMailbox.findFirst({
+      where: {
+        organizationId,
+        emailAccountId: enrollment.emailAccountId!,
+      },
+    });
+    const fromCheck = assertOutboundFromAllowed({
+      fromEmail: enrollment.emailAccount?.email || "",
+      allowFreeMailProvider: pool?.allowFreeMailProvider === true,
+    });
+    if (!fromCheck.ok) {
+      return prisma.emailOutbox.create({
+        data: {
+          ...heldBase,
+          id: outboxId,
+          bodyText: fromCheck.reason,
+          heldReason: "free_mail_blocked",
+          outboundMailboxId: pool?.id ?? null,
+        },
+      });
+    }
+
+    const resolvedTz = resolveOutboundTimezone({
+      timezone: company?.timezone,
+      country: company?.country,
+      fallbackTimezone: enrollment.organization.timezone || "Asia/Karachi",
+    });
+    const tz = resolvedTz.timezone;
+
+    let rendered;
+    try {
+      rendered = renderPowPlainEmail({
+        subject: subjectRendered.text,
+        bodyText: bodyRendered.text,
+        unsubscribeUrl: unsub,
+        track: {
+          organizationId,
+          outboxId,
+          campaign: "proof_of_work",
+        },
+      });
+    } catch (err) {
+      return prisma.emailOutbox.create({
+        data: {
+          ...heldBase,
+          id: outboxId,
+          bodyText: err instanceof Error ? err.message : "render failed",
+          heldReason: "render_failed",
+          outboundMailboxId: pool?.id ?? null,
+        },
+      });
+    }
+
+    const delayMs = Math.max(0, step.delayMinutes ?? 0) * 60_000;
+    const notBefore = new Date(Date.now() + delayMs);
+    const scheduledFor = nextSendWindowUtc(tz, notBefore) ?? notBefore;
+
+    return prisma.emailOutbox.create({
+      data: {
+        id: outboxId,
+        organizationId,
+        enrollmentId: enrollment.id,
+        stepOrder: step.stepOrder,
+        contactId: enrollment.contactId,
+        companyId: company?.id ?? null,
+        opportunityId: enrollment.opportunityId,
+        emailAccountId: enrollment.emailAccountId!,
+        outboundMailboxId: pool?.id ?? null,
+        status: EmailOutboxStatus.QUEUED,
+        toEmail: enrollment.contact.email!,
+        subject: rendered.subject,
+        bodyText: rendered.text,
+        bodyHtml: rendered.html,
+        scheduledFor,
+        idempotencyKey,
+        shadowMode: cfg.shadowMode,
+        metadata: {
+          unsubscribeUrl: unsub,
+          emailStyle: "PLAIN",
+          kind: "pow",
+          pitchId: pitch.id,
+          previewUrl: preview.url,
+          previewExp: preview.exp,
+          timezone: tz,
+          timezoneSource: resolvedTz.from,
+          sequenceDelayMinutes: step.delayMinutes ?? 0,
+          notBefore: notBefore.toISOString(),
+          tracked: true,
+          headers: buildListUnsubscribeHeaders({
+            unsubscribeUrl: unsub,
+            mailtoEmail: enrollment.emailAccount?.email,
+          }),
         } as Prisma.InputJsonValue,
       },
     });
@@ -1265,11 +1646,14 @@ export class OutboundJobService {
     });
     if (!item) return { id: outboxId, status: "error", reason: "missing" };
 
-    // PoW2: never deliver Proof of Work until POW_SEND_ENABLED
+    // PoW: never deliver until Super Admin send toggle (env can only force OFF)
     if (item.enrollment?.sequence) {
       try {
         const { assertPowSendAllowed } = await import("@/lib/pow/send-gate");
-        assertPowSendAllowed(item.enrollment.sequence);
+        await assertPowSendAllowed({
+          ...item.enrollment.sequence,
+          organizationId: item.organizationId,
+        });
       } catch (err) {
         const message =
           err instanceof Error ? err.message : "PoW send blocked";
@@ -1282,6 +1666,58 @@ export class OutboundJobService {
           },
         });
         return { id: outboxId, status: "held", reason: "pow_send_disabled" };
+      }
+    }
+
+    // PoW3: Severity A must still be broken before first send
+    if (item.enrollment?.sequence?.isProofOfWork) {
+      const meta =
+        item.metadata &&
+        typeof item.metadata === "object" &&
+        !Array.isArray(item.metadata)
+          ? (item.metadata as Record<string, unknown>)
+          : {};
+      const pitchId =
+        typeof meta.pitchId === "string"
+          ? meta.pitchId
+          : (
+              item.enrollment.metadata &&
+              typeof item.enrollment.metadata === "object" &&
+              !Array.isArray(item.enrollment.metadata)
+                ? (item.enrollment.metadata as Record<string, unknown>)
+                    .pitchId
+                : null
+            );
+      if (typeof pitchId === "string") {
+        const { powPitchService } = await import(
+          "@/services/pow-pitch.service"
+        );
+        const check = await powPitchService.recheckBeforeSend(
+          organizationId,
+          pitchId
+        );
+        if (check.stale) {
+          await prisma.emailOutbox.update({
+            where: { id: outboxId },
+            data: {
+              status: EmailOutboxStatus.HELD,
+              heldReason: "pow_stale",
+              lastError:
+                "Severity A finding no longer reproduces — PoW pitch marked stale",
+            },
+          });
+          await prisma.sequenceEnrollment
+            .update({
+              where: { id: item.enrollmentId! },
+              data: {
+                status: SequenceEnrollmentStatus.PAUSED,
+                pausedAt: new Date(),
+                lastError: "pow_stale",
+              },
+            })
+            .catch(() => undefined);
+          return { id: outboxId, status: "held", reason: "pow_stale" };
+        }
       }
     }
 

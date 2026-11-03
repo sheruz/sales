@@ -12,6 +12,7 @@ export const BILLING_ACTIONS = {
   ENRICHMENT: "enrichment",
   AUDIT_PITCH: "audit_pitch",
   AUDIT_DEEP: "audit_deep",
+  PREVIEW_PAGE: "preview_page",
   AI_REPLY_CLASSIFICATION: "ai_reply_classification",
   AI_REPLY_DRAFT: "ai_reply_draft",
   AI_CALL: "ai_call",
@@ -92,10 +93,20 @@ const defs: ActionDef[] = [
   },
   {
     action: BILLING_ACTIONS.AUDIT_DEEP,
-    // PoW5 will gate proof_of_work; PoW1 reuses AUDITS so existing plans can enqueue
-    featureKey: FEATURE_KEYS.AUDITS,
-    metric: "AUDITS",
+    // Own metric — not rolled into Audit 1.0 AUDITS
+    featureKey: FEATURE_KEYS.PROOF_OF_WORK,
+    metric: "AUDIT_DEEP",
     creditActionType: CREDIT_ACTIONS.AUDIT_DEEP,
+    period: "monthly",
+    dailyEmail: false,
+    alwaysExempt: false,
+    countsAiCalls: false,
+  },
+  {
+    action: BILLING_ACTIONS.PREVIEW_PAGE,
+    featureKey: FEATURE_KEYS.PROOF_OF_WORK,
+    metric: "PREVIEW_PAGE",
+    creditActionType: CREDIT_ACTIONS.PREVIEW_PAGE,
     period: "monthly",
     dailyEmail: false,
     alwaysExempt: false,

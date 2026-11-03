@@ -1,9 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
-import {
-  requireOrgPermission,
-  requireOrganizationContext,
-} from "@/lib/auth/api-auth";
+import { requireOrganizationContext } from "@/lib/auth/api-auth";
+import { requireModule } from "@/lib/auth/require-module";
+import { MODULE_KEYS } from "@/lib/billing/modules";
 import { apiSuccess } from "@/lib/api/response";
 import { handleApiError } from "@/lib/api/error-handler";
 import { powPitchService } from "@/services/pow-pitch.service";
@@ -36,8 +35,11 @@ type Ctx = { params: Promise<{ id: string }> };
 
 export async function POST(request: NextRequest, ctx: Ctx) {
   try {
-    await requireOrgPermission("organization.view");
-    const user = await requireOrganizationContext();
+    const user = await requireModule(MODULE_KEYS.PROOF_OF_WORK, {
+      permission: "organization.view",
+      mutation: true,
+    });
+    await requireOrganizationContext();
     const { id } = await ctx.params;
     const body = actionSchema.parse(await request.json());
 

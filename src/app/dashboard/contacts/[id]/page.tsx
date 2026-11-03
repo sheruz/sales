@@ -10,6 +10,7 @@ import { LegacyBadge } from "@/components/crm/legacy-badge";
 import { EntityRelatedLinks } from "@/components/crm/entity-related-links";
 import { EmptyState } from "@/components/crm/empty-state";
 import { SequenceEnrollmentPanel } from "@/components/sequences/sequence-enrollment-panel";
+import { ContactEmailSource } from "@/components/contacts/contact-email-source";
 import { sequenceEnrollmentService } from "@/services/sequence-enrollment.service";
 import { outreachSequenceService } from "@/services/outreach-sequence.service";
 import { campaignService } from "@/services/campaign.service";
@@ -53,6 +54,10 @@ export default async function ContactDetailPage({ params }: PageProps) {
     "sequences.manage",
     "campaigns.manage",
     "opportunities.update",
+  ]);
+  const canEditContact = hasAnyOrgPermission(user, [
+    "opportunities.update",
+    "leads.update",
   ]);
 
   return (
@@ -148,6 +153,11 @@ export default async function ContactDetailPage({ params }: PageProps) {
                 </Link>
               </p>
             )}
+            <ContactEmailSource
+              contactId={contact.id}
+              emailSource={contact.emailSource ?? null}
+              canEdit={canEditContact}
+            />
           </CardContent>
         </Card>
 

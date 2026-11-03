@@ -8,6 +8,7 @@ import {
   Building2,
   Calendar,
   ChevronsUpDown,
+  Flame,
   Home,
   Inbox,
   Lock,
@@ -114,8 +115,17 @@ const NAV: NavItem[] = [
       pathname.startsWith(appHome("/outreach")) ||
       pathname.startsWith(appHome("/sequences")) ||
       pathname.startsWith(appHome("/campaigns")) ||
+      pathname.startsWith(appHome("/hot-leads")) ||
       (pathname.startsWith(appHome("/autopilot")) &&
         (tab === "pitch" || tab === "pitches" || tab === "outbound")),
+  },
+  {
+    title: "Hot leads",
+    href: appHome("/hot-leads"),
+    icon: Flame,
+    moduleKey: MODULE_KEYS.PROOF_OF_WORK,
+    anyOf: ["organization.view", "opportunities.view", "leads.view"],
+    match: ({ pathname }) => pathname.startsWith(appHome("/hot-leads")),
   },
   {
     title: "Inbox",

@@ -373,9 +373,20 @@ async function main() {
       let evidenceId = evidence?.id;
       if (!evidenceId) {
         // Create a stub row + empty file path for HTTP status checks only
-        const company = await prisma.company.findFirst({
+        let company = await prisma.company.findFirst({
           where: { organizationId: orgId, deletedAt: null },
         });
+        if (!company) {
+          company = await prisma.company.create({
+            data: {
+              organizationId: orgId,
+              name: `PoW1 Evidence Stub ${Date.now()}`,
+              website: "https://example.com",
+              enrichmentStatus: "ENRICHED",
+              enrichedAt: new Date(),
+            },
+          });
+        }
         const audit = await prisma.websiteAudit.create({
           data: {
             organizationId: orgId,

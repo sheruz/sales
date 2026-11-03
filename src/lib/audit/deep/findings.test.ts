@@ -3,6 +3,7 @@ import {
   makeFinding,
   speedFindingFromPageSpeed,
 } from "@/lib/audit/deep/findings";
+import { sslDaysRemainingFromValidTo } from "@/lib/audit/deep/browser-runner";
 import type { PageSpeedResult } from "@/lib/audit/pagespeed.adapter";
 
 function psi(partial: Partial<PageSpeedResult> & { score?: number | null }): PageSpeedResult {
@@ -74,5 +75,22 @@ describe("makeFinding emailEligible", () => {
       confidence: "High",
     });
     expect(f.emailEligible).toBe(true);
+  });
+});
+
+describe("sslDaysRemainingFromValidTo", () => {
+  it("treats Playwright Unix-seconds validTo as future, not 1970", () => {
+    const inOneYearSec = Math.floor(Date.now() / 1000) + 365 * 24 * 3600;
+    const days = sslDaysRemainingFromValidTo(inOneYearSec);
+    expect(days).not.toBeNull();
+    expect(days!).toBeGreaterThan(300);
+    expect(days!).toBeLessThan(400);
+  });
+
+  it("returns negative only when cert is actually past", () => {
+    const pastSec = Math.floor(Date.now() / 1000) - 10 * 24 * 3600;
+    const days = sslDaysRemainingFromValidTo(pastSec);
+    expect(days).not.toBeNull();
+    expect(days!).toBeLessThan(0);
   });
 });

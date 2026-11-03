@@ -90,14 +90,14 @@ describe("PoW validators", () => {
 });
 
 describe("PoW send gate + CASL", () => {
-  it("executor refuses PoW sequences when flag off", () => {
+  it("executor refuses PoW sequences when flag off", async () => {
     expect(isPowSendEnabled()).toBe(false);
-    expect(() =>
+    await expect(
       assertPowSendAllowed({ isProofOfWork: true, name: "Proof of Work" })
-    ).toThrow(/cannot send/i);
-    expect(() =>
+    ).rejects.toThrow(/disabled|cannot send/i);
+    await expect(
       assertPowSendAllowed({ isProofOfWork: false, name: "Cold outreach" })
-    ).not.toThrow();
+    ).resolves.toBeUndefined();
   });
 
   it("CASL blocks Canadian without published source", () => {

@@ -21,6 +21,7 @@ import {
   type UsableFinding,
 } from "@/lib/pow/usable-findings";
 import { generatePowEmails } from "@/lib/pow/writer";
+import { validatePowDraft } from "@/lib/pow/validators";
 import { caseStudyService } from "@/services/case-study.service";
 import { starterOfferService } from "@/services/starter-offer.service";
 import { outboundConfigService } from "@/services/outbound-config.service";
@@ -80,6 +81,21 @@ export class PowPitchService {
       include: { steps: true },
     });
     if (byName) {
+      if (byName.steps.length < 4) {
+        await prisma.outreachSequenceStep.deleteMany({
+          where: { sequenceId: byName.id },
+        });
+        await prisma.outreachSequenceStep.createMany({
+          data: POW_OUTREACH_STEPS.map((s) => ({
+            sequenceId: byName.id,
+            stepOrder: s.stepOrder,
+            delayMinutes: s.delayMinutes,
+            subjectTemplate: s.subjectTemplate,
+            bodyTemplate: s.bodyTemplate,
+            emailStyle: s.emailStyle,
+          })),
+        });
+      }
       return prisma.outreachSequence.update({
         where: { id: byName.id },
         data: { isProofOfWork: true },
@@ -393,13 +409,54 @@ export class PowPitchService {
   ) {
     const pitch = await prisma.pitch.findFirst({
       where: { id: pitchId, organizationId, kind: "pow" },
+      include: {
+        company: { select: { name: true } },
+        contact: { select: { firstName: true } },
+      },
     });
     if (!pitch) throw new ValidationError("PoW pitch not found");
     const prev = (pitch.powDraft || {}) as PowDraftPayload;
+    if (prev.status === "no_usable_finding") {
+      throw new ValidationError("No usable finding — regenerate from audit");
+    }
+
+    const evidenceText = [
+      prev.finding?.evidence,
+      prev.finding?.title,
+      prev.secondFinding?.evidence,
+      prev.starterOfferId ? "offer" : "",
+    ]
+      .filter(Boolean)
+      .join("\n");
+
+    const validation = validatePowDraft({
+      steps,
+      evidenceText,
+      firstName: pitch.contact?.firstName,
+      companyName: pitch.company.name,
+    });
+
+    let status: PowDraftPayload["status"] = "ready";
+    if (!validation.ok) {
+      const inventOnly = validation.perStep.every(
+        (v) =>
+          v.ok ||
+          (v.inventedNumbers.length > 0 &&
+            v.bannedPhrases.length === 0 &&
+            v.wordCountOk &&
+            v.greetingOk &&
+            v.formatOk &&
+            v.subjectOk &&
+            v.linkOk)
+      );
+      status = inventOnly ? "flagged" : "rejected";
+    }
+
     const draft: PowDraftPayload = {
       ...prev,
       steps,
-      status: prev.status === "no_usable_finding" ? prev.status : "ready",
+      validation,
+      status,
     };
     return prisma.pitch.update({
       where: { id: pitchId },
@@ -415,9 +472,16 @@ export class PowPitchService {
     });
   }
 
+  /**
+   * PoW3: approve draft → enroll Proof of Work sequence → queue day-0 outbox.
+   * Actual SMTP still gated by POW_SEND_ENABLED (default false).
+   */
   async approve(organizationId: string, pitchId: string, userId: string) {
     const pitch = await prisma.pitch.findFirst({
       where: { id: pitchId, organizationId, kind: "pow" },
+      include: {
+        contact: { select: { id: true, email: true } },
+      },
     });
     if (!pitch) throw new ValidationError("PoW pitch not found");
     const draft = pitch.powDraft as PowDraftPayload | null;
@@ -427,14 +491,87 @@ export class PowPitchService {
     if (draft.status === "rejected") {
       throw new ValidationError("Draft failed validation — regenerate");
     }
-    return prisma.pitch.update({
+    if (!pitch.contactId || !pitch.contact?.email?.trim()) {
+      throw new ValidationError(
+        "Assign a contact with email before approving Proof of Work"
+      );
+    }
+
+    const approved = await prisma.pitch.update({
       where: { id: pitchId },
       data: {
         status: PitchStatus.APPROVED,
         approvedAt: new Date(),
         approvedBy: userId,
+        powStaleAt: null,
       },
     });
+
+    const sequence = await this.ensureProofOfWorkSequence(organizationId);
+    const { mailboxPoolService } = await import(
+      "@/services/mailbox-pool.service"
+    );
+    const picked = await mailboxPoolService.pickMailboxWithReasons(
+      organizationId
+    );
+    if (!picked.mailbox) {
+      throw new ValidationError(
+        picked.reasons.length
+          ? picked.reasons.join(" · ")
+          : "No outbound mailbox available for Proof of Work"
+      );
+    }
+
+    const { sequenceEnrollmentService } = await import(
+      "@/services/sequence-enrollment.service"
+    );
+    const { SequenceEnrollmentSource } = await import("@prisma/client");
+
+    let enrollment;
+    try {
+      enrollment = await sequenceEnrollmentService.enroll(organizationId, {
+        sequenceId: sequence.id,
+        contactId: pitch.contactId,
+        opportunityId: pitch.opportunityId,
+        source: SequenceEnrollmentSource.AUTOPILOT,
+        enrolledById: userId,
+        emailAccountId: picked.mailbox.emailAccountId,
+        startImmediately: true,
+        metadata: { kind: "pow", pitchId: pitch.id },
+      });
+    } catch (err) {
+      // Roll approve back if enroll fails so user can fix CASL / mailbox and retry
+      await prisma.pitch
+        .update({
+          where: { id: pitchId },
+          data: { status: PitchStatus.DRAFT, approvedAt: null, approvedBy: null },
+        })
+        .catch(() => undefined);
+      throw err;
+    }
+
+    const { outboundJobService } = await import(
+      "@/services/outbound-job.service"
+    );
+    try {
+      await outboundJobService.queueStep(organizationId, enrollment.id);
+    } catch (err) {
+      // Enrollment exists; leave pitch approved — queue can be retried via Process outbox
+      console.error("[pow] queueStep after approve failed", err);
+    }
+
+    await prisma.pitch.update({
+      where: { id: pitchId },
+      data: { status: PitchStatus.SUPERSEDED },
+    });
+
+    return {
+      ...approved,
+      status: PitchStatus.SUPERSEDED,
+      enrollmentId: enrollment.id,
+      sequenceId: sequence.id,
+      sendEnabled: process.env.POW_SEND_ENABLED === "true",
+    };
   }
 
   /** PoW3 hook: re-check Severity A before first send; mark stale if fixed */
