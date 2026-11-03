@@ -33,7 +33,10 @@ async function main() {
   }
 
   try {
-    assertPowSendAllowed({ isProofOfWork: true, name: "Proof of Work" });
+    await assertPowSendAllowed({
+      isProofOfWork: true,
+      name: "Proof of Work",
+    });
     fail("send-gate-assert", "expected throw when send disabled");
   } catch {
     ok("send-gate-assert", "assertPowSendAllowed throws");

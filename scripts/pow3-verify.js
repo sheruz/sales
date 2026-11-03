@@ -31,7 +31,7 @@ async function main() {
   } else {
     ok("send-flag", "POW_SEND_ENABLED=false (safe default)");
     try {
-      assertPowSendAllowed({ isProofOfWork: true });
+      await assertPowSendAllowed({ isProofOfWork: true });
       fail("send-gate", "expected throw");
     } catch {
       ok("send-gate", "PoW send blocked while flag false");
