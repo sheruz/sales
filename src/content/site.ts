@@ -21,7 +21,7 @@ export const siteConfig = {
     phone: "+16096916966",
     phoneDisplay: "+1 (609) 691 6966",
     whatsapp: "https://wa.me/16096916966",
-    bookingUrl: "https://cal.com/delvix-studio-mxqxqy/30min", // replace when ready
+    bookingUrl: "https://cal.com/delvix-studio/30min, // replace when ready
   },
   /** Empty string → founder quote card hidden (needs real founder photo + quote) */
   founderName: "",
