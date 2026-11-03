@@ -583,9 +583,9 @@ export default function MarketingHomePage() {
                 target="_blank"
                 rel="noopener noreferrer"
                 className="inline-flex items-center gap-2.5 rounded-xl border border-[#2A3550] px-[26px] py-4 font-semibold text-[#F5F7FB] no-underline"
+                aria-label="Chat on WhatsApp"
               >
-                <PathIcon d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" size={18} />
-                Chat on WhatsApp
+                {siteConfig.contact.phoneDisplay}
               </a>
             </div>
             <div className="flex flex-wrap justify-center gap-5">

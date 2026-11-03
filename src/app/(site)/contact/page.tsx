@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Calendar, Mail, MessageSquare, Phone } from "lucide-react";
+import { Calendar, Mail, Phone } from "lucide-react";
 import { ContactForm } from "@/components/marketing/contact-form";
 import { hasRealCopy, siteConfig } from "@/content/site";
 import { buildPageMetadata } from "@/lib/marketing/page-metadata";
@@ -22,12 +22,6 @@ const channels = [
     href: siteConfig.contact.bookingUrl,
   },
   {
-    icon: MessageSquare,
-    title: "WhatsApp",
-    value: "Quickest for short questions",
-    href: siteConfig.contact.whatsapp,
-  },
-  {
     icon: Mail,
     title: "Email",
     value: siteConfig.contact.email,
@@ -35,9 +29,9 @@ const channels = [
   },
   {
     icon: Phone,
-    title: "Phone",
+    title: "Phone / WhatsApp",
     value: siteConfig.contact.phoneDisplay,
-    href: `tel:${siteConfig.contact.phone}`,
+    href: siteConfig.contact.whatsapp,
   },
 ];
 

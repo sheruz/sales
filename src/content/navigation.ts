@@ -537,7 +537,7 @@ export const headerCtas = {
   secondary: { label: "Get a quote", href: "/contact?type=quote" },
   primary: {
     label: "Book a free call",
-    href: "https://cal.com/delvix/intro",
+    href: "https://cal.com/delvix-studio-mxqxqy/30min",
   },
 };
 

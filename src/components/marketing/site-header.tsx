@@ -166,12 +166,7 @@ export function SiteHeader() {
               target="_blank"
               rel="noopener noreferrer"
               className="inline-flex items-center gap-2"
-            >
-              WhatsApp
-            </a>
-            <a
-              href={`tel:${siteConfig.contact.phone}`}
-              className="inline-flex items-center gap-2"
+              aria-label="Chat on WhatsApp"
             >
               {siteConfig.contact.phoneDisplay}
             </a>

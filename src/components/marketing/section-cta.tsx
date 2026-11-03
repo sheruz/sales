@@ -25,14 +25,6 @@ export function SectionCta({
           >
             Book a free call
           </Link>
-          <a
-            href={siteConfig.contact.whatsapp}
-            className="mkt-btn mkt-btn--secondary"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            WhatsApp
-          </a>
           <Link href="/contact" className="mkt-btn mkt-btn--secondary">
             Get a quote
           </Link>

@@ -94,18 +94,13 @@ export function SiteFooter() {
                 {siteConfig.contact.email}
               </a>
               <a
-                href={`tel:${siteConfig.contact.phone}`}
-                className="text-[#D5DBE8] no-underline hover:text-white"
-              >
-                {siteConfig.contact.phoneDisplay}
-              </a>
-              <a
                 href={siteConfig.contact.whatsapp}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="text-[#D5DBE8] no-underline hover:text-white"
+                aria-label="Chat on WhatsApp"
               >
-                WhatsApp
+                {siteConfig.contact.phoneDisplay}
               </a>
             </div>
             <div className="flex gap-2.5">
