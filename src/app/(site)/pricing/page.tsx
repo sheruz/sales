@@ -2,6 +2,7 @@ import Link from "next/link";
 import type { Metadata } from "next";
 import { Check, ChevronDown } from "lucide-react";
 import { buildPageMetadata } from "@/lib/marketing/page-metadata";
+import { websiteAgencyPlansService } from "@/services/website-agency-plans.service";
 
 export const metadata: Metadata = buildPageMetadata({
   title: "Pricing | Delvix Studio",
@@ -9,7 +10,9 @@ export const metadata: Metadata = buildPageMetadata({
   path: "/pricing",
 });
 
-const models = [
+export const dynamic = "force-dynamic";
+
+const fallbackModels = [
   {
     title: "Fixed-price project",
     price: "[From $X]",
@@ -24,8 +27,6 @@ const models = [
     cta: "Get a quote",
     href: "/contact?type=quote",
     featured: false,
-    bg: "mkt-card",
-    btnClass: "mkt-btn mkt-btn--secondary",
   },
   {
     title: "Monthly retainer",
@@ -41,8 +42,6 @@ const models = [
     cta: "Discuss a retainer",
     href: "/contact?type=retainer",
     featured: true,
-    bg: "mkt-card mkt-card--light mkt-card--featured",
-    btnClass: "mkt-btn mkt-btn--primary",
   },
   {
     title: "Dedicated developer",
@@ -58,12 +57,10 @@ const models = [
     cta: "Hire a developer",
     href: "/contact?type=developer",
     featured: false,
-    bg: "mkt-card",
-    btnClass: "mkt-btn mkt-btn--secondary",
   },
 ];
 
-const offers = [
+const fallbackOffers = [
   {
     name: "[Offer name, e.g. Website fix + speed-up]",
     price: "[$X]",
@@ -123,7 +120,34 @@ const faq = [
   },
 ];
 
-export default function PricingPage() {
+export default async function PricingPage() {
+  let models = fallbackModels;
+  let offers = fallbackOffers;
+  try {
+    const data = await websiteAgencyPlansService.listPublic();
+    if (data.engagementPlans.length > 0) {
+      models = data.engagementPlans.map((p) => ({
+        title: p.name,
+        price: p.priceLabel,
+        unit: p.priceUnit,
+        text: p.description,
+        points: p.includes,
+        cta: p.ctaLabel,
+        href: p.ctaHref,
+        featured: p.featured,
+      }));
+    }
+    if (data.starterOffers.length > 0) {
+      offers = data.starterOffers.map((o) => ({
+        name: o.name,
+        price: o.priceLabel,
+        text: o.description,
+      }));
+    }
+  } catch {
+    // DB not migrated yet — keep hardcoded fallbacks
+  }
+
   return (
     <>
       {/* Hero */}
@@ -142,8 +166,15 @@ export default function PricingPage() {
       {/* Models */}
       <section className="mkt-section mkt-section--dark">
         <div className="mkt-wrap grid gap-5 lg:grid-cols-3">
-          {models.map((model) => (
-            <div key={model.title} className={model.bg}>
+          {models.map((model) => {
+            const bg = model.featured
+              ? "mkt-card mkt-card--light mkt-card--featured"
+              : "mkt-card";
+            const btnClass = model.featured
+              ? "mkt-btn mkt-btn--primary"
+              : "mkt-btn mkt-btn--secondary";
+            return (
+            <div key={model.title} className={bg}>
               {model.featured ? (
                 <span className="mkt-badge-primary mb-3 inline-block">
                   Most common
@@ -170,15 +201,17 @@ export default function PricingPage() {
                   </li>
                 ))}
               </ul>
-              <Link href={model.href} className={`${model.btnClass} block text-center`}>
+              <Link href={model.href} className={`${btnClass} block text-center`}>
                 {model.cta}
               </Link>
             </div>
-          ))}
+            );
+          })}
         </div>
       </section>
 
       {/* Starter Offers */}
+      {offers.length > 0 ? (
       <section className="mkt-section mkt-section--light">
         <div className="mkt-wrap space-y-10">
           <div className="max-w-3xl space-y-4">
@@ -203,11 +236,9 @@ export default function PricingPage() {
               </div>
             ))}
           </div>
-          <p className="text-sm text-muted-foreground">
-            Fill these from your Business Brain starter offers, or hide the section.
-          </p>
         </div>
       </section>
+      ) : null}
 
       {/* What Affects Price + FAQ */}
       <section className="mkt-section mkt-section--subtle">

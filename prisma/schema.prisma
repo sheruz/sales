@@ -810,6 +810,7 @@ model Organization {
   deepAuditJobs     DeepAuditJob[]
   pitches           Pitch[]
   powPreviewPages   PowPreviewPage[]
+  platformOutreachCampaigns PlatformOutreachCampaign[]
   outboundMailboxes OutboundMailbox[]
   emailOutbox       EmailOutbox[]
   aiReplyDrafts     AiReplyDraft[]
@@ -4430,6 +4431,128 @@ model PlatformSetting {
   updatedByUserId String?  @map("updated_by_user_id")
 
   @@map("platform_settings")
+}
+
+/// Super Admin Outreach templates (Default Workspace engine). Not system/transactional email.
+model PlatformOutreachTemplate {
+  id        String   @id @default(uuid())
+  /// Stable seed key e.g. first_touch_has_website
+  key       String   @unique
+  name      String
+  /// FIRST_TOUCH | FOLLOW_UP | BREAKUP
+  category  String
+  subject   String
+  bodyText  String   @map("body_text") @db.Text
+  active    Boolean  @default(true)
+  sortOrder Int      @default(0) @map("sort_order")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([category, active])
+  @@map("platform_outreach_templates")
+}
+
+/// Super Admin Outreach campaigns — enroll into Default Workspace sequences.
+model PlatformOutreachCampaign {
+  id                    String    @id @default(uuid())
+  organizationId        String    @map("organization_id")
+  name                  String
+  status                String    @default("DRAFT") // DRAFT | ACTIVE | PAUSED | COMPLETED
+  /// has_website | no_website | mixed
+  audienceMode          String    @default("mixed") @map("audience_mode")
+  hasWebsiteTemplateId  String?   @map("has_website_template_id")
+  noWebsiteTemplateId   String?   @map("no_website_template_id")
+  followUpTemplateId    String?   @map("follow_up_template_id")
+  followUpDelayDays     Int       @default(4) @map("follow_up_delay_days")
+  emailAccountId        String?   @map("email_account_id")
+  rotateAccounts        Boolean   @default(false) @map("rotate_accounts")
+  sendCap               Int       @default(50) @map("send_cap")
+  sentCount             Int       @default(0) @map("sent_count")
+  scheduledMode         String    @default("window") @map("scheduled_mode") // now | window
+  filters               Json?
+  pausedAt              DateTime? @map("paused_at")
+  completedAt           DateTime? @map("completed_at")
+  createdByUserId       String?   @map("created_by_user_id")
+  /// Backing OutreachSequence ids created for this campaign
+  hasWebsiteSequenceId  String?   @map("has_website_sequence_id")
+  noWebsiteSequenceId   String?   @map("no_website_sequence_id")
+  createdAt             DateTime  @default(now()) @map("created_at")
+  updatedAt             DateTime  @updatedAt @map("updated_at")
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  recipients   PlatformOutreachCampaignRecipient[]
+
+  @@index([organizationId, status])
+  @@map("platform_outreach_campaigns")
+}
+
+model PlatformOutreachCampaignRecipient {
+  id             String   @id @default(uuid())
+  campaignId     String   @map("campaign_id")
+  contactId      String   @map("contact_id")
+  companyId      String?  @map("company_id")
+  /// has_website | no_website
+  templateKind   String   @map("template_kind")
+  subject        String
+  bodyText       String   @map("body_text") @db.Text
+  /// SKIPPED | READY | QUEUED | SENT | FAILED
+  status         String   @default("READY")
+  skipReason     String?  @map("skip_reason")
+  enrollmentId   String?  @map("enrollment_id")
+  outboxId       String?  @map("outbox_id")
+  edited         Boolean  @default(false)
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  campaign PlatformOutreachCampaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+
+  @@unique([campaignId, contactId])
+  @@index([campaignId, status])
+  @@map("platform_outreach_campaign_recipients")
+}
+
+/// Agency website engagement models (Fixed project / Retainer / Dedicated).
+/// Managed in Super Admin → Packages → Website / agency. Not SaaS entitlements.
+model WebsiteEngagementPlan {
+  id          String   @id @default(uuid())
+  /// Stable slug: fixed-price | retainer | dedicated | custom
+  slug        String   @unique
+  name        String
+  /// Display price e.g. "From $4,500" or "From $3,000"
+  priceLabel  String   @map("price_label")
+  /// e.g. "per project" | "/ month"
+  priceUnit   String   @map("price_unit")
+  description String   @db.Text
+  includes    String[] @default([])
+  ctaLabel    String   @map("cta_label")
+  ctaHref     String   @map("cta_href")
+  featured    Boolean  @default(false)
+  active      Boolean  @default(true)
+  sortOrder   Int      @default(0) @map("sort_order")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  @@index([active, sortOrder])
+  @@map("website_engagement_plans")
+}
+
+/// Small fixed starter packages on the public pricing page (agency, not SaaS).
+model WebsiteStarterOffer {
+  id           String   @id @default(uuid())
+  name         String
+  /// Display price e.g. "$750" or "From $500"
+  priceLabel   String   @map("price_label")
+  /// What is included + delivery timing (one short line)
+  description  String   @db.Text
+  deliveryDays Int?     @map("delivery_days")
+  href         String?
+  active       Boolean  @default(true)
+  sortOrder    Int      @default(0) @map("sort_order")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  @@index([active, sortOrder])
+  @@map("website_starter_offers")
 }
 
 /// PoW personal preview page — public /for/{publicSlug}

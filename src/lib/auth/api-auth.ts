@@ -11,6 +11,7 @@ import {
   tenantAccessService,
   ACCESS_REASONS,
 } from "@/services/tenant-access.service";
+import prisma from "@/lib/db/prisma";
 
 /** Permissions still allowed when subscription is NONE/EXPIRED (locked). */
 const LOCKED_ALLOWED_PERMS = new Set<string>([
@@ -162,6 +163,24 @@ export async function requireSuperAdminWrite(): Promise<AuthUser> {
     throw new ForbiddenError("PLATFORM_SUPPORT is read-only");
   }
   throw new ForbiddenError();
+}
+
+/**
+ * Platform Outreach mutations: SUPER_ADMIN only, and 2FA must be enrolled.
+ * PLATFORM_SUPPORT → 403 (view via requirePlatformRead).
+ */
+export async function requirePlatformOutreachWrite(): Promise<AuthUser> {
+  const user = await requireSuperAdminWrite();
+  const row = await prisma.user.findUnique({
+    where: { id: user.id },
+    select: { totpEnabledAt: true },
+  });
+  if (!row?.totpEnabledAt) {
+    throw new ForbiddenError(
+      "Super Admin 2FA is required before Outreach send/connect actions"
+    );
+  }
+  return user;
 }
 
 export async function requireOrganizationContext(): Promise<

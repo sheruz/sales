@@ -26,6 +26,7 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Skeleton } from "@/components/ui/skeleton";
 import { PlatformPageHeader } from "@/components/platform/ui/page-header";
 import { PlatformEmptyState } from "@/components/platform/ui/empty-state";
+import { WebsiteAgencyPlansClient } from "@/components/platform/website-agency-plans-client";
 import { formatMoney } from "@/lib/platform/format";
 
 type PlanRow = {
@@ -47,6 +48,7 @@ type PlanRow = {
 };
 
 type TabKey = "PUBLIC" | "INTERNAL" | "ARCHIVED";
+type CatalogKey = "saas" | "website";
 
 export function PackagesListClient({ canWrite }: { canWrite: boolean }) {
   const [plans, setPlans] = useState<PlanRow[]>([]);
@@ -54,6 +56,7 @@ export function PackagesListClient({ canWrite }: { canWrite: boolean }) {
   const [creating, setCreating] = useState(false);
   const [name, setName] = useState("");
   const [tab, setTab] = useState<TabKey>("PUBLIC");
+  const [catalog, setCatalog] = useState<CatalogKey>("saas");
 
   async function load() {
     setLoading(true);
@@ -111,9 +114,13 @@ export function PackagesListClient({ canWrite }: { canWrite: boolean }) {
     <div className="space-y-6">
       <PlatformPageHeader
         title="Packages"
-        description="Edit plans as drafts, preview, then publish."
+        description={
+          catalog === "saas"
+            ? "SaaS product entitlements — drafts, preview, then publish."
+            : "Studio website pricing — engagement models and starter offers (not SaaS)."
+        }
         actions={
-          canWrite ? (
+          catalog === "saas" && canWrite ? (
             <div className="flex gap-2">
               <Input
                 className="w-48"
@@ -129,6 +136,20 @@ export function PackagesListClient({ canWrite }: { canWrite: boolean }) {
         }
       />
 
+      <Tabs
+        value={catalog}
+        onValueChange={(v) => v && setCatalog(v as CatalogKey)}
+      >
+        <TabsList>
+          <TabsTrigger value="saas">SaaS product</TabsTrigger>
+          <TabsTrigger value="website">Website / agency</TabsTrigger>
+        </TabsList>
+      </Tabs>
+
+      {catalog === "website" ? (
+        <WebsiteAgencyPlansClient canWrite={canWrite} />
+      ) : (
+        <>
       <Tabs
         value={tab}
         onValueChange={(v) => v && setTab(v as TabKey)}
@@ -225,6 +246,8 @@ export function PackagesListClient({ canWrite }: { canWrite: boolean }) {
           )}
         </CardContent>
       </Card>
+        </>
+      )}
     </div>
   );
 }

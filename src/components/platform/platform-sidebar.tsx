@@ -17,6 +17,7 @@ import {
   FileText,
   Receipt,
   Mail,
+  Megaphone,
 } from "lucide-react";
 import {
   Sidebar,
@@ -61,6 +62,12 @@ const navGroups: { label: string; items: NavItem[] }[] = [
       { title: "Payments", href: appOps("/payments"), icon: CreditCard },
       { title: "Transactions", href: appOps("/transactions"), icon: Receipt },
       { title: "Invoices", href: appOps("/invoices"), icon: FileText },
+    ],
+  },
+  {
+    label: "Outreach",
+    items: [
+      { title: "Outreach", href: appOps("/outreach"), icon: Megaphone },
     ],
   },
   {

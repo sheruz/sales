@@ -718,7 +718,17 @@ export class OutboundJobService {
       },
     });
     if (!enrollment) throw new ValidationError("Enrollment not found");
-    if (enrollment.source !== SequenceEnrollmentSource.AUTOPILOT) {
+    const enrollMetaEarly =
+      enrollment.metadata &&
+      typeof enrollment.metadata === "object" &&
+      !Array.isArray(enrollment.metadata)
+        ? (enrollment.metadata as Record<string, unknown>)
+        : {};
+    const isPlatformOutreach = enrollMetaEarly.platformOutreach === true;
+    if (
+      enrollment.source !== SequenceEnrollmentSource.AUTOPILOT &&
+      !isPlatformOutreach
+    ) {
       throw new ValidationError("queueStep is for AUTOPILOT enrollments only");
     }
 
@@ -729,12 +739,7 @@ export class OutboundJobService {
     if (!step) return null;
 
     const isPow = Boolean(enrollment.sequence.isProofOfWork);
-    const enrollMeta =
-      enrollment.metadata &&
-      typeof enrollment.metadata === "object" &&
-      !Array.isArray(enrollment.metadata)
-        ? (enrollment.metadata as Record<string, unknown>)
-        : {};
+    const enrollMeta = enrollMetaEarly;
     const powPitchId =
       typeof enrollMeta.pitchId === "string" ? enrollMeta.pitchId : null;
 
@@ -794,6 +799,18 @@ export class OutboundJobService {
         company,
         cfg,
         idempotencyKey,
+      });
+    }
+
+    if (isPlatformOutreach) {
+      return this.queuePlatformOutreachStep({
+        organizationId,
+        enrollment,
+        step,
+        company,
+        cfg,
+        idempotencyKey,
+        enrollMeta,
       });
     }
 
@@ -1047,6 +1064,184 @@ export class OutboundJobService {
                 }
               : {}),
           },
+        } as Prisma.InputJsonValue,
+      },
+    });
+  }
+
+  /** Super Admin Outreach — PLAIN text, filled vars, no open pixel. */
+  private async queuePlatformOutreachStep(opts: {
+    organizationId: string;
+    enrollment: {
+      id: string;
+      contactId: string;
+      opportunityId: string | null;
+      emailAccountId: string | null;
+      contact: {
+        email: string | null;
+        firstName: string | null;
+        company: {
+          id: string;
+          name: string;
+          domain: string | null;
+          website?: string | null;
+          city?: string | null;
+          timezone: string | null;
+          country: string | null;
+        } | null;
+      };
+    };
+    step: {
+      stepOrder: number;
+      delayMinutes: number;
+      subjectTemplate: string | null;
+      bodyTemplate: string;
+    };
+    company: {
+      id: string;
+      name: string;
+      domain: string | null;
+      website?: string | null;
+      city?: string | null;
+      timezone: string | null;
+      country: string | null;
+    } | null;
+    cfg: OutboundConfig;
+    idempotencyKey: string;
+    enrollMeta: Record<string, unknown>;
+  }) {
+    const {
+      organizationId,
+      enrollment,
+      step,
+      company,
+      cfg,
+      idempotencyKey,
+      enrollMeta,
+    } = opts;
+
+    if (!cfg.physicalAddress.trim()) {
+      return prisma.emailOutbox.create({
+        data: {
+          id: randomUUID(),
+          organizationId,
+          enrollmentId: enrollment.id,
+          stepOrder: step.stepOrder,
+          contactId: enrollment.contactId,
+          companyId: company?.id ?? null,
+          opportunityId: enrollment.opportunityId,
+          emailAccountId: enrollment.emailAccountId!,
+          status: EmailOutboxStatus.HELD,
+          toEmail: enrollment.contact.email!,
+          subject: step.subjectTemplate || "(outreach)",
+          bodyText: "",
+          heldReason: "compliance_setup",
+          lastError:
+            "Set business address in Outbound branding before sending",
+          idempotencyKey,
+          shadowMode: cfg.shadowMode,
+        },
+      });
+    }
+
+    const { fillPlatformTemplate, resolvePlatformOutreachTimezone } =
+      await import("@/lib/platform/outreach-eligibility");
+    const { getPlatformOutreachSendEnabled } = await import(
+      "@/lib/platform/outreach-send-gate"
+    );
+    if (!(await getPlatformOutreachSendEnabled())) {
+      return prisma.emailOutbox.create({
+        data: {
+          id: randomUUID(),
+          organizationId,
+          enrollmentId: enrollment.id,
+          stepOrder: step.stepOrder,
+          contactId: enrollment.contactId,
+          companyId: company?.id ?? null,
+          opportunityId: enrollment.opportunityId,
+          emailAccountId: enrollment.emailAccountId!,
+          status: EmailOutboxStatus.HELD,
+          toEmail: enrollment.contact.email!,
+          subject: step.subjectTemplate || "(outreach)",
+          bodyText: "",
+          heldReason: "platform_outreach_send_disabled",
+          lastError: "Platform Outreach sending is OFF",
+          idempotencyKey,
+          shadowMode: cfg.shadowMode,
+        },
+      });
+    }
+
+    const originalSubject =
+      (typeof enrollMeta.filledSubject === "string"
+        ? enrollMeta.filledSubject
+        : null) ||
+      step.subjectTemplate ||
+      "";
+
+    const subject =
+      step.stepOrder === 1 && typeof enrollMeta.filledSubject === "string"
+        ? enrollMeta.filledSubject
+        : fillPlatformTemplate({
+            template: step.subjectTemplate || "",
+            firstName: enrollment.contact.firstName,
+            companyName: company?.name,
+            website: company?.website || company?.domain,
+            city: company?.city,
+            businessAddress: cfg.physicalAddress,
+            originalSubject,
+          });
+
+    const bodyText =
+      step.stepOrder === 1 && typeof enrollMeta.filledBody === "string"
+        ? enrollMeta.filledBody
+        : fillPlatformTemplate({
+            template: step.bodyTemplate,
+            firstName: enrollment.contact.firstName,
+            companyName: company?.name,
+            website: company?.website || company?.domain,
+            city: company?.city,
+            businessAddress: cfg.physicalAddress,
+            originalSubject: subject,
+          });
+
+    const tz = resolvePlatformOutreachTimezone({
+      timezone: company?.timezone,
+      city: company?.city,
+      country: company?.country,
+    });
+    const notBefore = new Date(
+      Date.now() + Math.max(0, step.delayMinutes) * 60_000
+    );
+    const scheduledFor =
+      step.delayMinutes > 0
+        ? nextSendWindowUtc(tz, notBefore) ?? notBefore
+        : nextSendWindowUtc(tz, new Date()) ?? new Date();
+
+    return prisma.emailOutbox.create({
+      data: {
+        id: randomUUID(),
+        organizationId,
+        enrollmentId: enrollment.id,
+        stepOrder: step.stepOrder,
+        purpose: EmailOutboxPurpose.SEQUENCE,
+        contactId: enrollment.contactId,
+        companyId: company?.id ?? null,
+        opportunityId: enrollment.opportunityId,
+        emailAccountId: enrollment.emailAccountId!,
+        status: EmailOutboxStatus.QUEUED,
+        toEmail: enrollment.contact.email!,
+        subject,
+        bodyText,
+        bodyHtml: null,
+        scheduledFor,
+        idempotencyKey,
+        shadowMode: cfg.shadowMode,
+        metadata: {
+          platformOutreach: true,
+          emailStyle: "PLAIN",
+          notBefore: notBefore.toISOString(),
+          sequenceDelayMinutes: step.delayMinutes,
         } as Prisma.InputJsonValue,
       },
     });
