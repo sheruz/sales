@@ -1218,6 +1218,15 @@ export class OutboundJobService {
         ? nextSendWindowUtc(tz, notBefore) ?? notBefore
         : nextSendWindowUtc(tz, new Date()) ?? new Date();
 
+    const pool = await prisma.outboundMailbox.findFirst({
+      where: {
+        organizationId,
+        emailAccountId: enrollment.emailAccountId!,
+      },
+      select: { id: true },
+    });
+
+    // Real delivery when SA Outreach send is ON — do not inherit org shadowMode.
     return prisma.emailOutbox.create({
       data: {
         id: randomUUID(),
@@ -1229,6 +1238,7 @@ export class OutboundJobService {
         companyId: company?.id ?? null,
         opportunityId: enrollment.opportunityId,
         emailAccountId: enrollment.emailAccountId!,
+        outboundMailboxId: pool?.id ?? null,
         status: EmailOutboxStatus.QUEUED,
         toEmail: enrollment.contact.email!,
         subject,
@@ -1236,7 +1246,7 @@ export class OutboundJobService {
         bodyHtml: null,
         scheduledFor,
         idempotencyKey,
-        shadowMode: cfg.shadowMode,
+        shadowMode: false,
         metadata: {
           platformOutreach: true,
           emailStyle: "PLAIN",
@@ -1991,12 +2001,24 @@ export class OutboundJobService {
 
     // Always rebuild BRANDED HTML at send time so the designed template ships
     // even if the row was queued as plain (legacy) or before a deploy.
+    // Skip for PLAIN sequences (PoW + Super Admin Outreach) — they must stay plain text.
     let bodyText = item.bodyText;
     let bodyHtml = item.bodyHtml;
+    const sendMeta =
+      item.metadata &&
+      typeof item.metadata === "object" &&
+      !Array.isArray(item.metadata)
+        ? (item.metadata as Record<string, unknown>)
+        : {};
+    const isPlainSequence =
+      sendMeta.emailStyle === "PLAIN" ||
+      sendMeta.kind === "pow" ||
+      sendMeta.platformOutreach === true ||
+      item.enrollment?.sequence?.isProofOfWork === true;
     const isSequence =
       item.purpose === EmailOutboxPurpose.SEQUENCE ||
       item.enrollmentId != null;
-    const wantsBranded = isSequence;
+    const wantsBranded = isSequence && !isPlainSequence;
     const htmlLooksBranded =
       typeof bodyHtml === "string" &&
       (bodyHtml.includes("WHAT WE NOTICED") ||

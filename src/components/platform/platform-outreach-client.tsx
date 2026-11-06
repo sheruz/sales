@@ -188,7 +188,30 @@ export function PlatformOutreachClient({ canWrite }: { canWrite: boolean }) {
       );
       const json = await res.json();
       if (!json.success) throw new Error(json.error?.message || "Launch failed");
-      toast.success(`Queued ${json.data.queued}`);
+      const processed = json.data.processed ?? 0;
+      const results = (json.data.sendResults ?? []) as Array<{
+        status?: string;
+        reason?: string;
+      }>;
+      const sentReal = results.filter(
+        (r) => r.status === "sent" || r.status === "sent_shadow"
+      ).length;
+      const held = results.filter((r) => r.status === "held");
+      if (mode === "now" && sentReal > 0) {
+        toast.success(
+          `Sent ${sentReal}` +
+            (held.length ? ` · ${held.length} held` : "")
+        );
+      } else if (mode === "now" && held[0]?.reason) {
+        toast.message(
+          `Queued ${json.data.queued} but held: ${held[0].reason}`
+        );
+      } else {
+        toast.success(
+          `Queued ${json.data.queued}` +
+            (processed ? ` · processed ${processed}` : "")
+        );
+      }
       await loadCampaigns();
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Failed");

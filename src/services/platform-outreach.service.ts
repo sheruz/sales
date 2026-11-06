@@ -745,16 +745,22 @@ export class PlatformOutreachService {
         const outbox = await outboundJobService.queueStep(orgId, enrollment.id);
 
         if (outbox?.id && input.mode === "now") {
+          // Force due + real send (clear prior hold/shadow from queue)
           await prisma.emailOutbox.update({
             where: { id: outbox.id },
             data: {
               subject: recip.subject,
               bodyText: recip.bodyText,
+              bodyHtml: null,
               scheduledFor: new Date(),
-              status:
-                outbox.status === EmailOutboxStatus.HELD
-                  ? outbox.status
-                  : EmailOutboxStatus.QUEUED,
+              status: EmailOutboxStatus.QUEUED,
+              heldReason: null,
+              lastError: null,
+              shadowMode: false,
+              metadata: {
+                platformOutreach: true,
+                emailStyle: "PLAIN",
+              },
             },
           });
         } else if (outbox?.id && input.mode === "window") {
@@ -770,6 +776,15 @@ export class PlatformOutreachService {
               scheduledFor: when,
               subject: recip.subject,
               bodyText: recip.bodyText,
+              bodyHtml: null,
+              status: EmailOutboxStatus.QUEUED,
+              heldReason: null,
+              lastError: null,
+              shadowMode: false,
+              metadata: {
+                platformOutreach: true,
+                emailStyle: "PLAIN",
+              },
             },
           });
         }
@@ -809,10 +824,15 @@ export class PlatformOutreachService {
     });
 
     // Drain due outbox for "now" mode (respects limits / holds)
+    let sendResult: Awaited<
+      ReturnType<typeof outboundJobService.processOutboxBatch>
+    > | null = null;
     if (input.mode === "now" && sent > 0) {
-      await outboundJobService.processOutboxBatch(orgId, Math.min(sent, 10), {
-        manual: true,
-      });
+      sendResult = await outboundJobService.processOutboxBatch(
+        orgId,
+        Math.min(Math.max(sent, 5), 10),
+        { manual: true }
+      );
     }
 
     await organizationService.writePlatformAudit({
@@ -821,10 +841,23 @@ export class PlatformOutreachService {
       targetType: "platform_outreach_campaign",
       targetId: campaign.id,
       organizationId: orgId,
-      after: { queued: sent, mode: input.mode, errors: errors.length },
+      after: {
+        queued: sent,
+        mode: input.mode,
+        errors: errors.length,
+        processed: sendResult?.processed ?? 0,
+        sendResults: sendResult?.results ?? [],
+      },
     });
 
-    return { campaign: updated, queued: sent, errors };
+    return {
+      campaign: updated,
+      queued: sent,
+      errors,
+      processed: sendResult?.processed ?? 0,
+      sendResults: sendResult?.results ?? [],
+      sendReason: sendResult?.reason ?? null,
+    };
   }
 
   async searchContacts(opts: {
