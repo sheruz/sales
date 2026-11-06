@@ -670,11 +670,12 @@ export class PlatformOutreachService {
       );
     }
     const cfg = await this.requireAddressOrThrow();
-    let campaign = await this.getCampaign(input.campaignId);
-    if (campaign.status === "PAUSED") {
+    const existing = await this.getCampaign(input.campaignId);
+    if (existing.status === "PAUSED") {
       throw new ValidationError("Campaign is paused");
     }
-    campaign = await this.ensureCampaignSequences(campaign.id);
+    await this.ensureCampaignSequences(existing.id);
+    const campaign = await this.getCampaign(input.campaignId);
 
     const ready = await prisma.platformOutreachCampaignRecipient.findMany({
       where: { campaignId: campaign.id, status: "READY" },
