@@ -55,6 +55,7 @@ import { unsubscribeUrl } from "@/services/unsubscribe.service";
 import { resolveEnrollmentSteps } from "@/services/sequence-enrollment.service";
 import {
   renderOutboundEmail,
+  renderPlatformOutreachBranded,
   renderPowPlainEmail,
 } from "@/lib/email/render-outbound";
 import { emailBrandingService } from "@/services/email-branding.service";
@@ -1226,10 +1227,62 @@ export class OutboundJobService {
       select: { id: true },
     });
 
-    // Real delivery when SA Outreach send is ON — do not inherit org shadowMode.
+    const outboxId = randomUUID();
+    const unsub = unsubscribeUrl(organizationId, enrollment.contact.email!);
+    const sender = await emailBrandingService.resolveForSend(
+      organizationId,
+      pool?.id ?? null
+    );
+    let rendered;
+    try {
+      rendered = renderPlatformOutreachBranded({
+        subject,
+        bodyText,
+        contact: {
+          firstName: enrollment.contact.firstName,
+          email: enrollment.contact.email,
+        },
+        company: {
+          name: company?.name,
+          domain: company?.domain,
+        },
+        sender,
+        unsubscribeUrl: unsub,
+        track: {
+          organizationId,
+          outboxId,
+          campaign: "platform_outreach",
+        },
+      });
+    } catch (err) {
+      return prisma.emailOutbox.create({
+        data: {
+          id: outboxId,
+          organizationId,
+          enrollmentId: enrollment.id,
+          stepOrder: step.stepOrder,
+          contactId: enrollment.contactId,
+          companyId: company?.id ?? null,
+          opportunityId: enrollment.opportunityId,
+          emailAccountId: enrollment.emailAccountId!,
+          outboundMailboxId: pool?.id ?? null,
+          status: EmailOutboxStatus.HELD,
+          toEmail: enrollment.contact.email!,
+          subject,
+          bodyText,
+          heldReason: "render_failed",
+          lastError:
+            err instanceof Error ? err.message.slice(0, 500) : "branded render failed",
+          idempotencyKey,
+          shadowMode: false,
+        },
+      });
+    }
+
+    // Real delivery when SA Outreach send is ON — branded HTML, not shadow.
     return prisma.emailOutbox.create({
       data: {
-        id: randomUUID(),
+        id: outboxId,
         organizationId,
         enrollmentId: enrollment.id,
         stepOrder: step.stepOrder,
@@ -1241,17 +1294,22 @@ export class OutboundJobService {
         outboundMailboxId: pool?.id ?? null,
         status: EmailOutboxStatus.QUEUED,
         toEmail: enrollment.contact.email!,
-        subject,
-        bodyText,
-        bodyHtml: null,
+        subject: rendered.subject,
+        bodyText: rendered.text,
+        bodyHtml: rendered.html,
         scheduledFor,
         idempotencyKey,
         shadowMode: false,
         metadata: {
           platformOutreach: true,
-          emailStyle: "PLAIN",
+          emailStyle: "BRANDED",
+          letterBody: bodyText,
           notBefore: notBefore.toISOString(),
           sequenceDelayMinutes: step.delayMinutes,
+          unsubscribeUrl: unsub,
+          headers: buildListUnsubscribeHeaders({
+            unsubscribeUrl: unsub,
+          }),
         } as Prisma.InputJsonValue,
       },
     });
@@ -2001,7 +2059,7 @@ export class OutboundJobService {
 
     // Always rebuild BRANDED HTML at send time so the designed template ships
     // even if the row was queued as plain (legacy) or before a deploy.
-    // Skip for PLAIN sequences (PoW + Super Admin Outreach) — they must stay plain text.
+    // PoW stays PLAIN. Platform Outreach rebuilds from letter copy (no pitch).
     let bodyText = item.bodyText;
     let bodyHtml = item.bodyHtml;
     const sendMeta =
@@ -2010,20 +2068,85 @@ export class OutboundJobService {
       !Array.isArray(item.metadata)
         ? (item.metadata as Record<string, unknown>)
         : {};
-    const isPlainSequence =
+    const isPowPlain =
       sendMeta.emailStyle === "PLAIN" ||
       sendMeta.kind === "pow" ||
-      sendMeta.platformOutreach === true ||
       item.enrollment?.sequence?.isProofOfWork === true;
+    const isPlatformOutreach = sendMeta.platformOutreach === true;
     const isSequence =
       item.purpose === EmailOutboxPurpose.SEQUENCE ||
       item.enrollmentId != null;
-    const wantsBranded = isSequence && !isPlainSequence;
+    const wantsBranded = isSequence && !isPowPlain;
     const htmlLooksBranded =
       typeof bodyHtml === "string" &&
       (bodyHtml.includes("WHAT WE NOTICED") ||
         bodyHtml.includes("SOFTWARE STUDIO"));
-    if (wantsBranded) {
+
+    if (isPlatformOutreach) {
+      try {
+        const unsub =
+          (typeof sendMeta.unsubscribeUrl === "string"
+            ? sendMeta.unsubscribeUrl
+            : null) || unsubscribeUrl(organizationId, item.toEmail);
+        const sender = await emailBrandingService.resolveForSend(
+          organizationId,
+          item.outboundMailboxId
+        );
+        // Prefer original letter stored at queue (metadata.letterBody) else bodyText
+        const letter =
+          typeof sendMeta.letterBody === "string" && sendMeta.letterBody.trim()
+            ? sendMeta.letterBody
+            : item.bodyText;
+        const rebuilt = renderPlatformOutreachBranded({
+          subject: item.subject,
+          bodyText: letter,
+          contact: {
+            firstName: item.contact?.firstName,
+            email: item.contact?.email ?? item.toEmail,
+          },
+          company: {
+            name: item.company?.name,
+            domain: item.company?.domain,
+          },
+          sender,
+          unsubscribeUrl: unsub,
+          track: {
+            organizationId,
+            outboxId,
+            campaign: "platform_outreach",
+          },
+        });
+        bodyText = rebuilt.text;
+        bodyHtml = rebuilt.html;
+        await prisma.emailOutbox.update({
+          where: { id: outboxId },
+          data: {
+            bodyText,
+            bodyHtml,
+            subject: rebuilt.subject,
+            metadata: {
+              ...sendMeta,
+              emailStyle: "BRANDED",
+              platformOutreach: true,
+              letterBody: letter,
+              reRenderedAt: new Date().toISOString(),
+            } as Prisma.InputJsonValue,
+          },
+        });
+      } catch (err) {
+        await prisma.emailOutbox.update({
+          where: { id: outboxId },
+          data: {
+            status: EmailOutboxStatus.HELD,
+            heldReason: "render_failed",
+            lastError: (
+              err instanceof Error ? err.message : "platform branded render failed"
+            ).slice(0, 500),
+          },
+        });
+        return { id: outboxId, status: "held", reason: "render_failed" };
+      }
+    } else if (wantsBranded) {
       try {
         const rebuilt = await this.reRenderBrandedOutbox(organizationId, item);
         if (rebuilt) {

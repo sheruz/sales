@@ -618,14 +618,14 @@ export class PlatformOutreachService {
                 delayMinutes: 0,
                 subjectTemplate: first.subject,
                 bodyTemplate: first.body,
-                emailStyle: EmailStyle.PLAIN,
+                emailStyle: EmailStyle.BRANDED,
               },
               {
                 stepOrder: 2,
                 delayMinutes: delay,
                 subjectTemplate: follow.subject,
                 bodyTemplate: follow.body,
-                emailStyle: EmailStyle.PLAIN,
+                emailStyle: EmailStyle.BRANDED,
               },
             ],
           },
@@ -745,13 +745,11 @@ export class PlatformOutreachService {
         const outbox = await outboundJobService.queueStep(orgId, enrollment.id);
 
         if (outbox?.id && input.mode === "now") {
-          // Force due + real send (clear prior hold/shadow from queue)
+          // Force due + real send; keep letterBody for branded re-render at send
           await prisma.emailOutbox.update({
             where: { id: outbox.id },
             data: {
               subject: recip.subject,
-              bodyText: recip.bodyText,
-              bodyHtml: null,
               scheduledFor: new Date(),
               status: EmailOutboxStatus.QUEUED,
               heldReason: null,
@@ -759,7 +757,8 @@ export class PlatformOutreachService {
               shadowMode: false,
               metadata: {
                 platformOutreach: true,
-                emailStyle: "PLAIN",
+                emailStyle: "BRANDED",
+                letterBody: recip.bodyText,
               },
             },
           });
@@ -775,15 +774,14 @@ export class PlatformOutreachService {
             data: {
               scheduledFor: when,
               subject: recip.subject,
-              bodyText: recip.bodyText,
-              bodyHtml: null,
               status: EmailOutboxStatus.QUEUED,
               heldReason: null,
               lastError: null,
               shadowMode: false,
               metadata: {
                 platformOutreach: true,
-                emailStyle: "PLAIN",
+                emailStyle: "BRANDED",
+                letterBody: recip.bodyText,
               },
             },
           });

@@ -407,6 +407,88 @@ export function renderOutboundEmail(
 }
 
 /**
+ * Super Admin Outreach — wrap free-form letter copy in the BRANDED HTML shell
+ * (logo, WHAT WE NOTICED card, CTA, footer). No pitch row required.
+ */
+export function renderPlatformOutreachBranded(input: {
+  subject: string;
+  bodyText: string;
+  contact: { firstName?: string | null; email?: string | null };
+  company: { name?: string | null; domain?: string | null };
+  sender: ResolvedSender;
+  unsubscribeUrl: string;
+  track?: EmailTrackContext | null;
+  /** Optional override for the purple card title */
+  findingTitle?: string | null;
+  findingText?: string | null;
+}): RenderOutboundResult {
+  const lines = input.bodyText.replace(/\r\n/g, "\n").trim().split("\n");
+  let greeting = "";
+  let i = 0;
+  if (lines[0] && /^hi\b/i.test(lines[0].trim())) {
+    greeting = lines[0].trim();
+    i = 1;
+    while (i < lines.length && lines[i].trim() === "") i += 1;
+  }
+
+  const rest = lines.slice(i);
+  const stopAt = rest.findIndex((l) =>
+    /^(best regards|regards|thanks|thank you|not relevant\?)/i.test(l.trim())
+  );
+  const main = (stopAt >= 0 ? rest.slice(0, stopAt) : rest)
+    .join("\n")
+    .trim();
+
+  const paragraphs = main
+    .split(/\n{2,}/)
+    .map((p) => p.replace(/\n/g, " ").trim())
+    .filter(Boolean);
+
+  const introParas = paragraphs.slice(0, Math.min(2, paragraphs.length));
+  const bodyParas = paragraphs.slice(introParas.length);
+
+  const toHtml = (paras: string[]) =>
+    paras
+      .map(
+        (p) =>
+          `<p style="margin:0 0 14px 0;">${escapeHtml(p).replace(
+            /(https?:\/\/[^\s<]+)/g,
+            '<a href="$1" style="color:#5b63f5;">$1</a>'
+          )}</p>`
+      )
+      .join("");
+
+  const findingTitle =
+    input.findingTitle?.trim() ||
+    (input.subject.includes("website")
+      ? "A few ideas for your website"
+      : input.subject.includes("online")
+        ? "Help customers find you online"
+        : "A quick note from our team");
+  const findingText =
+    input.findingText?.trim() ||
+    "Small, practical improvements — free ideas, no obligation.";
+
+  return renderOutboundEmail({
+    style: "BRANDED",
+    subject: input.subject,
+    pitch: {
+      greeting: greeting || undefined,
+      introHtml: toHtml(introParas) || "<p></p>",
+      findingTitle,
+      findingText,
+      bodyHtml: toHtml(bodyParas),
+      preheader: findingTitle,
+    },
+    contact: input.contact,
+    company: input.company,
+    sender: input.sender,
+    unsubscribeUrl: input.unsubscribeUrl,
+    track: input.track,
+  });
+}
+
+/**
  * PoW3 — send already-authored plain-text body (after {{pow_*}} merge).
  * Does not rebuild from branded pitch HTML fields.
  */
