@@ -98,7 +98,8 @@ export class AuthService {
       );
       if (!ok) {
         throw new UnauthorizedError(
-          "Authenticator code required. Enter the 6-digit code (or a recovery code)."
+          "Authenticator code required. Enter the 6-digit code (or a recovery code).",
+          "MFA_REQUIRED"
         );
       }
     }

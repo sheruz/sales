@@ -26,6 +26,8 @@ export default function LoginPage() {
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [totpCode, setTotpCode] = useState("");
+  const [mfaRequired, setMfaRequired] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
@@ -36,13 +38,30 @@ export default function LoginPage() {
       const response = await fetch("/api/auth/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, password }),
+        body: JSON.stringify({
+          email,
+          password,
+          ...(mfaRequired || totpCode.trim()
+            ? { totpCode: totpCode.trim() }
+            : {}),
+        }),
       });
 
       const data = await response.json();
 
       if (!response.ok || !data.success) {
-        throw new Error(data.error?.message ?? "Login failed");
+        const code = data.error?.code as string | undefined;
+        const message = data.error?.message ?? "Login failed";
+        if (
+          code === "MFA_REQUIRED" ||
+          /authenticator code required/i.test(message)
+        ) {
+          setMfaRequired(true);
+          setTotpCode("");
+          toast.message("Enter your authenticator code to finish signing in");
+          return;
+        }
+        throw new Error(message);
       }
 
       toast.success(`Welcome back, ${data.data.user.firstName}!`);
@@ -96,49 +115,89 @@ export default function LoginPage() {
 
         <Card>
           <CardHeader>
-            <CardTitle>Sign in</CardTitle>
+            <CardTitle>{mfaRequired ? "Two-factor authentication" : "Sign in"}</CardTitle>
             <CardDescription>
-              Enter your credentials to access the dashboard
+              {mfaRequired
+                ? "Enter the 6-digit code from your authenticator app, or a recovery code"
+                : "Enter your credentials to access the dashboard"}
             </CardDescription>
           </CardHeader>
           <CardContent>
             <form onSubmit={handleSubmit} className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="email">Email</Label>
-                <Input
-                  id="email"
-                  type="email"
-                  placeholder="admin@salesplatform.local"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  required
-                  autoComplete="email"
-                  disabled={isLoading}
-                />
-              </div>
-              <div className="space-y-2">
-                <div className="flex items-center justify-between gap-2">
-                  <Label htmlFor="password">Password</Label>
-                  <Link
-                    href="/forgot-password"
+              {!mfaRequired ? (
+                <>
+                  <div className="space-y-2">
+                    <Label htmlFor="email">Email</Label>
+                    <Input
+                      id="email"
+                      type="email"
+                      placeholder="admin@salesplatform.local"
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      required
+                      autoComplete="email"
+                      disabled={isLoading}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between gap-2">
+                      <Label htmlFor="password">Password</Label>
+                      <Link
+                        href="/forgot-password"
+                        className="text-xs text-muted-foreground hover:underline"
+                      >
+                        Forgot password?
+                      </Link>
+                    </div>
+                    <Input
+                      id="password"
+                      type="password"
+                      placeholder="••••••••"
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      required
+                      autoComplete="current-password"
+                      disabled={isLoading}
+                    />
+                  </div>
+                </>
+              ) : (
+                <>
+                  <p className="text-sm text-muted-foreground">
+                    Signed in as <span className="font-medium text-foreground">{email}</span>
+                  </p>
+                  <div className="space-y-2">
+                    <Label htmlFor="totp">Authenticator code</Label>
+                    <Input
+                      id="totp"
+                      inputMode="numeric"
+                      autoComplete="one-time-code"
+                      placeholder="123456"
+                      value={totpCode}
+                      onChange={(e) => setTotpCode(e.target.value)}
+                      required
+                      autoFocus
+                      disabled={isLoading}
+                    />
+                  </div>
+                  <button
+                    type="button"
                     className="text-xs text-muted-foreground hover:underline"
+                    onClick={() => {
+                      setMfaRequired(false);
+                      setTotpCode("");
+                    }}
                   >
-                    Forgot password?
-                  </Link>
-                </div>
-                <Input
-                  id="password"
-                  type="password"
-                  placeholder="••••••••"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  required
-                  autoComplete="current-password"
-                  disabled={isLoading}
-                />
-              </div>
+                    ← Use a different account
+                  </button>
+                </>
+              )}
               <Button type="submit" className="w-full" disabled={isLoading}>
-                {isLoading ? "Signing in..." : "Sign in"}
+                {isLoading
+                  ? "Signing in..."
+                  : mfaRequired
+                    ? "Verify and sign in"
+                    : "Sign in"}
               </Button>
             </form>
           </CardContent>
