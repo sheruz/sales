@@ -14,6 +14,11 @@ import { sourcingJobService } from "@/services/sourcing-job.service";
 import { enrichmentJobService } from "@/services/enrichment-job.service";
 import { websiteAuditService } from "@/services/website-audit.service";
 import { timelineService } from "@/services/timeline.service";
+import {
+  leadExportRow,
+  rowsForCompany,
+  type ContactExportSource,
+} from "@/lib/leads/export-leads";
 
 /** Normalize a website or bare host to lowercase domain without www. */
 export function extractDomain(website?: string | null): string | null {
@@ -602,6 +607,115 @@ export class CompanyService {
       source: data?.source ?? "system",
       ...data,
     });
+  }
+
+  /**
+   * Companies created in the range (Autopilot places) plus contacts added
+   * in the range on older companies. Places with no person yet are included.
+   */
+  async exportLeadsInRange(
+    organizationId: string,
+    range: { gte: Date; lt: Date }
+  ) {
+    const inRange: Prisma.CompanyWhereInput = {
+      organizationId,
+      deletedAt: null,
+      createdAt: { gte: range.gte, lt: range.lt },
+    };
+    const extraWhere: Prisma.ContactWhereInput = {
+      organizationId,
+      createdAt: { gte: range.gte, lt: range.lt },
+      company: {
+        deletedAt: null,
+        OR: [
+          { createdAt: { lt: range.gte } },
+          { createdAt: { gte: range.lt } },
+        ],
+      },
+    };
+    const [companyCount, extraCount] = await Promise.all([
+      prisma.company.count({ where: inRange }),
+      prisma.contact.count({ where: extraWhere }),
+    ]);
+    if (companyCount + extraCount > 20_000) {
+      throw new ValidationError(
+        "This range has more than 20,000 leads. Narrow the dates and try again."
+      );
+    }
+
+    const companySelect = {
+      createdAt: true,
+      name: true,
+      website: true,
+      phone: true,
+      address: true,
+      city: true,
+      state: true,
+      country: true,
+      industry: true,
+      employeeCount: true,
+      linkedInUrl: true,
+      source: true,
+      emails: {
+        select: { email: true },
+        take: 1,
+        orderBy: { createdAt: "asc" as const },
+      },
+    } satisfies Prisma.CompanySelect;
+
+    const contactSelect = {
+      createdAt: true,
+      firstName: true,
+      lastName: true,
+      title: true,
+      email: true,
+      phone: true,
+      linkedInUrl: true,
+      source: true,
+      status: true,
+    } satisfies Prisma.ContactSelect;
+
+    const rows: Record<string, string>[] = [];
+    const pageSize = 200;
+    for (let skip = 0; skip < companyCount; skip += pageSize) {
+      const batch = await prisma.company.findMany({
+        where: inRange,
+        orderBy: [{ createdAt: "asc" }, { id: "asc" }],
+        skip,
+        take: pageSize,
+        select: {
+          ...companySelect,
+          contacts: {
+            orderBy: { createdAt: "asc" },
+            select: contactSelect,
+          },
+        },
+      });
+      for (const company of batch) {
+        const { contacts, ...fields } = company;
+        rows.push(
+          ...rowsForCompany(fields, contacts as ContactExportSource[])
+        );
+      }
+    }
+
+    for (let skip = 0; skip < extraCount; skip += pageSize) {
+      const batch = await prisma.contact.findMany({
+        where: extraWhere,
+        orderBy: [{ createdAt: "asc" }, { id: "asc" }],
+        skip,
+        take: pageSize,
+        select: {
+          ...contactSelect,
+          company: { select: companySelect },
+        },
+      });
+      for (const contact of batch) {
+        rows.push(leadExportRow(contact));
+      }
+    }
+
+    return rows;
   }
 }
 

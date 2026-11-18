@@ -1,10 +1,6 @@
 import prisma from "@/lib/db/prisma";
 import { ContactStatus, type Prisma } from "@prisma/client";
 import { NotFoundError, ValidationError } from "@/lib/api/response";
-import {
-  leadExportRow,
-  type LeadExportSource,
-} from "@/lib/leads/export-leads";
 
 export function normalizeEmail(email?: string | null): string | null {
   if (!email?.trim()) return null;
@@ -314,73 +310,6 @@ export class ContactService {
         company: { select: { id: true, name: true, domain: true } },
       },
     });
-  }
-
-  /**
-   * Contacts created in [gte, lt) for this organization only.
-   * Used by the company-admin date-range CSV export.
-   */
-  async exportCreatedBetween(
-    organizationId: string,
-    range: { gte: Date; lt: Date }
-  ) {
-    const where: Prisma.ContactWhereInput = {
-      organizationId,
-      createdAt: { gte: range.gte, lt: range.lt },
-      company: { deletedAt: null },
-    };
-    const total = await prisma.contact.count({ where });
-    if (total > 20_000) {
-      throw new ValidationError(
-        "This range has more than 20,000 leads. Narrow the dates and try again."
-      );
-    }
-
-    const select = {
-      createdAt: true,
-      firstName: true,
-      lastName: true,
-      title: true,
-      email: true,
-      phone: true,
-      linkedInUrl: true,
-      source: true,
-      status: true,
-      company: {
-        select: {
-          name: true,
-          website: true,
-          phone: true,
-          address: true,
-          city: true,
-          state: true,
-          country: true,
-          industry: true,
-          employeeCount: true,
-          linkedInUrl: true,
-          source: true,
-          emails: {
-            select: { email: true },
-            take: 1,
-            orderBy: { createdAt: "asc" as const },
-          },
-        },
-      },
-    } satisfies Prisma.ContactSelect;
-
-    const contacts: LeadExportSource[] = [];
-    const pageSize = 500;
-    for (let skip = 0; skip < total; skip += pageSize) {
-      const batch = await prisma.contact.findMany({
-        where,
-        orderBy: [{ createdAt: "asc" }, { id: "asc" }],
-        skip,
-        take: pageSize,
-        select,
-      });
-      contacts.push(...batch);
-    }
-    return contacts.map(leadExportRow);
   }
 
   /** Idempotent find-or-create within org+company by normalized email or name. */

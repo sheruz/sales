@@ -69,6 +69,39 @@ export type LeadExportSource = {
   };
 };
 
+export type CompanyExportSource = LeadExportSource["company"] & {
+  createdAt: Date;
+};
+
+export type ContactExportSource = Omit<LeadExportSource, "company">;
+
+/**
+ * One row per contact. A company with no contact yet (a fresh Autopilot
+ * place) still produces one row so the place is not dropped from the CSV.
+ */
+export function rowsForCompany(
+  company: CompanyExportSource,
+  contacts: ContactExportSource[]
+): Record<LeadExportColumn, string>[] {
+  if (contacts.length === 0) {
+    return [
+      leadExportRow({
+        createdAt: company.createdAt,
+        firstName: "",
+        lastName: "",
+        title: null,
+        email: null,
+        phone: null,
+        linkedInUrl: null,
+        source: null,
+        status: "ACTIVE",
+        company,
+      }),
+    ];
+  }
+  return contacts.map((contact) => leadExportRow({ ...contact, company }));
+}
+
 export function leadExportRow(
   contact: LeadExportSource
 ): Record<LeadExportColumn, string> {

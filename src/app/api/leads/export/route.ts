@@ -8,7 +8,7 @@ import {
   LEAD_EXPORT_COLUMNS,
   parseLeadExportRange,
 } from "@/lib/leads/export-leads";
-import { contactService } from "@/services/contact.service";
+import { companyService } from "@/services/company.service";
 
 /** Date-range CSV of this organization's leads. Company admin only. */
 export async function GET(request: NextRequest) {
@@ -21,7 +21,7 @@ export async function GET(request: NextRequest) {
     const from = request.nextUrl.searchParams.get("from") ?? "";
     const to = request.nextUrl.searchParams.get("to") ?? "";
     const range = parseLeadExportRange(from, to);
-    const rows = await contactService.exportCreatedBetween(
+    const rows = await companyService.exportLeadsInRange(
       user.organizationId,
       range
     );

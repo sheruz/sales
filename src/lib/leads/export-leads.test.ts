@@ -3,6 +3,7 @@ import {
   canCompanyAdminExportLeads,
   leadExportRow,
   parseLeadExportRange,
+  rowsForCompany,
 } from "@/lib/leads/export-leads";
 
 describe("company admin lead export", () => {
@@ -73,5 +74,32 @@ describe("company admin lead export", () => {
     expect(row.email).toBe("ada@example.com");
     expect(row.employee_count).toBe("12");
     expect(row.created_at).toBe("2026-03-02T12:00:00.000Z");
+  });
+
+  it("keeps a place that has no contact yet", () => {
+    const rows = rowsForCompany(
+      {
+        createdAt: new Date("2026-11-18T13:00:00.000Z"),
+        name: "Maple Dental",
+        website: "https://mapledental.example",
+        phone: "+1 512 555 0100",
+        address: "1 Main St",
+        city: "Austin",
+        state: "TX",
+        country: "US",
+        industry: null,
+        employeeCount: null,
+        linkedInUrl: null,
+        source: "google_places",
+        emails: [],
+      },
+      []
+    );
+    expect(rows).toHaveLength(1);
+    expect(rows[0]?.company_name).toBe("Maple Dental");
+    expect(rows[0]?.company_phone).toBe("+1 512 555 0100");
+    expect(rows[0]?.source).toBe("google_places");
+    expect(rows[0]?.first_name).toBe("");
+    expect(rows[0]?.email).toBe("");
   });
 });

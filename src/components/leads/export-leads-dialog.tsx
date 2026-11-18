@@ -92,8 +92,9 @@ export function ExportLeadsDialog({
         <DialogHeader>
           <DialogTitle>Export leads</DialogTitle>
           <DialogDescription>
-            Download contacts created in this date range for your company.
-            Dates are calendar days in UTC.
+            Download companies added in this date range, including places from
+            Autopilot. A place is included even when no contact has been found
+            yet. Dates are calendar days in UTC.
           </DialogDescription>
         </DialogHeader>
         <div className="grid gap-4 sm:grid-cols-2">
