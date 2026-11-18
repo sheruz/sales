@@ -4,6 +4,8 @@ import { Plus } from "lucide-react";
 import prisma from "@/lib/db/prisma";
 import { hasOrgPermission } from "@/lib/tenant/scope";
 import { ImportCrmCsvDialog } from "@/components/crm/import-crm-csv-dialog";
+import { ExportLeadsDialog } from "@/components/leads/export-leads-dialog";
+import { canCompanyAdminExportLeads } from "@/lib/leads/export-leads";
 import type { AuthUser } from "@/types/auth";
 
 export async function getLeadsHubCounts(organizationId: string) {
@@ -29,6 +31,8 @@ export async function LeadsHubHeader({
     counts = null;
   }
   const canCreate = hasOrgPermission(user, "leads.create");
+  const canExport =
+    hasOrgPermission(user, "leads.view") && canCompanyAdminExportLeads(user);
 
   return (
     <>
@@ -39,13 +43,16 @@ export async function LeadsHubHeader({
             Every business Autopilot found, and the people behind them.
           </p>
         </div>
-        {canCreate ? (
+        {canCreate || canExport ? (
           <div className="page-actions">
-            <ImportCrmCsvDialog variant="dx" />
-            <Link href={appHome("/leads/new")} className="btn primary">
-              <Plus />
-              Add lead
-            </Link>
+            {canExport ? <ExportLeadsDialog variant="dx" /> : null}
+            {canCreate ? <ImportCrmCsvDialog variant="dx" /> : null}
+            {canCreate ? (
+              <Link href={appHome("/leads/new")} className="btn primary">
+                <Plus />
+                Add lead
+              </Link>
+            ) : null}
           </div>
         ) : null}
       </div>
