@@ -1,20 +1,31 @@
 /**
  * ICP-style Google Places sourcing for "US Nonprofits $250k-$5M".
  * Same call the app uses: Places Text Search (New), business type × region.
- * Appends new places to the public sheet. Skips place IDs and website
- * domains already on the sheet.
+ * Writes a CSV on this server. Skips place IDs and website domains already
+ * in that file, so a second run does not copy old leads.
  *
  * Places does not return revenue, headcount, or job titles, so the
  * $250k-$5M / decision-maker filters cannot be applied here.
  *
- * Usage (PowerShell):
+ * Usage (PowerShell, from the project folder):
  *   $env:GOOGLE_PLACES_API_KEY="..."
- *   $env:GOOGLE_SHEETS_TOKEN="..."   # OAuth access token with spreadsheets scope
  *   node scripts/icp-us-nonprofits-to-sheet.mjs
  *
  * Optional: $env:MAX_PAGES="1"   (1–3, default 1)
+ *
+ * Download: storage/exports/us-nonprofits-250k-5m.csv
  */
-const SHEET_ID = "1Lska2f3Sioku0CRC2pKhRM5NDAfEza16pCOrg02TPeQ";
+import { appendFileSync, existsSync, mkdirSync, readFileSync } from "node:fs";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
+
+const OUT_FILE = join(
+  dirname(fileURLToPath(import.meta.url)),
+  "..",
+  "storage",
+  "exports",
+  "us-nonprofits-250k-5m.csv"
+);
 const PLACES_URL = "https://places.googleapis.com/v1/places:searchText";
 const FIELD_MASK = [
   "places.id",
@@ -132,16 +143,13 @@ const HEADERS = [
 ];
 
 const placesKey = process.env.GOOGLE_PLACES_API_KEY?.trim();
-const sheetsToken = process.env.GOOGLE_SHEETS_TOKEN?.trim();
 const maxPages = Math.min(
   3,
   Math.max(1, Number(process.env.MAX_PAGES || 1) || 1)
 );
 
-if (!placesKey || !sheetsToken) {
-  console.error(
-    "Set GOOGLE_PLACES_API_KEY and GOOGLE_SHEETS_TOKEN, then run again."
-  );
+if (!placesKey) {
+  console.error("Set GOOGLE_PLACES_API_KEY, then run again.");
   process.exit(1);
 }
 
@@ -176,25 +184,51 @@ function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-async function sheets(path, options = {}) {
-  const res = await fetch(
-    `https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}${path}`,
-    {
-      ...options,
-      headers: {
-        Authorization: `Bearer ${sheetsToken}`,
-        "Content-Type": "application/json",
-        ...(options.headers || {}),
-      },
+function csvEscape(value) {
+  const s = value == null ? "" : String(value);
+  if (/[",\n\r]/.test(s)) return `"${s.replace(/"/g, '""')}"`;
+  return s;
+}
+
+function parseCsv(text) {
+  const rows = [];
+  let row = [];
+  let cell = "";
+  let quoted = false;
+  for (let i = 0; i < text.length; i++) {
+    const ch = text[i];
+    if (quoted) {
+      if (ch === '"') {
+        if (text[i + 1] === '"') {
+          cell += '"';
+          i += 1;
+        } else {
+          quoted = false;
+        }
+      } else {
+        cell += ch;
+      }
+      continue;
     }
-  );
-  const json = await res.json().catch(() => ({}));
-  if (!res.ok) {
-    throw new Error(
-      json.error?.message || `Google Sheets failed (${res.status})`
-    );
+    if (ch === '"') {
+      quoted = true;
+    } else if (ch === ",") {
+      row.push(cell);
+      cell = "";
+    } else if (ch === "\n") {
+      row.push(cell);
+      rows.push(row);
+      row = [];
+      cell = "";
+    } else if (ch !== "\r") {
+      cell += ch;
+    }
   }
-  return json;
+  if (cell.length || row.length) {
+    row.push(cell);
+    rows.push(row);
+  }
+  return rows.filter((r) => r.some((c) => c.trim()));
 }
 
 async function textSearch(textQuery, pageToken) {
@@ -228,12 +262,29 @@ function mapPlace(raw) {
     placeId,
     name,
     website: typeof raw.websiteUri === "string" ? raw.websiteUri : "",
-    phone:
-      raw.nationalPhoneNumber || raw.internationalPhoneNumber || "",
-    address: typeof raw.formattedAddress === "string" ? raw.formattedAddress : "",
+    phone: raw.nationalPhoneNumber || raw.internationalPhoneNumber || "",
+    address:
+      typeof raw.formattedAddress === "string" ? raw.formattedAddress : "",
     rating: typeof raw.rating === "number" ? String(raw.rating) : "",
     types,
   };
+}
+
+function loadExisting() {
+  const seenPlaces = new Set();
+  const seenDomains = new Set();
+  if (!existsSync(OUT_FILE)) return { seenPlaces, seenDomains, hasHeader: false };
+  const grid = parseCsv(readFileSync(OUT_FILE, "utf8"));
+  if (!grid.length) return { seenPlaces, seenDomains, hasHeader: false };
+  const headers = grid[0].map((cell) => cell.trim());
+  const idCol = headers.indexOf("google_place_id");
+  const webCol = headers.indexOf("website");
+  for (const row of grid.slice(1)) {
+    if (idCol >= 0 && row[idCol]) seenPlaces.add(String(row[idCol]).trim());
+    const domain = domainOf(webCol >= 0 ? row[webCol] : "");
+    if (domain) seenDomains.add(domain);
+  }
+  return { seenPlaces, seenDomains, hasHeader: true };
 }
 
 async function main() {
@@ -244,35 +295,20 @@ async function main() {
   console.log(
     "About $35 per 1,000 Places Text Search calls. A monthly Google Maps credit often covers the first run at 1 page."
   );
+  console.log(`File: ${OUT_FILE}`);
 
-  const meta = await sheets("?fields=sheets.properties.title");
-  const title = meta.sheets?.[0]?.properties?.title || "Sheet1";
-  const range = encodeURIComponent(`${title}!A:Z`);
-  const existing = await sheets(`/values/${range}`);
-  const grid = existing.values || [];
-
-  const seenPlaces = new Set();
-  const seenDomains = new Set();
-  let headers = HEADERS;
-  let headerRow = false;
-
-  if (grid.length && grid[0].some((cell) => String(cell).trim())) {
-    headers = grid[0].map((cell) => String(cell).trim());
-    headerRow = true;
-    const idCol = headers.indexOf("google_place_id");
-    const webCol = headers.indexOf("website");
-    for (const row of grid.slice(1)) {
-      if (idCol >= 0 && row[idCol]) seenPlaces.add(String(row[idCol]).trim());
-      const domain = domainOf(webCol >= 0 ? row[webCol] : "");
-      if (domain) seenDomains.add(domain);
-    }
+  mkdirSync(dirname(OUT_FILE), { recursive: true });
+  const existing = loadExisting();
+  const seenPlaces = existing.seenPlaces;
+  const seenDomains = existing.seenDomains;
+  if (!existing.hasHeader) {
+    appendFileSync(OUT_FILE, `${HEADERS.join(",")}\n`, "utf8");
   }
-
   console.log(
-    `Sheet "${title}" already has ${seenPlaces.size} place ids and ${seenDomains.size} domains. Those will be skipped.`
+    `Already in the file: ${seenPlaces.size} place ids, ${seenDomains.size} domains. Those will be skipped.`
   );
 
-  const pending = [];
+  let added = 0;
   let calls = 0;
   let skipped = 0;
   let excluded = 0;
@@ -287,9 +323,8 @@ async function main() {
         if (pageToken) await sleep(2000);
         const json = await textSearch(textQuery, pageToken);
         calls += 1;
-        const places = (json.places || [])
-          .map(mapPlace)
-          .filter(Boolean);
+        const places = (json.places || []).map(mapPlace).filter(Boolean);
+        const lines = [];
         for (const place of places) {
           if (place.types.some((t) => EXCLUDED_TYPES.has(t))) {
             excluded += 1;
@@ -300,67 +335,53 @@ async function main() {
             continue;
           }
           const domain = domainOf(place.website);
-          if (seenPlaces.has(place.placeId) || (domain && seenDomains.has(domain))) {
+          if (
+            seenPlaces.has(place.placeId) ||
+            (domain && seenDomains.has(domain))
+          ) {
             skipped += 1;
             continue;
           }
           seenPlaces.add(place.placeId);
           if (domain) seenDomains.add(domain);
           const geo = parseUsAddress(place.address);
-          const record = {
-            created_at: new Date().toISOString(),
-            company_name: place.name,
-            website: place.website,
-            company_phone: place.phone,
-            address: place.address,
-            city: geo.city,
-            state_province: geo.state,
-            country: "United States",
+          const record = [
+            new Date().toISOString(),
+            place.name,
+            place.website,
+            place.phone,
+            place.address,
+            geo.city,
+            geo.state,
+            "United States",
             industry,
-            source: "google_places",
-            rating: place.rating,
-            google_place_id: place.placeId,
-            search_query: textQuery,
-            notes: textQuery,
-          };
-          pending.push(headers.map((h) => record[h] ?? ""));
+            "google_places",
+            place.rating,
+            place.placeId,
+            textQuery,
+          ];
+          lines.push(record.map(csvEscape).join(","));
+          added += 1;
+        }
+        if (lines.length) {
+          appendFileSync(OUT_FILE, `${lines.join("\n")}\n`, "utf8");
         }
         pageToken = json.nextPageToken || null;
         if (!pageToken) break;
       }
       if (index % 25 === 0 || index === searches) {
         console.log(
-          `${index}/${searches} ${textQuery} · new ${pending.length} · skipped ${skipped} · excluded ${excluded} · calls ${calls}`
+          `${index}/${searches} ${textQuery} · new ${added} · skipped ${skipped} · excluded ${excluded} · calls ${calls}`
         );
       }
       await sleep(200);
     }
   }
 
-  if (!pending.length) {
-    console.log("No new places to add.");
-    return;
-  }
-
-  if (!headerRow) {
-    await sheets(
-      `/values/${encodeURIComponent(`${title}!A1`)}:append?valueInputOption=USER_ENTERED&insertDataOption=INSERT_ROWS`,
-      { method: "POST", body: JSON.stringify({ values: [HEADERS] }) }
-    );
-  }
-
-  for (let i = 0; i < pending.length; i += 200) {
-    const chunk = pending.slice(i, i + 200);
-    await sheets(
-      `/values/${encodeURIComponent(`${title}!A1`)}:append?valueInputOption=USER_ENTERED&insertDataOption=INSERT_ROWS`,
-      { method: "POST", body: JSON.stringify({ values: chunk }) }
-    );
-    console.log(`Wrote ${Math.min(i + chunk.length, pending.length)}/${pending.length}`);
-  }
-
   console.log(
-    `Done. Added ${pending.length} leads. Skipped ${skipped} already on the sheet. Excluded ${excluded}. Places calls: ${calls}.`
+    `Done. Added ${added} leads. Skipped ${skipped} already in the file. Excluded ${excluded}. Places calls: ${calls}.`
   );
+  console.log(`Download: ${OUT_FILE}`);
 }
 
 main().catch((err) => {
