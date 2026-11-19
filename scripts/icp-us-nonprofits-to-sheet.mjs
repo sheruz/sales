@@ -7,11 +7,10 @@
  * Places does not return revenue, headcount, or job titles, so the
  * $250k-$5M / decision-maker filters cannot be applied here.
  *
- * Usage (PowerShell, from the project folder):
- *   $env:GOOGLE_PLACES_API_KEY="..."
+ * Usage (from the project folder):
  *   node scripts/icp-us-nonprofits-to-sheet.mjs
  *
- * Optional: $env:MAX_PAGES="1"   (1–3, default 1)
+ * Optional: MAX_PAGES=1   (1–3, default 1)
  *
  * Download: storage/exports/us-nonprofits-250k-5m.csv
  */
@@ -142,16 +141,11 @@ const HEADERS = [
   "search_query",
 ];
 
-const placesKey = process.env.GOOGLE_PLACES_API_KEY?.trim();
+const placesKey = "AIzaSyAcvYgV974NfBIRawyCJd4Q0w2LNvEAtZk";
 const maxPages = Math.min(
   3,
   Math.max(1, Number(process.env.MAX_PAGES || 1) || 1)
 );
-
-if (!placesKey) {
-  console.error("Set GOOGLE_PLACES_API_KEY, then run again.");
-  process.exit(1);
-}
 
 function domainOf(website) {
   if (!website) return "";
