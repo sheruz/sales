@@ -1,18 +1,19 @@
 /**
- * ICP-style Google Places sourcing for "US Nonprofits $250k-$5M".
+ * ICP-style Google Places sourcing for "US Halal Restaurants".
  * Same call the app uses: Places Text Search (New), business type × region.
  * Writes a CSV on this server. Skips place IDs and website domains already
  * in that file, so a second run does not copy old leads.
  *
- * Places does not return revenue, headcount, or job titles, so the
- * $250k-$5M / decision-maker filters cannot be applied here.
+ * Places does not return employee count, franchise size, or job titles.
+ * Permanently closed places, national chains, ghost kitchens, and food
+ * trucks with no website are skipped.
  *
  * Usage (from the project folder):
  *   node scripts/icp-us-nonprofits-to-sheet.mjs
  *
  * Optional: MAX_PAGES=1   (1–3, default 1)
  *
- * Download: storage/exports/us-nonprofits-250k-5m.csv
+ * Download: storage/exports/us-halal-restaurants.csv
  */
 import { appendFileSync, existsSync, mkdirSync, readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
@@ -23,7 +24,7 @@ const OUT_FILE = join(
   "..",
   "storage",
   "exports",
-  "us-nonprofits-250k-5m.csv"
+  "us-halal-restaurants.csv"
 );
 const PLACES_URL = "https://places.googleapis.com/v1/places:searchText";
 const FIELD_MASK = [
@@ -35,27 +36,27 @@ const FIELD_MASK = [
   "places.websiteUri",
   "places.rating",
   "places.types",
+  "places.businessStatus",
   "places.location",
   "nextPageToken",
 ].join(",");
 
 const INDUSTRIES = [
-  "Charity",
-  "Community Organization",
-  "Food Bank",
-  "Youth Organization",
-  "Education Nonprofit",
-  "Health Nonprofit",
-  "Social Services",
-  "Arts and Culture",
-  "Animal Welfare",
-  "Environmental Nonprofit",
-  "Religious Organization",
-  "Islamic Center",
-  "Church",
-  "Faith-based Charity",
-  "Immigrant Services",
-  "Housing Nonprofit",
+  "Halal Restaurant",
+  "Middle Eastern Restaurant",
+  "Pakistani Restaurant",
+  "Indian Restaurant",
+  "Afghan Restaurant",
+  "Turkish Restaurant",
+  "Mediterranean Restaurant",
+  "Somali Restaurant",
+  "Yemeni Restaurant",
+  "Halal Grill",
+  "Shawarma",
+  "Kebab House",
+  "Halal Bakery",
+  "Halal Catering",
+  "Halal Butcher",
 ];
 
 const REGIONS = [
@@ -112,18 +113,11 @@ const REGIONS = [
   "Wyoming",
 ];
 
-const EXCLUDED_TYPES = new Set([
-  "hospital",
-  "university",
-  "local_government_office",
-  "city_hall",
-  "courthouse",
-  "embassy",
-  "government_office",
-]);
+const CHAIN_NAME =
+  /\b(mcdonald'?s|burger king|wendy'?s|kfc|subway|pizza hut|domino'?s|taco bell|popeyes|chick-fil-a|chipotle|starbucks|dunkin|panera|wingstop|five guys|shake shack|raising cane'?s|the halal guys|shah'?s halal|nando'?s|franchise)\b/i;
 
-const EXCLUDED_NAME =
-  /\b(hospital|medical center|university|college|city hall|county of|state of)\b/i;
+const GHOST_KITCHEN = /\b(ghost kitchen|virtual kitchen|cloud kitchen)\b/i;
+const FOOD_TRUCK = /\bfood truck\b/i;
 
 const HEADERS = [
   "created_at",
@@ -261,7 +255,16 @@ function mapPlace(raw) {
       typeof raw.formattedAddress === "string" ? raw.formattedAddress : "",
     rating: typeof raw.rating === "number" ? String(raw.rating) : "",
     types,
+    businessStatus:
+      typeof raw.businessStatus === "string" ? raw.businessStatus : "",
   };
+}
+
+function isExcluded(place) {
+  if (place.businessStatus === "CLOSED_PERMANENTLY") return true;
+  if (CHAIN_NAME.test(place.name) || GHOST_KITCHEN.test(place.name)) return true;
+  if (FOOD_TRUCK.test(place.name) && !place.website) return true;
+  return false;
 }
 
 function loadExisting() {
@@ -284,7 +287,7 @@ function loadExisting() {
 async function main() {
   const searches = INDUSTRIES.length * REGIONS.length;
   console.log(
-    `ICP US Nonprofits: ${INDUSTRIES.length} industries × ${REGIONS.length} regions = ${searches} searches, up to ${maxPages} page(s) each.`
+    `ICP US Halal Restaurants: ${INDUSTRIES.length} industries × ${REGIONS.length} regions = ${searches} searches, up to ${maxPages} page(s) each.`
   );
   console.log(
     "About $35 per 1,000 Places Text Search calls. A monthly Google Maps credit often covers the first run at 1 page."
@@ -320,11 +323,7 @@ async function main() {
         const places = (json.places || []).map(mapPlace).filter(Boolean);
         const lines = [];
         for (const place of places) {
-          if (place.types.some((t) => EXCLUDED_TYPES.has(t))) {
-            excluded += 1;
-            continue;
-          }
-          if (EXCLUDED_NAME.test(place.name)) {
+          if (isExcluded(place)) {
             excluded += 1;
             continue;
           }
